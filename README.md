@@ -15,6 +15,7 @@ This README is a guide to every user-facing page currently implemented in the ap
 - [Owner and caretaker pages](#owner-and-caretaker-pages)
 - [Shared pages](#shared-pages)
 - [Project structure](#project-structure)
+- [Recommended account provisioning](#recommended-account-provisioning)
 - [Implementation status](#implementation-status)
 
 ## Getting started
@@ -373,6 +374,68 @@ lib/
 ```
 
 Branding, photos, and the custom font are in `assets/`. Platform runners are included for Android, iOS, web, Windows, macOS, and Linux.
+
+## Recommended account provisioning
+
+CarmeLink should not offer public registration. Dormitory accounts provide access to private tenant, guardian, payment, and gate information, so account creation should remain under staff control.
+
+### Create the first owner account
+
+The recommended first-time setup is:
+
+1. Open **Supabase Dashboard → Authentication → Users → Add user**.
+2. Create the first owner account with a temporary password, or send an invitation to the owner's email address.
+3. Copy the Auth user's generated UUID.
+4. Use the Supabase SQL Editor to add a matching record to the application's `public.profiles` table with the `owner` role.
+5. Sign in as the owner and require a password change if a temporary password was used.
+6. Keep public sign-up disabled.
+
+Do not manually insert the login into `auth.users`. Supabase manages that schema and expects internal authentication and identity fields to be created through its Dashboard or Auth API. SQL should be used for the application's profile, role, and dormitory records after the Auth user exists.
+
+An example application-profile record is:
+
+```sql
+insert into public.profiles (
+  id,
+  full_name,
+  role,
+  phone
+)
+values (
+  'PASTE-AUTH-USER-UUID-HERE',
+  'Carmelita Admin',
+  'owner',
+  '+63 917 000 0001'
+);
+```
+
+The exact columns must match the final database schema. The profile ID should reference `auth.users.id` and use `on delete cascade`.
+
+### Create later accounts from CarmeLink
+
+After the first owner exists, add an **Account Management** area to the Owner/Caretaker workspace. The recommended workflow is:
+
+1. An authorized staff member enters the new user's information.
+2. The Flutter app calls a protected Supabase Edge Function.
+3. The Edge Function uses the server-side Auth Admin API to create or invite the user.
+4. The function creates the matching profile and tenant, guardian, or staff record.
+5. The new user follows the invitation link or signs in with a temporary password.
+6. On first sign-in, the user sets a new password and may bind a trusted device.
+
+The Supabase secret/service-role key must only exist in a trusted server environment such as an Edge Function. It must never be included in the Flutter source, app assets, or client configuration.
+
+Recommended permissions:
+
+| Role | Create tenants | Create guardians | Create caretakers | Create owners |
+|---|---:|---:|---:|---:|
+| Owner | Yes | Yes | Yes | Restricted |
+| Caretaker | Yes | Yes | No | No |
+| Tenant | No | No | No | No |
+| Guardian | No | No | No | No |
+
+Authentication accounts and dormitory profiles should remain separate but linked by the Auth user UUID. This lets authentication credentials change without affecting room assignments, contracts, payment records, or guardian relationships.
+
+For implementation details, see the official [Supabase user invitation guide](https://supabase.com/docs/guides/auth/users) and [Admin create-user documentation](https://supabase.com/docs/reference/javascript/auth-admin-createuser).
 
 ## Implementation status
 
