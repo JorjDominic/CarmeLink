@@ -5,6 +5,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../widgets/feature_widgets.dart';
+import 'floor_plan_page.dart';
 
 void _ownerPush(BuildContext context, Widget page) {
   Navigator.of(context).push(
@@ -386,88 +387,16 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
 
   @override
   Widget build(BuildContext context) {
-    final items = <_OperationItem>[
-      const _OperationItem(
-        'Tenants',
-        'Manage tenant records',
-        Icons.groups_outlined,
-        TenantDirectoryPage(),
-      ),
-      const _OperationItem(
-        'Rooms',
-        'Manage rooms',
-        Icons.bed_outlined,
-        RoomMonitoringPage(),
-      ),
-      const _OperationItem(
-        'Payments',
-        'Track payments',
-        Icons.payments_outlined,
-        PaymentVerificationPage(),
-      ),
-      const _OperationItem(
-        'Maintenance',
-        'Manage requests',
-        Icons.build_outlined,
-        MaintenanceManagementPage(),
-      ),
-      const _OperationItem('Contract expiry', 'Track renewals',
-          Icons.event_busy_outlined, ContractExpiryAlertsPage()),
-      const _OperationItem('Income & expenses', 'Monitor finances',
-          Icons.insights_outlined, ExpenseIncomeSummaryPage()),
-      const _OperationItem(
-        'Curfew',
-        'Review requests',
-        Icons.schedule_outlined,
-        CurfewMonitoringPage(),
-      ),
-      const _OperationItem(
-        'Visitors',
-        'Manage visitor requests',
-        Icons.people_outline,
-        VisitorManagementPage(),
-      ),
-      const _OperationItem(
-        'Confidential reports',
-        'Review private reports',
-        Icons.shield_outlined,
-        ConfidentialReportsPage(),
-      ),
-      const _OperationItem('Disciplinary records', 'Manage violations',
-          Icons.gavel_outlined, DisciplinaryRecordsPage()),
-      const _OperationItem(
-        'Announcements',
-        'Post updates',
-        Icons.campaign_outlined,
-        AnnouncementsManagementPage(),
-      ),
-      const _OperationItem(
-        'Messages',
-        'Send messages',
-        Icons.chat_bubble_outline,
-        OwnerMessagingPage(),
-      ),
-      const _OperationItem(
-        'Contact directory',
-        'View important contacts',
-        Icons.emergency_outlined,
-        EmergencyContactsPage(),
-      ),
-      const _OperationItem(
-        'System status',
-        'Monitor cameras and services',
-        Icons.memory_outlined,
-        IotDeviceStatusPage(),
-      ),
-      const _OperationItem('Reports & analytics', 'View detailed reports',
-          Icons.analytics_outlined, ReportsAnalyticsPage()),
-    ];
-
-    final filtered = items.where((item) {
-      final value = '${item.title} ${item.subtitle}'.toLowerCase();
-      return value.contains(query.toLowerCase());
-    }).toList();
     final controller = OwnerController.instance;
+    final categories = _operationCategories;
+    final filtered = categories.where((category) {
+      final searchable = [
+        category.title,
+        category.subtitle,
+        ...category.items.expand((item) => [item.title, item.subtitle]),
+      ].join(' ').toLowerCase();
+      return searchable.contains(query.toLowerCase());
+    }).toList();
 
     return PageFrame(
       title: 'Operations',
@@ -483,7 +412,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                   controller: searchController,
                   onChanged: (value) => setState(() => query = value.trim()),
                   decoration: InputDecoration(
-                    hintText: 'Search operations, tenants, rooms...',
+                    hintText: 'Search categories or tools...',
                     prefixIcon: const Icon(Icons.search_rounded),
                     suffixIcon: query.isEmpty
                         ? null
@@ -546,11 +475,16 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
               );
             }),
             const SizedBox(height: 24),
-            Text('Operations',
+            Text('Management areas',
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            Text(
+              'Related tools are grouped together for quicker navigation.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             const SizedBox(height: 10),
             if (filtered.isEmpty)
               const EmptyState(
@@ -559,7 +493,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                   message: 'Try a different search term.')
             else
               LayoutBuilder(builder: (context, constraints) {
-                final columns = constraints.maxWidth >= 1000 ? 3 : 2;
+                final columns = constraints.maxWidth >= 700 ? 2 : 1;
                 return GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -567,13 +501,15 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                     crossAxisCount: columns,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
-                    childAspectRatio: constraints.maxWidth < 520 ? 2.15 : 2.8,
+                    childAspectRatio: constraints.maxWidth < 520 ? 3.05 : 3.4,
                   ),
                   itemCount: filtered.length,
-                  itemBuilder: (context, index) => _OperationShortcut(
-                    item: filtered[index],
-                    color: _operationColors[index % _operationColors.length],
-                    onTap: () => _ownerPush(context, filtered[index].page),
+                  itemBuilder: (context, index) => _OperationCategoryCard(
+                    category: filtered[index],
+                    onTap: () => _ownerPush(
+                      context,
+                      OperationsCategoryPage(category: filtered[index]),
+                    ),
                   ),
                 );
               }),
@@ -582,17 +518,201 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
       ),
     );
   }
+}
 
-  static const _operationColors = [
+const _operationCategories = [
+  _OperationCategory(
+    'Property',
+    'Rooms, floor plan, maintenance and devices',
+    Icons.apartment_outlined,
     Color(0xFF56886B),
+    [
+      _OperationItem('Rooms', 'Manage room occupancy', Icons.bed_outlined,
+          RoomMonitoringPage()),
+      _OperationItem('Floor plan', 'Explore the interactive room map',
+          Icons.map_outlined, AdminFloorPlanPage()),
+      _OperationItem('Maintenance', 'Manage repair requests',
+          Icons.build_outlined, MaintenanceManagementPage()),
+      _OperationItem('System status', 'Monitor cameras and services',
+          Icons.memory_outlined, IotDeviceStatusPage()),
+    ],
+  ),
+  _OperationCategory(
+    'Tenants & safety',
+    'People, access, conduct and private reports',
+    Icons.health_and_safety_outlined,
     Color(0xFF627FA8),
+    [
+      _OperationItem('Tenants', 'Manage tenant records', Icons.groups_outlined,
+          TenantDirectoryPage()),
+      _OperationItem('Curfew', 'Review curfew activity and requests',
+          Icons.schedule_outlined, CurfewMonitoringPage()),
+      _OperationItem('Visitors', 'Manage visitor requests',
+          Icons.people_outline, VisitorManagementPage()),
+      _OperationItem('Confidential reports', 'Review private reports',
+          Icons.shield_outlined, ConfidentialReportsPage()),
+      _OperationItem('Disciplinary records', 'Manage violations',
+          Icons.gavel_outlined, DisciplinaryRecordsPage()),
+    ],
+  ),
+  _OperationCategory(
+    'Finance & contracts',
+    'Payments, accounting, renewals and reports',
+    Icons.account_balance_wallet_outlined,
     Color(0xFFAA8A45),
-    Color(0xFFB47A52),
+    [
+      _OperationItem('Payments', 'Verify and track payments',
+          Icons.payments_outlined, PaymentVerificationPage()),
+      _OperationItem('Income & expenses', 'Monitor property finances',
+          Icons.insights_outlined, ExpenseIncomeSummaryPage()),
+      _OperationItem('Contract expiry', 'Track renewals and move-outs',
+          Icons.event_busy_outlined, ContractExpiryAlertsPage()),
+      _OperationItem('Reports & analytics', 'View detailed reports',
+          Icons.analytics_outlined, ReportsAnalyticsPage()),
+    ],
+  ),
+  _OperationCategory(
+    'Communication',
+    'Announcements, messages and important contacts',
+    Icons.forum_outlined,
     Color(0xFF7D70A0),
-    Color(0xFF568F8E),
-    Color(0xFFAA6870),
-    Color(0xFFA86D87),
-  ];
+    [
+      _OperationItem('Announcements', 'Post updates', Icons.campaign_outlined,
+          AnnouncementsManagementPage()),
+      _OperationItem('Messages', 'Send and receive messages',
+          Icons.chat_bubble_outline, OwnerMessagingPage()),
+      _OperationItem('Contact directory', 'View important contacts',
+          Icons.emergency_outlined, EmergencyContactsPage()),
+    ],
+  ),
+];
+
+class OperationsCategoryPage extends StatelessWidget {
+  const OperationsCategoryPage({required this.category, super.key});
+  final _OperationCategory category;
+
+  @override
+  Widget build(BuildContext context) => PageFrame(
+        title: category.title,
+        subtitle: category.subtitle,
+        useScriptTitle: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: category.color.withValues(alpha: .07),
+                borderRadius: BorderRadius.circular(20),
+                border:
+                    Border.all(color: category.color.withValues(alpha: .14)),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: category.color.withValues(alpha: .12),
+                    foregroundColor: category.color,
+                    child: Icon(category.icon),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      '${category.items.length} connected tools',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            LayoutBuilder(builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 700 ? 2 : 1;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: category.items.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: constraints.maxWidth < 520 ? 3.8 : 3.5,
+                ),
+                itemBuilder: (context, index) => _OperationShortcut(
+                  item: category.items[index],
+                  color: category.color,
+                  onTap: () => _ownerPush(context, category.items[index].page),
+                ),
+              );
+            }),
+          ],
+        ),
+      );
+}
+
+class _OperationCategoryCard extends StatelessWidget {
+  const _OperationCategoryCard({required this.category, required this.onTap});
+  final _OperationCategory category;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => CarmelitaCard(
+        onTap: onTap,
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: category.color.withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(category.icon, color: category.color),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(category.title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w900, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Text(
+                    category.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 3),
+                  Text('${category.items.length} tools',
+                      style: TextStyle(
+                          color: category.color,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded),
+          ],
+        ),
+      );
+}
+
+class _OperationCategory {
+  const _OperationCategory(
+      this.title, this.subtitle, this.icon, this.color, this.items);
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final List<_OperationItem> items;
 }
 
 class _OperationsStatus {
@@ -646,16 +766,16 @@ class _OperationShortcut extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CarmelitaCard(
         onTap: onTap,
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
         child: Row(children: [
           Container(
-              width: 38,
-              height: 38,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
                   color: color.withValues(alpha: .075),
-                  borderRadius: BorderRadius.circular(11)),
-              child: Icon(item.icon, color: color, size: 21)),
-          const SizedBox(width: 9),
+                  borderRadius: BorderRadius.circular(10)),
+              child: Icon(item.icon, color: color, size: 19)),
+          const SizedBox(width: 8),
           Expanded(
               child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -665,8 +785,8 @@ class _OperationShortcut extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontWeight: FontWeight.w800, fontSize: 13)),
-                const SizedBox(height: 2),
+                        fontWeight: FontWeight.w800, fontSize: 12)),
+                const SizedBox(height: 1),
                 Text(item.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
