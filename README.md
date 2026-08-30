@@ -64,6 +64,7 @@ CarmeLink selects a workspace after sign-in. Compact screens use bottom navigati
 | Profile | Profile | Profile |
 
 Cards, shortcuts, and action buttons open the supporting pages described below.
+Messages and Notifications are also available from the role menu with consistent outlined navigation icons.
 
 ## Authentication pages
 
@@ -213,7 +214,7 @@ Provides office hours, dormitory contacts, and emergency details.
 
 #### Dashboard
 
-Prioritizes daily operations. It summarizes occupancy, pending payment reviews, maintenance, and gate alerts, then highlights expiring contracts and flagged events.
+Prioritizes daily operations. A compact four-card status row summarizes occupancy, pending payment reviews, maintenance, and gate alerts, then highlights expiring contracts and flagged events.
 
 #### Tenants
 
@@ -224,11 +225,11 @@ Provides a searchable tenant directory. Selecting a tenant opens their full reco
 Is the compact staff control center. Instead of presenting every tool in one long list, it groups related work into four searchable management areas:
 
 - **Property** — rooms, the interactive floor plan, maintenance, and system status
-- **Tenants & Safety** — tenant records, curfew, visitors, confidential reports, and disciplinary records
+- **Tenants & Safety** — curfew, visitors, confidential reports, and disciplinary records; the tenant directory remains a primary navigation destination
 - **Finance & Contracts** — payment review, income and expenses, contract expiry, and analytics
 - **Communication** — announcements, messages, and important contacts
 
-Selecting an area opens a focused page containing its related tools. Searches match both category names and the tools within them. Urgent Dashboard shortcuts still open their corresponding tools directly.
+Selecting an area opens a focused page containing its related pages. Each management card includes a short description, its connected-page count, and a live pending-work count when applicable. Searches match both category names and the tools within them. Admins can use the visible `+` button beside **Quick access** to add or remove any Operations tool. Urgent Dashboard shortcuts still open their corresponding tools directly.
 
 #### Gate monitoring
 
@@ -254,10 +255,14 @@ Provides a sample two-dimensional layout for the ground and second floors. Staff
 
 - Switch between floors
 - Pan, pinch to zoom, use dedicated zoom controls, or reset the view
+- Search for a room number and open a full-screen map
+- Switch between occupancy and maintenance display modes
 - Select a room to inspect its capacity, occupancy, availability, and description
+- View open-maintenance markers on affected rooms
+- Use a bottom detail sheet on phones or a side detail panel on wider screens
 - Distinguish available rooms, full rooms, corridors, shared spaces, stairs, and entrances
 
-The floor plan currently uses demonstration room positions and occupancy values. Its layout and status data can later be connected to persistent property records.
+The floor plan currently uses demonstration room positions. Occupancy and maintenance status come from the same owner data used by room monitoring and maintenance management, keeping the administrative views consistent. Persistent property records still require backend integration.
 
 #### Contract expiry alerts
 

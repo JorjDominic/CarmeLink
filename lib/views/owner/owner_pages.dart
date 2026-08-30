@@ -52,6 +52,7 @@ class OwnerDashboardPage extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             MutedDashboardGrid(
+              denseFourColumn: true,
               items: [
                 MutedDashboardItem(
                   label: 'Occupancy',
@@ -80,7 +81,7 @@ class OwnerDashboardPage extends StatelessWidget {
                   label: 'Maintenance',
                   value: '${controller.openMaintenance}',
                   detail: 'Open reports',
-                  icon: Icons.handyman_outlined,
+                  icon: Icons.build_outlined,
                   color: const Color(0xFFB47A52),
                   onTap: () => _ownerPush(
                     context,
@@ -91,7 +92,7 @@ class OwnerDashboardPage extends StatelessWidget {
                   label: 'Gate alerts',
                   value: '${controller.pendingGateReviews}',
                   detail: 'Flagged events',
-                  icon: Icons.security_outlined,
+                  icon: Icons.sensor_door_outlined,
                   color: const Color(0xFFAA6870),
                   onTap: () => _ownerPush(
                     context,
@@ -131,7 +132,7 @@ class OwnerDashboardPage extends StatelessWidget {
             const SizedBox(height: 8),
             AttentionCard(
               compact: true,
-              icon: Icons.approval_outlined,
+              icon: Icons.schedule_outlined,
               title:
                   '${controller.pendingCurfewReviews} curfew request(s) waiting',
               subtitle:
@@ -377,7 +378,11 @@ class OperationsHubPage extends StatefulWidget {
 
 class _OperationsHubPageState extends State<OperationsHubPage> {
   final searchController = TextEditingController();
+  final Set<String> _quickAccess = {'Payments', 'Maintenance', 'Floor plan'};
   String query = '';
+
+  List<_OperationItem> get _allOperationItems =>
+      _operationCategories.expand((category) => category.items).toList();
 
   @override
   void dispose() {
@@ -464,10 +469,10 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: constraints.maxWidth < 700 ? 4 : 4,
+                  crossAxisCount: constraints.maxWidth < 600 ? 2 : 4,
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 8,
-                  childAspectRatio: constraints.maxWidth < 500 ? .67 : 1.2,
+                  childAspectRatio: constraints.maxWidth < 600 ? 1.55 : 1.2,
                 ),
                 itemCount: cards.length,
                 itemBuilder: (context, index) =>
@@ -475,6 +480,41 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
               );
             }),
             const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Quick access',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w900)),
+                ),
+                IconButton.filledTonal(
+                  tooltip: 'Customize quick access',
+                  onPressed: _showQuickAccessPicker,
+                  icon: const Icon(Icons.add_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ..._allOperationItems
+                    .where((item) => _quickAccess.contains(item.title))
+                    .map((item) => InputChip(
+                          avatar: Icon(item.icon, size: 18),
+                          label: Text(_quickAccessLabel(item, controller)),
+                          tooltip: 'Open ${item.title}',
+                          onPressed: () => _ownerPush(context, item.page),
+                          onDeleted: () =>
+                              setState(() => _quickAccess.remove(item.title)),
+                          deleteIcon: const Icon(Icons.close_rounded, size: 17),
+                        )),
+              ],
+            ),
+            const SizedBox(height: 20),
             Text('Management areas',
                 style: Theme.of(context)
                     .textTheme
@@ -501,11 +541,12 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                     crossAxisCount: columns,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
-                    childAspectRatio: constraints.maxWidth < 520 ? 4.4 : 4.7,
+                    childAspectRatio: constraints.maxWidth < 520 ? 3.15 : 3.5,
                   ),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) => _OperationCategoryCard(
                     category: filtered[index],
+                    badge: _categoryBadge(filtered[index], controller),
                     onTap: () => _ownerPush(
                       context,
                       OperationsCategoryPage(category: filtered[index]),
@@ -514,6 +555,102 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                 );
               }),
           ],
+        ),
+      ),
+    );
+  }
+
+  String? _categoryBadge(
+      _OperationCategory category, OwnerController controller) {
+    switch (category.title) {
+      case 'Property':
+        return controller.openMaintenance == 0
+            ? null
+            : '${controller.openMaintenance} open';
+      case 'Tenants & safety':
+        final total = controller.pendingCurfewReviews +
+            controller.pendingVisitors +
+            controller.pendingGateReviews;
+        return total == 0 ? null : '$total pending';
+      case 'Finance & contracts':
+        return controller.pendingPaymentProofs == 0
+            ? null
+            : '${controller.pendingPaymentProofs} review';
+      default:
+        return null;
+    }
+  }
+
+  String _quickAccessLabel(_OperationItem item, OwnerController controller) {
+    switch (item.title) {
+      case 'Payments':
+        return 'Payments (${controller.pendingPaymentProofs})';
+      case 'Maintenance':
+        return 'Maintenance (${controller.openMaintenance})';
+      case 'Curfew':
+        return 'Curfew (${controller.pendingCurfewReviews})';
+      case 'Visitors':
+        return 'Visitors (${controller.pendingVisitors})';
+      default:
+        return item.title;
+    }
+  }
+
+  void _showQuickAccessPicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Customize quick access',
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text(
+                'Choose the tools you use most often.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 10),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: _allOperationItems.map((item) {
+                    final selected = _quickAccess.contains(item.title);
+                    return CheckboxListTile(
+                      value: selected,
+                      secondary: Icon(item.icon),
+                      title: Text(item.title),
+                      subtitle: Text(item.subtitle),
+                      controlAffinity: ListTileControlAffinity.trailing,
+                      onChanged: (checked) {
+                        setState(() {
+                          if (checked ?? false) {
+                            _quickAccess.add(item.title);
+                          } else {
+                            _quickAccess.remove(item.title);
+                          }
+                        });
+                        setSheetState(() {});
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  child: const Text('Done'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -543,8 +680,6 @@ const _operationCategories = [
     Icons.health_and_safety_outlined,
     Color(0xFF627FA8),
     [
-      _OperationItem('Tenants', 'Manage tenant records', Icons.groups_outlined,
-          TenantDirectoryPage()),
       _OperationItem('Curfew', 'Review curfew activity and requests',
           Icons.schedule_outlined, CurfewMonitoringPage()),
       _OperationItem('Visitors', 'Manage visitor requests',
@@ -619,7 +754,7 @@ class OperationsCategoryPage extends StatelessWidget {
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
-                      '${category.items.length} connected tools',
+                      '${category.items.length} connected pages',
                       style: Theme.of(context)
                           .textTheme
                           .titleMedium
@@ -655,9 +790,11 @@ class OperationsCategoryPage extends StatelessWidget {
 }
 
 class _OperationCategoryCard extends StatelessWidget {
-  const _OperationCategoryCard({required this.category, required this.onTap});
+  const _OperationCategoryCard(
+      {required this.category, required this.onTap, this.badge});
   final _OperationCategory category;
   final VoidCallback onTap;
+  final String? badge;
 
   @override
   Widget build(BuildContext context) => CarmelitaCard(
@@ -683,12 +820,46 @@ class _OperationCategoryCard extends StatelessWidget {
                   Text(category.title,
                       style: const TextStyle(
                           fontWeight: FontWeight.w900, fontSize: 14)),
-                  const SizedBox(height: 1),
-                  Text('${category.items.length} tools',
-                      style: TextStyle(
-                          color: category.color,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 10)),
+                  const SizedBox(height: 2),
+                  Text(
+                    category.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(fontSize: 10),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Text('${category.items.length} pages',
+                          style: TextStyle(
+                              color: category.color,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 10)),
+                      if (badge != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 3,
+                          height: 3,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFAA6870),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(badge!,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Color(0xFFAA6870),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10)),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -2075,7 +2246,7 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
                 controller: message,
                 decoration: InputDecoration(
                   hintText: 'Write a message',
-                  prefixIcon: const Icon(Icons.chat_bubble_outline_rounded),
+                  prefixIcon: const Icon(Icons.chat_bubble_outline),
                   suffixIcon: IconButton(
                     onPressed: () {
                       if (message.text.trim().isEmpty) {

@@ -93,16 +93,22 @@ class MutedDashboardItem {
 
 class MutedDashboardGrid extends StatelessWidget {
   const MutedDashboardGrid(
-      {required this.items, this.compact = false, super.key});
+      {required this.items,
+      this.compact = false,
+      this.denseFourColumn = false,
+      super.key});
   final List<MutedDashboardItem> items;
   final bool compact;
+  final bool denseFourColumn;
 
   @override
   Widget build(BuildContext context) =>
       LayoutBuilder(builder: (context, constraints) {
-        final columns = constraints.maxWidth < 700
-            ? (items.length >= 4 ? 4 : 2)
-            : items.length.clamp(2, 4);
+        final columns = denseFourColumn
+            ? items.length.clamp(1, 4)
+            : constraints.maxWidth < 600
+                ? (constraints.maxWidth < 320 ? 1 : 2)
+                : items.length.clamp(2, 4);
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -113,9 +119,11 @@ class MutedDashboardGrid extends StatelessWidget {
             mainAxisSpacing: 8,
             childAspectRatio: compact
                 ? (constraints.maxWidth < 500 ? 1.45 : 1.7)
-                : constraints.maxWidth < 500 && columns == 4
+                : denseFourColumn && constraints.maxWidth < 500
                     ? .65
-                    : 1.15,
+                    : constraints.maxWidth < 500
+                        ? 1.05
+                        : 1.15,
           ),
           itemBuilder: (context, index) {
             final item = items[index];
@@ -273,13 +281,16 @@ class PageFrame extends StatelessWidget {
     final navScope = CarmelitaNavScope.maybeOf(context);
     final canPop = Navigator.of(context).canPop();
     final extraBottom = navScope == null ? 24.0 : 132.0;
+    final isOwner =
+        SessionController.instance.currentUser?.role == UserRole.ownerCaretaker;
+    final ownerOperationalPage = isOwner && title != 'Dashboard';
     final canShowNotifications =
         SessionController.instance.currentUser != null &&
             title.toLowerCase() != 'notifications';
-    final canShowMessages =
-        navScope != null && title.toLowerCase() != 'messages';
-    final ownerSection = SessionController.instance.currentUser?.role ==
-            UserRole.ownerCaretaker &&
+    final canShowMessages = (navScope != null ||
+            (isOwner && AdaptiveRoleShell.activeMessagePage != null)) &&
+        title.toLowerCase() != 'messages';
+    final ownerSection = isOwner &&
         title != 'Dashboard' &&
         title != 'Operations' &&
         title != 'Profile' &&
@@ -298,6 +309,10 @@ class PageFrame extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: 10),
+              if (subtitle != null) ...[
+                Text(subtitle!, style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 14),
+              ],
               child,
             ],
           )
@@ -307,18 +322,24 @@ class PageFrame extends StatelessWidget {
           MaterialPageRoute(builder: (_) => const _GlobalNotificationsPage()),
         );
 
-    void openMessages() => navScope?.openMessages?.call();
+    void openMessages() {
+      if (navScope?.openMessages != null) {
+        navScope!.openMessages!.call();
+      } else {
+        AdaptiveRoleShell.openActiveMessages(context);
+      }
+    }
 
     final messageButton = IconButton(
       tooltip: 'Messages',
       onPressed: openMessages,
-      icon: const Icon(Icons.chat_bubble_outline_rounded),
+      icon: const Icon(Icons.chat_bubble_outline),
     );
 
     final notificationButton = IconButton(
       tooltip: 'Notifications',
       onPressed: openNotifications,
-      icon: const Icon(Icons.notifications_none_rounded),
+      icon: const Icon(Icons.notifications_outlined),
     );
 
     Widget? resolvedFloatingActionButton = floatingActionButton;
@@ -374,7 +395,7 @@ class PageFrame extends StatelessWidget {
                           useScriptTitle ? FontWeight.w600 : FontWeight.w700,
                     ),
               ),
-              if (subtitle != null)
+              if (subtitle != null && !ownerOperationalPage)
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
                   child: Text(

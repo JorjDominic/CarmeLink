@@ -61,6 +61,14 @@ class AdaptiveRoleShell extends StatefulWidget {
   final String roleLabel;
   final Widget messagePage;
 
+  static Widget? activeMessagePage;
+
+  static void openActiveMessages(BuildContext context) {
+    final page = activeMessagePage;
+    if (page == null) return;
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+  }
+
   @override
   State<AdaptiveRoleShell> createState() => _AdaptiveRoleShellState();
 }
@@ -97,6 +105,10 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                     roleLabel: widget.roleLabel,
                     destinations: widget.destinations,
                     currentIndex: index,
+                    onOpenMessages: () {
+                      Navigator.of(dialogContext).pop();
+                      _openMessages();
+                    },
                     onSelect: (value) {
                       Navigator.of(dialogContext).pop();
                       _select(value);
@@ -135,6 +147,10 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                   roleLabel: widget.roleLabel,
                   destinations: widget.destinations,
                   currentIndex: index,
+                  onOpenMessages: () {
+                    Navigator.of(sheetContext).pop();
+                    _openMessages();
+                  },
                   onSelect: (value) {
                     Navigator.of(sheetContext).pop();
                     _select(value);
@@ -156,6 +172,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 
   @override
   Widget build(BuildContext context) {
+    AdaptiveRoleShell.activeMessagePage = widget.messagePage;
     final destination = widget.destinations[index];
 
     return CarmelitaNavScope(
@@ -346,12 +363,14 @@ class _RoleMenu extends StatelessWidget {
     required this.roleLabel,
     required this.destinations,
     required this.currentIndex,
+    required this.onOpenMessages,
     required this.onSelect,
   });
 
   final String roleLabel;
   final List<AppDestination> destinations;
   final int currentIndex;
+  final VoidCallback onOpenMessages;
   final ValueChanged<int> onSelect;
 
   @override
@@ -485,6 +504,13 @@ class _RoleMenu extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           const Divider(),
+          ListTile(
+            minTileHeight: 54,
+            leading: const Icon(Icons.chat_bubble_outline),
+            title: const Text('Messages'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: onOpenMessages,
+          ),
           ListTile(
             minTileHeight: 54,
             leading: const Icon(Icons.notifications_outlined),
