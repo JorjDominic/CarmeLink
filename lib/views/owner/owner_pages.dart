@@ -501,7 +501,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                     crossAxisCount: columns,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
-                    childAspectRatio: constraints.maxWidth < 520 ? 3.05 : 3.4,
+                    childAspectRatio: constraints.maxWidth < 520 ? 4.4 : 4.7,
                   ),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) => _OperationCategoryCard(
@@ -640,7 +640,7 @@ class OperationsCategoryPage extends StatelessWidget {
                   crossAxisCount: columns,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
-                  childAspectRatio: constraints.maxWidth < 520 ? 3.8 : 3.5,
+                  childAspectRatio: constraints.maxWidth < 520 ? 4.5 : 4.2,
                 ),
                 itemBuilder: (context, index) => _OperationShortcut(
                   item: category.items[index],
@@ -662,19 +662,19 @@ class _OperationCategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CarmelitaCard(
         onTap: onTap,
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(
           children: [
             Container(
-              width: 42,
-              height: 42,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: category.color.withValues(alpha: .10),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(category.icon, color: category.color),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 9),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -683,14 +683,7 @@ class _OperationCategoryCard extends StatelessWidget {
                   Text(category.title,
                       style: const TextStyle(
                           fontWeight: FontWeight.w900, fontSize: 14)),
-                  const SizedBox(height: 2),
-                  Text(
-                    category.subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 1),
                   Text('${category.items.length} tools',
                       style: TextStyle(
                           color: category.color,
@@ -766,16 +759,16 @@ class _OperationShortcut extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CarmelitaCard(
         onTap: onTap,
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         child: Row(children: [
           Container(
-              width: 34,
-              height: 34,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
                   color: color.withValues(alpha: .075),
                   borderRadius: BorderRadius.circular(10)),
-              child: Icon(item.icon, color: color, size: 19)),
-          const SizedBox(width: 8),
+              child: Icon(item.icon, color: color, size: 17)),
+          const SizedBox(width: 7),
           Expanded(
               child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,

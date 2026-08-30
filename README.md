@@ -221,7 +221,14 @@ Provides a searchable tenant directory. Selecting a tenant opens their full reco
 
 #### Operations
 
-Is the staff control center. Search and filter shortcuts to room, payment, maintenance, curfew, visitor, announcement, messaging, contact, system, finance, discipline, and analytics tools.
+Is the compact staff control center. Instead of presenting every tool in one long list, it groups related work into four searchable management areas:
+
+- **Property** — rooms, the interactive floor plan, maintenance, and system status
+- **Tenants & Safety** — tenant records, curfew, visitors, confidential reports, and disciplinary records
+- **Finance & Contracts** — payment review, income and expenses, contract expiry, and analytics
+- **Communication** — announcements, messages, and important contacts
+
+Selecting an area opens a focused page containing its related tools. Searches match both category names and the tools within them. Urgent Dashboard shortcuts still open their corresponding tools directly.
 
 #### Gate monitoring
 
@@ -240,6 +247,17 @@ Shows room, phone, guardian contact, payment state, and gate status for one tena
 #### Room monitoring
 
 Displays a visual room board and occupied/available bed counts for vacancy monitoring.
+
+#### Interactive admin floor plan
+
+Provides a sample two-dimensional layout for the ground and second floors. Staff can:
+
+- Switch between floors
+- Pan, pinch to zoom, use dedicated zoom controls, or reset the view
+- Select a room to inspect its capacity, occupancy, availability, and description
+- Distinguish available rooms, full rooms, corridors, shared spaces, stairs, and entrances
+
+The floor plan currently uses demonstration room positions and occupancy values. Its layout and status data can later be connected to persistent property records.
 
 #### Contract expiry alerts
 
@@ -368,7 +386,7 @@ lib/
 └── views/
     ├── auth/                # Entry and recovery pages
     ├── guardian/            # Guardian shell and pages
-    ├── owner/               # Staff shell and pages
+    ├── owner/               # Staff shell, grouped operations, and floor plan
     ├── shared/              # Profile, settings, notifications
     └── tenant/              # Tenant shell and pages
 ```
