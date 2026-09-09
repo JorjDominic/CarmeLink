@@ -281,16 +281,17 @@ class PageFrame extends StatelessWidget {
     final navScope = CarmelitaNavScope.maybeOf(context);
     final canPop = Navigator.of(context).canPop();
     final extraBottom = navScope == null ? 24.0 : 132.0;
-    final isOwner =
-        SessionController.instance.currentUser?.role == UserRole.ownerCaretaker;
-    final ownerOperationalPage = isOwner && title != 'Dashboard';
+    final currentRole = SessionController.instance.currentUser?.role;
+    final isStaff =
+        currentRole == UserRole.owner || currentRole == UserRole.caretaker;
+    final ownerOperationalPage = isStaff && title != 'Dashboard';
     final canShowNotifications =
         SessionController.instance.currentUser != null &&
             title.toLowerCase() != 'notifications';
     final canShowMessages = (navScope != null ||
-            (isOwner && AdaptiveRoleShell.activeMessagePage != null)) &&
+            (isStaff && AdaptiveRoleShell.activeMessagePage != null)) &&
         title.toLowerCase() != 'messages';
-    final ownerSection = isOwner &&
+    final ownerSection = isStaff &&
         title != 'Dashboard' &&
         title != 'Operations' &&
         title != 'Profile' &&
@@ -300,7 +301,7 @@ class PageFrame extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'OWNER / CARETAKER',
+                currentRole == UserRole.owner ? 'OWNER' : 'CARETAKER',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                       fontSize: 13,

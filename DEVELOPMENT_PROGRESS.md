@@ -12,11 +12,12 @@ divided between two developers to reduce merge conflicts.
 - **Live** — connected to Supabase
 - **Mock** — uses local demonstration data or a simulated workflow
 
-## Developer 1 — Owner/Caretaker and foundation
+## Developer 1 — Owner, Caretaker, and foundation
 
 Owned folders and files:
 
 - `lib/views/owner/`
+- `lib/views/caretaker/`
 - `lib/views/auth/`
 - `lib/core/`
 - `lib/services/`
@@ -30,14 +31,19 @@ Owned folders and files:
 - [x] Supabase email/password login — **Live**
 - [x] Persistent session restoration — **Live**
 - [x] Server-controlled role lookup — **Live**
-- [x] Role routing for tenant, guardian, and owner/caretaker
+- [x] Separate role routing for tenant, guardian, caretaker, and owner
 - [x] Protected profiles table and row-level security
+- [x] Explicit anonymous-access revocation and authenticated privileges
+- [x] Role guards around all four role workspaces
+- [x] Separate caretaker operational navigation
+- [x] Owner-only authorization helper for restricted future tables
+- [x] Live role-access checks for anonymous and authenticated accounts
 - [x] One test account for each role
 - [ ] Complete password-recovery redirect/deep-link flow
 - [ ] Add table-specific RLS as backend features are connected
 - [ ] Complete production access-control testing
 
-### Owner/Caretaker pages
+### Owner and Caretaker pages
 
 - [x] Dashboard — **Mock**
 - [x] Tenant directory and tenant details — **Mock**
@@ -56,9 +62,11 @@ Owned folders and files:
 
 ### Developer 1 next tasks
 
-- [ ] Design operational Supabase tables and relationships
+- [x] Create core profile, room, bed-space, assignment, and guardian-link tables
+- [x] Add core foreign keys, validation, indexes, and RLS policies
+- [ ] Design feature tables for payments, maintenance, gate, and visitors
 - [ ] Connect tenants, rooms, payments, maintenance, gate, and visitors
-- [ ] Apply owner/caretaker policies to every connected table
+- [ ] Apply operational staff and owner-only policies to every connected table
 - [ ] Replace owner mock controllers with repositories/services
 - [ ] Add loading, empty, offline, and backend-error states
 - [ ] Verify owner actions are rejected for tenant and guardian accounts
@@ -120,7 +128,7 @@ Owned folders and files:
 
 ## Shared integration tasks
 
-- [x] Standardize roles as `tenant`, `guardian`, and `owner_caretaker`
+- [x] Standardize roles as `tenant`, `guardian`, `caretaker`, and `owner`
 - [x] Create and verify one test login for each role
 - [ ] Agree on table, column, model, and storage-bucket names
 - [ ] Test phone, tablet, and wide-screen layouts
@@ -138,7 +146,8 @@ Development only; remove before production.
 |---|---|
 | Tenant | `tenant@carmelita.test` |
 | Guardian | `guardian@carmelita.test` |
-| Owner/Caretaker | `owner@carmelita.test` |
+| Caretaker | `caretaker@carmelita.test` |
+| Owner | `owner@carmelita.test` |
 
 The shared test password is intentionally shown only in the sign-in screen for
 development convenience. Do not reuse it for real accounts.

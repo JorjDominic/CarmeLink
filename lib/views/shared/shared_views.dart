@@ -61,12 +61,14 @@ class _OwnerProfileContent extends StatelessWidget {
   const _OwnerProfileContent({required this.user});
   final AppUser user;
 
+  String get roleLabel => user.role == UserRole.owner ? 'Owner' : 'Caretaker';
+
   @override
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'OWNER / CARETAKER PROFILE',
+            '${roleLabel.toUpperCase()} PROFILE',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   fontSize: 15,
@@ -100,7 +102,7 @@ class _OwnerProfileContent extends StatelessWidget {
                   Text(user.email,
                       style: Theme.of(context).textTheme.bodySmall),
                   const SizedBox(height: 6),
-                  const StatusPill('Owner / Caretaker'),
+                  StatusPill(roleLabel),
                 ],
               )),
             ]),
@@ -126,11 +128,13 @@ class _OwnerProfileContent extends StatelessWidget {
               label: 'Phone',
               value: user.phone),
           const SizedBox(height: 8),
-          const _TenantProfileRow(
+          _TenantProfileRow(
               icon: Icons.admin_panel_settings_outlined,
-              color: Color(0xFFB47A52),
+              color: const Color(0xFFB47A52),
               label: 'Access level',
-              value: 'Full dormitory administration'),
+              value: user.role == UserRole.owner
+                  ? 'Full dormitory administration'
+                  : 'Dormitory operations'),
           const SizedBox(height: 20),
           const SectionTitle('Account'),
           const SizedBox(height: 10),

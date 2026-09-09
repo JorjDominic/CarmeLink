@@ -6,8 +6,7 @@ function once with that value in the `x-bootstrap-secret` header, and delete the
 function afterward. The Supabase service-role key stays inside the function and
 must never be added to the Flutter app.
 
-All three test accounts use `CarmeLinkTest123!`:
+This one-time version provisions the caretaker account using
+`CarmeLinkTest123!`:
 
-- `tenant@carmelita.test`
-- `guardian@carmelita.test`
-- `owner@carmelita.test`
+- `caretaker@carmelita.test`

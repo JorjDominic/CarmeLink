@@ -417,7 +417,8 @@ class _SignInPageState extends State<SignInPage> {
                               _demoChip('Tenant', 'tenant@carmelita.test'),
                               _demoChip('Guardian', 'guardian@carmelita.test'),
                               _demoChip(
-                                  'Owner/Caretaker', 'owner@carmelita.test'),
+                                  'Caretaker', 'caretaker@carmelita.test'),
+                              _demoChip('Owner', 'owner@carmelita.test'),
                             ]),
                             const SizedBox(height: 12),
                             Text(

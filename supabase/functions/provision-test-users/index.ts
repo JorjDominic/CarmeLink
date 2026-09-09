@@ -1,9 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const users = [
-  { email: 'tenant@carmelita.test', name: 'Anna Dela Cruz', role: 'tenant', phone: '+63 917 000 0003' },
-  { email: 'guardian@carmelita.test', name: 'Maria Dela Cruz', role: 'guardian', phone: '+63 917 000 0002' },
-  { email: 'owner@carmelita.test', name: 'Carmelita Admin', role: 'owner_caretaker', phone: '+63 917 000 0001' },
+  { email: 'caretaker@carmelita.test', name: 'Carmelita Caretaker', role: 'caretaker', phone: '+63 917 000 0004' },
 ] as const
 
 Deno.serve(async (request) => {

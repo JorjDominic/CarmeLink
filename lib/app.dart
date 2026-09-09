@@ -6,6 +6,7 @@ import 'core/constants/app_assets.dart';
 import 'core/theme/app_theme.dart';
 import 'models/models.dart';
 import 'views/auth/auth_views.dart';
+import 'views/caretaker/caretaker_shell.dart';
 import 'views/guardian/guardian_shell.dart';
 import 'views/owner/owner_shell.dart';
 import 'views/tenant/tenant_shell.dart';
@@ -68,7 +69,9 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
         return const TenantShell();
       case UserRole.guardian:
         return const GuardianShell();
-      case UserRole.ownerCaretaker:
+      case UserRole.caretaker:
+        return const CaretakerShell();
+      case UserRole.owner:
         return const OwnerShell();
     }
   }

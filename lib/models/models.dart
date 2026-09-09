@@ -1,4 +1,4 @@
-enum UserRole { tenant, guardian, ownerCaretaker }
+enum UserRole { tenant, guardian, caretaker, owner }
 
 class AppUser {
   const AppUser(

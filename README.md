@@ -47,11 +47,12 @@ use these development accounts:
 
 | Role | Example email | Result |
 |---|---|---|
-| Owner / Caretaker | `owner@carmelita.test` | Opens the staff workspace |
+| Owner | `owner@carmelita.test` | Opens the full administration workspace |
+| Caretaker | `caretaker@carmelita.test` | Opens the operational workspace |
 | Guardian | `guardian@carmelita.test` | Opens the guardian workspace |
 | Tenant | `tenant@carmelita.test` | Opens the tenant workspace |
 
-All three accounts initially use `CarmeLinkTest123!`. Remove the test users and
+All four accounts initially use `CarmeLinkTest123!`. Remove the test users and
 the provisioning function before production. A user cannot select or update
 their own role from the client.
 
@@ -61,13 +62,13 @@ Most records are local demo data. Form submissions, messages, approvals, and sta
 
 CarmeLink selects a workspace after sign-in. Compact screens use bottom navigation; wider screens show the same five destinations in side navigation.
 
-| Tenant | Guardian | Owner / Caretaker |
-|---|---|---|
-| Home | Home | Dashboard |
-| Payments | Curfew | Tenants |
-| Reports | Requests | Operations |
-| Gate | Messages | Gate |
-| Profile | Profile | Profile |
+| Tenant | Guardian | Caretaker | Owner |
+|---|---|---|---|
+| Home | Home | Tenants | Dashboard |
+| Payments | Curfew | Rooms | Tenants |
+| Reports | Requests | Maintenance | Operations |
+| Gate | Messages | Gate | Gate |
+| Profile | Profile | Profile | Profile |
 
 Cards, shortcuts, and action buttons open the supporting pages described below.
 Messages and Notifications are also available from the role menu with consistent outlined navigation icons.

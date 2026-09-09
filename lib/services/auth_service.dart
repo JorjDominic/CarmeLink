@@ -60,7 +60,8 @@ class SupabaseAuthService implements AuthService {
   UserRole _parseRole(String role) => switch (role) {
         'tenant' => UserRole.tenant,
         'guardian' => UserRole.guardian,
-        'owner_caretaker' => UserRole.ownerCaretaker,
+        'caretaker' => UserRole.caretaker,
+        'owner' => UserRole.owner,
         _ => throw const AuthException('This account has an invalid role.'),
       };
 
