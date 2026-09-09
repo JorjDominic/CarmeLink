@@ -443,10 +443,11 @@ The exact columns must match the final database schema. The profile ID should re
 
 ### Create later accounts from CarmeLink
 
-After the first owner exists, add an **Account Management** area to the Owner/Caretaker workspace. The recommended workflow is:
+The Owner Operations hub includes **Accounts & Access**, while the Caretaker
+workspace includes a restricted **Accounts** destination. Their workflow is:
 
 1. An authorized staff member enters the new user's information.
-2. The Flutter app calls a protected Supabase Edge Function.
+2. The Flutter app calls the authenticated `create-user` Supabase Edge Function.
 3. The Edge Function uses the server-side Auth Admin API to create or invite the user.
 4. The function creates the matching profile and tenant, guardian, or staff record.
 5. The new user follows the invitation link or signs in with a temporary password.
@@ -454,16 +455,22 @@ After the first owner exists, add an **Account Management** area to the Owner/Ca
 
 The Supabase secret/service-role key must only exist in a trusted server environment such as an Edge Function. It must never be included in the Flutter source, app assets, or client configuration.
 
-Recommended permissions:
+Implemented permissions:
 
 | Role | Create tenants | Create guardians | Create caretakers | Create owners |
 |---|---:|---:|---:|---:|
-| Owner | Yes | Yes | Yes | Restricted |
+| Owner | Yes | Yes | Yes | Yes |
 | Caretaker | Yes | Yes | No | No |
 | Tenant | No | No | No | No |
 | Guardian | No | No | No | No |
 
 Authentication accounts and dormitory profiles should remain separate but linked by the Auth user UUID. This lets authentication credentials change without affecting room assignments, contracts, payment records, or guardian relationships.
+
+Role-specific information is also separated. `tenant_details` stores school,
+emergency-contact, address, and contract information; `staff_details` stores
+employment information for owners and caretakers. Guardian relationships remain
+in `guardian_tenant_links`, and room occupancy remains in
+`tenant_assignments`. All tables use RLS and reference `profiles.id`.
 
 For implementation details, see the official [Supabase user invitation guide](https://supabase.com/docs/guides/auth/users) and [Admin create-user documentation](https://supabase.com/docs/reference/javascript/auth-admin-createuser).
 

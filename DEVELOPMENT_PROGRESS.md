@@ -7,8 +7,8 @@ divided between two developers to reduce merge conflicts.
 
 ## Status legend
 
-- [x] UI/page implemented
-- [ ] Not yet completed
+- [✓] Completed and connected, or fully complete as a static feature
+- [ ] Incomplete, including UI that still uses mock data
 - **Live** — connected to Supabase
 - **Mock** — uses local demonstration data or a simulated workflow
 
@@ -26,44 +26,52 @@ Owned folders and files:
 
 ### Authentication and security
 
-- [x] Splash, welcome, sign-in, and forgot-password pages
-- [x] Show/hide-password toggle
-- [x] Supabase email/password login — **Live**
-- [x] Persistent session restoration — **Live**
-- [x] Server-controlled role lookup — **Live**
-- [x] Separate role routing for tenant, guardian, caretaker, and owner
-- [x] Protected profiles table and row-level security
-- [x] Explicit anonymous-access revocation and authenticated privileges
-- [x] Role guards around all four role workspaces
-- [x] Separate caretaker operational navigation
-- [x] Owner-only authorization helper for restricted future tables
-- [x] Live role-access checks for anonymous and authenticated accounts
-- [x] One test account for each role
-- [ ] Complete password-recovery redirect/deep-link flow
+- [✓] Splash, welcome, sign-in, and forgot-password pages
+- [✓] Show/hide-password toggle
+- [✓] Supabase email/password login — **Live**
+- [✓] Persistent session restoration — **Live**
+- [✓] Server-controlled role lookup — **Live**
+- [✓] Separate role routing for tenant, guardian, caretaker, and owner
+- [✓] Protected profiles table and row-level security
+- [✓] Explicit anonymous-access revocation and authenticated privileges
+- [✓] Role guards around all four role workspaces
+- [✓] Separate caretaker operational navigation
+- [✓] Owner-only authorization helper for restricted future tables
+- [✓] Live role-access checks for anonymous and authenticated accounts
+- [✓] One test account for each role
+- [✓] Connect password changes to Supabase Auth
+- [ ] Configure and test password-recovery deep links end to end
+- [✓] Display authenticated profile identity and live role relationships
+- [✓] Add protected owner/caretaker account management
+- [✓] Place owner account management under Operations and caretaker Accounts
+- [✓] Deploy role-restricted server-side user creation
 - [ ] Add table-specific RLS as backend features are connected
 - [ ] Complete production access-control testing
 
 ### Owner and Caretaker pages
 
-- [x] Dashboard — **Mock**
-- [x] Tenant directory and tenant details — **Mock**
-- [x] Operations hub and category pages — **Mock**
-- [x] Room monitoring and interactive floor plan — **Mock**
-- [x] Payment verification — **Mock**
-- [x] Maintenance management and floor monitoring — **Mock**
-- [x] Gate monitoring and manual override — **Mock**
-- [x] Curfew monitoring and request review — **Mock**
-- [x] Visitor management — **Mock**
-- [x] Confidential reports — **Mock**
-- [x] Announcements — **Mock**
-- [x] Messaging and conversations — **Mock**
-- [x] Emergency contacts and system status — **Mock**
-- [x] Contracts, finance, discipline, and analytics — **Mock**
+- [ ] Dashboard — UI implemented, **Mock**
+- [ ] Tenant directory and tenant details — UI implemented, **Mock**
+- [ ] Operations hub and category pages — UI implemented, **Mock**
+- [ ] Room monitoring and interactive floor plan — UI implemented, **Mock**
+- [ ] Payment verification — UI implemented, **Mock**
+- [ ] Maintenance management and floor monitoring — UI implemented, **Mock**
+- [ ] Gate monitoring and manual override — UI implemented, **Mock**
+- [ ] Curfew monitoring and request review — UI implemented, **Mock**
+- [ ] Visitor management — UI implemented, **Mock**
+- [ ] Confidential reports — UI implemented, **Mock**
+- [ ] Announcements — UI implemented, **Mock**
+- [ ] Messaging and conversations — UI implemented, **Mock**
+- [ ] Emergency contacts and system status — UI implemented, **Mock**
+- [ ] Contracts, finance, discipline, and analytics — UI implemented, **Mock**
 
 ### Developer 1 next tasks
 
-- [x] Create core profile, room, bed-space, assignment, and guardian-link tables
-- [x] Add core foreign keys, validation, indexes, and RLS policies
+- [✓] Create core profile, room, bed-space, assignment, and guardian-link tables
+- [✓] Add core foreign keys, validation, indexes, and RLS policies
+- [✓] Separate tenant and staff role-specific information tables
+- [✓] Apply tenant, guardian, caretaker, and owner policies to detail tables
+- [✓] Create role-specific detail rows during secure account creation
 - [ ] Design feature tables for payments, maintenance, gate, and visitors
 - [ ] Connect tenants, rooms, payments, maintenance, gate, and visitors
 - [ ] Apply operational staff and owner-only policies to every connected table
@@ -83,37 +91,41 @@ Owned folders and files:
 
 ### Tenant pages
 
-- [x] Home/dashboard and My Room — **Mock**
-- [x] Payments and payment history — **Mock**
-- [x] Payment-proof upload — **Mock**
-- [x] Reports hub — **Mock**
-- [x] Maintenance list, submission, and floor plan — **Mock**
-- [x] Announcements — **Mock**
-- [x] Messages and conversation — **Mock**
-- [x] Gate and curfew overview — **Mock**
-- [x] Curfew-exception request — **Mock**
-- [x] Visitor request — **Mock**
-- [x] Confidential concern — **Mock**
-- [x] Rules and policies
+- [ ] Home/dashboard and My Room — UI implemented, **Mock**
+- [ ] Payments and payment history — UI implemented, **Mock**
+- [ ] Payment-proof upload — UI implemented, **Mock**
+- [ ] Reports hub — UI implemented, **Mock**
+- [ ] Maintenance list, submission, and floor plan — UI implemented, **Mock**
+- [ ] Announcements — UI implemented, **Mock**
+- [ ] Messages and conversation — UI implemented, **Mock**
+- [ ] Gate and curfew overview — UI implemented, **Mock**
+- [ ] Curfew-exception request — UI implemented, **Mock**
+- [ ] Visitor request — UI implemented, **Mock**
+- [ ] Confidential concern — UI implemented, **Mock**
+- [✓] Rules and policies
 
 ### Guardian pages
 
-- [x] Home/dashboard and linked-tenant information — **Mock**
-- [x] Curfew overview and gate activity — **Mock**
-- [x] Curfew-request review — **Mock**
-- [x] Payment status — **Mock**
-- [x] Announcements — **Mock**
-- [x] Messages and conversation — **Mock**
-- [x] Emergency and safety alerts — **Mock**
+- [ ] Home/dashboard — UI implemented, **Mock**
+- [✓] Linked-tenant identity on Profile — **Live**
+- [ ] Curfew overview and gate activity — UI implemented, **Mock**
+- [ ] Curfew-request review — UI implemented, **Mock**
+- [ ] Payment status — UI implemented, **Mock**
+- [ ] Announcements — UI implemented, **Mock**
+- [ ] Messages and conversation — UI implemented, **Mock**
+- [ ] Emergency and safety alerts — UI implemented, **Mock**
 
 ### Shared pages
 
-- [x] Profile, notifications, and settings
-- [x] Notification preferences — **Mock/local state**
-- [x] Privacy and permissions — **Mock/local state**
-- [x] Change-password UI — connection still required
-- [x] Device binding and verification code — **Mock**
-- [x] Dormitory information
+- [✓] Profile with authenticated user information — **Live**
+- [ ] Notifications — UI implemented, **Mock**
+- [✓] Settings and theme selection — **Local state**
+- [ ] Notification preferences — UI implemented, **Mock/local state**
+- [ ] Privacy and permissions — UI implemented, **Mock/local state**
+- [✓] Change password — **Live**
+- [ ] Password recovery — email request is live; deep-link flow needs testing
+- [ ] Device binding and verification code — UI implemented, **Mock**
+- [✓] Dormitory information
 
 ### Developer 2 next tasks
 
@@ -122,14 +134,14 @@ Owned folders and files:
 - [ ] Store payment proofs in Supabase Storage
 - [ ] Persist maintenance, visitor, curfew, and confidential reports
 - [ ] Connect announcements and real-time messaging
-- [ ] Connect password changes and notification preferences
+- [ ] Connect notification preferences
 - [ ] Verify tenants can access only their own records
 - [ ] Verify guardians can access only their linked tenant
 
 ## Shared integration tasks
 
-- [x] Standardize roles as `tenant`, `guardian`, `caretaker`, and `owner`
-- [x] Create and verify one test login for each role
+- [✓] Standardize roles as `tenant`, `guardian`, `caretaker`, and `owner`
+- [✓] Create and verify one test login for each role
 - [ ] Agree on table, column, model, and storage-bucket names
 - [ ] Test phone, tablet, and wide-screen layouts
 - [ ] Add unit, widget, and integration tests

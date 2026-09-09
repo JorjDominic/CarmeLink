@@ -6,6 +6,8 @@ import '../../core/constants/app_assets.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
+import '../../services/auth_service.dart';
+import '../../services/profile_service.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
@@ -287,11 +289,12 @@ class _GuardianProfileContent extends StatelessWidget {
               label: 'Phone',
               value: user.phone),
           const SizedBox(height: 8),
-          const _TenantProfileRow(
-              icon: Icons.family_restroom_outlined,
-              color: Color(0xFFB47A52),
-              label: 'Linked tenant',
-              value: 'Anna Dela Cruz • Room 204'),
+          _LiveProfileRow(
+            icon: Icons.family_restroom_outlined,
+            color: const Color(0xFFB47A52),
+            label: 'Linked tenant',
+            value: const ProfileService().guardianLinkedTenant(user.id),
+          ),
           const SizedBox(height: 20),
           const SectionTitle('Account'),
           const SizedBox(height: 10),
@@ -385,11 +388,12 @@ class _TenantProfileContent extends StatelessWidget {
               label: 'Phone',
               value: user.phone),
           const SizedBox(height: 8),
-          const _TenantProfileRow(
-              icon: Icons.bed_outlined,
-              color: Color(0xFFB47A52),
-              label: 'Room assignment',
-              value: 'Room 204 • Bed 2'),
+          _LiveProfileRow(
+            icon: Icons.bed_outlined,
+            color: const Color(0xFFB47A52),
+            label: 'Room assignment',
+            value: const ProfileService().tenantRoomAssignment(user.id),
+          ),
           const SizedBox(height: 20),
           const SectionTitle('Account'),
           const SizedBox(height: 10),
@@ -433,6 +437,33 @@ class _TenantProfileRow extends StatelessWidget {
           color: color,
           title: label,
           subtitle: value,
+        ),
+      );
+}
+
+class _LiveProfileRow extends StatelessWidget {
+  const _LiveProfileRow({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String label;
+  final Future<String> value;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<String>(
+        future: value,
+        builder: (context, snapshot) => _TenantProfileRow(
+          icon: icon,
+          color: color,
+          label: label,
+          value: snapshot.hasError
+              ? 'Unable to load'
+              : snapshot.data ?? 'Loading…',
         ),
       );
 }
@@ -850,7 +881,14 @@ class _PrivacyPermissionsPageState extends State<PrivacyPermissionsPage> {
 }
 
 class ChangePasswordPage extends StatefulWidget {
-  const ChangePasswordPage({super.key});
+  const ChangePasswordPage({
+    this.recoveryMode = false,
+    this.onComplete,
+    super.key,
+  });
+
+  final bool recoveryMode;
+  final VoidCallback? onComplete;
 
   @override
   State<ChangePasswordPage> createState() => _ChangePasswordPageState();
@@ -860,6 +898,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   final currentPassword = TextEditingController();
   final newPassword = TextEditingController();
   final confirmPassword = TextEditingController();
+  final AuthService authService = SupabaseAuthService();
+  bool loading = false;
 
   @override
   void dispose() {
@@ -869,8 +909,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     super.dispose();
   }
 
-  void submit() {
-    if (currentPassword.text.isEmpty || newPassword.text.length < 8) {
+  Future<void> submit() async {
+    if ((!widget.recoveryMode && currentPassword.text.isEmpty) ||
+        newPassword.text.length < 8) {
       showAppSnackBar(
         context,
         'Enter your current password and a new password of at least 8 characters.',
@@ -881,10 +922,32 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       showAppSnackBar(context, 'New passwords do not match.');
       return;
     }
-    showAppSnackBar(
-      context,
-      'Password change is ready for backend connection.',
-    );
+    setState(() => loading = true);
+    try {
+      if (widget.recoveryMode) {
+        await authService.setRecoveredPassword(newPassword.text);
+      } else {
+        await authService.changePassword(
+            currentPassword.text, newPassword.text);
+      }
+      currentPassword.clear();
+      newPassword.clear();
+      confirmPassword.clear();
+      if (mounted) showAppSnackBar(context, 'Password updated successfully.');
+      widget.onComplete?.call();
+    } catch (error) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          error
+              .toString()
+              .replaceFirst('AuthException(message: ', '')
+              .replaceFirst(', statusCode: 400)', ''),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   @override
@@ -897,15 +960,17 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         child: CarmelitaCard(
           child: Column(
             children: [
-              TextField(
-                controller: currentPassword,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Current password',
-                  prefixIcon: Icon(Icons.lock_outline),
+              if (!widget.recoveryMode) ...[
+                TextField(
+                  controller: currentPassword,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Current password',
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
+              ],
               TextField(
                 controller: newPassword,
                 obscureText: true,
@@ -922,14 +987,14 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   labelText: 'Confirm new password',
                   prefixIcon: Icon(Icons.password_outlined),
                 ),
-                onSubmitted: (_) => submit(),
+                onSubmitted: (_) => loading ? null : submit(),
               ),
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: submit,
-                  child: const Text('Update password'),
+                  onPressed: loading ? null : submit,
+                  child: Text(loading ? 'Updating…' : 'Update password'),
                 ),
               ),
             ],

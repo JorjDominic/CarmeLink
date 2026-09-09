@@ -5,6 +5,7 @@ import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../owner/owner_pages.dart';
 import '../shared/shared_views.dart';
+import '../shared/account_management_page.dart';
 
 /// Operational workspace that excludes owner-only financial and analytics UI.
 class CaretakerShell extends StatelessWidget {
@@ -40,6 +41,12 @@ class CaretakerShell extends StatelessWidget {
               icon: Icons.sensor_door_outlined,
               selectedIcon: Icons.sensor_door,
               page: GateMonitoringPage(),
+            ),
+            AppDestination(
+              label: 'Accounts',
+              icon: Icons.manage_accounts_outlined,
+              selectedIcon: Icons.manage_accounts,
+              page: AccountManagementPage(),
             ),
             AppDestination(
               label: 'Profile',

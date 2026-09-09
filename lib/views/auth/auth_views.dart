@@ -6,7 +6,6 @@ import '../../core/constants/app_assets.dart';
 import '../../core/responsive/breakpoints.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../services/auth_service.dart';
-import '../shared/shared_views.dart';
 
 class AuthFlow extends StatefulWidget {
   const AuthFlow({
@@ -481,9 +480,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                               await service
                                   .requestPasswordReset(email.text.trim());
                               if (!context.mounted) return;
-                              Navigator.of(context).push(MaterialPageRoute(
-                                  builder: (_) =>
-                                      OtpPage(email: email.text.trim())));
+                              showAppSnackBar(context,
+                                  'Password reset instructions were sent to your email.');
+                              Navigator.of(context).pop();
                             } catch (e) {
                               if (context.mounted)
                                 showAppSnackBar(

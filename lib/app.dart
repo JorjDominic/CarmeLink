@@ -10,6 +10,7 @@ import 'views/caretaker/caretaker_shell.dart';
 import 'views/guardian/guardian_shell.dart';
 import 'views/owner/owner_shell.dart';
 import 'views/tenant/tenant_shell.dart';
+import 'views/shared/shared_views.dart';
 
 class CarmelitaBootstrap extends StatefulWidget {
   const CarmelitaBootstrap({super.key});
@@ -57,6 +58,12 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   }
 
   Widget _rootForSession() {
+    if (sessionController.passwordRecovery) {
+      return ChangePasswordPage(
+        recoveryMode: true,
+        onComplete: sessionController.completePasswordRecovery,
+      );
+    }
     final user = sessionController.currentUser;
     if (user == null) {
       return AuthFlow(

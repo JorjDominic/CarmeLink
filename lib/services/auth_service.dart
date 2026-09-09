@@ -8,6 +8,8 @@ abstract class AuthService {
   Future<AppUser> signIn(String email, String password);
   Future<void> signOut();
   Future<void> requestPasswordReset(String email);
+  Future<void> changePassword(String currentPassword, String newPassword);
+  Future<void> setRecoveredPassword(String newPassword);
 }
 
 class SupabaseAuthService implements AuthService {
@@ -74,5 +76,28 @@ class SupabaseAuthService implements AuthService {
       throw const AuthException('Enter a valid email address.');
     }
     await _client.auth.resetPasswordForEmail(email.trim());
+  }
+
+  @override
+  Future<void> changePassword(
+      String currentPassword, String newPassword) async {
+    final email = _client.auth.currentUser?.email;
+    if (email == null) throw const AuthException('Your session has expired.');
+
+    // Supabase updateUser only requires a session, so reauthenticate first to
+    // ensure knowledge of the current password for this sensitive action.
+    await _client.auth.signInWithPassword(
+      email: email,
+      password: currentPassword,
+    );
+    await _client.auth.updateUser(UserAttributes(password: newPassword));
+  }
+
+  @override
+  Future<void> setRecoveredPassword(String newPassword) async {
+    if (_client.auth.currentSession == null) {
+      throw const AuthException('The recovery link is invalid or expired.');
+    }
+    await _client.auth.updateUser(UserAttributes(password: newPassword));
   }
 }

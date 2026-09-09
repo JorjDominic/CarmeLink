@@ -5,6 +5,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../widgets/feature_widgets.dart';
+import '../shared/account_management_page.dart';
 import 'floor_plan_page.dart';
 
 void _ownerPush(BuildContext context, Widget page) {
@@ -658,6 +659,20 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
 }
 
 const _operationCategories = [
+  _OperationCategory(
+    'Accounts & access',
+    'Create users and manage system access',
+    Icons.manage_accounts_outlined,
+    Color(0xFF7D70A0),
+    [
+      _OperationItem(
+        'User accounts',
+        'Create and review role-based accounts',
+        Icons.person_add_alt_1_outlined,
+        AccountManagementPage(),
+      ),
+    ],
+  ),
   _OperationCategory(
     'Property',
     'Rooms, floor plan, maintenance and devices',
