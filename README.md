@@ -453,6 +453,13 @@ workspace includes a restricted **Accounts** destination. Their workflow is:
 5. The new user follows the invitation link or signs in with a temporary password.
 6. On first sign-in, the user sets a new password and may bind a trusted device.
 
+Authorized staff can also review accounts, edit names, email
+addresses, and phone numbers, send password-recovery emails, and delete
+accounts after confirmation. Account roles are immutable after creation to
+protect linked room, guardian, tenant, and staff records. Owners manage every
+role; caretakers manage tenant and guardian accounts only. Users cannot delete
+their own currently signed-in account.
+
 The Supabase secret/service-role key must only exist in a trusted server environment such as an Edge Function. It must never be included in the Flutter source, app assets, or client configuration.
 
 Implemented permissions:

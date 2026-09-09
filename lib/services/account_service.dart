@@ -6,11 +6,8 @@ class AccountService {
   const AccountService();
 
   Future<List<Map<String, dynamic>>> listAccounts() async {
-    final rows = await SupabaseConfig.client
-        .from('profiles')
-        .select('id, full_name, role, phone, created_at')
-        .order('created_at');
-    return List<Map<String, dynamic>>.from(rows);
+    final data = await _invokeManage({'action': 'list'});
+    return List<Map<String, dynamic>>.from(data['accounts'] as List);
   }
 
   Future<void> createAccount({
@@ -45,6 +42,44 @@ class AccountService {
     }
     if (details is String && details.trim().isNotEmpty) return details;
     return 'The account could not be created. Please try again.';
+  }
+
+  Future<void> updateAccount({
+    required String id,
+    required String fullName,
+    required String email,
+    required String phone,
+  }) async {
+    await _invokeManage({
+      'action': 'update',
+      'id': id,
+      'full_name': fullName.trim(),
+      'email': email.trim().toLowerCase(),
+      'phone': phone.trim(),
+    });
+  }
+
+  Future<void> sendPasswordReset(String id) async {
+    await _invokeManage({'action': 'reset_password', 'id': id});
+  }
+
+  Future<void> deleteAccount(String id) async {
+    await _invokeManage({'action': 'delete', 'id': id});
+  }
+
+  Future<Map<String, dynamic>> _invokeManage(Map<String, dynamic> body) async {
+    try {
+      final response = await SupabaseConfig.client.functions.invoke(
+        'manage-user',
+        body: body,
+      );
+      if (response.status < 200 || response.status >= 300) {
+        throw AccountCreationException(_messageFrom(response.data));
+      }
+      return Map<String, dynamic>.from(response.data as Map);
+    } on FunctionException catch (error) {
+      throw AccountCreationException(_messageFrom(error.details));
+    }
   }
 }
 

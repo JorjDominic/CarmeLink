@@ -45,8 +45,38 @@ Owned folders and files:
 - [✓] Add protected owner/caretaker account management
 - [✓] Place owner account management under Operations and caretaker Accounts
 - [✓] Deploy role-restricted server-side user creation
+- [✓] Add full account CRUD: create, list, edit, recovery, and delete
+- [✓] Verify account CRUD against Supabase with temporary-record cleanup
+- [ ] Send every new user a secure email invitation
+- [ ] Open onboarding from the invitation link and require a permanent password
+- [ ] Require owners and caretakers to verify SMS during onboarding
+- [ ] Require guardians to verify SMS before approving sensitive requests
+- [ ] Require tenants to verify SMS before gate, visitor, and recovery actions
+- [ ] Add OTP expiration, retry limits, resend cooldown, and attempt limits
+- [ ] Store email and phone verification timestamps for security auditing
+- [ ] Enforce verification requirements in RLS or protected server functions
+- [ ] Add recovery handling when a user cannot access their email or phone
 - [ ] Add table-specific RLS as backend features are connected
 - [ ] Complete production access-control testing
+
+### Planned account verification flow
+
+1. Authorized staff creates the account.
+2. The user receives a secure email invitation.
+3. The invitation opens onboarding and the user creates a permanent password.
+4. SMS verification is requested according to the account role or sensitive action.
+5. Required verification must succeed before protected access is granted.
+
+| Role | SMS requirement |
+|---|---|
+| Owner | Required during onboarding |
+| Caretaker | Required during onboarding |
+| Guardian | Required before approving sensitive requests |
+| Tenant | Required before gate, visitor, and account-recovery actions |
+
+The email invitation verifies ownership of the email address. The SMS code
+separately verifies the registered phone and is never placed inside the email
+link.
 
 ### Owner and Caretaker pages
 
