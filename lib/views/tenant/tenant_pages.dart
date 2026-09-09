@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../controllers/tenant_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/widgets/common_widgets.dart';
@@ -861,7 +864,7 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
                                 : const Color(0xFF627FA8),
                         title: '${report.category} • ${report.location}',
                         subtitle:
-                            '${report.description}\n${shortDate(report.createdAt)}',
+                            '${report.description}\n${shortDate(report.createdAt)}${report.photoPath == null ? '' : '\nPhoto attached'}',
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -943,14 +946,27 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
   ];
 
   static const urgencies = ['Low', 'Medium', 'High'];
+  static const int _maximumPhotoBytes = 5 * 1024 * 1024;
+
+  final ImagePicker _imagePicker = ImagePicker();
 
   late final TextEditingController description;
   late String category;
   late String urgency;
   late String location;
+
+  Uint8List? selectedPhotoBytes;
+  String? selectedPhotoName;
+  String? selectedPhotoMimeType;
+  String? existingPhotoUrl;
+  bool removeExistingPhoto = false;
+  bool photoLoading = false;
   bool saving = false;
 
   bool get editing => widget.report != null;
+  bool get hasExistingPhoto =>
+      widget.report?.photoPath != null && !removeExistingPhoto;
+  bool get hasPhoto => selectedPhotoBytes != null || hasExistingPhoto;
 
   @override
   void initState() {
@@ -964,12 +980,116 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
     location = locations.contains(report?.location)
         ? report!.location
         : locations.first;
+
+    if (report?.photoPath != null) {
+      _loadExistingPhoto();
+    }
   }
 
   @override
   void dispose() {
     description.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadExistingPhoto() async {
+    setState(() => photoLoading = true);
+    try {
+      final url = await TenantController.instance
+          .maintenancePhotoUrl(widget.report?.photoPath);
+      if (!mounted) return;
+      setState(() => existingPhotoUrl = url);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => existingPhotoUrl = null);
+    } finally {
+      if (mounted) setState(() => photoLoading = false);
+    }
+  }
+
+  Future<void> _showPhotoSource() async {
+    if (saving) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take photo'),
+              subtitle: const Text('Use the device camera'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _pickPhoto(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              subtitle: const Text('Select an existing photo'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _pickPhoto(ImageSource.gallery);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    try {
+      final photo = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1800,
+      );
+
+      if (photo == null) return;
+
+      final bytes = await photo.readAsBytes();
+      if (bytes.isEmpty) {
+        if (!mounted) return;
+        showAppSnackBar(context, 'The selected photo is empty.');
+        return;
+      }
+
+      if (bytes.length > _maximumPhotoBytes) {
+        if (!mounted) return;
+        showAppSnackBar(context, 'Photo must be 5 MB or smaller.');
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        selectedPhotoBytes = bytes;
+        selectedPhotoName = photo.name;
+        selectedPhotoMimeType = photo.mimeType;
+        removeExistingPhoto = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        'Unable to open the ${source == ImageSource.camera ? 'camera' : 'gallery'}: '
+        '${error.toString().replaceFirst('Exception: ', '')}',
+      );
+    }
+  }
+
+  void _removePhoto() {
+    setState(() {
+      selectedPhotoBytes = null;
+      selectedPhotoName = null;
+      selectedPhotoMimeType = null;
+      if (widget.report?.photoPath != null) {
+        removeExistingPhoto = true;
+      }
+    });
   }
 
   Future<void> _save() async {
@@ -989,6 +1109,10 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
           description: cleanDescription,
           location: location,
           urgency: urgency,
+          photoBytes: selectedPhotoBytes,
+          photoFileName: selectedPhotoName,
+          photoMimeType: selectedPhotoMimeType,
+          removePhoto: removeExistingPhoto && selectedPhotoBytes == null,
         );
       } else {
         await TenantController.instance.submitMaintenance(
@@ -996,6 +1120,9 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
           description: cleanDescription,
           location: location,
           urgency: urgency,
+          photoBytes: selectedPhotoBytes,
+          photoFileName: selectedPhotoName,
+          photoMimeType: selectedPhotoMimeType,
         );
       }
 
@@ -1014,6 +1141,75 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
     } finally {
       if (mounted) setState(() => saving = false);
     }
+  }
+
+  Widget _photoSection(BuildContext context) {
+    if (selectedPhotoBytes != null) {
+      return _PhotoPreviewCard(
+        image: Image.memory(
+          selectedPhotoBytes!,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: 220,
+        ),
+        onChange: _showPhotoSource,
+        onRemove: _removePhoto,
+      );
+    }
+
+    if (hasExistingPhoto) {
+      if (photoLoading) {
+        return const CarmelitaCard(
+          child: SizedBox(
+            height: 120,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        );
+      }
+
+      if (existingPhotoUrl != null) {
+        return _PhotoPreviewCard(
+          image: Image.network(
+            existingPhotoUrl!,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: 220,
+            errorBuilder: (_, __, ___) => const SizedBox(
+              height: 180,
+              child: Center(
+                child: Icon(Icons.broken_image_outlined, size: 44),
+              ),
+            ),
+          ),
+          onChange: _showPhotoSource,
+          onRemove: _removePhoto,
+        );
+      }
+    }
+
+    return CarmelitaCard(
+      onTap: _showPhotoSource,
+      child: const Row(
+        children: [
+          Icon(Icons.add_a_photo_outlined),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add photo',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                SizedBox(height: 2),
+                Text('Take a photo or choose one from the gallery'),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right),
+        ],
+      ),
+    );
   }
 
   @override
@@ -1083,27 +1279,7 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
                     : (value) => setState(() => urgency = value ?? urgency),
               ),
               const SizedBox(height: 14),
-              CarmelitaCard(
-                onTap: saving
-                    ? null
-                    : () => showAppSnackBar(
-                          context,
-                          'Photo upload will be connected in a later feature.',
-                        ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.add_a_photo_outlined),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Add photo',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    Icon(Icons.chevron_right),
-                  ],
-                ),
-              ),
+              _photoSection(context),
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
@@ -1122,6 +1298,51 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
           ),
         ),
       );
+}
+
+class _PhotoPreviewCard extends StatelessWidget {
+  const _PhotoPreviewCard({
+    required this.image,
+    required this.onChange,
+    required this.onRemove,
+  });
+
+  final Widget image;
+  final VoidCallback onChange;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return CarmelitaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: image,
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onChange,
+                  icon: const Icon(Icons.swap_horiz_rounded),
+                  label: const Text('Change photo'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Remove photo',
+                onPressed: onRemove,
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class InteractiveFloorPlanPage extends StatelessWidget {

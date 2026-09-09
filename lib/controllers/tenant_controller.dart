@@ -12,6 +12,7 @@ class TenantController extends ChangeNotifier {
   final MaintenanceService _maintenanceService = const MaintenanceService();
 
   final List<MaintenanceReport> _maintenance = [];
+
   bool _maintenanceLoading = false;
   String? _maintenanceError;
 
@@ -23,24 +24,30 @@ class TenantController extends ChangeNotifier {
 
   List<GateEvent> get gateEvents => List.unmodifiable(MockData.gateEvents);
 
-  List<Announcement> get announcements =>
-      List.unmodifiable(MockData.announcements);
+  List<Announcement> get announcements => List.unmodifiable(
+        MockData.announcements,
+      );
 
-  List<CurfewRequest> get curfewRequests =>
-      List.unmodifiable(MockData.curfewRequests);
+  List<CurfewRequest> get curfewRequests => List.unmodifiable(
+        MockData.curfewRequests,
+      );
 
   List<VisitorRequest> get visitors => List.unmodifiable(MockData.visitors);
 
   List<ConcernReport> get concerns => List.unmodifiable(MockData.concerns);
 
-  List<ChatMessage> get messages => List.unmodifiable(MockData.tenantMessages);
+  List<ChatMessage> get messages => List.unmodifiable(
+        MockData.tenantMessages,
+      );
 
   bool get maintenanceLoading => _maintenanceLoading;
 
   String? get maintenanceError => _maintenanceError;
 
   Future<void> loadMaintenance() async {
-    if (_maintenanceLoading) return;
+    if (_maintenanceLoading) {
+      return;
+    }
 
     _maintenanceLoading = true;
     _maintenanceError = null;
@@ -85,12 +92,18 @@ class TenantController extends ChangeNotifier {
     required String description,
     required String location,
     required String urgency,
+    Uint8List? photoBytes,
+    String? photoFileName,
+    String? photoMimeType,
   }) async {
     final report = await _maintenanceService.createReport(
       category: category,
       description: description,
       location: location,
       urgency: urgency,
+      photoBytes: photoBytes,
+      photoFileName: photoFileName,
+      photoMimeType: photoMimeType,
     );
 
     _maintenance.insert(0, report);
@@ -104,6 +117,10 @@ class TenantController extends ChangeNotifier {
     required String description,
     required String location,
     required String urgency,
+    Uint8List? photoBytes,
+    String? photoFileName,
+    String? photoMimeType,
+    bool removePhoto = false,
   }) async {
     final updated = await _maintenanceService.updateReport(
       id: id,
@@ -111,6 +128,10 @@ class TenantController extends ChangeNotifier {
       description: description,
       location: location,
       urgency: urgency,
+      photoBytes: photoBytes,
+      photoFileName: photoFileName,
+      photoMimeType: photoMimeType,
+      removePhoto: removePhoto,
     );
 
     final index = _maintenance.indexWhere(
@@ -125,7 +146,9 @@ class TenantController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> deleteMaintenance(String id) async {
+  Future<void> deleteMaintenance(
+    String id,
+  ) async {
     await _maintenanceService.deleteReport(id);
 
     _maintenance.removeWhere(
@@ -134,6 +157,12 @@ class TenantController extends ChangeNotifier {
 
     _maintenanceError = null;
     notifyListeners();
+  }
+
+  Future<String?> maintenancePhotoUrl(
+    String? photoPath,
+  ) {
+    return _maintenanceService.createPhotoUrl(photoPath);
   }
 
   void submitCurfew({
@@ -197,7 +226,9 @@ class TenantController extends ChangeNotifier {
   void sendMessage(String body) {
     final clean = body.trim();
 
-    if (clean.isEmpty) return;
+    if (clean.isEmpty) {
+      return;
+    }
 
     MockData.tenantMessages.add(
       ChatMessage(
@@ -215,9 +246,18 @@ class TenantController extends ChangeNotifier {
   String _message(Object error) {
     return error
         .toString()
-        .replaceFirst('Exception: ', '')
-        .replaceFirst('AuthException(message: ', '')
-        .replaceFirst(RegExp(r', statusCode:.*$'), '')
+        .replaceFirst(
+          'Exception: ',
+          '',
+        )
+        .replaceFirst(
+          'AuthException(message: ',
+          '',
+        )
+        .replaceFirst(
+          RegExp(r', statusCode:.*$'),
+          '',
+        )
         .replaceAll(')', '');
   }
 }
