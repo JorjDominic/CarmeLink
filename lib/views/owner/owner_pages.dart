@@ -493,29 +493,48 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                 IconButton.filledTonal(
                   tooltip: 'Customize quick access',
                   onPressed: _showQuickAccessPicker,
-                  icon: const Icon(Icons.add_rounded),
+                  visualDensity: VisualDensity.compact,
+                  constraints:
+                      const BoxConstraints.tightFor(width: 40, height: 40),
+                  icon: const Icon(Icons.add_rounded, size: 20),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 6,
+              runSpacing: 6,
               children: [
                 ..._allOperationItems
                     .where((item) => _quickAccess.contains(item.title))
                     .map((item) => InputChip(
-                          avatar: Icon(item.icon, size: 18),
+                          avatar: Icon(item.icon, size: 15),
                           label: Text(_quickAccessLabel(item, controller)),
+                          labelStyle: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          labelPadding:
+                              const EdgeInsets.symmetric(horizontal: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          visualDensity: const VisualDensity(
+                            horizontal: -2,
+                            vertical: -2,
+                          ),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          side: BorderSide(
+                            color: Theme.of(context).dividerColor,
+                          ),
                           tooltip: 'Open ${item.title}',
                           onPressed: () => _ownerPush(context, item.page),
                           onDeleted: () =>
                               setState(() => _quickAccess.remove(item.title)),
-                          deleteIcon: const Icon(Icons.close_rounded, size: 17),
+                          deleteIcon: const Icon(Icons.close_rounded, size: 14),
                         )),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Text('Management areas',
                 style: Theme.of(context)
                     .textTheme

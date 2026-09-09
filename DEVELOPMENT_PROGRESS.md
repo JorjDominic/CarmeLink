@@ -12,6 +12,187 @@ divided between two developers to reduce merge conflicts.
 - **Live** — connected to Supabase
 - **Mock** — uses local demonstration data or a simulated workflow
 
+## Important core of the system
+
+These modules should be completed before optional automation such as OCR,
+facial recognition, geofencing, IoT monitoring, or advanced analytics.
+
+1. **Identity and access** — authentication, profiles, roles, verification, and RLS.
+2. **People and relationships** — tenants, guardians, staff, and their verified links.
+3. **Rooms and occupancy** — rooms, beds, assignments, vacancies, and contracts.
+4. **Payments** — charges, balances, receipts, verification, and payment history.
+5. **Maintenance** — submissions, locations, assignments, status, and resolution.
+6. **Gate, curfew, and visitors** — auditable events and approval workflows.
+7. **Communication** — announcements, notifications, and role-scoped messaging.
+8. **Safety and privacy** — confidential reports, audit logs, retention, and permissions.
+
+## Core requirements by page
+
+`[✓]` means the page's core requirement is live or complete. `[ ]` means the
+page exists but its important backend workflow is unfinished.
+
+### Authentication pages
+
+- [✓] **Splash and Welcome** — initialize Supabase and restore the session.
+- [✓] **Sign in** — authenticate credentials and route using the server role.
+- [✓] **Change password** — reauthenticate and update Supabase credentials.
+- [ ] **Forgot password** — complete and test recovery email deep links.
+- [ ] **Account onboarding** — invitation, permanent password, and required SMS verification.
+
+### Tenant pages
+
+- [ ] **Home** — live room, balance, maintenance, gate, and announcement summary.
+- [ ] **My Room** — assigned room, bed, roommates, capacity, and utilities.
+- [ ] **Payments** — charges, outstanding balance, due dates, and payment history.
+- [ ] **Upload Payment Proof** — secure Storage upload and verification status.
+- [ ] **Reports Hub** — live maintenance and confidential-report summaries.
+- [ ] **Maintenance Reports** — tenant-owned reports and current status.
+- [ ] **Submit Maintenance** — persist category, urgency, description, and location.
+- [ ] **Maintenance Floor Plan** — attach a valid room/location to a report.
+- [ ] **Announcements** — show only notices published for the tenant audience.
+- [ ] **Messages and Conversation** — persisted, role-scoped real-time messaging.
+- [ ] **Gate and Curfew** — verified IN/OUT events, curfew status, and exceptions.
+- [ ] **Curfew Exception** — tenant request with guardian and staff decisions.
+- [ ] **Visitor Request** — visitor identity, schedule, status, and audit history.
+- [ ] **Confidential Concern** — encrypted/restricted submission visible only to authorized staff.
+- [✓] **Rules and Policies** — maintained dormitory rules and safety guidance.
+
+### Guardian pages
+
+- [ ] **Home** — live linked-tenant, payment, request, gate, and notice summary.
+- [ ] **Tenant Information** — RLS-limited data for verified linked tenants only.
+- [ ] **Curfew Overview** — linked tenant's current status and approved exceptions.
+- [ ] **Gate Activity** — verified activity for linked tenants only.
+- [ ] **Curfew Requests** — approve or reject requests with an audit timestamp.
+- [ ] **Payment Status** — read-only charges and verification for linked tenants.
+- [ ] **Announcements** — guardian-audience notices from Supabase.
+- [ ] **Messages and Conversation** — persistent communication with authorized staff.
+- [ ] **Emergency and Safety Alerts** — urgent targeted alerts and acknowledgement.
+
+### Caretaker pages
+
+- [ ] **Tenants** — live directory and operational tenant information.
+- [ ] **Rooms** — vacancies, bed status, and assignments without owner-only finance.
+- [ ] **Maintenance** — triage, assign, update, and resolve tenant reports.
+- [ ] **Gate** — review events and record authorized manual overrides.
+- [✓] **Accounts** — CRUD limited to tenant and guardian accounts.
+- [✓] **Profile** — authenticated caretaker identity and access level.
+
+### Owner pages
+
+- [ ] **Dashboard** — prioritized live occupancy, payment, maintenance, and gate metrics.
+- [ ] **Tenants** — full tenant directory, relationships, assignments, and contracts.
+- [ ] **Operations** — live grouped access to every management workflow.
+- [ ] **Rooms and Floor Plan** — manage rooms, beds, occupancy, and maintenance markers.
+- [ ] **Payments** — review receipts, correct records, and maintain an audit trail.
+- [ ] **Maintenance** — assign work, update status, and record resolution details.
+- [ ] **Gate and Manual Override** — auditable access decisions and system health.
+- [ ] **Curfew Review** — guardian input and final staff decisions.
+- [ ] **Visitor Management** — approve, reject, and audit visitor access.
+- [ ] **Confidential Reports** — owner-authorized access with audit logging.
+- [ ] **Announcements** — create, target, publish, and archive notices.
+- [ ] **Messages** — persistent tenant and guardian conversations.
+- [ ] **Contacts** — verified guardian and emergency contact directory.
+- [ ] **Contracts** — dates, renewal state, expiry alerts, and history.
+- [ ] **Income and Expenses** — validated financial records and owner-only RLS.
+- [ ] **Disciplinary Records** — verified incidents, notices, and restricted history.
+- [ ] **Reports and Analytics** — owner-only metrics generated from live records.
+- [✓] **Accounts & Access** — full CRUD with server-enforced role permissions.
+- [✓] **Profile** — authenticated owner identity and access level.
+
+### Shared pages
+
+- [✓] **Profile identity** — live name, email, phone, and server-controlled role.
+- [ ] **Profile role details** — editable tenant and staff details with validation.
+- [ ] **Notifications** — persisted read/unread, audience, type, and deep links.
+- [✓] **Settings and Theme** — local appearance preference.
+- [ ] **Notification Preferences** — persist preferences per authenticated account.
+- [ ] **Privacy and Permissions** — connect actual device permission state.
+- [ ] **Device Binding** — trusted-device registration, revocation, and audit history.
+- [ ] **Verification Code** — secure expiring SMS OTP with retry and resend limits.
+- [✓] **Dormitory Information** — static dormitory information and contact guidance.
+
+### Requirements applying to every live page
+
+- [ ] Loading, empty, error, retry, and offline states.
+- [ ] Server-side authorization for every read and mutation.
+- [ ] Input validation on both Flutter and Supabase.
+- [ ] Audit fields for sensitive creation, updates, approvals, and deletion.
+- [ ] Responsive phone, tablet, and wide-screen testing.
+- [ ] Unit, widget, integration, and role-access tests.
+- [ ] No production page may depend on `MockData`.
+
+## Development handoff
+
+Tenant and Guardian development can continue without waiting for the Owner or
+Caretaker interfaces. The authentication, profile, relationship, room, bed,
+assignment, and initial RLS foundations are already available.
+
+### Developer 2 can build independently
+
+- [ ] Replace `TenantController` mock data with tenant-scoped repositories.
+- [ ] Replace `GuardianController` mock data with guardian-scoped repositories.
+- [ ] Connect the Tenant Profile and My Room pages to live assignments.
+- [ ] Connect Guardian Tenant Information to verified guardian links.
+- [ ] Implement tenant payments and guardian payment visibility.
+- [ ] Implement maintenance submission and status tracking.
+- [ ] Implement announcements for tenant and guardian audiences.
+- [ ] Implement curfew requests and guardian decisions.
+- [ ] Implement visitor requests.
+- [ ] Implement tenant and guardian messaging.
+
+The Owner/Admin interface does not need to be completed before these pages are
+built. For multi-role workflows, Developer 2 may complete the tenant and
+guardian actions first and leave the final staff action for later integration.
+
+### Shared contracts that must be agreed first
+
+- [ ] Table and column names for payments, maintenance, announcements, curfew,
+  visitors, messages, and notifications.
+- [ ] Allowed status values and valid status transitions.
+- [ ] Model and repository method names used by Flutter.
+- [ ] Tenant ownership and guardian-link rules used by RLS.
+- [ ] Storage bucket names and upload rules.
+- [ ] Real-time subscription channels where required.
+
+### File ownership during the handoff
+
+Developer 1 owns:
+
+- `lib/views/owner/`
+- `lib/views/caretaker/`
+- `lib/views/auth/`
+- `lib/services/account_service.dart`
+- `lib/views/shared/account_management_page.dart`
+- `supabase/migrations/`
+- `supabase/functions/`
+
+Developer 2 owns:
+
+- `lib/views/tenant/`
+- `lib/views/guardian/`
+- `lib/controllers/tenant_controller.dart`
+- `lib/controllers/guardian_controller.dart`
+- New tenant/guardian repositories and services agreed by both developers.
+
+Shared files require coordination before editing:
+
+- `lib/models/models.dart`
+- `lib/app.dart`
+- `lib/views/shared/`
+- `lib/core/`
+- `pubspec.yaml`
+
+### Handoff rules
+
+- [ ] Developer 2 works from a dedicated `feature/tenant-guardian-live-data` branch.
+- [ ] Do not edit migrations `001` through `006`; create a new migration instead.
+- [ ] Never place the Supabase service-role key in Flutter code or assets.
+- [ ] Keep all role restrictions in RLS or protected server functions.
+- [ ] Test changes using both tenant and guardian accounts.
+- [ ] Confirm that each role is denied access to unrelated records.
+- [ ] Update this progress file in the same pull request as each completed feature.
+
 ## Developer 1 — Owner, Caretaker, and foundation
 
 Owned folders and files:
