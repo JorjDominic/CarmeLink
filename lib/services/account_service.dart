@@ -20,23 +20,38 @@ class AccountService {
     required String role,
     required String temporaryPassword,
   }) async {
-    final response = await SupabaseConfig.client.functions.invoke(
-      'create-user',
-      body: {
-        'full_name': fullName.trim(),
-        'email': email.trim().toLowerCase(),
-        'phone': phone.trim(),
-        'role': role,
-        'password': temporaryPassword,
-      },
-    );
-    if (response.status < 200 || response.status >= 300) {
-      final data = response.data;
-      throw FunctionException(
-        status: response.status,
-        details: data,
-        reasonPhrase: data is Map ? data['error']?.toString() : null,
+    try {
+      final response = await SupabaseConfig.client.functions.invoke(
+        'create-user',
+        body: {
+          'full_name': fullName.trim(),
+          'email': email.trim().toLowerCase(),
+          'phone': phone.trim(),
+          'role': role,
+          'password': temporaryPassword,
+        },
       );
+      if (response.status < 200 || response.status >= 300) {
+        throw AccountCreationException(_messageFrom(response.data));
+      }
+    } on FunctionException catch (error) {
+      throw AccountCreationException(_messageFrom(error.details));
     }
   }
+
+  String _messageFrom(dynamic details) {
+    if (details is Map && details['error'] != null) {
+      return details['error'].toString();
+    }
+    if (details is String && details.trim().isNotEmpty) return details;
+    return 'The account could not be created. Please try again.';
+  }
+}
+
+class AccountCreationException implements Exception {
+  const AccountCreationException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
 }

@@ -37,9 +37,14 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
               final created = await showModalBottomSheet<bool>(
                 context: context,
                 isScrollControlled: true,
+                useSafeArea: true,
+                showDragHandle: true,
                 builder: (_) => const _CreateAccountSheet(),
               );
-              if (created == true) reload();
+              if (created == true && context.mounted) {
+                reload();
+                showAppSnackBar(context, 'Account created successfully.');
+              }
             },
             icon: const Icon(Icons.person_add_outlined),
             label: const Text('Create account'),
@@ -111,6 +116,7 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
   bool loading = false;
   bool passwordVisible = false;
   String role = 'tenant';
+  String? errorMessage;
 
   List<String> get allowedRoles =>
       SessionController.instance.currentUser?.role == UserRole.owner
@@ -127,13 +133,16 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
   }
 
   Future<void> submit() async {
+    FocusScope.of(context).unfocus();
+    setState(() => errorMessage = null);
     if (fullName.text.trim().isEmpty || !email.text.contains('@')) {
-      showAppSnackBar(context, 'Enter a name and valid email address.');
+      setState(
+          () => errorMessage = 'Enter a full name and a valid email address.');
       return;
     }
     if (password.text.length < 12) {
-      showAppSnackBar(
-          context, 'Temporary password must be at least 12 characters.');
+      setState(() => errorMessage =
+          'Temporary password must contain at least 12 characters.');
       return;
     }
     setState(() => loading = true);
@@ -146,10 +155,9 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
         temporaryPassword: password.text,
       );
       if (!mounted) return;
-      showAppSnackBar(context, 'Account created successfully.');
       Navigator.of(context).pop(true);
     } catch (error) {
-      if (mounted) showAppSnackBar(context, 'Unable to create account: $error');
+      if (mounted) setState(() => errorMessage = error.toString());
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -216,12 +224,50 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
                     ),
                   ),
                 ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 14),
+                  Semantics(
+                    liveRegion: true,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .errorContainer
+                            .withValues(alpha: .55),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .error
+                              .withValues(alpha: .35),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.error_outline,
+                              color: Theme.of(context).colorScheme.error),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(errorMessage!)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: loading ? null : submit,
-                    icon: const Icon(Icons.person_add_outlined),
+                    icon: loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.person_add_outlined),
                     label: Text(loading ? 'Creating…' : 'Create account'),
                   ),
                 ),
