@@ -76,7 +76,127 @@ Users do not choose their own role in the client. The role is stored in the prot
 
 ---
 
+
+# Development Ownership — Two-Developer Split
+
+CarmeLink development is divided between two developers so the Owner/Caretaker backend work and the Tenant/Guardian client work can progress in parallel with fewer merge conflicts.
+
+## Developer 1 — Owner, Caretaker, Authentication, and Backend Foundation
+
+**Primary responsibility:** server-side foundation, database design, security, Owner/Caretaker workflows, and protected administrative functions.
+
+Owned areas:
+
+- `lib/views/owner/`
+- `lib/views/caretaker/`
+- `lib/views/auth/`
+- `lib/core/`
+- `lib/services/`
+- `lib/controllers/session_controller.dart`
+- `lib/services/account_service.dart`
+- `lib/views/shared/account_management_page.dart`
+- `supabase/migrations/`
+- `supabase/functions/`
+
+Main system responsibilities:
+
+- Authentication and session security
+- Role routing and role guards
+- Account creation and account management
+- Owner-only guardian-to-tenant link management
+- Database migrations and relational schema
+- Row Level Security policies
+- Owner dashboard and Operations Hub
+- Caretaker operational pages
+- Room/bed management and staff-side assignments
+- Staff-side payment verification
+- Staff-side maintenance management
+- Gate monitoring and manual overrides
+- Staff curfew decisions
+- Visitor approvals
+- Owner financial records, contracts, reports, and analytics
+- Backend support for OCR, geofencing, gate devices, notifications, and other advanced integrations
+
+## Developer 2 — Tenant, Guardian, and User-Facing Shared Pages
+
+**Primary responsibility:** Tenant and Guardian workspaces plus shared end-user pages and the repositories/controllers needed to connect those pages to the agreed backend contracts.
+
+Owned areas:
+
+- `lib/views/tenant/`
+- `lib/views/guardian/`
+- `lib/views/shared/` except Developer 1-owned account-management components
+- `lib/controllers/tenant_controller.dart`
+- `lib/controllers/guardian_controller.dart`
+- New Tenant/Guardian repositories and feature services agreed by both developers
+
+Main system responsibilities:
+
+- Tenant dashboard and My Room
+- Tenant payments and payment-proof flow
+- Tenant maintenance submission and history
+- Tenant gate/curfew interface
+- Tenant curfew exception requests
+- Tenant visitor requests
+- Tenant confidential concerns
+- Tenant announcements and messaging
+- Guardian dashboard and linked-tenant information
+- Guardian curfew/gate monitoring
+- Guardian request approval/rejection
+- Guardian payment status
+- Guardian announcements, messages, and emergency alerts
+- Shared profile, settings, notifications, notification preferences, permissions, and dormitory-information pages
+- Tenant/Guardian loading, empty, error, and offline states
+- Client-side validation for Tenant/Guardian workflows
+
+## Shared Files Requiring Coordination
+
+The following files affect both development lanes and should not be edited independently without agreeing on the contract first:
+
+- `lib/models/models.dart`
+- `lib/app.dart`
+- Shared routing/navigation definitions
+- Shared theme/core contracts
+- `pubspec.yaml`
+- Any repository interface used by both management and resident roles
+
+`lib/views/shared/` is primarily handled by Developer 2, but **account-management UI and any shared page that changes protected account/role behavior remain Developer 1-owned or require explicit coordination**.
+
+## Backend Contract Rule
+
+Developer 1 owns production migrations and RLS. Developer 2 should not create competing schemas for the same feature. Before connecting a feature, both developers agree on:
+
+- Table and column names
+- Allowed status values
+- Valid status transitions
+- Model/repository method names
+- Storage bucket names and upload policies
+- Realtime channels where needed
+- Tenant ownership rules
+- Guardian-to-tenant access rules
+
+This allows Developer 2 to build against a stable contract while Developer 1 keeps database security centralized.
+
+## Parallel Development Principle
+
+```text
+DEVELOPER 1                              DEVELOPER 2
+Owner + Caretaker + Backend              Tenant + Guardian + Shared UX
+        │                                         │
+        ├── Defines schema/RLS/contracts ─────────┤
+        │                                         ├── Connects user-facing pages
+        ├── Builds staff workflows                ├── Builds resident/guardian workflows
+        │                                         │
+        └──────────── Integration + role tests ───┘
+```
+
+The Tenant and Guardian interfaces do not need to wait for every Owner/Caretaker page to be finished. They only need the relevant database contract, RLS rules, and test data for the feature being connected.
+
+---
+
 # 3. Authentication and Account Management
+
+**Primary owner: Developer 1.** Developer 2 consumes the authenticated session and role/profile data in Tenant, Guardian, and shared user pages.
 
 ## Authentication Pages
 
@@ -129,6 +249,8 @@ The current ZIP already contains live account-management services and protected 
 
 # 4. Owner Web / Administrative Workspace
 
+**Primary owner: Developer 1.**
+
 ## Main Navigation
 
 ```text
@@ -144,6 +266,8 @@ The Owner workspace provides the broadest access in the system.
 ---
 
 # 5. Owner Dashboard
+
+**Primary owner: Developer 1.**
 
 The dashboard should prioritize information requiring action rather than only showing raw statistics.
 
@@ -180,6 +304,8 @@ The dashboard should prioritize information requiring action rather than only sh
 ---
 
 # 6. Owner Operations Hub
+
+**Primary owner: Developer 1.**
 
 The actual project groups owner functions into focused categories rather than placing every management page in one long menu.
 
@@ -408,6 +534,8 @@ Announcements should support audience targeting such as:
 
 # 7. Caretaker Workspace
 
+**Primary owner: Developer 1.**
+
 ## Main Navigation
 
 ```text
@@ -467,6 +595,8 @@ Caretakers cannot create owner or caretaker accounts.
 
 # 8. Tenant Mobile Application
 
+**Primary owner: Developer 2.** Backend tables/RLS are supplied through contracts maintained by Developer 1.
+
 ## Main Navigation
 
 ```text
@@ -482,6 +612,8 @@ The tenant interface should stay simpler than the staff interface and focus on r
 ---
 
 # 9. Tenant Home
+
+**Primary owner: Developer 2.**
 
 Recommended dashboard structure:
 
@@ -524,6 +656,8 @@ Latest Announcement
 
 # 10. Tenant Room Information
 
+**Primary owner: Developer 2.**
+
 ## My Room
 
 - Room number
@@ -540,6 +674,8 @@ Room and bed information should come from the same central room assignment recor
 ---
 
 # 11. Tenant Payments & Utilities
+
+**Primary owner: Developer 2 for Tenant UI/integration; Developer 1 owns billing/payment schema and staff verification.**
 
 ## Features
 
@@ -584,6 +720,8 @@ OCR is currently represented as a simulated workflow in the ZIP and should not b
 
 # 12. Tenant Reports Hub
 
+**Primary owner: Developer 2.**
+
 The tenant Reports section combines maintenance and private concern reporting.
 
 ## Reports Dashboard
@@ -597,6 +735,8 @@ The tenant Reports section combines maintenance and private concern reporting.
 ---
 
 # 13. Maintenance Workflow
+
+**Split ownership:** Developer 2 owns Tenant submission/history UX; Developer 1 owns the production schema, RLS, staff assignment, progress, and completion workflow.
 
 ## Tenant Submission
 
@@ -640,6 +780,8 @@ The tenant can use an interactive floor plan to identify the exact room or dormi
 ---
 
 # 14. Gate and Curfew Module
+
+**Split ownership:** Developer 2 owns Tenant/Guardian views and request UX; Developer 1 owns gate-event infrastructure, staff review, overrides, and backend enforcement.
 
 This is one of the system's major safety and monitoring modules.
 
@@ -691,6 +833,8 @@ The current UI includes facial-recognition events, geofence cross-check status, 
 
 # 15. Curfew Exception Workflow
 
+**Split ownership:** Developer 2 owns Tenant submission and Guardian decision UX; Developer 1 owns the shared schema/RLS and final Owner/Caretaker decision workflow.
+
 ```text
 Tenant Creates Request
         ↓
@@ -724,6 +868,8 @@ Curfew Monitoring Uses Approved Exception
 ---
 
 # 16. Visitor Request Workflow
+
+**Split ownership:** Developer 2 owns Tenant request/cancellation; Developer 1 owns schema/RLS and staff approval/audit workflow.
 
 ```text
 Tenant Registers Visitor
@@ -759,6 +905,8 @@ Recommended visitor fields:
 
 # 17. Confidential Concern Reporting
 
+**Split ownership:** Developer 2 owns Tenant submission/history; Developer 1 owns restricted staff access, audit logging, and server-side authorization.
+
 Tenants can privately submit concerns involving:
 
 - Safety
@@ -789,6 +937,8 @@ Access must be tightly controlled through RLS and server-side authorization. The
 ---
 
 # 18. Announcements and Notifications
+
+**Split ownership:** Developer 1 owns staff publishing/backend contracts; Developer 2 owns Tenant/Guardian consumption, notification preferences, and user-facing notification UX.
 
 ## Announcement Flow
 
@@ -839,6 +989,8 @@ Notification + Announcement History
 
 # 19. Guardian Mobile Application
 
+**Primary owner: Developer 2.**
+
 ## Main Navigation
 
 ```text
@@ -854,6 +1006,8 @@ The Guardian role is read-focused and approval-focused. A guardian should only s
 ---
 
 # 20. Guardian Home
+
+**Primary owner: Developer 2.**
 
 ## Summary Information
 
@@ -874,6 +1028,8 @@ The Guardian role is read-focused and approval-focused. A guardian should only s
 
 # 21. Guardian Tenant Information
 
+**Primary owner: Developer 2.** Guardian-link data and RLS are maintained by Developer 1.
+
 A verified guardian may view only permitted information for linked tenants.
 
 Recommended visible fields:
@@ -889,6 +1045,8 @@ Recommended visible fields:
 ---
 
 # 22. Guardian Curfew and Gate Activity
+
+**Primary owner: Developer 2 for Guardian UX; Developer 1 supplies verified backend events and access policies.**
 
 ## Curfew Overview
 
@@ -912,6 +1070,8 @@ The current page also contains a device-usage demonstration view. If retained, i
 
 # 23. Guardian Request Approval
 
+**Primary owner: Developer 2 for Guardian decision UX; Developer 1 owns schema/RLS and the final staff-decision stage.**
+
 Guardians review curfew requests submitted by a linked tenant.
 
 ## Available Actions
@@ -929,6 +1089,8 @@ Guardian approval does not automatically have to become the final dormitory deci
 
 # 24. Guardian Payment Status
 
+**Primary owner: Developer 2 for read-only Guardian UX; Developer 1 owns financial records and verification.**
+
 Read-only functions:
 
 - Current balance
@@ -943,6 +1105,8 @@ Guardians should not be able to modify payment records.
 
 # 25. Guardian Communication
 
+**Primary owner: Developer 2 for Guardian UX; shared messaging contracts are coordinated with Developer 1.**
+
 - Guardian announcements
 - Direct message with owner/caretaker
 - Dormitory contact information
@@ -951,6 +1115,8 @@ Guardians should not be able to modify payment records.
 ---
 
 # 26. Shared Pages and Settings
+
+**Primary owner: Developer 2 for normal end-user shared pages.** Account-management and protected role/account behavior remain Developer 1-owned.
 
 All roles can use shared pages according to permission.
 
@@ -999,6 +1165,8 @@ Planned policy:
 
 # 27. Room and Bed Assignment Model
 
+**Primary backend owner: Developer 1.** Developer 2 consumes the resulting assignment data in Tenant/Guardian pages.
+
 The current backend already separates rooms, bed spaces, and assignments.
 
 ```text
@@ -1039,6 +1207,8 @@ Create Active Assignment
 ---
 
 # 28. Current Live Database Foundation
+
+**Primary owner: Developer 1.**
 
 The current Supabase migrations create these main database objects.
 
@@ -1187,6 +1357,8 @@ Rules:
 
 # 29. Planned Operational Database Structure
 
+**Primary schema/migration owner: Developer 1.** Developer 2 integrates Tenant/Guardian pages only after these contracts are agreed.
+
 The current migrations provide the foundation. The next production tables should be added as new migrations rather than forcing unrelated data into the existing core tables.
 
 A recommended complete schema is:
@@ -1251,6 +1423,8 @@ audit_logs
 ---
 
 # 30. Important Database Relationships
+
+**Primary owner: Developer 1 for relational integrity and RLS; both developers must follow the same relationship contracts.**
 
 ## Occupancy
 
@@ -1338,6 +1512,8 @@ Manual Override / Audit if needed
 
 # 31. Suggested Payment Database Design
 
+**Primary owner: Developer 1.** Developer 2 consumes these records for Tenant and Guardian payment pages.
+
 ## `billing_cycles`
 
 Represents a tenant's bill for a period.
@@ -1419,6 +1595,8 @@ reviewed_at
 
 # 32. Suggested Maintenance Database Design
 
+**Primary owner: Developer 1 for schema/RLS; Developer 2 connects Tenant-facing creation and history.**
+
 ## `maintenance_requests`
 
 ```text
@@ -1460,6 +1638,8 @@ created_at
 ---
 
 # 33. Suggested Curfew and Gate Database Design
+
+**Primary owner: Developer 1 for schema/RLS; Developer 2 connects Tenant/Guardian request and review UX.**
 
 ## `curfew_requests`
 
@@ -1527,6 +1707,8 @@ occurred_at
 
 # 34. Suggested Visitor Database Design
 
+**Primary owner: Developer 1 for schema/RLS; Developer 2 connects Tenant request UX.**
+
 ## `visitor_requests`
 
 ```text
@@ -1558,6 +1740,8 @@ notes
 ---
 
 # 35. Suggested Communication Database Design
+
+**Shared feature:** Developer 1 owns protected schema/publishing rules; Developer 2 owns Tenant/Guardian communication UX.
 
 ## `announcements`
 
@@ -1610,6 +1794,8 @@ read_at
 
 # 36. Suggested Safety Database Design
 
+**Shared feature:** Developer 1 owns restricted schema/RLS; Developer 2 owns Tenant submission UX where applicable.
+
 ## `confidential_reports`
 
 ```text
@@ -1653,6 +1839,8 @@ created_at
 
 # 37. Notifications Database Design
 
+**Shared feature:** Developer 1 owns backend schema/policies; Developer 2 owns user-facing preferences and notification pages.
+
 ## `notifications`
 
 ```text
@@ -1684,6 +1872,8 @@ updated_at
 ---
 
 # 38. Audit and Security Records
+
+**Primary owner: Developer 1.**
 
 ## `audit_logs`
 
@@ -1718,6 +1908,8 @@ Important actions to audit:
 ---
 
 # 39. Row Level Security Plan
+
+**Primary implementation owner: Developer 1.** Both developers must test that Tenant and Guardian accounts are denied unrelated records.
 
 RLS must remain the final authority even if Flutter hides buttons.
 
@@ -1902,6 +2094,8 @@ This is a future refactor recommendation. It is not necessary to reorganize ever
 
 # 42. Backend Access Pattern
 
+**Developer 1 owns backend/security contracts. Developer 2 owns Tenant/Guardian repositories that consume those contracts.**
+
 Because the current system uses Supabase, the preferred architecture is:
 
 ```text
@@ -1924,6 +2118,8 @@ Administrative actions that require elevated privileges must use protected serve
 ---
 
 # 43. Existing Protected Backend Functions
+
+**Primary owner: Developer 1.**
 
 The ZIP contains Edge Functions for account administration.
 
@@ -1949,6 +2145,8 @@ Additional Edge Functions should be added only when a task genuinely requires tr
 ---
 
 # 44. Major External / Advanced Integrations
+
+**Split ownership:** Developer 1 owns backend/service integration and protected functions; Developer 2 connects the resulting Tenant/Guardian user experience where required.
 
 These are represented by pages or workflows in the current app but should be treated as separate production integrations.
 
@@ -2105,6 +2303,8 @@ Visit History
 
 # 46. Reports
 
+**Primary owner: Developer 1 for Owner reports and export services.** Developer 2 may expose role-scoped summaries to Tenant/Guardian pages.
+
 ## Owner Reports
 
 - Occupancy report
@@ -2163,6 +2363,8 @@ Recommended UI principles already reflected in the project:
 
 # 48. Error, Offline, and Empty States
 
+**Shared responsibility:** each developer implements these states inside the pages and services they own.
+
 Every production-backed page should explicitly handle:
 
 - Loading
@@ -2182,6 +2384,8 @@ No page should silently fall back to mock data in production.
 ---
 
 # 49. Validation Rules
+
+**Shared responsibility:** Developer 1 enforces server/database validation; each developer enforces appropriate client-side validation in owned pages.
 
 ## Accounts
 
@@ -2242,6 +2446,8 @@ No page should silently fall back to mock data in production.
 
 # 50. Security Requirements
 
+**Primary backend owner: Developer 1; verification responsibility: both developers.**
+
 - Keep RLS enabled on all private tables.
 - Never rely on Flutter UI hiding as the only authorization layer.
 - Never expose the Supabase service-role key in the client.
@@ -2261,6 +2467,8 @@ No page should silently fall back to mock data in production.
 
 # 51. Privacy Requirements
 
+**Shared responsibility.** Developer 1 enforces protected access and retention controls; Developer 2 must avoid exposing sensitive Tenant/Guardian data in client UI.
+
 Special attention is required for:
 
 - Tenant personal information
@@ -2278,325 +2486,525 @@ The production system should use the minimum data necessary for each function an
 
 ---
 
-# 52. Development Phases
+# 52. Development Phases — Two-Developer Parallel Plan
 
-The phases below are aligned to the current ZIP rather than assuming development starts from zero.
+The phases below follow the current ZIP and the ownership model in `DEVELOPMENT_PROGRESS.md`. They are not meant to force both developers to finish one entire phase before moving. The goal is to expose a stable backend contract from Developer 1, then let Developer 2 connect the matching Tenant/Guardian workflow in parallel.
 
-## Phase 1 — Foundation and Security
+## Phase 1 — Foundation, Authentication, and Security
+
+### Developer 1
 
 Already substantially implemented:
 
-- Flutter project foundation
-- Responsive role shell
-- Supabase configuration
-- Authentication
-- Persistent session restoration
-- Protected profiles
-- Owner/caretaker/guardian/tenant roles
-- Role guards
-- RLS foundation
-- Account creation/management Edge Functions
-- Account-management UI
-- Guardian linking
+- [✓] Flutter/Supabase foundation
+- [✓] Supabase email/password authentication
+- [✓] Persistent session restoration
+- [✓] Protected profiles and server-controlled roles
+- [✓] Owner, Caretaker, Guardian, and Tenant role routing
+- [✓] Role guards and initial RLS
+- [✓] Protected account creation/management Edge Functions
+- [✓] Owner/Caretaker account-management UI
+- [✓] Guardian-to-tenant link management
 
-Remaining foundation work:
+Remaining:
 
-- Complete password-recovery deep links
-- Complete production onboarding/invitation flow
-- Finalize SMS/OTP policy if required
-- Add production error/offline states
-- Add complete access-control tests
+- [ ] Complete and test password-recovery deep links
+- [ ] Finish invitation/onboarding flow
+- [ ] Finalize SMS/OTP policy if retained
+- [ ] Add verification timestamps and retry/expiry controls where required
+- [ ] Complete production access-control tests
+- [ ] Keep all production role restrictions in RLS/protected server functions
+
+### Developer 2
+
+- [✓] Consume authenticated profile/session in Tenant and Guardian workspaces
+- [✓] Shared profile identity
+- [✓] Change password
+- [✓] Local settings/theme
+- [ ] Add permitted self-profile editing for Tenant and Guardian
+- [ ] Connect notification preferences to authenticated accounts
+- [ ] Add complete loading/error/offline states to owned shared pages
+
+### Integration checkpoint
+
+Both developers verify one test account for each role and confirm that Tenant/Guardian sessions cannot open Owner/Caretaker data or actions.
 
 ---
 
-## Phase 2 — People, Rooms, and Occupancy
+## Phase 2 — People, Rooms, Occupancy, and Relationships
 
-Current backend foundation exists for:
+### Developer 1
 
-- Profiles
-- Tenant details
-- Staff details
-- Rooms
-- Bed spaces
-- Tenant assignments
-- Guardian links
+Current backend foundation:
+
+- [✓] `profiles`
+- [✓] `tenant_details`
+- [✓] `staff_details`
+- [✓] `rooms`
+- [✓] `bed_spaces`
+- [✓] `tenant_assignments`
+- [✓] `guardian_tenant_links`
 
 Next work:
 
-- Replace mock tenant directory with Supabase data
-- Replace mock room monitoring with live rooms/bed spaces
-- Create room/bed management CRUD
-- Create assignment workflow
-- Connect My Room
-- Connect guardian-linked tenant information
-- Add contract table/history
+- [ ] Replace Owner/Caretaker mock tenant directory with live records
+- [ ] Replace mock room monitoring with live rooms and bed spaces
+- [ ] Build room/bed CRUD and assignment management
+- [ ] Add contract/rental-history model
+- [ ] Expose stable repository/service contracts for room and linked-tenant reads
+
+### Developer 2
+
+- [ ] Connect Tenant `My Room` to the active assignment
+- [ ] Show bed, room, roommates, capacity, and permitted utility information
+- [ ] Connect Guardian `Tenant Information` to verified links only
+- [ ] Add proper empty states when a Tenant has no assignment or a Guardian has no active link
+
+### Integration checkpoint
+
+Verify that a Tenant can read only their own assignment and a Guardian can read only linked Tenant information. Owner/Caretaker remain the only roles that can manage occupancy.
 
 ---
 
 ## Phase 3 — Billing and Payments
 
-Build:
+### Developer 1
 
-- Rental contracts
-- Monthly billing generation
-- Billing items
-- Utilities
-- Penalties
-- Discounts
-- Partial payments
-- Payment proofs
-- Secure receipt upload
-- Payment verification
-- Balances
-- Payment history
-- Receipts
+Build the production financial backend and management workflow:
 
-Then connect:
+- [ ] Rental contracts
+- [ ] Billing cycles
+- [ ] Billing items
+- [ ] Utilities
+- [ ] Penalties and discounts
+- [ ] Partial-payment support
+- [ ] Payment records
+- [ ] Payment-proof metadata
+- [ ] Payment verification history
+- [ ] Owner/Caretaker payment review
+- [ ] Audit trail for corrections and decisions
+- [ ] Dashboard payment metrics
 
-- Tenant Payments
-- Guardian Payment Status
-- Owner Payment Review
-- Dashboard payment metrics
+### Developer 2
+
+After the payment contract is frozen:
+
+- [ ] Connect Tenant current bill and outstanding balance
+- [ ] Connect Tenant payment history
+- [ ] Upload payment proof to the agreed Storage bucket
+- [ ] Display verification status and receipt information
+- [ ] Connect Guardian read-only payment status for linked Tenants
+- [ ] Handle rejected, partial, overdue, and pending-verification states
+
+### Integration checkpoint
+
+Test the full flow:
+
+```text
+Owner creates charge
+      ↓
+Tenant sees balance
+      ↓
+Tenant uploads payment proof
+      ↓
+Owner/Caretaker verifies
+      ↓
+Tenant and Guardian see updated status
+```
 
 ---
 
 ## Phase 4 — Maintenance and Property Operations
 
-Build:
+### Developer 1
 
-- Maintenance request tables
-- Attachments
-- Status history
-- Staff assignment
-- Completion records
-- Floor-plan location references
+- [ ] Create maintenance request schema, attachments, updates, assignment, and resolution tables
+- [ ] Apply Tenant ownership and staff-management RLS
+- [ ] Connect Owner/Caretaker maintenance queues
+- [ ] Connect staff assignment, status changes, and resolution notes
+- [ ] Connect floor-plan monitoring and maintenance markers
+- [ ] Add dashboard maintenance metrics
 
-Then connect:
+### Developer 2
 
-- Tenant Reports
-- Submit Maintenance
-- Maintenance History
-- Caretaker Maintenance
-- Owner Maintenance
-- Floor Plan Monitoring
-- Dashboard maintenance counts
+This lane can begin as soon as the minimal request schema/RLS contract is ready; it does not need to wait for the full Owner/Caretaker maintenance UI.
 
----
+- [ ] Submit Tenant maintenance requests
+- [ ] Save category, urgency, description, room/location, and attachments
+- [ ] Show the Tenant's own request history
+- [ ] Show `Pending`, `Assigned`, `In Progress`, `Completed`, and other agreed statuses
+- [ ] Connect the Tenant maintenance floor-plan location selector
+- [ ] Add cancellation/edit rules only for states permitted by the shared contract
 
-## Phase 5 — Curfew, Gate, and Visitors
+### Integration checkpoint
 
-Build:
-
-- Curfew requests
-- Guardian decisions
-- Staff decisions
-- Gate events
-- Gate review records
-- Manual overrides
-- Visitor requests
-- Visitor logs
-
-Then connect:
-
-- Tenant Gate & Curfew
-- Curfew Exception
-- Guardian Curfew Overview
-- Guardian Request Approval
-- Guardian Gate Activity
-- Owner/Caretaker Curfew Monitoring
-- Gate Monitoring
-- Visitor Management
-
-At this phase, normal manual/test gate events can be implemented before advanced camera/geofence automation.
+A Tenant-created `Pending` request must appear in the Owner/Caretaker queue without exposing other tenants' private reports to the submitting Tenant.
 
 ---
 
-## Phase 6 — Communication and Safety
+## Phase 5 — Curfew Requests, Gate Events, and Visitors
 
-Build:
+### Developer 1
 
-- Announcements
-- Audience targeting
-- Announcement read state
-- Conversations
-- Messages
-- Notifications
-- Notification preferences
-- Confidential reports
-- Confidential report updates
-- Disciplinary records
+- [ ] Create `curfew_requests`, guardian decisions, and staff decisions
+- [ ] Create gate event/review/override tables
+- [ ] Create visitor request/log tables
+- [ ] Apply role-specific RLS and status transitions
+- [ ] Connect Owner/Caretaker curfew review
+- [ ] Connect Gate monitoring and manual override
+- [ ] Connect staff visitor approval/rejection
+- [ ] Add audit timestamps and decision identities
 
-Then connect all existing communication and safety pages to live data.
+### Developer 2
+
+The request workflows can be developed before advanced camera/geofence automation.
+
+- [ ] Tenant creates/views/cancels unreviewed curfew requests
+- [ ] Guardian views requests from an already-linked Tenant
+- [ ] Guardian approves/rejects with remarks and timestamp
+- [ ] Show `Awaiting staff decision` after Guardian approval when applicable
+- [ ] Tenant creates/views/cancels unreviewed visitor requests
+- [ ] Connect Tenant Gate & Curfew overview to verified events
+- [ ] Connect Guardian Curfew Overview and Gate Activity to linked-Tenant events only
+
+### Integration checkpoint
+
+```text
+Tenant curfew request
+       ↓
+Guardian decision
+       ↓
+Owner/Caretaker final decision
+       ↓
+Tenant + Guardian see final result
+```
+
+Manual/test gate events should be proven first. Camera, facial recognition, and geofence automation are later enhancements, not prerequisites for this workflow.
+
+---
+
+## Phase 6 — Communication, Notifications, and Safety
+
+### Developer 1
+
+- [ ] Create announcement and audience-targeting backend
+- [ ] Connect Owner/Caretaker announcement publishing
+- [ ] Create protected conversation/message contracts
+- [ ] Create notification records and delivery triggers
+- [ ] Create confidential-report tables with strict staff-only access
+- [ ] Create disciplinary-record backend
+- [ ] Add audit logging for sensitive staff access/actions
+
+### Developer 2
+
+- [ ] Connect Tenant/Guardian announcements
+- [ ] Connect Tenant/Guardian conversations and message history
+- [ ] Connect notifications and deep links
+- [ ] Persist Tenant/Guardian notification preferences
+- [ ] Submit Tenant confidential concerns
+- [ ] Show only the submitting Tenant's permitted confidential-report state/history
+- [ ] Connect Guardian emergency/safety alerts where the backend audience permits it
+
+### Integration checkpoint
+
+Test announcement audiences, conversation membership, notification ownership, and confidential-report denial rules across all roles.
 
 ---
 
 ## Phase 7 — Advanced Verification and Automation
 
-Integrate only after the core workflows are stable:
+These features come only after the core manual workflows are reliable.
 
-- OCR payment extraction
-- Geofence service
-- Gate camera/facial recognition
-- IoT/service health monitoring
-- Device binding
-- Biometrics
-- SMS verification if retained
-- Push notifications
+### Developer 1
 
-Each integration needs failure handling and a manual fallback.
+- [ ] OCR/payment extraction backend
+- [ ] Geofence event/service integration
+- [ ] Gate camera/facial-recognition integration
+- [ ] IoT/device health monitoring
+- [ ] Trusted-device backend
+- [ ] SMS verification service if retained
+- [ ] Push-notification backend
+- [ ] Manual fallback and failure logging for every automation
+
+### Developer 2
+
+- [ ] Integrate OCR results into the Tenant payment-proof experience without treating OCR as authoritative
+- [ ] Display geofence/gate verification state to Tenant/Guardian only when permitted
+- [ ] Connect verification/device-binding pages
+- [ ] Handle unavailable, denied-permission, timeout, and fallback states
+- [ ] Keep the normal request/payment/gate flows usable when automation fails
+
+### Integration checkpoint
+
+No automated result should bypass RLS, staff authority, audit logging, or the manual fallback path.
 
 ---
 
-## Phase 8 — Finance, Reports, and Analytics
+## Phase 8 — Finance, Contracts, Reports, and Analytics
 
-Build:
+### Developer 1
 
-- Income records
-- Expense records
-- Contract analytics
-- Occupancy analytics
-- Payment compliance
-- Maintenance analytics
-- Curfew/gate analytics
-- Visitor analytics
-- Export services
+Primary phase owner:
 
-Exports:
+- [ ] Income records
+- [ ] Expense records
+- [ ] Contract expiry and renewal workflow
+- [ ] Occupancy analytics
+- [ ] Payment compliance analytics
+- [ ] Maintenance analytics
+- [ ] Curfew/gate analytics
+- [ ] Visitor analytics
+- [ ] Owner dashboard metrics
+- [ ] PDF export
+- [ ] Excel export
+- [ ] CSV export
 
-- PDF
-- Excel
-- CSV
+### Developer 2
+
+Supporting user-facing work:
+
+- [ ] Ensure Tenant/Guardian summary cards use the same live records and status definitions
+- [ ] Expose only role-appropriate history/summary views
+- [ ] Add navigation/deep links from notifications into the correct record
 
 ---
 
 ## Phase 9 — Testing and Production Hardening
 
-- Unit tests
-- Widget tests
-- Integration tests
-- RLS role-access tests
-- Account-permission tests
-- File upload policy tests
-- Offline/network tests
-- Responsive tests
-- Security review
-- Privacy review
-- Performance testing
-- Backup/recovery plan
-- Audit-log verification
-- Remove mock production dependencies
-- Remove test users/provisioners
+### Developer 1
+
+- [ ] RLS/access-control tests for every production table
+- [ ] Edge Function tests
+- [ ] Owner/Caretaker integration tests
+- [ ] Storage policy tests
+- [ ] Audit-log verification
+- [ ] Backup/recovery plan
+- [ ] Security and privacy review
+- [ ] Remove development-only provisioning paths and test accounts
+
+### Developer 2
+
+- [ ] Tenant widget/integration tests
+- [ ] Guardian widget/integration tests
+- [ ] Shared-page tests
+- [ ] Offline/network/error-state tests
+- [ ] Phone/tablet/wide-screen tests for owned interfaces
+- [ ] Verify no owned production page depends on `MockData`
+
+### Joint final tests
+
+- [ ] Full Tenant → Guardian → Caretaker/Owner workflow tests
+- [ ] Session expiry and sign-out
+- [ ] Password recovery
+- [ ] Permission denial
+- [ ] File upload failures
+- [ ] Realtime reconnection
+- [ ] Cross-role privacy checks
+- [ ] Performance and release build validation
 
 ---
 
-# 53. Recommended Implementation Priority
+# 53. Recommended Two-Developer Implementation Priority
 
-Do not build the advanced camera/geofence/OCR features before the core records are reliable.
+The order below minimizes blocking and merge conflicts.
 
-Recommended order:
+## Developer 1 Priority
 
 ```text
-1. Authentication + Roles + RLS
-2. Profiles + Guardian Links
-3. Rooms + Bed Spaces + Assignments
-4. Contracts
-5. Billing + Payments
-6. Maintenance
-7. Curfew Requests
-8. Visitors
-9. Gate Events
-10. Announcements + Messaging + Notifications
-11. Confidential / Disciplinary Records
-12. Reports + Analytics
-13. OCR
-14. Geofence / Gate Camera / IoT
-15. Final Security + Production Testing
+1. Finish authentication recovery/onboarding/security
+2. Freeze shared table/model/status conventions
+3. Finish live rooms + assignments management
+4. Create maintenance request schema/RLS
+5. Create curfew + visitor schema/RLS
+6. Create billing + payment schema/RLS
+7. Create announcements/messages/notifications schema/RLS
+8. Connect Owner/Caretaker operational pages
+9. Add confidential/safety/disciplinary backend
+10. Add contracts + owner finance + analytics
+11. Add advanced automation services
+12. Complete RLS/security/production testing
+```
+
+## Developer 2 Priority
+
+The first items are intentionally features that can proceed with minimal dependence on completed Owner/Caretaker pages.
+
+```text
+1. Permitted Tenant/Guardian self-profile editing
+2. Tenant maintenance submission + own history
+3. Tenant curfew submission + Guardian approval/rejection
+4. Tenant visitor submission + cancellation
+5. Tenant confidential-concern submission
+6. Tenant/Guardian notification preferences
+7. My Room + linked-Tenant information
+8. Tenant payments + proof upload + Guardian payment status
+9. Announcements + messaging + notifications
+10. Gate/curfew live event views
+11. Advanced verification UX
+12. Tenant/Guardian production testing and MockData removal
+```
+
+## Shared Integration Checkpoints
+
+```text
+A. Auth/Profile contract
+B. Rooms/Assignments contract
+C. Maintenance contract
+D. Curfew/Visitor contract
+E. Billing/Payments contract
+F. Messaging/Notifications contract
+G. Advanced integrations
+H. Final cross-role testing
+```
+
+At each checkpoint, Developer 1 supplies or confirms the backend contract and RLS behavior before Developer 2 merges the corresponding live-data integration.
+
+---
+
+# 54. Current ZIP Status Summary by Developer
+
+## Developer 1 — Live / Connected
+
+- [✓] Supabase initialization
+- [✓] Supabase email/password authentication
+- [✓] Session restoration
+- [✓] Protected role lookup
+- [✓] Four-role routing and guards
+- [✓] Change-password backend support
+- [✓] Protected `profiles`
+- [✓] `tenant_details`
+- [✓] `staff_details`
+- [✓] Core `rooms`
+- [✓] Core `bed_spaces`
+- [✓] Core `tenant_assignments`
+- [✓] `guardian_tenant_links`
+- [✓] Owner/Caretaker account management
+- [✓] Owner-only guardian-link management
+- [✓] RLS foundation
+- [✓] Server-side user-management functions
+
+## Developer 1 — UI Exists but Operational Backend Is Mostly Mock
+
+- [ ] Owner dashboard metrics
+- [ ] Owner/Caretaker tenant operational data
+- [ ] Room monitoring and management data
+- [ ] Interactive floor-plan operational records
+- [ ] Payment verification
+- [ ] Maintenance management
+- [ ] Gate monitoring/manual override
+- [ ] Curfew staff review
+- [ ] Visitor approval
+- [ ] Confidential-report management
+- [ ] Staff announcements
+- [ ] Staff messaging
+- [ ] Contract expiry
+- [ ] Income/expenses
+- [ ] Disciplinary records
+- [ ] Reports/analytics
+- [ ] Device/service monitoring
+
+## Developer 2 — Live / Complete
+
+- [✓] Tenant/Guardian sign-in through shared authentication
+- [✓] Tenant/Guardian authenticated profile identity
+- [✓] Guardian linked-tenant identity on Profile
+- [✓] Change password
+- [✓] Settings/theme local state
+- [✓] Rules and policies
+- [✓] Dormitory information
+
+## Developer 2 — UI Exists but Mostly Mock / Local
+
+- [ ] Tenant dashboard and My Room
+- [ ] Tenant payments/history
+- [ ] Payment-proof upload/OCR flow
+- [ ] Tenant reports hub
+- [ ] Tenant maintenance submission/history/floor plan
+- [ ] Tenant announcements
+- [ ] Tenant messages
+- [ ] Tenant gate/curfew
+- [ ] Tenant curfew exceptions
+- [ ] Tenant visitor requests
+- [ ] Tenant confidential concerns
+- [ ] Guardian dashboard
+- [ ] Guardian curfew/gate activity
+- [ ] Guardian curfew review
+- [ ] Guardian payment status
+- [ ] Guardian announcements/messages
+- [ ] Guardian emergency/safety alerts
+- [ ] Notifications
+- [ ] Notification preferences persistence
+- [ ] Privacy/permission state
+- [ ] Device binding/verification code
+
+A feature should be called **fully implemented** only when its persistence, authorization, validation, error handling, role isolation, and required tests are connected—not merely because its UI exists.
+
+---
+
+# 55. Branch, Handoff, and Merge Rules
+
+To keep two developers productive without repeatedly editing the same files:
+
+- Developer 1 remains the owner of Supabase migrations and Edge Functions.
+- Developer 2 should use a dedicated Tenant/Guardian feature branch such as `feature/tenant-guardian-live-data`.
+- Existing applied migrations should not be rewritten; create a new migration for changes.
+- Never place the Supabase service-role key in Flutter code, assets, or client configuration.
+- All role restrictions must be enforced server-side through RLS or protected functions, not only hidden in UI.
+- Shared model/status changes must be agreed before either developer integrates them.
+- Each pull request should update implementation/progress documentation for completed features.
+- Developer 2 must test with both Tenant and Guardian accounts.
+- Developer 1 must test Owner/Caretaker actions and explicitly verify that Tenant/Guardian accounts are denied the same protected operations.
+- Cross-role workflows should be merged only after both ends use the same status values and database contract.
+
+### Recommended Git ownership pattern
+
+```text
+Developer 1 branches
+├── feature/backend-<module>
+├── feature/owner-<module>
+└── feature/caretaker-<module>
+
+Developer 2 branches
+├── feature/tenant-<module>
+├── feature/guardian-<module>
+└── feature/shared-user-<module>
+
+Integration
+└── Pull request → main/development branch after contract + role tests
 ```
 
 ---
 
-# 54. Current ZIP Status Summary
+# 56. Final System Scope
 
-## Live / Connected
-
-- Supabase initialization
-- Supabase email/password authentication
-- Session restoration
-- Protected role lookup
-- Owner role routing
-- Caretaker role routing
-- Guardian role routing
-- Tenant role routing
-- Role guards
-- Change password
-- Protected `profiles`
-- Core `rooms`
-- Core `bed_spaces`
-- Core `tenant_assignments`
-- `guardian_tenant_links`
-- `tenant_details`
-- `staff_details`
-- Owner/caretaker account management
-- Owner-only guardian-link management
-- RLS foundation
-- Server-side user-management functions
-- Theme/settings UI
-- Static rules and dormitory information
-
-## UI Exists but Mostly Mock / Demo
-
-- Owner dashboard metrics
-- Tenant directory operational data
-- Room monitoring data
-- Interactive floor-plan records
-- Payments and balances
-- Payment proof/OCR workflow
-- Payment verification
-- Maintenance requests
-- Gate events
-- Facial recognition/geofence checks
-- Manual gate override
-- Curfew request workflow
-- Visitor workflow
-- Confidential reports
-- Announcements
-- Messaging
-- Notifications
-- Contract expiry
-- Income/expenses
-- Disciplinary records
-- Reports/analytics
-- Device/service monitoring
-
-This distinction is important when presenting the system: the UI demonstrates the planned complete workflow, but a feature should only be called fully implemented once its persistence, authorization, validation, error handling, and testing are connected to the backend.
-
----
-
-# 55. Final System Scope
-
-The complete CarmeLink system should provide one coordinated workflow for four parties:
+The complete CarmeLink system should provide one coordinated workflow for four parties while preserving the two-developer ownership split during implementation:
 
 ```text
+DEVELOPER 1
 OWNER
 Full administration, finance, safety, reports, accounts
-        │
         │
 CARETAKER
 Daily tenant, room, maintenance, gate, and account operations
         │
-        │
-TENANT
-Payments, room, maintenance, gate/curfew, visitors, reports
-        │
-        │
-GUARDIAN
-Linked-tenant monitoring, approvals, payment status, communication
+        ├──────────── Shared Supabase backend + RLS ────────────┐
+        │                                                       │
+DEVELOPER 2                                                     │
+TENANT                                                          │
+Payments, room, maintenance, gate/curfew, visitors, reports     │
+        │                                                       │
+GUARDIAN                                                        │
+Linked-tenant monitoring, approvals, payment status, messages ──┘
 ```
 
-All four roles connect to the same protected Supabase backend.
+All four roles connect to the same protected Supabase backend and relational database.
 
-The most important system principle is:
+The implementation principle is:
 
-> **One Flutter system, one backend, one relational database, strict role-based access, and a single source of truth for tenant, room, payment, maintenance, gate, curfew, visitor, guardian, and communication records.**
+> **Developer 1 owns the management side and backend/security foundation; Developer 2 owns the Tenant/Guardian user side; both integrate through agreed database, RLS, model, and status contracts.**
+
+The system principle remains:
+
+> **One Flutter system, one backend, one relational database, strict role-based access, and one source of truth for tenant, room, payment, maintenance, gate, curfew, visitor, guardian, and communication records.**
 
 Advanced features such as OCR, geofencing, facial recognition, IoT monitoring, and biometrics should support the core dormitory workflows rather than replace them.
