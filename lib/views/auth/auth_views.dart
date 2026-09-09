@@ -305,9 +305,10 @@ class SignInPage extends StatefulWidget {
 }
 
 class _SignInPageState extends State<SignInPage> {
-  final email = TextEditingController(text: 'tenant@carmelita.demo');
-  final password = TextEditingController(text: 'demo1234');
+  final email = TextEditingController(text: 'tenant@carmelita.test');
+  final password = TextEditingController(text: 'CarmeLinkTest123!');
   final session = SessionController.instance;
+  bool _passwordVisible = false;
 
   @override
   void dispose() {
@@ -366,10 +367,20 @@ class _SignInPageState extends State<SignInPage> {
                             const SizedBox(height: 14),
                             TextField(
                                 controller: password,
-                                obscureText: true,
-                                decoration: const InputDecoration(
+                                obscureText: !_passwordVisible,
+                                decoration: InputDecoration(
                                     labelText: 'Password',
-                                    prefixIcon: Icon(Icons.lock_outline)),
+                                    prefixIcon: const Icon(Icons.lock_outline),
+                                    suffixIcon: IconButton(
+                                      tooltip: _passwordVisible
+                                          ? 'Hide password'
+                                          : 'Show password',
+                                      onPressed: () => setState(() =>
+                                          _passwordVisible = !_passwordVisible),
+                                      icon: Icon(_passwordVisible
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined),
+                                    )),
                                 onSubmitted: (_) => _submit()),
                             Align(
                                 alignment: Alignment.centerRight,
@@ -396,21 +407,21 @@ class _SignInPageState extends State<SignInPage> {
                                       : 'Sign in'),
                                 )),
                             const SizedBox(height: 22),
-                            Text('Frontend demo accounts',
+                            Text('Test accounts',
                                 style: Theme.of(context)
                                     .textTheme
                                     .titleSmall
                                     ?.copyWith(fontWeight: FontWeight.w800)),
                             const SizedBox(height: 10),
                             Wrap(spacing: 8, runSpacing: 8, children: [
-                              _demoChip('Tenant', 'tenant@carmelita.demo'),
-                              _demoChip('Guardian', 'guardian@carmelita.demo'),
+                              _demoChip('Tenant', 'tenant@carmelita.test'),
+                              _demoChip('Guardian', 'guardian@carmelita.test'),
                               _demoChip(
-                                  'Owner/Caretaker', 'owner@carmelita.demo'),
+                                  'Owner/Caretaker', 'owner@carmelita.test'),
                             ]),
                             const SizedBox(height: 12),
                             Text(
-                                'Demo authentication is isolated in the service layer so it can be replaced by Supabase Auth later.',
+                                'These accounts are for development only. Remove them before production.',
                                 style: Theme.of(context).textTheme.bodySmall),
                           ]),
                     ),
@@ -426,7 +437,7 @@ class _SignInPageState extends State<SignInPage> {
       label: Text(label),
       onPressed: () => setState(() {
             email.text = value;
-            password.text = 'demo1234';
+            password.text = 'CarmeLinkTest123!';
           }));
 }
 
@@ -438,7 +449,7 @@ class ForgotPasswordPage extends StatefulWidget {
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final email = TextEditingController();
-  final AuthService service = MockAuthService();
+  final AuthService service = SupabaseAuthService();
   bool loading = false;
 
   @override

@@ -3,6 +3,8 @@
 CarmeLink is a Flutter dormitory-management app for Carmelita's Dormitory. It gives tenants, guardians, and dormitory staff role-specific tools for payments, maintenance, gate activity, curfew, visitors, announcements, and communication.
 
 This README is a guide to every user-facing page currently implemented in the app.
+Development assignments and completion status are tracked separately in
+[`DEVELOPMENT_PROGRESS.md`](DEVELOPMENT_PROGRESS.md).
 
 ## Contents
 
@@ -37,17 +39,21 @@ flutter analyze
 flutter test
 ```
 
-## Demo sign-in
+## Test sign-in
 
-The current build uses mock authentication. Enter any non-empty password and use the email to choose a role:
+The app uses Supabase Auth and loads authorization roles from the protected
+`public.profiles` table. After running the migration and one-time provisioner,
+use these development accounts:
 
 | Role | Example email | Result |
 |---|---|---|
-| Owner / Caretaker | `owner@example.com` | Opens the staff workspace |
-| Guardian | `guardian@example.com` | Opens the guardian workspace |
-| Tenant | `tenant@example.com` | Opens the tenant workspace |
+| Owner / Caretaker | `owner@carmelita.test` | Opens the staff workspace |
+| Guardian | `guardian@carmelita.test` | Opens the guardian workspace |
+| Tenant | `tenant@carmelita.test` | Opens the tenant workspace |
 
-Emails containing `owner` or `caretaker` become staff accounts. Emails containing `guardian` or `parent` become guardian accounts. All other non-empty emails become tenant accounts.
+All three accounts initially use `CarmeLinkTest123!`. Remove the test users and
+the provisioning function before production. A user cannot select or update
+their own role from the client.
 
 Most records are local demo data. Form submissions, messages, approvals, and status changes demonstrate the intended experience but are not production-backed persistence.
 
@@ -462,7 +468,8 @@ For implementation details, see the official [Supabase user invitation guide](ht
 
 ## Implementation status
 
-- Authentication uses `MockAuthService`, not production authentication.
+- Authentication uses Supabase Auth. Role routing is based on a protected
+  profile record rather than email text or client metadata.
 - Operational records primarily come from `lib/data/mock_data.dart` and in-memory controllers.
 - Supabase is included as a dependency and configuration scaffold, but the documented demo workflows should not be assumed to persist remotely.
 - OCR, facial recognition, geofencing, biometrics, device binding, and IoT monitoring are simulated product workflows/status interfaces pending production integrations.

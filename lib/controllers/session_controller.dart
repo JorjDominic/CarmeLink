@@ -5,9 +5,9 @@ import '../services/auth_service.dart';
 class SessionController extends ChangeNotifier {
   SessionController._();
   static final SessionController instance = SessionController._();
-  final AuthService _authService = MockAuthService();
+  final AuthService _authService = SupabaseAuthService();
   AppUser? _currentUser;
-  bool _loading = false;
+  bool _loading = true;
   String? _error;
   bool _justSignedOut = false;
 
@@ -15,6 +15,18 @@ class SessionController extends ChangeNotifier {
   bool get loading => _loading;
   String? get error => _error;
   bool get justSignedOut => _justSignedOut;
+
+  Future<void> initialize() async {
+    try {
+      _currentUser = await _authService.restoreSession();
+    } catch (_) {
+      await _authService.signOut();
+      _currentUser = null;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
 
   Future<bool> signIn(String email, String password) async {
     _loading = true;
@@ -33,7 +45,8 @@ class SessionController extends ChangeNotifier {
     }
   }
 
-  void signOut() {
+  Future<void> signOut() async {
+    await _authService.signOut();
     _currentUser = null;
     _error = null;
     _justSignedOut = true;
