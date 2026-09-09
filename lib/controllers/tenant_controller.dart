@@ -2,24 +2,63 @@ import 'package:flutter/foundation.dart';
 
 import '../data/mock_data.dart';
 import '../models/models.dart';
+import '../services/maintenance_service.dart';
 
 class TenantController extends ChangeNotifier {
   TenantController._();
 
   static final TenantController instance = TenantController._();
 
+  final MaintenanceService _maintenanceService = const MaintenanceService();
+
+  final List<MaintenanceReport> _maintenance = [];
+  bool _maintenanceLoading = false;
+  String? _maintenanceError;
+
   Room get room => MockData.room;
+
   List<Payment> get payments => List.unmodifiable(MockData.payments);
-  List<MaintenanceReport> get maintenance =>
-      List.unmodifiable(MockData.maintenance);
+
+  List<MaintenanceReport> get maintenance => List.unmodifiable(_maintenance);
+
   List<GateEvent> get gateEvents => List.unmodifiable(MockData.gateEvents);
+
   List<Announcement> get announcements =>
       List.unmodifiable(MockData.announcements);
+
   List<CurfewRequest> get curfewRequests =>
       List.unmodifiable(MockData.curfewRequests);
+
   List<VisitorRequest> get visitors => List.unmodifiable(MockData.visitors);
+
   List<ConcernReport> get concerns => List.unmodifiable(MockData.concerns);
+
   List<ChatMessage> get messages => List.unmodifiable(MockData.tenantMessages);
+
+  bool get maintenanceLoading => _maintenanceLoading;
+
+  String? get maintenanceError => _maintenanceError;
+
+  Future<void> loadMaintenance() async {
+    if (_maintenanceLoading) return;
+
+    _maintenanceLoading = true;
+    _maintenanceError = null;
+    notifyListeners();
+
+    try {
+      final reports = await _maintenanceService.listOwnReports();
+
+      _maintenance
+        ..clear()
+        ..addAll(reports);
+    } catch (error) {
+      _maintenanceError = _message(error);
+    } finally {
+      _maintenanceLoading = false;
+      notifyListeners();
+    }
+  }
 
   void submitPaymentProof({
     required double amount,
@@ -37,27 +76,63 @@ class TenantController extends ChangeNotifier {
         reference: reference.trim().isEmpty ? null : reference.trim(),
       ),
     );
+
     notifyListeners();
   }
 
-  void submitMaintenance({
+  Future<void> submitMaintenance({
     required String category,
     required String description,
     required String location,
     required String urgency,
-  }) {
-    MockData.maintenance.insert(
-      0,
-      MaintenanceReport(
-        id: 'm${DateTime.now().millisecondsSinceEpoch}',
-        category: category,
-        description: description,
-        location: location,
-        urgency: urgency,
-        status: 'Submitted',
-        createdAt: DateTime.now(),
-      ),
+  }) async {
+    final report = await _maintenanceService.createReport(
+      category: category,
+      description: description,
+      location: location,
+      urgency: urgency,
     );
+
+    _maintenance.insert(0, report);
+    _maintenanceError = null;
+    notifyListeners();
+  }
+
+  Future<void> updateMaintenance({
+    required String id,
+    required String category,
+    required String description,
+    required String location,
+    required String urgency,
+  }) async {
+    final updated = await _maintenanceService.updateReport(
+      id: id,
+      category: category,
+      description: description,
+      location: location,
+      urgency: urgency,
+    );
+
+    final index = _maintenance.indexWhere(
+      (report) => report.id == id,
+    );
+
+    if (index != -1) {
+      _maintenance[index] = updated;
+    }
+
+    _maintenanceError = null;
+    notifyListeners();
+  }
+
+  Future<void> deleteMaintenance(String id) async {
+    await _maintenanceService.deleteReport(id);
+
+    _maintenance.removeWhere(
+      (report) => report.id == id,
+    );
+
+    _maintenanceError = null;
     notifyListeners();
   }
 
@@ -78,6 +153,7 @@ class TenantController extends ChangeNotifier {
         ownerStatus: 'Pending',
       ),
     );
+
     notifyListeners();
   }
 
@@ -96,6 +172,7 @@ class TenantController extends ChangeNotifier {
         status: 'Pending',
       ),
     );
+
     notifyListeners();
   }
 
@@ -113,11 +190,13 @@ class TenantController extends ChangeNotifier {
         createdAt: DateTime.now(),
       ),
     );
+
     notifyListeners();
   }
 
   void sendMessage(String body) {
     final clean = body.trim();
+
     if (clean.isEmpty) return;
 
     MockData.tenantMessages.add(
@@ -129,6 +208,16 @@ class TenantController extends ChangeNotifier {
         sentAt: DateTime.now(),
       ),
     );
+
     notifyListeners();
+  }
+
+  String _message(Object error) {
+    return error
+        .toString()
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('AuthException(message: ', '')
+        .replaceFirst(RegExp(r', statusCode:.*$'), '')
+        .replaceAll(')', '');
   }
 }

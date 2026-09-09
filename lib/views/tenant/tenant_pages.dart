@@ -3,6 +3,7 @@ import '../../controllers/tenant_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../data/mock_data.dart';
+import '../../models/models.dart';
 import '../widgets/feature_widgets.dart';
 
 class TenantDashboardPage extends StatelessWidget {
@@ -12,7 +13,8 @@ class TenantDashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = TenantController.instance;
     final payment = controller.payments.first;
-    final maintenance = controller.maintenance.first;
+    final maintenance =
+        controller.maintenance.isEmpty ? null : controller.maintenance.first;
 
     return PageFrame(
       title: 'Home',
@@ -131,17 +133,33 @@ class TenantDashboardPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          AttentionCard(
-            icon: Icons.build_outlined,
-            title: maintenance.category,
-            subtitle: '${maintenance.location} • ${maintenance.description}',
-            status: maintenance.status,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const MaintenanceReportsPage(),
+          if (maintenance != null)
+            AttentionCard(
+              icon: Icons.build_outlined,
+              title: maintenance.category,
+              subtitle: '${maintenance.location} • ${maintenance.description}',
+              status: maintenance.status,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const MaintenanceReportsPage(),
+                ),
+              ),
+            )
+          else
+            AttentionCard(
+              icon: Icons.build_outlined,
+              title: controller.maintenanceLoading
+                  ? 'Loading maintenance reports'
+                  : 'No maintenance reports',
+              subtitle: controller.maintenanceError ??
+                  'No submitted maintenance issue needs attention.',
+              status: controller.maintenanceLoading ? 'Loading' : 'Clear',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const MaintenanceReportsPage(),
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 24),
           const SectionTitle(
             'Quick actions',
@@ -619,177 +637,491 @@ class TenantReportsHubPage extends StatelessWidget {
   }
 }
 
-class MaintenanceReportsPage extends StatelessWidget {
+class MaintenanceReportsPage extends StatefulWidget {
   const MaintenanceReportsPage({super.key});
+
+  @override
+  State<MaintenanceReportsPage> createState() => _MaintenanceReportsPageState();
+}
+
+class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
+  final controller = TenantController.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    controller.loadMaintenance();
+  }
+
+  Future<void> _edit(MaintenanceReport report) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SubmitMaintenancePage(report: report),
+      ),
+    );
+  }
+
+  Future<void> _delete(MaintenanceReport report) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete maintenance report?'),
+        content: Text(
+          'Delete the ${report.category.toLowerCase()} report for '
+          '${report.location}? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await controller.deleteMaintenance(report.id);
+      if (!mounted) return;
+      showAppSnackBar(context, 'Maintenance report deleted.');
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        error.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final c = TenantController.instance;
     return PageFrame(
       title: 'Maintenance reports',
       subtitle: 'Submitted issues and progress',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh reports',
+          onPressed:
+              controller.maintenanceLoading ? null : controller.loadMaintenance,
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
       floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SubmitMaintenancePage())),
-          icon: const Icon(Icons.add),
-          label: const Text('Report issue')),
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const SubmitMaintenancePage(),
+          ),
+        ),
+        icon: const Icon(Icons.add),
+        label: const Text('Report issue'),
+      ),
       child: AnimatedBuilder(
-          animation: c,
-          builder: (context, _) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'REPORT SUMMARY',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                          letterSpacing: 1.3,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+        animation: controller,
+        builder: (context, _) {
+          final reports = controller.maintenance;
+          final openCount = reports
+              .where(
+                (report) => !{'Resolved', 'Cancelled'}.contains(report.status),
+              )
+              .length;
+          final highCount = reports
+              .where(
+                (report) =>
+                    report.urgency == 'High' &&
+                    !{'Resolved', 'Cancelled'}.contains(report.status),
+              )
+              .length;
+
+          if (controller.maintenanceLoading && reports.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (controller.maintenanceError != null && reports.isEmpty) {
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_off_outlined, size: 44),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Unable to load maintenance reports',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      controller.maintenanceError!,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: controller.loadMaintenance,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Try again'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'REPORT SUMMARY',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      letterSpacing: 1.3,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              MutedDashboardGrid(
+                compact: true,
+                items: [
+                  MutedDashboardItem(
+                    label: 'Open reports',
+                    value: '$openCount',
+                    detail: 'Needs attention',
+                    icon: Icons.build_outlined,
+                    color: const Color(0xFFB47A52),
                   ),
-                  const SizedBox(height: 8),
-                  MutedDashboardGrid(
-                    compact: true,
-                    items: [
-                      MutedDashboardItem(
-                        label: 'Open reports',
-                        value:
-                            '${c.maintenance.where((r) => r.status != 'Completed').length}',
-                        detail: 'Needs attention',
-                        icon: Icons.build_outlined,
-                        color: const Color(0xFFB47A52),
-                      ),
-                      MutedDashboardItem(
-                        label: 'High priority',
-                        value:
-                            '${c.maintenance.where((r) => r.urgency == 'High').length}',
-                        detail: 'Urgent issues',
-                        icon: Icons.priority_high_rounded,
-                        color: const Color(0xFFAA6870),
+                  MutedDashboardItem(
+                    label: 'High priority',
+                    value: '$highCount',
+                    detail: 'Urgent issues',
+                    icon: Icons.priority_high_rounded,
+                    color: const Color(0xFFAA6870),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              const SectionTitle('Submitted reports'),
+              const SizedBox(height: 10),
+              if (controller.maintenanceError != null) ...[
+                CarmelitaCard(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(controller.maintenanceError!)),
+                      TextButton(
+                        onPressed: controller.loadMaintenance,
+                        child: const Text('Retry'),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 22),
-                  const SectionTitle('Submitted reports'),
-                  const SizedBox(height: 10),
-                  ...c.maintenance.map(
-                    (r) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: CarmelitaCard(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (reports.isEmpty)
+                const CarmelitaCard(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle_outline),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'No maintenance reports yet. Use Report issue to submit one.',
+                          ),
                         ),
-                        child: TimelineTile(
-                            compact: true,
-                            icon: Icons.build_outlined,
-                            color: r.urgency == 'High'
-                                ? const Color(0xFFAA6870)
-                                : r.urgency == 'Medium'
-                                    ? const Color(0xFFB47A52)
-                                    : const Color(0xFF627FA8),
-                            title: '${r.category} • ${r.location}',
-                            subtitle:
-                                '${r.description}\n${shortDate(r.createdAt)}',
-                            trailing: StatusPill(r.status)),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ...reports.map(
+                  (report) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: CarmelitaCard(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      child: TimelineTile(
+                        compact: true,
+                        icon: Icons.build_outlined,
+                        color: report.urgency == 'High'
+                            ? const Color(0xFFAA6870)
+                            : report.urgency == 'Medium'
+                                ? const Color(0xFFB47A52)
+                                : const Color(0xFF627FA8),
+                        title: '${report.category} • ${report.location}',
+                        subtitle:
+                            '${report.description}\n${shortDate(report.createdAt)}',
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            StatusPill(report.status),
+                            if (report.status == 'Pending') ...[
+                              const SizedBox(width: 4),
+                              PopupMenuButton<String>(
+                                tooltip: 'Report actions',
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    _edit(report);
+                                  } else if (value == 'delete') {
+                                    _delete(report);
+                                  }
+                                },
+                                itemBuilder: (_) => const [
+                                  PopupMenuItem(
+                                    value: 'edit',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.edit_outlined),
+                                        SizedBox(width: 10),
+                                        Text('Edit'),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.delete_outline),
+                                        SizedBox(width: 10),
+                                        Text('Delete'),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ],
-              )),
+                ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
 
 class SubmitMaintenancePage extends StatefulWidget {
-  const SubmitMaintenancePage({super.key});
+  const SubmitMaintenancePage({super.key, this.report});
+
+  final MaintenanceReport? report;
+
   @override
   State<SubmitMaintenancePage> createState() => _SubmitMaintenancePageState();
 }
 
 class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
-  final description = TextEditingController();
-  String category = 'Plumbing';
-  String urgency = 'Medium';
-  String location = 'Room 204';
+  static const categories = [
+    'Plumbing',
+    'Electrical',
+    'Furniture',
+    'Air conditioning',
+    'Other',
+  ];
+
+  static const locations = [
+    'Room 204',
+    'Room 204 • Bathroom',
+    'Second-floor corridor',
+    'Kitchen',
+    'Laundry area',
+    'Other common area',
+  ];
+
+  static const urgencies = ['Low', 'Medium', 'High'];
+
+  late final TextEditingController description;
+  late String category;
+  late String urgency;
+  late String location;
+  bool saving = false;
+
+  bool get editing => widget.report != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final report = widget.report;
+    description = TextEditingController(text: report?.description ?? '');
+    category = categories.contains(report?.category)
+        ? report!.category
+        : categories.first;
+    urgency = urgencies.contains(report?.urgency) ? report!.urgency : 'Medium';
+    location = locations.contains(report?.location)
+        ? report!.location
+        : locations.first;
+  }
+
+  @override
+  void dispose() {
+    description.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final cleanDescription = description.text.trim();
+    if (cleanDescription.length < 3) {
+      showAppSnackBar(context, 'Enter a short description first.');
+      return;
+    }
+
+    setState(() => saving = true);
+
+    try {
+      if (editing) {
+        await TenantController.instance.updateMaintenance(
+          id: widget.report!.id,
+          category: category,
+          description: cleanDescription,
+          location: location,
+          urgency: urgency,
+        );
+      } else {
+        await TenantController.instance.submitMaintenance(
+          category: category,
+          description: cleanDescription,
+          location: location,
+          urgency: urgency,
+        );
+      }
+
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        editing ? 'Maintenance report updated.' : 'Maintenance report added.',
+      );
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        error.toString().replaceFirst('Exception: ', ''),
+      );
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => PageFrame(
-      title: 'Submit maintenance report',
-      subtitle: 'Describe the issue and exact location',
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          DropdownButtonFormField<String>(
-              initialValue: category,
-              decoration: const InputDecoration(labelText: 'Issue category'),
-              items: const [
-                'Plumbing',
-                'Electrical',
-                'Furniture',
-                'Air conditioning',
-                'Other'
-              ].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-              onChanged: (v) => setState(() => category = v ?? category)),
-          const SizedBox(height: 14),
-          LabeledField(
-              label: 'Description',
-              hint: 'Explain what is wrong and what you observed.',
-              controller: description,
-              maxLines: 4),
-          const SizedBox(height: 14),
-          DropdownButtonFormField<String>(
-              initialValue: location,
-              decoration: const InputDecoration(labelText: 'Room / area'),
-              items: const [
-                'Room 204',
-                'Room 204 • Bathroom',
-                'Second-floor corridor',
-                'Kitchen',
-                'Laundry area',
-                'Other common area'
-              ].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-              onChanged: (v) => setState(() => location = v ?? location)),
-          const SizedBox(height: 14),
-          DropdownButtonFormField<String>(
-              initialValue: urgency,
-              decoration: const InputDecoration(labelText: 'Urgency'),
-              items: const ['Low', 'Medium', 'High']
-                  .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-                  .toList(),
-              onChanged: (v) => setState(() => urgency = v ?? urgency)),
-          const SizedBox(height: 14),
-          CarmelitaCard(
-              onTap: () =>
-                  showAppSnackBar(context, 'Photo picker placeholder opened.'),
-              child: const Row(children: [
-                Icon(Icons.add_a_photo_outlined),
-                SizedBox(width: 12),
-                Expanded(
-                    child: Text('Add photo',
-                        style: TextStyle(fontWeight: FontWeight.w700))),
-                Icon(Icons.chevron_right)
-              ])),
-          const SizedBox(height: 18),
-          SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                  onPressed: () {
-                    if (description.text.trim().isEmpty) {
-                      showAppSnackBar(
-                          context, 'Enter a short description first.');
-                      return;
-                    }
-                    TenantController.instance.submitMaintenance(
-                        category: category,
-                        description: description.text.trim(),
-                        location: location,
-                        urgency: urgency);
-                    showAppSnackBar(context, 'Maintenance report added.');
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Submit report'))),
-        ]),
-      ));
+        title:
+            editing ? 'Edit maintenance report' : 'Submit maintenance report',
+        subtitle: editing
+            ? 'Update this report while it is still pending'
+            : 'Describe the issue and exact location',
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: category,
+                decoration: const InputDecoration(labelText: 'Issue category'),
+                items: categories
+                    .map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text(value),
+                      ),
+                    )
+                    .toList(),
+                onChanged: saving
+                    ? null
+                    : (value) => setState(() => category = value ?? category),
+              ),
+              const SizedBox(height: 14),
+              LabeledField(
+                label: 'Description',
+                hint: 'Explain what is wrong and what you observed.',
+                controller: description,
+                maxLines: 4,
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                initialValue: location,
+                decoration: const InputDecoration(labelText: 'Room / area'),
+                items: locations
+                    .map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text(value),
+                      ),
+                    )
+                    .toList(),
+                onChanged: saving
+                    ? null
+                    : (value) => setState(() => location = value ?? location),
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                initialValue: urgency,
+                decoration: const InputDecoration(labelText: 'Urgency'),
+                items: urgencies
+                    .map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text(value),
+                      ),
+                    )
+                    .toList(),
+                onChanged: saving
+                    ? null
+                    : (value) => setState(() => urgency = value ?? urgency),
+              ),
+              const SizedBox(height: 14),
+              CarmelitaCard(
+                onTap: saving
+                    ? null
+                    : () => showAppSnackBar(
+                          context,
+                          'Photo upload will be connected in a later feature.',
+                        ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.add_a_photo_outlined),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Add photo',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    Icon(Icons.chevron_right),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: saving ? null : _save,
+                  child: saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(editing ? 'Save changes' : 'Submit report'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 class InteractiveFloorPlanPage extends StatelessWidget {
