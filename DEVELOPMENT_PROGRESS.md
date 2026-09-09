@@ -98,6 +98,7 @@ page exists but its important backend workflow is unfinished.
 - [ ] **Disciplinary Records** — verified incidents, notices, and restricted history.
 - [ ] **Reports and Analytics** — owner-only metrics generated from live records.
 - [✓] **Accounts & Access** — full CRUD with server-enforced role permissions.
+- [✓] **Guardian Links** — owner-only create, edit, primary selection, and removal using live data.
 - [✓] **Profile** — authenticated owner identity and access level.
 
 ### Shared pages
@@ -128,22 +129,58 @@ Tenant and Guardian development can continue without waiting for the Owner or
 Caretaker interfaces. The authentication, profile, relationship, room, bed,
 assignment, and initial RLS foundations are already available.
 
-### Developer 2 can build independently
+### Developer 2 functions that are truly independent
 
-- [ ] Replace `TenantController` mock data with tenant-scoped repositories.
-- [ ] Replace `GuardianController` mock data with guardian-scoped repositories.
-- [ ] Connect the Tenant Profile and My Room pages to live assignments.
-- [ ] Connect Guardian Tenant Information to verified guardian links.
-- [ ] Implement tenant payments and guardian payment visibility.
-- [ ] Implement maintenance submission and status tracking.
-- [ ] Implement announcements for tenant and guardian audiences.
-- [ ] Implement curfew requests and guardian decisions.
-- [ ] Implement visitor requests.
-- [ ] Implement tenant and guardian messaging.
+These functions do not require a completed Owner/Caretaker page or an
+owner-created operational record. Their database tables and RLS policies still
+need to be agreed on before implementation.
 
-The Owner/Admin interface does not need to be completed before these pages are
-built. For multi-role workflows, Developer 2 may complete the tenant and
-guardian actions first and leave the final staff action for later integration.
+#### Tenant
+
+- [✓] Sign in, sign out, view authenticated profile, and change password.
+- [✓] Use local theme/settings and view Rules and Dormitory Information.
+- [ ] Edit only the tenant's permitted personal and emergency-contact fields.
+- [ ] Create and view the tenant's own maintenance submissions in `Pending` state.
+- [ ] Create, view, and cancel the tenant's own unreviewed visitor requests.
+- [ ] Create, view, and cancel the tenant's own unreviewed curfew requests.
+- [ ] Submit and view the tenant's own confidential concerns.
+- [ ] Persist the tenant's own notification preferences.
+
+#### Guardian
+
+- [✓] Sign in, sign out, view authenticated profile, and change password.
+- [✓] View the existing verified guardian-to-tenant relationship.
+- [✓] Use local theme/settings and view Dormitory Information.
+- [ ] Edit only the guardian's permitted personal contact fields.
+- [ ] View curfew requests submitted by an already-linked tenant.
+- [ ] Approve or reject those requests with remarks and a decision timestamp.
+- [ ] Persist the guardian's own notification preferences.
+
+The curfew workflow above depends on the Tenant and Guardian implementations,
+but it does not require the Owner page. The request may remain
+`Awaiting staff decision` after the guardian response.
+
+### Functions that depend on Owner, Caretaker, or external system data
+
+- [ ] Room, bed, roommate, occupancy, and contract display needs staff assignment data.
+- [ ] Payment balances and history need owner-created charges and payment records.
+- [ ] Payment verification needs an owner/caretaker decision.
+- [ ] Maintenance assignment, progress, and completion need caretaker actions.
+- [ ] Announcements and emergency alerts need staff-published content.
+- [ ] Staff messaging needs a staff participant and response workflow.
+- [ ] Gate activity needs verified gate, camera, or manual staff records.
+- [ ] Visitor requests need staff approval for a completed workflow.
+- [ ] Curfew requests need a final staff decision for a completed workflow.
+- [ ] Facial recognition, IoT, geofencing, OCR, and analytics need external services.
+
+### Recommended independent implementation order
+
+1. Permitted self-profile editing.
+2. Tenant maintenance submission and own-history viewing.
+3. Tenant curfew submission and Guardian approval/rejection.
+4. Tenant visitor submission and cancellation.
+5. Tenant confidential-concern submission.
+6. Tenant and Guardian notification preferences.
 
 ### Shared contracts that must be agreed first
 
@@ -228,6 +265,7 @@ Owned folders and files:
 - [✓] Deploy role-restricted server-side user creation
 - [✓] Add full account CRUD: create, list, edit, recovery, and delete
 - [✓] Verify account CRUD against Supabase with temporary-record cleanup
+- [✓] Add owner-only guardian-to-tenant link management and RLS
 - [ ] Send every new user a secure email invitation
 - [ ] Open onboarding from the invitation link and require a permanent password
 - [ ] Require owners and caretakers to verify SMS during onboarding
@@ -275,6 +313,7 @@ link.
 - [ ] Messaging and conversations — UI implemented, **Mock**
 - [ ] Emergency contacts and system status — UI implemented, **Mock**
 - [ ] Contracts, finance, discipline, and analytics — UI implemented, **Mock**
+- [✓] Guardian-to-tenant linking — owner management UI, **Live**
 
 ### Developer 1 next tasks
 

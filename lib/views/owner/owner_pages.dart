@@ -7,6 +7,7 @@ import '../../models/models.dart';
 import '../widgets/feature_widgets.dart';
 import '../shared/account_management_page.dart';
 import 'floor_plan_page.dart';
+import 'guardian_link_management_page.dart';
 
 void _ownerPush(BuildContext context, Widget page) {
   Navigator.of(context).push(
@@ -689,6 +690,12 @@ const _operationCategories = [
         'Create and review role-based accounts',
         Icons.person_add_alt_1_outlined,
         AccountManagementPage(),
+      ),
+      _OperationItem(
+        'Guardian links',
+        'Connect guardians to tenant accounts',
+        Icons.family_restroom_outlined,
+        GuardianLinkManagementPage(),
       ),
     ],
   ),
