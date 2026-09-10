@@ -24,7 +24,9 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
   @override
   void initState() {
     super.initState();
-    _loadRooms(showSpinner: true);
+    rooms = RoomService.cachedRooms;
+    loading = rooms == null;
+    _loadRooms(showSpinner: rooms == null);
     subscription = TableRefreshSubscription(
       'rooms',
       ['rooms', 'bed_spaces', 'tenant_assignments'],

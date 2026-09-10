@@ -6,7 +6,23 @@ class RoomService {
   const RoomService();
   SupabaseClient get _client => SupabaseConfig.client;
 
-  Future<List<RoomRecord>> listRooms() async {
+  static List<RoomRecord>? _cachedRooms;
+  static DateTime? _lastFetch;
+
+  static List<RoomRecord>? get cachedRooms => _cachedRooms;
+
+  static void invalidateCache() {
+    _cachedRooms = null;
+    _lastFetch = null;
+  }
+
+  Future<List<RoomRecord>> listRooms({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _cachedRooms != null &&
+        _lastFetch != null &&
+        DateTime.now().difference(_lastFetch!) < const Duration(seconds: 30)) {
+      return _cachedRooms!;
+    }
     final results = await Future.wait([
       _client
           .from('rooms')
@@ -28,18 +44,22 @@ class RoomService {
       final bed = BedRecord.fromRow(row, occupied.contains(row['id']));
       bedsByRoom.putIfAbsent(row['room_id'] as String, () => []).add(bed);
     }
-    return results[0]
+    final list = results[0]
         .map((row) => RoomRecord.fromRow(
               row,
               bedsByRoom[row['id'] as String] ?? const [],
             ))
         .toList();
+    _cachedRooms = list;
+    _lastFetch = DateTime.now();
+    return list;
   }
 
   Future<void> createRoom(
       {required String number,
       required String floor,
       required String description}) async {
+    invalidateCache();
     await _client.rpc('create_room_with_four_beds', params: {
       'p_room_number': number.trim(),
       'p_floor': floor.trim(),
@@ -52,6 +72,7 @@ class RoomService {
       required String number,
       required String floor,
       required String description}) async {
+    invalidateCache();
     await _client.from('rooms').update({
       'room_number': number.trim(),
       'floor': floor.trim(),
@@ -60,13 +81,16 @@ class RoomService {
     }).eq('id', id);
   }
 
-  Future<void> deleteRoom(String id) =>
-      _client.from('rooms').delete().eq('id', id);
+  Future<void> deleteRoom(String id) async {
+    invalidateCache();
+    await _client.from('rooms').delete().eq('id', id);
+  }
 
   Future<void> createBed(
       {required String roomId,
       required String label,
       required String status}) async {
+    invalidateCache();
     await _client
         .from('bed_spaces')
         .insert({'room_id': roomId, 'label': label.trim(), 'status': status});
@@ -76,13 +100,16 @@ class RoomService {
       {required String id,
       required String label,
       required String status}) async {
+    invalidateCache();
     await _client
         .from('bed_spaces')
         .update({'label': label.trim(), 'status': status}).eq('id', id);
   }
 
-  Future<void> deleteBed(String id) =>
-      _client.from('bed_spaces').delete().eq('id', id);
+  Future<void> deleteBed(String id) async {
+    invalidateCache();
+    await _client.from('bed_spaces').delete().eq('id', id);
+  }
 }
 
 class RoomRecord {

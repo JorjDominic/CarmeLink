@@ -4,14 +4,34 @@ import '../models/models.dart';
 class TenantService {
   const TenantService();
 
-  Future<List<TenantDirectoryEntry>> loadTenants() async {
+  static List<TenantDirectoryEntry>? _cachedTenants;
+  static DateTime? _lastTenantFetch;
+
+  static List<TenantDirectoryEntry>? get cachedTenants => _cachedTenants;
+
+  static void invalidateCache() {
+    _cachedTenants = null;
+    _lastTenantFetch = null;
+  }
+
+  Future<List<TenantDirectoryEntry>> loadTenants({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _cachedTenants != null &&
+        _lastTenantFetch != null &&
+        DateTime.now().difference(_lastTenantFetch!) < const Duration(seconds: 30)) {
+      return _cachedTenants!;
+    }
     final client = SupabaseConfig.client;
     final profiles = await client
         .from('profiles')
         .select('id, full_name, phone')
         .eq('role', 'tenant')
         .order('full_name');
-    if (profiles.isEmpty) return [];
+    if (profiles.isEmpty) {
+      _cachedTenants = [];
+      _lastTenantFetch = DateTime.now();
+      return [];
+    }
     final results = await Future.wait([
       client
           .from('tenant_assignments')
@@ -47,7 +67,7 @@ class TenantService {
     final details = <String, Map<String, dynamic>>{
       for (final row in results[2]) row['profile_id'] as String: row,
     };
-    return profiles.map((profile) {
+    final entries = profiles.map((profile) {
       final id = profile['id'] as String;
       final assignment = assignments[id];
       final guardian = guardians[id];
@@ -66,6 +86,9 @@ class TenantService {
         contractEndsOn: _date(detail?['contract_ends_on']),
       );
     }).toList();
+    _cachedTenants = entries;
+    _lastTenantFetch = DateTime.now();
+    return entries;
   }
 
   DateTime? _date(dynamic value) =>
@@ -93,15 +116,69 @@ class TenantService {
     return beds;
   }
 
-  Future<void> assignBed(String tenantId, String bedId) =>
-      SupabaseConfig.client.rpc('assign_tenant_bed',
-          params: {'p_tenant_id': tenantId, 'p_bed_space_id': bedId});
-  Future<void> endAssignment(String tenantId) => SupabaseConfig.client
-      .rpc('end_tenant_assignment', params: {'p_tenant_id': tenantId});
-  Future<void> updateResidencyStatus(String tenantId, String status) =>
-      SupabaseConfig.client
-          .from('tenant_details')
-          .update({'residency_status': status}).eq('profile_id', tenantId);
+  Future<List<RoomWithAvailableBeds>> loadAvailableBedsGroupedByRoom() async {
+    final beds = await loadAvailableBeds();
+    final grouped = <String, List<AvailableBed>>{};
+    final floorByRoom = <String, String>{};
+
+    for (final bed in beds) {
+      grouped.putIfAbsent(bed.room, () => []).add(bed);
+      floorByRoom[bed.room] = bed.floor;
+    }
+
+    final rooms = grouped.entries.map((e) {
+      final roomBeds = e.value
+        ..sort((a, b) => a.label.compareTo(b.label));
+      return RoomWithAvailableBeds(
+        roomNumber: e.key,
+        floor: floorByRoom[e.key] ?? '',
+        beds: roomBeds,
+      );
+    }).toList();
+
+    // Natural sort: 101, 102, ... 201, 202
+    rooms.sort((a, b) {
+      final aNum = int.tryParse(a.roomNumber);
+      final bNum = int.tryParse(b.roomNumber);
+      if (aNum != null && bNum != null) {
+        return aNum.compareTo(bNum);
+      }
+      return a.roomNumber.compareTo(b.roomNumber);
+    });
+
+    return rooms;
+  }
+
+  Future<void> assignBed(String tenantId, String bedId) async {
+    invalidateCache();
+    await SupabaseConfig.client.rpc('assign_tenant_bed',
+        params: {'p_tenant_id': tenantId, 'p_bed_space_id': bedId});
+  }
+
+  Future<void> endAssignment(String tenantId) async {
+    invalidateCache();
+    await SupabaseConfig.client
+        .rpc('end_tenant_assignment', params: {'p_tenant_id': tenantId});
+  }
+
+  Future<void> updateResidencyStatus(String tenantId, String status) async {
+    invalidateCache();
+    await SupabaseConfig.client
+        .from('tenant_details')
+        .update({'residency_status': status}).eq('profile_id', tenantId);
+  }
+}
+
+class RoomWithAvailableBeds {
+  const RoomWithAvailableBeds({
+    required this.roomNumber,
+    required this.floor,
+    required this.beds,
+  });
+
+  final String roomNumber;
+  final String floor;
+  final List<AvailableBed> beds;
 }
 
 class AvailableBed {

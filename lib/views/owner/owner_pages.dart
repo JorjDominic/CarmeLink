@@ -178,25 +178,30 @@ class TenantDirectoryPage extends StatefulWidget {
 
 class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
   final _service = const TenantService();
-  late Future<List<TenantDirectoryEntry>> _tenants;
+  List<TenantDirectoryEntry>? _tenants;
+  bool _loading = true;
+  String? _errorMessage;
   late final TableRefreshSubscription _subscription;
   String query = '';
 
   @override
   void initState() {
     super.initState();
-    _tenants = _service.loadTenants();
+    _tenants = TenantService.cachedTenants;
+    _loading = _tenants == null;
+    _fetchTenants(showSpinner: _tenants == null);
     _subscription = TableRefreshSubscription(
-        'tenant-directory',
-        [
-          'profiles',
-          'tenant_details',
-          'guardian_tenant_links',
-          'tenant_assignments',
-          'bed_spaces',
-          'rooms'
-        ],
-        _refresh);
+      'tenant-directory',
+      [
+        'profiles',
+        'tenant_details',
+        'guardian_tenant_links',
+        'tenant_assignments',
+        'bed_spaces',
+        'rooms'
+      ],
+      () => _fetchTenants(showSpinner: false),
+    );
   }
 
   @override
@@ -205,119 +210,138 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
     super.dispose();
   }
 
-  void _refresh() {
-    if (mounted) setState(() => _tenants = _service.loadTenants());
+  Future<void> _fetchTenants({bool showSpinner = false}) async {
+    if (showSpinner && mounted) {
+      setState(() => _loading = true);
+    }
+    try {
+      final latest = await _service.loadTenants(forceRefresh: true);
+      if (mounted) {
+        setState(() {
+          _tenants = latest;
+          _loading = false;
+          _errorMessage = null;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = error.toString();
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentTenants = _tenants;
+
+    Widget body;
+    if (_loading && currentTenants == null) {
+      body = const Center(child: CircularProgressIndicator());
+    } else if (_errorMessage != null && currentTenants == null) {
+      body = Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            EmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: 'Unable to load tenants',
+              message: _errorMessage!,
+            ),
+            FilledButton.icon(
+              onPressed: () => _fetchTenants(showSpinner: true),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      final allTenants = currentTenants ?? [];
+      final filtered = allTenants
+          .where(
+            (tenant) =>
+                tenant.name.toLowerCase().contains(
+                      query.toLowerCase(),
+                    ) ||
+                tenant.room.contains(query),
+          )
+          .toList();
+
+      body = Column(
+        children: [
+          TextField(
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search),
+              hintText: 'Search tenant name or room',
+            ),
+            onChanged: (value) => setState(() => query = value),
+          ),
+          const SizedBox(height: 14),
+          if (filtered.isEmpty)
+            const EmptyState(
+              icon: Icons.person_search_outlined,
+              title: 'No tenant found',
+              message: 'Try another name or room number.',
+            )
+          else
+            ...filtered.map(
+              (tenant) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: CarmelitaCard(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  child: ListTile(
+                    dense: true,
+                    visualDensity: const VisualDensity(vertical: -2),
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      radius: 19,
+                      backgroundColor:
+                          const Color(0xFF56886B).withValues(alpha: .10),
+                      foregroundColor: const Color(0xFF56886B),
+                      child: Text(tenant.name.isNotEmpty ? tenant.name[0] : '?'),
+                    ),
+                    title: Text(
+                      tenant.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    subtitle:
+                        Text('Room ${tenant.room} • ${tenant.bedSpace}'),
+                    trailing:
+                        StatusPill(_residencyLabel(tenant.residencyStatus)),
+                    onTap: () async {
+                      await Navigator.of(context)
+                          .push(MaterialPageRoute<void>(
+                        builder: (_) => TenantDetailsPage(tenant: tenant),
+                      ));
+                      if (mounted) _fetchTenants(showSpinner: false);
+                    },
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+
     return PageFrame(
       title: 'Tenants',
       subtitle: 'Search and view tenant records',
       actions: [
         IconButton(
           tooltip: 'Refresh',
-          onPressed: _refresh,
+          onPressed: () => _fetchTenants(showSpinner: currentTenants == null),
           icon: const Icon(Icons.refresh),
         ),
       ],
-      child: FutureBuilder<List<TenantDirectoryEntry>>(
-        future: _tenants,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  EmptyState(
-                    icon: Icons.cloud_off_outlined,
-                    title: 'Unable to load tenants',
-                    message: '${snapshot.error}',
-                  ),
-                  FilledButton.icon(
-                    onPressed: _refresh,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          }
-          final allTenants = snapshot.data ?? [];
-          final filtered = allTenants
-              .where(
-                (tenant) =>
-                    tenant.name.toLowerCase().contains(
-                          query.toLowerCase(),
-                        ) ||
-                    tenant.room.contains(query),
-              )
-              .toList();
-
-          return Column(
-            children: [
-              TextField(
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
-                  hintText: 'Search tenant name or room',
-                ),
-                onChanged: (value) => setState(() => query = value),
-              ),
-              const SizedBox(height: 14),
-              if (filtered.isEmpty)
-                const EmptyState(
-                  icon: Icons.person_search_outlined,
-                  title: 'No tenant found',
-                  message: 'Try another name or room number.',
-                )
-              else
-                ...filtered.map(
-                  (tenant) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: CarmelitaCard(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      child: ListTile(
-                        dense: true,
-                        visualDensity: const VisualDensity(vertical: -2),
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          radius: 19,
-                          backgroundColor:
-                              const Color(0xFF56886B).withValues(alpha: .10),
-                          foregroundColor: const Color(0xFF56886B),
-                          child: Text(tenant.name[0]),
-                        ),
-                        title: Text(
-                          tenant.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        subtitle:
-                            Text('Room ${tenant.room} • ${tenant.bedSpace}'),
-                        trailing:
-                            StatusPill(_residencyLabel(tenant.residencyStatus)),
-                        onTap: () async {
-                          await Navigator.of(context)
-                              .push(MaterialPageRoute<void>(
-                            builder: (_) => TenantDetailsPage(tenant: tenant),
-                          ));
-                          if (mounted) _refresh();
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
+      child: body,
     );
   }
 }
@@ -408,16 +432,15 @@ class _TenantAssignmentManagerState extends State<_TenantAssignmentManager> {
   Future<void> _assign() async {
     setState(() => saving = true);
     try {
-      final beds = await service.loadAvailableBeds();
+      final bedRooms = await service.loadAvailableBedsGroupedByRoom();
       if (!mounted) return;
-      if (beds.isEmpty) {
+      if (bedRooms.isEmpty) {
         await showDialog<void>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('No available beds'),
             content: const Text(
-              'Create rooms and bed spaces in the backend first, or free an '
-              'existing bed by ending its active assignment.',
+              'All rooms and bed spaces are currently occupied or unavailable. Free an existing bed by ending its active assignment first.',
             ),
             actions: [
               TextButton(
@@ -432,44 +455,23 @@ class _TenantAssignmentManagerState extends State<_TenantAssignmentManager> {
       final selected = await showModalBottomSheet<AvailableBed>(
         context: context,
         isScrollControlled: true,
-        builder: (context) => SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(context).height * .75,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const ListTile(
-                  leading: Icon(Icons.bed_outlined),
-                  title: Text('Select an available bed'),
-                  subtitle: Text('Only unoccupied, available beds are shown.'),
-                ),
-                const Divider(height: 1),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: beds.length,
-                    itemBuilder: (context, index) {
-                      final bed = beds[index];
-                      return ListTile(
-                        title: Text('Room ${bed.room} • ${bed.label}'),
-                        subtitle: Text(bed.floor),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.pop(context, bed),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
+        useSafeArea: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (context) => _RoomBedSelectorSheet(
+          rooms: bedRooms,
+          tenantName: widget.tenant.name,
         ),
       );
       if (selected == null || !mounted) return;
       await service.assignBed(widget.tenant.id, selected.id);
       if (mounted) {
-        showAppSnackBar(context, 'Bed assignment saved.');
+        showAppSnackBar(
+          context,
+          'Assigned ${widget.tenant.name} to Room ${selected.room} • ${selected.label}',
+        );
         Navigator.of(context).pop();
       }
     } catch (error) {
@@ -553,6 +555,277 @@ String _tenantAssignmentError(Object error) {
     return 'Your account is not authorized to manage bed assignments.';
   }
   return 'Unable to load or save bed assignments. Check your connection and retry.';
+}
+
+class _RoomBedSelectorSheet extends StatefulWidget {
+  const _RoomBedSelectorSheet({
+    required this.rooms,
+    required this.tenantName,
+  });
+
+  final List<RoomWithAvailableBeds> rooms;
+  final String tenantName;
+
+  @override
+  State<_RoomBedSelectorSheet> createState() => _RoomBedSelectorSheetState();
+}
+
+class _RoomBedSelectorSheetState extends State<_RoomBedSelectorSheet> {
+  String? _expandedRoom;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.rooms.isNotEmpty) {
+      _expandedRoom = widget.rooms.first.roomNumber;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final totalBeds =
+        widget.rooms.fold<int>(0, (sum, r) => sum + r.beds.length);
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .80,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color:
+                      theme.colorScheme.onSurfaceVariant.withValues(alpha: .3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.bed_outlined,
+                      color: theme.colorScheme.primary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Select bed space',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$totalBeds open bed spaces across ${widget.rooms.length} rooms',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 10),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: widget.rooms.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final room = widget.rooms[index];
+                  final isExpanded = _expandedRoom == room.roomNumber;
+
+                  return CarmelitaCard(
+                    padding: EdgeInsets.zero,
+                    child: Column(
+                      children: [
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            setState(() {
+                              _expandedRoom =
+                                  isExpanded ? null : room.roomNumber;
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 17,
+                                  backgroundColor: isExpanded
+                                      ? theme.colorScheme.primary
+                                          .withValues(alpha: .15)
+                                      : theme
+                                          .colorScheme.surfaceContainerHighest,
+                                  foregroundColor: isExpanded
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurfaceVariant,
+                                  child: const Icon(Icons.meeting_room_outlined,
+                                      size: 18),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Room ${room.roomNumber}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        room.floor,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 9, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF56886B)
+                                        .withValues(alpha: .12),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    '${room.beds.length} open',
+                                    style: const TextStyle(
+                                      color: Color(0xFF56886B),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11.5,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                AnimatedRotation(
+                                  duration: const Duration(milliseconds: 200),
+                                  turns: isExpanded ? .25 : 0,
+                                  child: Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 20,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (isExpanded) ...[
+                          const Divider(height: 1),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                            child: Column(
+                              children: room.beds.map((bed) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(10),
+                                    onTap: () => Navigator.of(context).pop(bed),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 9),
+                                      decoration: BoxDecoration(
+                                        color: theme
+                                            .colorScheme.surfaceContainerHighest
+                                            .withValues(alpha: .35),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.bed_outlined,
+                                            size: 19,
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(
+                                              bed.label,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 9, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: theme.colorScheme.primary
+                                                  .withValues(alpha: .12),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  'Assign',
+                                                  style: TextStyle(
+                                                    color: theme
+                                                        .colorScheme.primary,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 3),
+                                                Icon(
+                                                  Icons.arrow_forward_rounded,
+                                                  size: 13,
+                                                  color: theme
+                                                      .colorScheme.primary,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class OperationsHubPage extends StatefulWidget {
