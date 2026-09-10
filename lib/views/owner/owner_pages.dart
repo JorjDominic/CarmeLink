@@ -4,6 +4,7 @@ import '../../controllers/owner_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
+import '../../services/tenant_service.dart';
 import '../widgets/feature_widgets.dart';
 import '../shared/account_management_page.dart';
 import 'floor_plan_page.dart';
@@ -174,19 +175,43 @@ class TenantDirectoryPage extends StatefulWidget {
 }
 
 class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
+  final _service = const TenantService();
+  late Future<List<TenantDirectoryEntry>> _tenants;
   String query = '';
 
   @override
-  Widget build(BuildContext context) {
-    final controller = OwnerController.instance;
+  void initState() {
+    super.initState();
+    _tenants = _service.loadTenants();
+  }
 
+  void _refresh() => setState(() => _tenants = _service.loadTenants());
+
+  @override
+  Widget build(BuildContext context) {
     return PageFrame(
       title: 'Tenants',
       subtitle: 'Search and view tenant records',
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) {
-          final filtered = controller.tenants
+      actions: [
+        IconButton(
+          tooltip: 'Refresh',
+          onPressed: _refresh,
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+      child: FutureBuilder<List<TenantDirectoryEntry>>(
+        future: _tenants,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('Unable to load tenants: ${snapshot.error}'),
+            );
+          }
+          final allTenants = snapshot.data ?? [];
+          final filtered = allTenants
               .where(
                 (tenant) =>
                     tenant.name.toLowerCase().contains(
