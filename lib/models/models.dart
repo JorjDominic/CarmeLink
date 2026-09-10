@@ -166,18 +166,6 @@ class ConcernReport {
   final DateTime createdAt;
 }
 
-class DeviceStatus {
-  const DeviceStatus({
-    required this.name,
-    required this.status,
-    required this.detail,
-  });
-
-  final String name;
-  final String status;
-  final String detail;
-}
-
 class AppNotification {
   const AppNotification({
     required this.title,
@@ -235,8 +223,12 @@ class TenantDirectoryEntry {
     required this.phone,
     required this.guardianName,
     required this.guardianPhone,
-    required this.gateStatus,
-    required this.paymentSummary,
+    this.residencyStatus = 'active',
+    this.gateStatus = 'Unavailable',
+    this.paymentSummary = 'Unavailable',
+    this.assignmentId,
+    this.contractStartsOn,
+    this.contractEndsOn,
   });
 
   final String id;
@@ -246,8 +238,12 @@ class TenantDirectoryEntry {
   final String phone;
   final String guardianName;
   final String guardianPhone;
+  final String residencyStatus;
   final String gateStatus;
   final String paymentSummary;
+  final String? assignmentId;
+  final DateTime? contractStartsOn;
+  final DateTime? contractEndsOn;
 }
 
 class OwnerConversation {

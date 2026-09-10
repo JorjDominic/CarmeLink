@@ -7,6 +7,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
+import '../../services/table_refresh_subscription.dart';
 import '../widgets/feature_widgets.dart';
 
 class TenantDashboardPage extends StatelessWidget {
@@ -649,11 +650,20 @@ class MaintenanceReportsPage extends StatefulWidget {
 
 class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
   final controller = TenantController.instance;
+  late final TableRefreshSubscription subscription;
 
   @override
   void initState() {
     super.initState();
     controller.loadMaintenance();
+    subscription = TableRefreshSubscription('tenant-maintenance',
+        ['maintenance_reports'], controller.loadMaintenance);
+  }
+
+  @override
+  void dispose() {
+    subscription.dispose();
+    super.dispose();
   }
 
   Future<void> _edit(MaintenanceReport report) async {

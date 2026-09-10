@@ -231,7 +231,7 @@ Provides a searchable tenant directory. Selecting a tenant opens their full reco
 
 Is the compact staff control center. Instead of presenting every tool in one long list, it groups related work into four searchable management areas:
 
-- **Property** — rooms, the interactive floor plan, maintenance, and system status
+- **Property** — rooms, the interactive floor plan, and maintenance
 - **Tenants & Safety** — curfew, visitors, confidential reports, and disciplinary records; the tenant directory remains a primary navigation destination
 - **Finance & Contracts** — payment review, income and expenses, contract expiry, and analytics
 - **Communication** — announcements, messages, and important contacts
@@ -240,7 +240,7 @@ Selecting an area opens a focused page containing its related pages. Each manage
 
 #### Gate monitoring
 
-Displays facial-recognition events with geofence checks, service health, and alerts. Staff can review flags or open a manual override.
+Displays geofence entry and exit events and alerts. Staff can review uncertain or flagged location events and record a manual decision.
 
 #### Profile
 
@@ -254,7 +254,7 @@ Shows room, phone, guardian contact, payment state, and gate status for one tena
 
 #### Room monitoring
 
-Displays a visual room board and occupied/available bed counts for vacancy monitoring.
+Displays live rooms and assignment-aware occupied/available bed counts. Staff can create, edit, and delete unused rooms and bed spaces, and manage bed availability, reservation, and maintenance status.
 
 #### Interactive admin floor plan
 
@@ -325,7 +325,7 @@ Shows each reason, destination, guardian response, and return time and allows th
 
 Lists expected visitors, relationships, schedules, and permission states for staff approval or rejection.
 
-### Communication, safety, and systems
+### Communication and safety
 
 #### Confidential reports
 
@@ -346,10 +346,6 @@ Displays a selected conversation, participant role, history, and message compose
 #### Dormitory contact directory
 
 Lists guardian and emergency contacts for internal reference.
-
-#### System status
-
-Shows camera, recognition processor, and connectivity health for gate-monitoring equipment.
 
 ## Shared pages
 
@@ -487,7 +483,7 @@ For implementation details, see the official [Supabase user invitation guide](ht
   profile record rather than email text or client metadata.
 - Operational records primarily come from `lib/data/mock_data.dart` and in-memory controllers.
 - Supabase is included as a dependency and configuration scaffold, but the documented demo workflows should not be assumed to persist remotely.
-- OCR, facial recognition, geofencing, biometrics, device binding, and IoT monitoring are simulated product workflows/status interfaces pending production integrations.
+- OCR, geofencing, biometrics, and device binding are simulated product workflows pending production integrations.
 - Some finance, contract, discipline, and analytics pages explicitly mark where backend data is required.
 
 Before release, connect secured backend services, enforce server-side role permissions, add persistent uploads and messaging, test device permissions, and replace demo records with validated live data.

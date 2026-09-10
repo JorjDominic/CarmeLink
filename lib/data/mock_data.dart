@@ -60,21 +60,21 @@ class MockData {
         person: 'Anna Dela Cruz',
         direction: 'IN',
         time: DateTime(2026, 8, 8, 20, 14),
-        verification: 'Face recognition',
+        verification: 'Geofence entry confirmed',
         status: 'Verified'),
     GateEvent(
         id: 'g2',
         person: 'Bea Santos',
         direction: 'OUT',
         time: DateTime(2026, 8, 8, 19, 52),
-        verification: 'Face recognition • Geofence confirmed',
+        verification: 'Geofence exit confirmed',
         status: 'Verified'),
     GateEvent(
         id: 'g3',
         person: 'Unknown person',
         direction: 'ENTRY',
         time: DateTime(2026, 8, 8, 19, 48),
-        verification: 'Camera',
+        verification: 'Geofence signal unavailable',
         status: 'Review'),
   ];
 
@@ -359,26 +359,11 @@ class MockData {
         person: 'Unknown person',
         direction: 'ENTRY',
         time: DateTime(2026, 8, 8, 19, 48),
-        verification: 'Camera',
+        verification: 'Geofence signal unavailable',
         status: 'Review',
       ),
       reviewStatus: 'Pending',
     ),
-  ];
-
-  static const devices = [
-    DeviceStatus(
-        name: 'Recognition processor',
-        status: 'Online',
-        detail: 'Last heartbeat: just now'),
-    DeviceStatus(
-        name: 'Entry camera',
-        status: 'Online',
-        detail: 'Last capture: 8:14 PM'),
-    DeviceStatus(
-        name: 'Geofence service',
-        status: 'Online',
-        detail: 'Last cross-check: 8:14 PM'),
   ];
 
   static final notifications = [

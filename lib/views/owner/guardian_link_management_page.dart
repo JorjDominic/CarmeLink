@@ -4,6 +4,7 @@ import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../../services/guardian_link_service.dart';
+import '../../services/table_refresh_subscription.dart';
 
 class GuardianLinkManagementPage extends StatefulWidget {
   const GuardianLinkManagementPage({super.key});
@@ -17,8 +18,24 @@ class _GuardianLinkManagementPageState
     extends State<GuardianLinkManagementPage> {
   final service = const GuardianLinkService();
   late Future<List<Map<String, dynamic>>> links = service.listLinks();
+  late final TableRefreshSubscription subscription;
 
-  void reload() => setState(() => links = service.listLinks());
+  @override
+  void initState() {
+    super.initState();
+    subscription = TableRefreshSubscription(
+        'guardian-links', ['guardian_tenant_links', 'profiles'], reload);
+  }
+
+  @override
+  void dispose() {
+    subscription.dispose();
+    super.dispose();
+  }
+
+  void reload() {
+    if (mounted) setState(() => links = service.listLinks());
+  }
 
   Future<void> openEditor([Map<String, dynamic>? link]) async {
     final changed = await showModalBottomSheet<bool>(

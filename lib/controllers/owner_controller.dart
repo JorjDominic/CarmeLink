@@ -25,7 +25,6 @@ class OwnerController extends ChangeNotifier {
       List.unmodifiable(MockData.curfewRequests);
   List<VisitorRequest> get visitors => List.unmodifiable(MockData.visitors);
   List<ConcernReport> get concerns => List.unmodifiable(MockData.concerns);
-  List<DeviceStatus> get devices => List.unmodifiable(MockData.devices);
   List<Announcement> get announcements =>
       List.unmodifiable(MockData.announcements);
   List<OwnerConversation> get conversations =>

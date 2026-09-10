@@ -15,7 +15,7 @@ divided between two developers to reduce merge conflicts.
 ## Important core of the system
 
 These modules should be completed before optional automation such as OCR,
-facial recognition, geofencing, IoT monitoring, or advanced analytics.
+geofencing or advanced analytics.
 
 1. **Identity and access** — authentication, profiles, roles, verification, and RLS.
 2. **People and relationships** — tenants, guardians, staff, and their verified links.
@@ -72,7 +72,7 @@ page exists but its important backend workflow is unfinished.
 ### Caretaker pages
 
 - [ ] **Tenants** — live directory and operational tenant information.
-- [ ] **Rooms** — vacancies, bed status, and assignments without owner-only finance.
+- [✓] **Rooms** — live room/bed CRUD, vacancies, bed status, and assignments without owner-only finance.
 - [ ] **Maintenance** — triage, assign, update, and resolve tenant reports.
 - [ ] **Gate** — review events and record authorized manual overrides.
 - [✓] **Accounts** — CRUD limited to tenant and guardian accounts.
@@ -83,7 +83,8 @@ page exists but its important backend workflow is unfinished.
 - [ ] **Dashboard** — prioritized live occupancy, payment, maintenance, and gate metrics.
 - [ ] **Tenants** — full tenant directory, relationships, assignments, and contracts.
 - [ ] **Operations** — live grouped access to every management workflow.
-- [ ] **Rooms and Floor Plan** — manage rooms, beds, occupancy, and maintenance markers.
+- [✓] **Rooms** — live room and bed-space CRUD with assignment-aware occupancy.
+- [ ] **Floor Plan** — replace demonstration geometry and maintenance markers with live property data.
 - [ ] **Payments** — review receipts, correct records, and maintain an audit trail.
 - [ ] **Maintenance** — assign work, update status, and record resolution details.
 - [ ] **Gate and Manual Override** — auditable access decisions and system health.
@@ -168,10 +169,10 @@ but it does not require the Owner page. The request may remain
 - [ ] Maintenance assignment, progress, and completion need caretaker actions.
 - [ ] Announcements and emergency alerts need staff-published content.
 - [ ] Staff messaging needs a staff participant and response workflow.
-- [ ] Gate activity needs verified gate, camera, or manual staff records.
+- [ ] Gate activity needs verified geofence or manual staff records.
 - [ ] Visitor requests need staff approval for a completed workflow.
 - [ ] Curfew requests need a final staff decision for a completed workflow.
-- [ ] Facial recognition, IoT, geofencing, OCR, and analytics need external services.
+- [ ] Geofencing, OCR, and analytics need external services.
 
 ### Recommended independent implementation order
 
@@ -311,7 +312,7 @@ link.
 - [ ] Confidential reports — UI implemented, **Mock**
 - [ ] Announcements — UI implemented, **Mock**
 - [ ] Messaging and conversations — UI implemented, **Mock**
-- [ ] Emergency contacts and system status — UI implemented, **Mock**
+- [ ] Emergency contacts — UI implemented, **Mock**
 - [ ] Contracts, finance, discipline, and analytics — UI implemented, **Mock**
 - [✓] Guardian-to-tenant linking — owner management UI, **Live**
 

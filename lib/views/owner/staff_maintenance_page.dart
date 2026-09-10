@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/widgets/common_widgets.dart';
 import '../../services/staff_maintenance_service.dart';
+import '../../services/table_refresh_subscription.dart';
 
 class StaffMaintenancePage extends StatefulWidget {
   const StaffMaintenancePage({super.key});
@@ -13,14 +14,25 @@ class StaffMaintenancePage extends StatefulWidget {
 class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
   final _service = const StaffMaintenanceService();
   late Future<List<StaffMaintenanceReport>> _reports;
+  late final TableRefreshSubscription _subscription;
 
   @override
   void initState() {
     super.initState();
     _reports = _service.listReports();
+    _subscription = TableRefreshSubscription('staff-maintenance',
+        ['maintenance_reports', 'maintenance_staff_history'], _refresh);
   }
 
-  void _refresh() => setState(() => _reports = _service.listReports());
+  @override
+  void dispose() {
+    _subscription.dispose();
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() => _reports = _service.listReports());
+  }
 
   @override
   Widget build(BuildContext context) => PageFrame(

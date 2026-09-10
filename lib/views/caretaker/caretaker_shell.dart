@@ -4,6 +4,7 @@ import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../owner/owner_pages.dart';
+import '../owner/room_monitoring_page.dart';
 import '../shared/shared_views.dart';
 import '../shared/account_management_page.dart';
 

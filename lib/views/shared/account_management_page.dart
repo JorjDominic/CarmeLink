@@ -5,6 +5,7 @@ import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../../services/account_service.dart';
+import '../../services/table_refresh_subscription.dart';
 
 class AccountManagementPage extends StatefulWidget {
   const AccountManagementPage({super.key});
@@ -16,8 +17,23 @@ class AccountManagementPage extends StatefulWidget {
 class _AccountManagementPageState extends State<AccountManagementPage> {
   final service = const AccountService();
   late Future<List<Map<String, dynamic>>> accounts = service.listAccounts();
+  late final TableRefreshSubscription subscription;
 
-  void reload() => setState(() => accounts = service.listAccounts());
+  @override
+  void initState() {
+    super.initState();
+    subscription = TableRefreshSubscription('accounts', ['profiles'], reload);
+  }
+
+  @override
+  void dispose() {
+    subscription.dispose();
+    super.dispose();
+  }
+
+  void reload() {
+    if (mounted) setState(() => accounts = service.listAccounts());
+  }
 
   Future<void> manage(Map<String, dynamic> account) async {
     final changed = await showModalBottomSheet<bool>(

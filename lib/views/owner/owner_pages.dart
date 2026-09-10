@@ -5,11 +5,13 @@ import '../../core/constants/app_assets.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/tenant_service.dart';
+import '../../services/table_refresh_subscription.dart';
 import '../widgets/feature_widgets.dart';
 import '../shared/account_management_page.dart';
 import 'floor_plan_page.dart';
 import 'guardian_link_management_page.dart';
 import 'staff_maintenance_page.dart';
+import 'room_monitoring_page.dart';
 
 void _ownerPush(BuildContext context, Widget page) {
   Navigator.of(context).push(
@@ -177,15 +179,35 @@ class TenantDirectoryPage extends StatefulWidget {
 class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
   final _service = const TenantService();
   late Future<List<TenantDirectoryEntry>> _tenants;
+  late final TableRefreshSubscription _subscription;
   String query = '';
 
   @override
   void initState() {
     super.initState();
     _tenants = _service.loadTenants();
+    _subscription = TableRefreshSubscription(
+        'tenant-directory',
+        [
+          'profiles',
+          'tenant_details',
+          'guardian_tenant_links',
+          'tenant_assignments',
+          'bed_spaces',
+          'rooms'
+        ],
+        _refresh);
   }
 
-  void _refresh() => setState(() => _tenants = _service.loadTenants());
+  @override
+  void dispose() {
+    _subscription.dispose();
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() => _tenants = _service.loadTenants());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +229,21 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
           }
           if (snapshot.hasError) {
             return Center(
-              child: Text('Unable to load tenants: ${snapshot.error}'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  EmptyState(
+                    icon: Icons.cloud_off_outlined,
+                    title: 'Unable to load tenants',
+                    message: '${snapshot.error}',
+                  ),
+                  FilledButton.icon(
+                    onPressed: _refresh,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
             );
           }
           final allTenants = snapshot.data ?? [];
@@ -265,13 +301,15 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
                         ),
                         subtitle:
                             Text('Room ${tenant.room} • ${tenant.bedSpace}'),
-                        trailing: StatusPill(tenant.gateStatus),
-                        onTap: () => _ownerPush(
-                          context,
-                          TenantDetailsPage(
-                            tenant: tenant,
-                          ),
-                        ),
+                        trailing:
+                            StatusPill(_residencyLabel(tenant.residencyStatus)),
+                        onTap: () async {
+                          await Navigator.of(context)
+                              .push(MaterialPageRoute<void>(
+                            builder: (_) => TenantDetailsPage(tenant: tenant),
+                          ));
+                          if (mounted) _refresh();
+                        },
                       ),
                     ),
                   ),
@@ -323,78 +361,198 @@ class TenantDetailsPage extends StatelessWidget {
                   icon: Icons.contact_phone_outlined,
                 ),
                 InfoRow(
-                  label: 'Payment',
-                  value: tenant.paymentSummary,
-                  icon: Icons.payments_outlined,
-                ),
+                    label: 'Residency status',
+                    value: _residencyLabel(tenant.residencyStatus),
+                    icon: Icons.badge_outlined),
                 InfoRow(
-                  label: 'Gate status',
-                  value: tenant.gateStatus,
-                  icon: Icons.sensor_door_outlined,
-                ),
+                    label: 'Contract starts',
+                    value: _dateOrNone(tenant.contractStartsOn),
+                    icon: Icons.event_available_outlined),
+                InfoRow(
+                    label: 'Contract ends',
+                    value: _dateOrNone(tenant.contractEndsOn),
+                    icon: Icons.event_busy_outlined),
               ],
             ),
           ),
           const SizedBox(height: 14),
-          CarmelitaCard(
-            child: Column(
-              children: [
-                _OwnerRouteTile(
-                  title: 'Payment verification',
-                  icon: Icons.receipt_long_outlined,
-                  onTap: () => _ownerPush(
-                    context,
-                    const PaymentVerificationPage(),
-                  ),
-                ),
-                const Divider(),
-                _OwnerRouteTile(
-                  title: 'Gate logs',
-                  icon: Icons.sensor_door_outlined,
-                  onTap: () => _ownerPush(
-                    context,
-                    const GateMonitoringPage(),
-                  ),
-                ),
-                const Divider(),
-                _OwnerRouteTile(
-                  title: 'Confidential reports',
-                  icon: Icons.shield_outlined,
-                  onTap: () => _ownerPush(
-                    context,
-                    const ConfidentialReportsPage(),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _TenantAssignmentManager(tenant: tenant),
         ],
       ),
     );
   }
 }
 
-class _OwnerRouteTile extends StatelessWidget {
-  const _OwnerRouteTile({
-    required this.title,
-    required this.icon,
-    required this.onTap,
-  });
+String _residencyLabel(String value) => switch (value) {
+      'moving_out' => 'Moving out',
+      'inactive' => 'Inactive',
+      _ => 'Active',
+    };
 
-  final String title;
-  final IconData icon;
-  final VoidCallback onTap;
+String _dateOrNone(DateTime? value) => value == null
+    ? 'Not set'
+    : '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+
+class _TenantAssignmentManager extends StatefulWidget {
+  const _TenantAssignmentManager({required this.tenant});
+  final TenantDirectoryEntry tenant;
+  @override
+  State<_TenantAssignmentManager> createState() =>
+      _TenantAssignmentManagerState();
+}
+
+class _TenantAssignmentManagerState extends State<_TenantAssignmentManager> {
+  final service = const TenantService();
+  bool saving = false;
+
+  Future<void> _assign() async {
+    setState(() => saving = true);
+    try {
+      final beds = await service.loadAvailableBeds();
+      if (!mounted) return;
+      if (beds.isEmpty) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('No available beds'),
+            content: const Text(
+              'Create rooms and bed spaces in the backend first, or free an '
+              'existing bed by ending its active assignment.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      final selected = await showModalBottomSheet<AvailableBed>(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * .75,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const ListTile(
+                  leading: Icon(Icons.bed_outlined),
+                  title: Text('Select an available bed'),
+                  subtitle: Text('Only unoccupied, available beds are shown.'),
+                ),
+                const Divider(height: 1),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: beds.length,
+                    itemBuilder: (context, index) {
+                      final bed = beds[index];
+                      return ListTile(
+                        title: Text('Room ${bed.room} • ${bed.label}'),
+                        subtitle: Text(bed.floor),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.pop(context, bed),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (selected == null || !mounted) return;
+      await service.assignBed(widget.tenant.id, selected.id);
+      if (mounted) {
+        showAppSnackBar(context, 'Bed assignment saved.');
+        Navigator.of(context).pop();
+      }
+    } catch (error) {
+      if (mounted) {
+        showAppSnackBar(context, _tenantAssignmentError(error));
+      }
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> _setStatus(String status) => _save(
+      () => service.updateResidencyStatus(widget.tenant.id, status),
+      'Residency status updated. Refresh the directory to see it.');
+
+  Future<void> _end() => _save(() => service.endAssignment(widget.tenant.id),
+      'Assignment ended. Refresh the directory to see it.');
+
+  Future<void> _save(Future<void> Function() action, String message) async {
+    setState(() => saving = true);
+    try {
+      await action();
+      if (mounted) {
+        showAppSnackBar(context, message);
+        Navigator.of(context).pop();
+      }
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Unable to save: $error');
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon),
-      title: Text(title),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
-    );
+  Widget build(BuildContext context) => CarmelitaCard(
+          child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SectionTitle('Room and residency management'),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+              onPressed: saving ? null : _assign,
+              icon: saving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.bed_outlined),
+              label: Text(widget.tenant.assignmentId == null
+                  ? 'Assign bed'
+                  : 'Move to another bed')),
+          if (widget.tenant.assignmentId != null)
+            TextButton(
+                onPressed: saving ? null : _end,
+                child: const Text('End current assignment')),
+          DropdownButtonFormField<String>(
+              initialValue: widget.tenant.residencyStatus,
+              decoration: const InputDecoration(labelText: 'Residency status'),
+              items: const [
+                DropdownMenuItem(value: 'active', child: Text('Active')),
+                DropdownMenuItem(
+                    value: 'moving_out', child: Text('Moving out')),
+                DropdownMenuItem(value: 'inactive', child: Text('Inactive'))
+              ],
+              onChanged: saving
+                  ? null
+                  : (value) {
+                      if (value != null) _setStatus(value);
+                    }),
+        ],
+      ));
+}
+
+String _tenantAssignmentError(Object error) {
+  final message = error.toString();
+  if (message.contains('no longer available') ||
+      message.contains('tenant_assignments_one_active_per_bed')) {
+    return 'That bed was just assigned to someone else. Choose another bed.';
   }
+  if (message.contains('Staff access required') || message.contains('42501')) {
+    return 'Your account is not authorized to manage bed assignments.';
+  }
+  return 'Unable to load or save bed assignments. Check your connection and retry.';
 }
 
 class OperationsHubPage extends StatefulWidget {
@@ -737,8 +895,6 @@ const _operationCategories = [
           Icons.map_outlined, AdminFloorPlanPage()),
       _OperationItem('Maintenance', 'Manage repair requests',
           Icons.build_outlined, MaintenanceManagementPage()),
-      _OperationItem('System status', 'Monitor cameras and services',
-          Icons.memory_outlined, IotDeviceStatusPage()),
     ],
   ),
   _OperationCategory(
@@ -1046,8 +1202,8 @@ class _OperationItem {
   final Widget page;
 }
 
-class RoomMonitoringPage extends StatelessWidget {
-  const RoomMonitoringPage({super.key});
+class LegacyRoomMonitoringPage extends StatelessWidget {
+  const LegacyRoomMonitoringPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -1249,17 +1405,7 @@ class GateMonitoringPage extends StatelessWidget {
 
     return PageFrame(
       title: 'Gate monitoring',
-      subtitle: 'Facial recognition events with geofence cross-checks',
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'System status',
-        backgroundColor: const Color(0xFF568F8E),
-        foregroundColor: Colors.white,
-        onPressed: () => _ownerPush(
-          context,
-          const IotDeviceStatusPage(),
-        ),
-        child: const Icon(Icons.memory_outlined),
-      ),
+      subtitle: 'Geofence entry and exit events requiring staff review',
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) => Column(
@@ -1268,10 +1414,10 @@ class GateMonitoringPage extends StatelessWidget {
             AdaptiveGrid(
               children: [
                 const MetricCard(
-                  label: 'Recognition processor',
-                  value: 'Online',
-                  detail: 'Last capture: 8:14 PM',
-                  icon: Icons.router_outlined,
+                  label: 'Dormitory boundary',
+                  value: 'Configured',
+                  detail: 'Entry and exit zone',
+                  icon: Icons.location_searching_outlined,
                 ),
                 const MetricCard(
                   label: 'Geofence service',
@@ -1315,7 +1461,7 @@ class GateMonitoringPage extends StatelessWidget {
                         ? Icons.login
                         : event.direction == 'OUT'
                             ? Icons.logout
-                            : Icons.videocam_outlined,
+                            : Icons.location_off_outlined,
                     color: event.status == 'Review'
                         ? const Color(0xFFAA6870)
                         : event.direction == 'IN'
@@ -2204,80 +2350,6 @@ class EmergencyContactsPage extends StatelessWidget {
               )
               .toList(),
         ),
-      ),
-    );
-  }
-}
-
-class IotDeviceStatusPage extends StatelessWidget {
-  const IotDeviceStatusPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = OwnerController.instance;
-
-    return PageFrame(
-      title: 'System status',
-      subtitle: 'Camera, processing device, and connectivity',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const CarmelitaCard(
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.info_outline),
-              title: Text(
-                'Frontend demonstration',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              subtitle: Text(
-                'These states are mock values. Live camera captures, processing '
-                'heartbeats, and connectivity require the backend monitoring feed.',
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          AdaptiveGrid(
-            minTileWidth: 250,
-            children: controller.devices
-                .map(
-                  (device) => CarmelitaCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          children: [
-                            const Expanded(
-                              child: Icon(
-                                Icons.memory_outlined,
-                                size: 26,
-                              ),
-                            ),
-                            StatusPill(device.status),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          device.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          device.detail,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        ],
       ),
     );
   }
