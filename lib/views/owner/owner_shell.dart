@@ -30,10 +30,10 @@ class OwnerShell extends StatelessWidget {
                 selectedIcon: Icons.tune,
                 page: OperationsHubPage()),
             AppDestination(
-                label: 'Gate',
-                icon: Icons.sensor_door_outlined,
-                selectedIcon: Icons.sensor_door,
-                page: GateMonitoringPage()),
+                label: 'Curfew',
+                icon: Icons.schedule_outlined,
+                selectedIcon: Icons.schedule,
+                page: GeofenceMonitoringPage()),
             AppDestination(
                 label: 'Profile',
                 icon: Icons.person_outline,

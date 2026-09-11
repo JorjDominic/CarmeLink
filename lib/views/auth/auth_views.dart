@@ -217,7 +217,7 @@ class WelcomePage extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         Text(
-          'Payments, room information, maintenance, gate activity, curfew requests, announcements, and safety updates are organized around what each user needs to do.',
+          'Payments, room information, maintenance, geofence presence monitoring, announcements, and safety updates are organized around what each user needs to do.',
           style: Theme.of(context).textTheme.bodyLarge,
         ),
         const SizedBox(height: 26),

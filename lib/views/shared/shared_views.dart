@@ -688,7 +688,7 @@ class SettingsPage extends StatelessWidget {
                       ),
                     ),
                     subtitle: const Text(
-                      'Payment, gate, maintenance, curfew, and announcement alerts.',
+                      'Payment, geofence presence, maintenance, and announcement alerts.',
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.of(context).push(
@@ -700,11 +700,11 @@ class SettingsPage extends StatelessWidget {
                   const Divider(),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.fingerprint_outlined),
+                    leading: const Icon(Icons.phonelink_lock_outlined),
                     title: const Text('Device binding',
                         style: TextStyle(fontWeight: FontWeight.w700)),
                     subtitle: const Text(
-                        'Register this device and enable the native biometric app lock.'),
+                        'Register this device for background geofence presence detection.'),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => const DeviceBindingPage())),
@@ -787,9 +787,8 @@ class _NotificationPreferencesPageState
     extends State<NotificationPreferencesPage> {
   final enabled = <String, bool>{
     'Payments': true,
-    'Gate activity': true,
+    'Geofence presence': true,
     'Maintenance': true,
-    'Curfew requests': true,
     'Announcements': true,
   };
 
@@ -797,9 +796,8 @@ class _NotificationPreferencesPageState
   Widget build(BuildContext context) {
     const icons = <String, IconData>{
       'Payments': Icons.payments_outlined,
-      'Gate activity': Icons.sensor_door_outlined,
+      'Geofence presence': Icons.location_on_outlined,
       'Maintenance': Icons.build_outlined,
-      'Curfew requests': Icons.schedule_outlined,
       'Announcements': Icons.campaign_outlined,
     };
 
@@ -867,6 +865,29 @@ class _PrivacyPermissionsPageState extends State<PrivacyPermissionsPage> {
                       setState(() => permissions[entry.key] = value),
                 );
               }).toList(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          CarmelitaCard(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Permission usage',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '• Location: Required for automated perimeter geofencing to verify inside/outside dormitory presence.\n'
+                  '• Camera & Storage: Required for capturing maintenance issue photos and payment proof receipts.\n'
+                  '• Notifications: Real-time safety announcements and account updates.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 12),
@@ -1020,15 +1041,15 @@ class DeviceBindingPage extends StatelessWidget {
                       leading: Icon(Icons.phonelink_lock_outlined),
                       title: Text('Register this device'),
                       subtitle: Text(
-                          'Binding supports accurate geofencing and protects access with fingerprint or Face ID. Native biometric and device-token services are not connected yet.'))),
+                          'Binding registers this phone as your trusted device for background geofencing presence detection. Native background location and device-token services are not connected yet.'))),
               const SizedBox(height: 14),
               SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
                       onPressed: () => showAppSnackBar(context,
-                          'Device binding requires native biometric and backend integration.'),
-                      icon: const Icon(Icons.fingerprint),
-                      label: const Text('Bind and enable biometrics'))),
+                          'Device binding requires native background location and hardware token registration.'),
+                      icon: const Icon(Icons.phonelink_lock_outlined),
+                      label: const Text('Bind trusted device'))),
             ])),
       );
 }

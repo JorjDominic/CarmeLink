@@ -54,47 +54,28 @@ class MockData {
         createdAt: DateTime(2026, 8, 7, 18, 10)),
   ];
 
-  static List<GateEvent> gateEvents = [
-    GateEvent(
+  static List<GeofenceEvent> gateEvents = [
+    GeofenceEvent(
         id: 'g1',
         person: 'Anna Dela Cruz',
         direction: 'IN',
         time: DateTime(2026, 8, 8, 20, 14),
-        verification: 'Geofence entry confirmed',
+        verification: 'GPS Geofence confirmed',
         status: 'Verified'),
-    GateEvent(
+    GeofenceEvent(
         id: 'g2',
         person: 'Bea Santos',
         direction: 'OUT',
         time: DateTime(2026, 8, 8, 19, 52),
-        verification: 'Geofence exit confirmed',
+        verification: 'GPS Geofence confirmed',
         status: 'Verified'),
-    GateEvent(
+    GeofenceEvent(
         id: 'g3',
-        person: 'Unknown person',
-        direction: 'ENTRY',
-        time: DateTime(2026, 8, 8, 19, 48),
-        verification: 'Geofence signal unavailable',
-        status: 'Review'),
-  ];
-
-  static List<CurfewRequest> curfewRequests = [
-    CurfewRequest(
-        id: 'c1',
-        tenantName: 'Anna Dela Cruz',
-        reason: 'Late laboratory activity',
-        destination: 'University campus',
-        expectedReturn: DateTime(2026, 8, 9, 23, 15),
-        guardianStatus: 'Input pending',
-        ownerStatus: 'Pending'),
-    CurfewRequest(
-        id: 'c2',
-        tenantName: 'Carla Reyes',
-        reason: 'Family dinner',
-        destination: 'Baliwag town center',
-        expectedReturn: DateTime(2026, 8, 10, 22, 45),
-        guardianStatus: 'Confirmed',
-        ownerStatus: 'Pending'),
+        person: 'Carla Reyes',
+        direction: 'IN',
+        time: DateTime(2026, 8, 8, 18, 30),
+        verification: 'GPS Geofence confirmed',
+        status: 'Verified'),
   ];
 
   static List<VisitorRequest> visitors = [
@@ -351,21 +332,6 @@ class MockData {
     ),
   ];
 
-  static List<GateReviewRecord> gateReviews = [
-    GateReviewRecord(
-      id: 'gr1',
-      event: GateEvent(
-        id: 'g-review-1',
-        person: 'Unknown person',
-        direction: 'ENTRY',
-        time: DateTime(2026, 8, 8, 19, 48),
-        verification: 'Geofence signal unavailable',
-        status: 'Review',
-      ),
-      reviewStatus: 'Pending',
-    ),
-  ];
-
   static final notifications = [
     AppNotification(
         title: 'Payment reminder',
@@ -378,9 +344,9 @@ class MockData {
         time: DateTime(2026, 8, 8, 11, 20),
         type: 'Maintenance'),
     AppNotification(
-        title: 'Gate activity',
-        body: 'IN event verified at 8:14 PM.',
+        title: 'Geofence arrival',
+        body: 'Anna Dela Cruz arrived at Carmelita\'s Dormitory (GPS verified).',
         time: DateTime(2026, 8, 8, 20, 14),
-        type: 'Gate'),
+        type: 'Geofence'),
   ];
 }

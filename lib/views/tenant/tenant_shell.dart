@@ -50,10 +50,10 @@ class _TenantShellState extends State<TenantShell> {
               page: TenantReportsHubPage(),
             ),
             AppDestination(
-              label: 'Gate',
-              icon: Icons.sensor_door_outlined,
-              selectedIcon: Icons.sensor_door,
-              page: GateCurfewPage(),
+              label: 'Curfew',
+              icon: Icons.schedule_outlined,
+              selectedIcon: Icons.schedule,
+              page: TenantPresencePage(),
             ),
             AppDestination(
               label: 'Profile',

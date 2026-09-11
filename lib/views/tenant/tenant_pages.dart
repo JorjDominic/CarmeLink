@@ -107,14 +107,14 @@ class TenantDashboardPage extends StatelessWidget {
                 ),
               ),
               MutedDashboardItem(
-                label: 'Gate status',
+                label: 'Curfew',
                 value: 'Inside',
-                detail: 'Last IN • 8:14 PM',
-                icon: Icons.sensor_door_outlined,
+                detail: 'Geofence verified • 8:14 PM',
+                icon: Icons.schedule_outlined,
                 color: const Color(0xFF56886B),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const GateCurfewPage(),
+                    builder: (_) => const TenantPresencePage(),
                   ),
                 ),
               ),
@@ -196,13 +196,13 @@ class TenantDashboardPage extends StatelessWidget {
                 ),
               ),
               MutedActionItem(
-                label: 'Curfew request',
-                detail: 'Request an exception',
+                label: 'Curfew log',
+                detail: 'Review geofence',
                 icon: Icons.schedule_outlined,
                 color: const Color(0xFF7D70A0),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const CurfewExceptionPage(),
+                    builder: (_) => const TenantPresencePage(),
                   ),
                 ),
               ),
@@ -2127,19 +2127,23 @@ class _TenantConversationPageState extends State<TenantConversationPage> {
   }
 }
 
-class GateCurfewPage extends StatelessWidget {
-  const GateCurfewPage({super.key});
+class TenantPresencePage extends StatelessWidget {
+  const TenantPresencePage({super.key});
+
   @override
   Widget build(BuildContext context) {
-    final events = TenantController.instance.gateEvents
+    final events = TenantController.instance.geofenceEvents
         .where((e) => e.person == 'Anna Dela Cruz')
         .toList();
+
     return PageFrame(
-        title: 'Gate & curfew',
-        subtitle: 'Current status and recent gate activity',
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      title: 'Curfew',
+      subtitle: 'Geofence tracking and presence status',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            'GATE SUMMARY',
+            'CURFEW STATUS',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   fontSize: 15,
@@ -2153,7 +2157,7 @@ class GateCurfewPage extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final compact = constraints.maxWidth < 330;
-                final copy = const Column(
+                const copy = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -2173,84 +2177,99 @@ class GateCurfewPage extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 6),
-                    Text('Last IN: 8:14 PM • Face recognition'),
+                    Text('Last IN: 8:14 PM • GPS Geofence confirmed'),
                   ],
                 );
 
                 if (compact) {
-                  return Column(
+                  return const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
                           CircleAvatar(
                             radius: 24,
                             backgroundColor: Color(0x1356886B),
                             foregroundColor: Color(0xFF56886B),
-                            child: Icon(Icons.home_outlined),
+                            child: Icon(Icons.location_on_outlined),
                           ),
                           SizedBox(width: 12),
                           StatusPill('IN'),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12),
                       copy,
                     ],
                   );
                 }
 
-                return Row(
+                return const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const CircleAvatar(
+                    CircleAvatar(
                       radius: 28,
                       backgroundColor: Color(0x1356886B),
                       foregroundColor: Color(0xFF56886B),
-                      child: Icon(Icons.home_outlined),
+                      child: Icon(Icons.location_on_outlined),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     Expanded(child: copy),
-                    const SizedBox(width: 10),
-                    const StatusPill('IN'),
+                    SizedBox(width: 10),
+                    StatusPill('IN'),
                   ],
                 );
               },
             ),
           ),
           const SizedBox(height: 18),
-          const MutedDashboardGrid(compact: true, items: [
-            MutedDashboardItem(
-                label: 'Curfew',
-                value: '10:00 PM',
-                detail: 'Standard schedule',
-                icon: Icons.schedule_outlined,
-                color: Color(0xFF7D70A0)),
-            MutedDashboardItem(
-                label: 'Late records',
-                value: '0',
-                detail: 'This month',
-                icon: Icons.warning_amber_outlined,
-                color: Color(0xFFAA8A45))
-          ]),
+          const MutedDashboardGrid(
+            compact: true,
+            items: [
+              MutedDashboardItem(
+                label: 'Geofence boundary',
+                value: '50m Radius',
+                detail: 'Carmelita\'s Dormitory',
+                icon: Icons.location_searching_outlined,
+                color: Color(0xFF56886B),
+              ),
+              MutedDashboardItem(
+                label: 'Detection signal',
+                value: 'Active',
+                detail: 'GPS Geofencing',
+                icon: Icons.gps_fixed_outlined,
+                color: Color(0xFF627FA8),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
-          MutedActionGrid(items: [
-            MutedActionItem(
-                label: 'Curfew exception',
-                detail: 'Request a late return',
-                color: const Color(0xFF7D70A0),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const CurfewExceptionPage())),
-                icon: Icons.event_available_outlined),
-            MutedActionItem(
+          MutedActionGrid(
+            items: [
+              MutedActionItem(
                 label: 'Visitor request',
                 detail: 'Register a visitor',
                 color: const Color(0xFF568F8E),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const VisitorRequestPage())),
-                icon: Icons.person_add_alt_outlined),
-          ]),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const VisitorRequestPage(),
+                  ),
+                ),
+                icon: Icons.person_add_alt_outlined,
+              ),
+              MutedActionItem(
+                label: 'Dormitory rules',
+                detail: 'Guidelines & policies',
+                color: const Color(0xFF7D70A0),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const DormitoryRulesPage(),
+                  ),
+                ),
+                icon: Icons.rule_outlined,
+              ),
+            ],
+          ),
           const SizedBox(height: 22),
-          const SectionTitle('Recent gate records'),
+          const SectionTitle('Recent presence records'),
           const SizedBox(height: 10),
           ...events.map(
             (e) => Padding(
@@ -2259,121 +2278,30 @@ class GateCurfewPage extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 child: TimelineTile(
-                    compact: true,
-                    icon: e.direction == 'IN' ? Icons.login : Icons.logout,
-                    color: e.direction == 'IN'
-                        ? const Color(0xFF56886B)
-                        : const Color(0xFF627FA8),
-                    title: e.direction,
-                    subtitle:
-                        '${shortDate(e.time)} • ${timeText(e.time)} • ${e.verification}',
-                    trailing: StatusPill(e.status)),
+                  compact: true,
+                  icon: e.direction == 'IN'
+                      ? Icons.login_rounded
+                      : Icons.logout_rounded,
+                  color: e.direction == 'IN'
+                      ? const Color(0xFF56886B)
+                      : const Color(0xFF627FA8),
+                  title: e.direction == 'IN'
+                      ? 'Entered dormitory perimeter'
+                      : 'Exited dormitory perimeter',
+                  subtitle:
+                      '${shortDate(e.time)} • ${timeText(e.time)} • ${e.verification}',
+                  trailing: StatusPill(e.status),
+                ),
               ),
             ),
           ),
-        ]));
+        ],
+      ),
+    );
   }
 }
 
-class CurfewExceptionPage extends StatefulWidget {
-  const CurfewExceptionPage({super.key});
-  @override
-  State<CurfewExceptionPage> createState() => _CurfewExceptionPageState();
-}
-
-class _CurfewExceptionPageState extends State<CurfewExceptionPage> {
-  final reason = TextEditingController();
-  final destination = TextEditingController();
-  DateTime expected = DateTime(2026, 8, 9, 23);
-  @override
-  Widget build(BuildContext context) => PageFrame(
-      title: 'Curfew exception',
-      subtitle: 'Guardian approval is required',
-      child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-              'REQUEST DETAILS',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    letterSpacing: 1.3,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-            ),
-            const SizedBox(height: 10),
-            LabeledField(
-                label: 'Reason',
-                hint: 'Why do you need to return late?',
-                controller: reason,
-                maxLines: 3),
-            const SizedBox(height: 14),
-            LabeledField(
-                label: 'Destination',
-                hint: 'Where will you be?',
-                controller: destination),
-            const SizedBox(height: 14),
-            CarmelitaCard(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(children: [
-                  Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                          color:
-                              const Color(0xFF7D70A0).withValues(alpha: .075),
-                          borderRadius: BorderRadius.circular(11)),
-                      child: const Icon(Icons.schedule_outlined,
-                          color: Color(0xFF7D70A0), size: 19)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: Text(
-                          'Expected return: ${shortDate(expected)} • ${timeText(expected)}',
-                          style: const TextStyle(fontWeight: FontWeight.w700))),
-                  TextButton(
-                      onPressed: () => setState(() =>
-                          expected = expected.add(const Duration(minutes: 30))),
-                      child: const Text('+30 min'))
-                ])),
-            const SizedBox(height: 14),
-            CarmelitaCard(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: ListTile(
-                    dense: true,
-                    visualDensity: const VisualDensity(vertical: -2),
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.verified_user_outlined,
-                        color: Color(0xFF56886B)),
-                    title: const Text('Guardian confirmation',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 13)),
-                    subtitle: const Text(
-                        'Guardian input supports the owner/caretaker’s final decision.',
-                        style: TextStyle(fontSize: 11)))),
-            const SizedBox(height: 18),
-            SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                    onPressed: () {
-                      if (reason.text.trim().isEmpty ||
-                          destination.text.trim().isEmpty) {
-                        showAppSnackBar(
-                            context, 'Complete the reason and destination.');
-                        return;
-                      }
-                      TenantController.instance.submitCurfew(
-                          reason: reason.text.trim(),
-                          destination: destination.text.trim(),
-                          expectedReturn: expected);
-                      showAppSnackBar(context, 'Curfew request submitted.');
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text('Submit request'))),
-          ])));
-}
+typedef GateCurfewPage = TenantPresencePage;
 
 class VisitorRequestPage extends StatefulWidget {
   const VisitorRequestPage({super.key});
@@ -2650,10 +2578,10 @@ class RulesPoliciesPage extends StatelessWidget {
       subtitle: 'Dormitory guidelines and procedures',
       child: Column(children: [
         _PolicyCard(
-            title: 'Curfew',
+            title: 'Curfew & geofencing',
             icon: Icons.schedule_outlined,
             body:
-                'Return by the standard curfew unless an exception has been approved by the guardian and owner/caretaker.'),
+                'Automated GPS geofencing records dormitory arrival and departure for curfew monitoring and resident safety. Keep location access enabled.'),
         SizedBox(height: 12),
         _PolicyCard(
             title: 'Payments',
@@ -2662,12 +2590,14 @@ class RulesPoliciesPage extends StatelessWidget {
                 'Submit payments according to the agreed schedule. Uploaded proof remains pending until verified.'),
         SizedBox(height: 12),
         _PolicyCard(
-            title: 'Safety and access',
+            title: 'Safety and community',
             icon: Icons.shield_outlined,
             body:
-                'Do not allow unregistered people to enter through the gate. Report unusual access events immediately.'),
+                'Maintain a safe, respectful environment. Register any visitors in advance through the visitor request tool.'),
       ]));
 }
+
+typedef DormitoryRulesPage = RulesPoliciesPage;
 
 class _PolicyCard extends StatelessWidget {
   const _PolicyCard(

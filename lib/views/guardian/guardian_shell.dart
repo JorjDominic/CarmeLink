@@ -23,12 +23,12 @@ class GuardianShell extends StatelessWidget {
                 label: 'Curfew',
                 icon: Icons.schedule_outlined,
                 selectedIcon: Icons.schedule,
-                page: GuardianCurfewOverviewPage()),
+                page: GuardianPresenceMonitoringPage()),
             AppDestination(
-                label: 'Requests',
-                icon: Icons.approval_outlined,
-                selectedIcon: Icons.approval,
-                page: GuardianCurfewRequestsPage()),
+                label: 'Notices',
+                icon: Icons.campaign_outlined,
+                selectedIcon: Icons.campaign,
+                page: GuardianAnnouncementsPage()),
             AppDestination(
                 label: 'Messages',
                 icon: Icons.chat_bubble_outline,

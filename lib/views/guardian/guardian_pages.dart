@@ -13,11 +13,6 @@ class GuardianDashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = GuardianController.instance;
-    final linkedRequests = controller.curfewRequests
-        .where(
-          (request) => request.tenantName == controller.linkedTenantName,
-        )
-        .toList();
 
     return PageFrame(
       title: 'Home',
@@ -40,12 +35,12 @@ class GuardianDashboardPage extends StatelessWidget {
           children: [
             const ElegantHeader(
               eyebrow: 'Guardian view',
-              title: 'Anna is inside the dormitory.',
+              title: 'Anna is inside the dormitory perimeter.',
               subtitle:
-                  'Everything important about your linked tenant appears here first.',
+                  'Real-time GPS geofencing confirms safe arrival and departure.',
               trailing: StatusPill(
                 'IN',
-                icon: Icons.home_rounded,
+                icon: Icons.location_on_rounded,
               ),
             ),
             const SizedBox(height: 22),
@@ -83,7 +78,7 @@ class GuardianDashboardPage extends StatelessWidget {
                         SizedBox(height: 4),
                         Text('Room 204 • Bed 2'),
                         SizedBox(height: 3),
-                        Text('Last IN • 8:14 PM'),
+                        Text('Last IN • 8:14 PM • GPS verified'),
                       ],
                     ),
                   ),
@@ -94,20 +89,20 @@ class GuardianDashboardPage extends StatelessWidget {
             const SizedBox(height: 24),
             const SectionTitle(
               'At a glance',
-              subtitle: 'Gate, payment, and pending approvals',
+              subtitle: 'Presence, payment, and dormitory status',
             ),
             const SizedBox(height: 10),
             MutedDashboardGrid(
               items: [
                 MutedDashboardItem(
-                  label: 'Gate status',
+                  label: 'Curfew',
                   value: 'Inside',
-                  detail: 'Verified • 8:14 PM',
-                  icon: Icons.sensor_door_outlined,
+                  detail: 'GPS Geofence • 8:14 PM',
+                  icon: Icons.schedule_outlined,
                   color: const Color(0xFF56886B),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const GuardianCurfewOverviewPage(),
+                      builder: (_) => const GuardianPresenceMonitoringPage(),
                     ),
                   ),
                 ),
@@ -127,45 +122,31 @@ class GuardianDashboardPage extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             const SectionTitle(
-              'Needs your attention',
-              subtitle: 'Requests that require a guardian decision',
+              'Safety & presence status',
+              subtitle: 'Automated geofence tracking for resident safety',
             ),
             const SizedBox(height: 10),
-            if (controller.pendingCurfewCount == 0)
-              const CarmelitaCard(
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.task_alt_rounded),
-                  title: Text(
-                    'No pending curfew requests',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'New requests from your linked tenant will appear here.',
-                  ),
+            CarmelitaCard(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.verified_user_outlined, color: Color(0xFF56886B)),
+                title: const Text(
+                  'Perimeter status: Safe & Inside',
+                  style: TextStyle(fontWeight: FontWeight.w800),
                 ),
-              )
-            else
-              ...linkedRequests
-                  .where(
-                    (request) => request.guardianStatus == 'Pending',
-                  )
-                  .map(
-                    (request) => AttentionCard(
-                      icon: Icons.schedule_outlined,
-                      title: request.reason,
-                      subtitle:
-                          '${request.destination} • Return ${timeText(request.expectedReturn)}',
-                      status: request.guardianStatus,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const GuardianCurfewRequestsPage(),
-                        ),
-                      ),
+                subtitle: const Text(
+                  'Anna Dela Cruz is currently within Carmelita\'s Dormitory perimeter. No issues reported.',
+                ),
+                trailing: TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const GuardianPresenceMonitoringPage(),
                     ),
                   ),
+                  child: const Text('View history'),
+                ),
+              ),
+            ),
             const SizedBox(height: 24),
             const SectionTitle(
               'Quick access',
@@ -251,25 +232,25 @@ class GuardianTenantInfoPage extends StatelessWidget {
       ])));
 }
 
-class GuardianCurfewOverviewPage extends StatelessWidget {
-  const GuardianCurfewOverviewPage({super.key});
+class GuardianPresenceMonitoringPage extends StatelessWidget {
+  const GuardianPresenceMonitoringPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     final controller = GuardianController.instance;
-    final events = controller.gateEvents
+    final events = controller.geofenceEvents
         .where((event) => event.person == controller.linkedTenantName)
         .toList();
     return PageFrame(
       title: 'Curfew',
-      subtitle: 'Linked tenant status and curfew activity',
+      subtitle: 'Linked tenant curfew & geofence status',
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'CURFEW SUMMARY',
+              'CURFEW STATUS',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
@@ -285,30 +266,21 @@ class GuardianCurfewOverviewPage extends StatelessWidget {
                   label: 'Current status',
                   value: 'Inside',
                   detail: 'Last IN 8:14 PM',
-                  icon: Icons.home_outlined,
+                  icon: Icons.location_on_outlined,
                   color: Color(0xFF56886B),
                 ),
                 MutedDashboardItem(
-                  label: 'Standard curfew',
-                  value: '10:00 PM',
-                  detail: 'Daily schedule',
-                  icon: Icons.schedule_outlined,
-                  color: Color(0xFF7D70A0),
+                  label: 'Geofence zone',
+                  value: '50m Radius',
+                  detail: 'Carmelita\'s Dormitory',
+                  icon: Icons.location_searching_outlined,
+                  color: Color(0xFF627FA8),
                 ),
               ],
             ),
             const SizedBox(height: 20),
             MutedActionGrid(
               items: [
-                MutedActionItem(
-                  label: 'Curfew requests',
-                  detail: 'Provide supporting input',
-                  icon: Icons.approval_outlined,
-                  color: const Color(0xFF7D70A0),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const GuardianCurfewRequestsPage(),
-                  )),
-                ),
                 MutedActionItem(
                   label: 'Tenant information',
                   detail: 'View linked tenant',
@@ -318,16 +290,28 @@ class GuardianCurfewOverviewPage extends StatelessWidget {
                     builder: (_) => const GuardianTenantInfoPage(),
                   )),
                 ),
+                MutedActionItem(
+                  label: 'Payments',
+                  detail: 'Check balances',
+                  icon: Icons.payments_outlined,
+                  color: const Color(0xFFAA8A45),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const GuardianPaymentStatusPage(),
+                  )),
+                ),
               ],
             ),
             const SizedBox(height: 22),
-            const SectionTitle('Recent gate records'),
+            const SectionTitle(
+              'Recent presence records',
+              subtitle: 'Automated GPS geofence arrival and departure logs',
+            ),
             const SizedBox(height: 10),
             if (events.isEmpty)
               const EmptyState(
-                icon: Icons.sensor_door_outlined,
-                title: 'No recent gate records',
-                message: 'Recognized entries and exits will appear here.',
+                icon: Icons.location_off_outlined,
+                title: 'No recent presence records',
+                message: 'Verified arrivals and departures will appear here.',
               )
             else
               ...events.map(
@@ -346,7 +330,9 @@ class GuardianCurfewOverviewPage extends StatelessWidget {
                       color: event.direction == 'IN'
                           ? const Color(0xFF56886B)
                           : const Color(0xFF627FA8),
-                      title: event.direction,
+                      title: event.direction == 'IN'
+                          ? 'Entered dormitory perimeter'
+                          : 'Exited dormitory perimeter',
                       subtitle:
                           '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verification}',
                       trailing: StatusPill(event.status),
@@ -361,15 +347,19 @@ class GuardianCurfewOverviewPage extends StatelessWidget {
   }
 }
 
-class GuardianGateActivityPage extends StatefulWidget {
-  const GuardianGateActivityPage({super.key});
+typedef GuardianCurfewOverviewPage = GuardianPresenceMonitoringPage;
+
+class GuardianActivityPage extends StatefulWidget {
+  const GuardianActivityPage({super.key});
 
   @override
-  State<GuardianGateActivityPage> createState() =>
-      _GuardianGateActivityPageState();
+  State<GuardianActivityPage> createState() =>
+      _GuardianActivityPageState();
 }
 
-class _GuardianGateActivityPageState extends State<GuardianGateActivityPage>
+typedef GuardianGateActivityPage = GuardianActivityPage;
+
+class _GuardianActivityPageState extends State<GuardianActivityPage>
     with WidgetsBindingObserver {
   bool loading = true;
   bool hasPermission = false;
@@ -430,7 +420,7 @@ class _GuardianGateActivityPageState extends State<GuardianGateActivityPage>
   @override
   Widget build(BuildContext context) => PageFrame(
         title: 'Activity',
-        subtitle: 'Today\'s device usage and recent gate events',
+        subtitle: 'Today\'s device usage and recent presence events',
         actions: [
           IconButton(
             tooltip: 'Refresh activity',
@@ -447,10 +437,10 @@ class _GuardianGateActivityPageState extends State<GuardianGateActivityPage>
             const SizedBox(height: 10),
             _usageCard(),
             const SizedBox(height: 24),
-            const SectionTitle('Recent gate records',
-                subtitle: 'Verified IN and OUT events'),
+            const SectionTitle('Recent presence records',
+                subtitle: 'Verified perimeter crossings'),
             const SizedBox(height: 10),
-            const _GuardianGateRecords(),
+            const _GuardianPresenceRecords(),
           ],
         ),
       );
@@ -526,11 +516,11 @@ class _GuardianGateActivityPageState extends State<GuardianGateActivityPage>
   }
 }
 
-class _GuardianGateRecords extends StatelessWidget {
-  const _GuardianGateRecords();
+class _GuardianPresenceRecords extends StatelessWidget {
+  const _GuardianPresenceRecords();
   @override
   Widget build(BuildContext context) {
-    final events = GuardianController.instance.gateEvents
+    final events = GuardianController.instance.geofenceEvents
         .where((e) => e.person == 'Anna Dela Cruz')
         .toList();
     return CarmelitaCard(
@@ -545,101 +535,7 @@ class _GuardianGateRecords extends StatelessWidget {
   }
 }
 
-class GuardianCurfewRequestsPage extends StatelessWidget {
-  const GuardianCurfewRequestsPage({super.key});
-  @override
-  Widget build(BuildContext context) {
-    final c = GuardianController.instance;
-    return PageFrame(
-        title: 'Curfew requests',
-        subtitle: 'Review requests and provide guardian input',
-        child: AnimatedBuilder(
-            animation: c,
-            builder: (context, _) =>
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(
-                    'REQUEST SUMMARY',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                          letterSpacing: 1.3,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  MutedDashboardGrid(
-                    compact: true,
-                    items: [
-                      MutedDashboardItem(
-                        label: 'Needs input',
-                        value: '${c.pendingCurfewCount}',
-                        detail: 'Guardian response',
-                        icon: Icons.pending_actions_outlined,
-                        color: const Color(0xFFAA8A45),
-                      ),
-                      MutedDashboardItem(
-                        label: 'Total requests',
-                        value:
-                            '${c.curfewRequests.where((r) => r.tenantName == c.linkedTenantName).length}',
-                        detail: 'Linked tenant',
-                        icon: Icons.schedule_outlined,
-                        color: const Color(0xFF7D70A0),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 22),
-                  const SectionTitle('Curfew requests'),
-                  const SizedBox(height: 10),
-                  ...c.curfewRequests
-                      .where((r) => r.tenantName == 'Anna Dela Cruz')
-                      .map((r) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: CarmelitaCard(
-                                padding: const EdgeInsets.all(12),
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(children: [
-                                        Expanded(
-                                            child: Text(r.reason,
-                                                style: const TextStyle(
-                                                    fontWeight: FontWeight.w800,
-                                                    fontSize: 17))),
-                                        StatusPill(r.guardianStatus)
-                                      ]),
-                                      const SizedBox(height: 10),
-                                      InfoRow(
-                                          label: 'Destination',
-                                          value: r.destination),
-                                      InfoRow(
-                                          label: 'Expected return',
-                                          value:
-                                              '${shortDate(r.expectedReturn)} • ${timeText(r.expectedReturn)}'),
-                                      if (r.guardianStatus ==
-                                          'Input pending') ...[
-                                        const SizedBox(height: 12),
-                                        Row(children: [
-                                          Expanded(
-                                              child: OutlinedButton(
-                                                  onPressed: () =>
-                                                      c.decideCurfew(r, false),
-                                                  child: const Text(
-                                                      'Note concern'))),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                              child: FilledButton(
-                                                  onPressed: () =>
-                                                      c.decideCurfew(r, true),
-                                                  child: const Text(
-                                                      'Confirm details'))),
-                                        ])
-                                      ],
-                                    ])),
-                          )),
-                ])));
-  }
-}
+typedef GuardianCurfewRequestsPage = GuardianPresenceMonitoringPage;
 
 class GuardianPaymentStatusPage extends StatelessWidget {
   const GuardianPaymentStatusPage({super.key});

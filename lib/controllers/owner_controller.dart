@@ -20,17 +20,15 @@ class OwnerController extends ChangeNotifier {
       ..sort((a, b) => (rank[b.urgency] ?? 0).compareTo(rank[a.urgency] ?? 0));
   }
 
-  List<GateEvent> get gateEvents => List.unmodifiable(MockData.gateEvents);
-  List<CurfewRequest> get curfewRequests =>
-      List.unmodifiable(MockData.curfewRequests);
+  List<GeofenceEvent> get geofenceEvents =>
+      List.unmodifiable(MockData.gateEvents);
+  List<GeofenceEvent> get gateEvents => geofenceEvents;
   List<VisitorRequest> get visitors => List.unmodifiable(MockData.visitors);
   List<ConcernReport> get concerns => List.unmodifiable(MockData.concerns);
   List<Announcement> get announcements =>
       List.unmodifiable(MockData.announcements);
   List<OwnerConversation> get conversations =>
       List.unmodifiable(MockData.ownerConversations);
-  List<GateReviewRecord> get gateReviews =>
-      List.unmodifiable(MockData.gateReviews);
 
   int get occupiedBeds =>
       rooms.fold<int>(0, (sum, room) => sum + room.occupied);
@@ -50,15 +48,16 @@ class OwnerController extends ChangeNotifier {
       )
       .length;
 
-  int get pendingCurfewReviews => curfewRequests
-      .where((request) => request.ownerStatus == 'Pending')
-      .length;
-
   int get pendingVisitors =>
       visitors.where((visitor) => visitor.status == 'Pending').length;
 
-  int get pendingGateReviews =>
-      gateReviews.where((review) => review.reviewStatus == 'Pending').length;
+  int get tenantsInsideCount => tenants
+      .where((t) => t.gateStatus == 'IN' || t.gateStatus == 'Inside')
+      .length;
+
+  int get tenantsOutsideCount => tenants
+      .where((t) => t.gateStatus == 'OUT' || t.gateStatus == 'Outside')
+      .length;
 
   void verifyPayment(Payment payment, bool approve) {
     payment.status = approve ? 'Verified' : 'Rejected';
@@ -74,11 +73,6 @@ class OwnerController extends ChangeNotifier {
     if (notes != null && notes.trim().isNotEmpty) {
       report.notes = notes.trim();
     }
-    notifyListeners();
-  }
-
-  void decideCurfew(CurfewRequest request, bool approve) {
-    request.ownerStatus = approve ? 'Approved' : 'Rejected';
     notifyListeners();
   }
 
@@ -133,17 +127,4 @@ class OwnerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void reviewGateEvent(
-    GateReviewRecord review, {
-    required String status,
-    String note = '',
-  }) {
-    review.reviewStatus = status;
-    review.note = note.trim();
-    notifyListeners();
-  }
-
-  // Legacy migration stub only. No physical lock/relay is connected and the
-  // manual-override screen has no navigation path in the finalized app.
-  void addManualOverride({required String reason, required String action}) {}
 }

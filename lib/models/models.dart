@@ -80,8 +80,8 @@ class MaintenanceReport {
   String notes;
 }
 
-class GateEvent {
-  const GateEvent({
+class GeofenceEvent {
+  const GeofenceEvent({
     required this.id,
     required this.person,
     required this.direction,
@@ -98,25 +98,7 @@ class GateEvent {
   final String status;
 }
 
-class CurfewRequest {
-  CurfewRequest({
-    required this.id,
-    required this.tenantName,
-    required this.reason,
-    required this.destination,
-    required this.expectedReturn,
-    required this.guardianStatus,
-    required this.ownerStatus,
-  });
-
-  final String id;
-  final String tenantName;
-  final String reason;
-  final String destination;
-  final DateTime expectedReturn;
-  String guardianStatus;
-  String ownerStatus;
-}
+typedef GateEvent = GeofenceEvent;
 
 class VisitorRequest {
   VisitorRequest({
@@ -258,18 +240,4 @@ class OwnerConversation {
   final String personName;
   final String personRole;
   final List<ChatMessage> messages;
-}
-
-class GateReviewRecord {
-  GateReviewRecord({
-    required this.id,
-    required this.event,
-    required this.reviewStatus,
-    this.note = '',
-  });
-
-  final String id;
-  final GateEvent event;
-  String reviewStatus;
-  String note;
 }

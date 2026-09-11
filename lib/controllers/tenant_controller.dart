@@ -22,14 +22,13 @@ class TenantController extends ChangeNotifier {
 
   List<MaintenanceReport> get maintenance => List.unmodifiable(_maintenance);
 
-  List<GateEvent> get gateEvents => List.unmodifiable(MockData.gateEvents);
+  List<GeofenceEvent> get geofenceEvents =>
+      List.unmodifiable(MockData.gateEvents);
+
+  List<GeofenceEvent> get gateEvents => geofenceEvents;
 
   List<Announcement> get announcements => List.unmodifiable(
         MockData.announcements,
-      );
-
-  List<CurfewRequest> get curfewRequests => List.unmodifiable(
-        MockData.curfewRequests,
       );
 
   List<VisitorRequest> get visitors => List.unmodifiable(MockData.visitors);
@@ -163,27 +162,6 @@ class TenantController extends ChangeNotifier {
     String? photoPath,
   ) {
     return _maintenanceService.createPhotoUrl(photoPath);
-  }
-
-  void submitCurfew({
-    required String reason,
-    required String destination,
-    required DateTime expectedReturn,
-  }) {
-    MockData.curfewRequests.insert(
-      0,
-      CurfewRequest(
-        id: 'c${DateTime.now().millisecondsSinceEpoch}',
-        tenantName: 'Anna Dela Cruz',
-        reason: reason,
-        destination: destination,
-        expectedReturn: expectedReturn,
-        guardianStatus: 'Input pending',
-        ownerStatus: 'Pending',
-      ),
-    );
-
-    notifyListeners();
   }
 
   void submitVisitor({

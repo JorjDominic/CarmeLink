@@ -38,10 +38,10 @@ class CaretakerShell extends StatelessWidget {
               page: MaintenanceManagementPage(),
             ),
             AppDestination(
-              label: 'Gate',
-              icon: Icons.sensor_door_outlined,
-              selectedIcon: Icons.sensor_door,
-              page: GateMonitoringPage(),
+              label: 'Curfew',
+              icon: Icons.schedule_outlined,
+              selectedIcon: Icons.schedule,
+              page: GeofenceMonitoringPage(),
             ),
             AppDestination(
               label: 'Accounts',

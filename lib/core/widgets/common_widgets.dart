@@ -497,11 +497,12 @@ class _PageEntranceState extends State<_PageEntrance>
 class _GlobalNotificationsPage extends StatelessWidget {
   const _GlobalNotificationsPage();
 
-  int _urgency(String type) => type == 'Gate'
-      ? 3
-      : type == 'Payment'
-          ? 2
-          : 1;
+  int _urgency(String type) =>
+      (type == 'Gate' || type == 'Geofence' || type == 'Presence')
+          ? 3
+          : type == 'Payment'
+              ? 2
+              : 1;
 
   @override
   Widget build(BuildContext context) {
@@ -516,8 +517,10 @@ class _GlobalNotificationsPage extends StatelessWidget {
               .map((notification) => TimelineTile(
                     icon: notification.type == 'Payment'
                         ? Icons.payments_outlined
-                        : notification.type == 'Gate'
-                            ? Icons.sensor_door_outlined
+                        : (notification.type == 'Gate' ||
+                                notification.type == 'Geofence' ||
+                                notification.type == 'Presence')
+                            ? Icons.location_on_outlined
                             : Icons.build_outlined,
                     title: notification.title,
                     subtitle:

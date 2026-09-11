@@ -10,30 +10,18 @@ class GuardianController extends ChangeNotifier {
 
   String get linkedTenantName => 'Anna Dela Cruz';
 
-  List<CurfewRequest> get curfewRequests =>
-      List.unmodifiable(MockData.curfewRequests);
-  List<GateEvent> get gateEvents => List.unmodifiable(MockData.gateEvents);
+  List<GeofenceEvent> get geofenceEvents =>
+      List.unmodifiable(MockData.gateEvents);
+  List<GeofenceEvent> get gateEvents => geofenceEvents;
   List<Payment> get payments => List.unmodifiable(MockData.payments);
   List<ChatMessage> get messages =>
       List.unmodifiable(MockData.guardianMessages);
 
-  int get pendingCurfewCount => curfewRequests
-      .where(
-        (request) =>
-            request.tenantName == linkedTenantName &&
-            request.guardianStatus == 'Input pending',
-      )
-      .length;
+  String get linkedTenantPresence => 'Inside';
 
   double get outstandingTotal => payments
       .where((payment) => payment.status != 'Verified')
       .fold<double>(0, (sum, payment) => sum + payment.amount);
-
-  void decideCurfew(CurfewRequest request, bool confirm) {
-    request.guardianStatus = confirm ? 'Confirmed' : 'Concern noted';
-    request.ownerStatus = 'Pending';
-    notifyListeners();
-  }
 
   void sendMessage(String body) {
     final clean = body.trim();

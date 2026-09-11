@@ -42,8 +42,8 @@ class OwnerDashboardPage extends StatelessWidget {
               subtitle:
                   '${controller.occupiedBeds} of ${controller.totalCapacity} beds are currently occupied.',
               trailing: StatusPill(
-                '${controller.pendingGateReviews} gate alert',
-                icon: Icons.shield_outlined,
+                '${controller.tenantsInsideCount} inside',
+                icon: Icons.location_on_outlined,
               ),
             ),
             const SizedBox(height: 22),
@@ -97,14 +97,14 @@ class OwnerDashboardPage extends StatelessWidget {
                   ),
                 ),
                 MutedDashboardItem(
-                  label: 'Gate alerts',
-                  value: '${controller.pendingGateReviews}',
-                  detail: 'Flagged events',
-                  icon: Icons.sensor_door_outlined,
-                  color: const Color(0xFFAA6870),
+                  label: 'Curfew',
+                  value: '${controller.tenantsInsideCount} Inside',
+                  detail: '${controller.tenantsOutsideCount} Outside',
+                  icon: Icons.schedule_outlined,
+                  color: const Color(0xFF56886B),
                   onTap: () => _ownerPush(
                     context,
-                    const GateMonitoringPage(),
+                    const GeofenceMonitoringPage(),
                   ),
                 ),
               ],
@@ -140,28 +140,13 @@ class OwnerDashboardPage extends StatelessWidget {
             const SizedBox(height: 8),
             AttentionCard(
               compact: true,
-              icon: Icons.schedule_outlined,
-              title:
-                  '${controller.pendingCurfewReviews} curfew request(s) waiting',
-              subtitle:
-                  'Guardian input is supporting information; your decision is final.',
-              status: controller.pendingCurfewReviews > 0 ? 'Pending' : 'Clear',
+              icon: Icons.location_on_outlined,
+              title: 'Dormitory geofencing active',
+              subtitle: 'GPS perimeter monitoring ${controller.tenants.length} registered residents.',
+              status: 'Active',
               onTap: () => _ownerPush(
                 context,
-                const CurfewRequestReviewPage(),
-              ),
-            ),
-            const SizedBox(height: 8),
-            AttentionCard(
-              compact: true,
-              icon: Icons.videocam_outlined,
-              title: '${controller.pendingGateReviews} flagged gate event(s)',
-              subtitle:
-                  'Review identity mismatch, unrecognized person, or tailgating alerts.',
-              status: controller.pendingGateReviews > 0 ? 'Review' : 'Clear',
-              onTap: () => _ownerPush(
-                context,
-                const GateMonitoringPage(),
+                const GeofenceMonitoringPage(),
               ),
             ),
           ],
@@ -923,8 +908,11 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                     '${controller.openMaintenance}',
                     Icons.assignment_outlined,
                     const Color(0xFF627FA8)),
-                _OperationsStatus('Alerts', '${controller.pendingGateReviews}',
-                    Icons.warning_amber_rounded, const Color(0xFFAA6870)),
+                _OperationsStatus(
+                    'Inside perimeter',
+                    '${controller.tenantsInsideCount}',
+                    Icons.location_on_outlined,
+                    const Color(0xFF4C8C65)),
               ];
               return GridView.builder(
                 shrinkWrap: true,
@@ -1048,9 +1036,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
             ? null
             : '${controller.openMaintenance} open';
       case 'Tenants & safety':
-        final total = controller.pendingCurfewReviews +
-            controller.pendingVisitors +
-            controller.pendingGateReviews;
+        final total = controller.pendingVisitors;
         return total == 0 ? null : '$total pending';
       case 'Finance & contracts':
         return controller.pendingPaymentProofs == 0
@@ -1067,8 +1053,6 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
         return 'Payments (${controller.pendingPaymentProofs})';
       case 'Maintenance':
         return 'Maintenance (${controller.openMaintenance})';
-      case 'Curfew':
-        return 'Curfew (${controller.pendingCurfewReviews})';
       case 'Visitors':
         return 'Visitors (${controller.pendingVisitors})';
       default:
@@ -1178,8 +1162,8 @@ const _operationCategories = [
     Icons.health_and_safety_outlined,
     Color(0xFF627FA8),
     [
-      _OperationItem('Curfew', 'Review curfew activity and requests',
-          Icons.schedule_outlined, CurfewMonitoringPage()),
+      _OperationItem('Geofence presence', 'Review live tenant presence and boundary',
+          Icons.location_on_outlined, GeofenceMonitoringPage()),
       _OperationItem('Visitors', 'Manage visitor requests',
           Icons.people_outline, VisitorManagementPage()),
       _OperationItem('Confidential reports', 'Review private reports',
@@ -1671,16 +1655,16 @@ class FloorPlanMonitoringPage extends StatelessWidget {
   }
 }
 
-class GateMonitoringPage extends StatelessWidget {
-  const GateMonitoringPage({super.key});
+class GeofenceMonitoringPage extends StatelessWidget {
+  const GeofenceMonitoringPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     final controller = OwnerController.instance;
 
     return PageFrame(
-      title: 'Gate monitoring',
-      subtitle: 'Geofence entry and exit events requiring staff review',
+      title: 'Curfew',
+      subtitle: 'Geofence perimeter and live tenant status',
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) => Column(
@@ -1689,40 +1673,97 @@ class GateMonitoringPage extends StatelessWidget {
             AdaptiveGrid(
               children: [
                 const MetricCard(
-                  label: 'Dormitory boundary',
-                  value: 'Configured',
-                  detail: 'Entry and exit zone',
+                  label: 'Dormitory perimeter',
+                  value: '50m Radius',
+                  detail: 'Carmelita\'s Dormitory',
                   icon: Icons.location_searching_outlined,
                 ),
-                const MetricCard(
-                  label: 'Geofence service',
-                  value: 'Online',
-                  detail: 'Supporting location signal',
-                  icon: Icons.location_on_outlined,
+                MetricCard(
+                  label: 'Inside perimeter',
+                  value: '${controller.tenantsInsideCount}',
+                  detail: 'Residents on premises',
+                  icon: Icons.home_outlined,
                 ),
                 MetricCard(
-                  label: 'Alerts',
-                  value: '${controller.pendingGateReviews}',
-                  detail: 'Needs review',
-                  icon: Icons.warning_amber_outlined,
+                  label: 'Outside perimeter',
+                  value: '${controller.tenantsOutsideCount}',
+                  detail: 'Residents away',
+                  icon: Icons.directions_walk_outlined,
                 ),
               ],
             ),
             const SizedBox(height: 22),
-            if (controller.gateReviews.isNotEmpty) ...[
-              const SectionTitle('Flagged events'),
-              const SizedBox(height: 10),
-              ...controller.gateReviews.map(
-                (review) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _GateReviewCard(review: review),
+            const SectionTitle(
+              'Resident presence directory',
+              subtitle: 'Current presence verified via background GPS geofencing',
+            ),
+            const SizedBox(height: 10),
+            ...controller.tenants.map(
+              (tenant) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: CarmelitaCard(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: (tenant.gateStatus == 'IN' ||
+                                tenant.gateStatus == 'Inside')
+                            ? const Color(0x1556886B)
+                            : const Color(0x15627FA8),
+                        foregroundColor: (tenant.gateStatus == 'IN' ||
+                                tenant.gateStatus == 'Inside')
+                            ? const Color(0xFF56886B)
+                            : const Color(0xFF627FA8),
+                        child: Icon(
+                          (tenant.gateStatus == 'IN' ||
+                                  tenant.gateStatus == 'Inside')
+                              ? Icons.home_rounded
+                              : Icons.directions_walk_rounded,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tenant.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Room ${tenant.room} • Bed ${tenant.bedSpace}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      StatusPill(
+                        (tenant.gateStatus == 'IN' ||
+                                tenant.gateStatus == 'Inside')
+                            ? 'Inside'
+                            : 'Outside',
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
-            ],
-            const SectionTitle('Recent gate events'),
+            ),
+            const SizedBox(height: 22),
+            const SectionTitle(
+              'Recent geofence transitions',
+              subtitle: 'Automated perimeter arrival and departure logs',
+            ),
             const SizedBox(height: 10),
-            ...controller.gateEvents.map(
+            ...controller.geofenceEvents.map(
               (event) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: CarmelitaCard(
@@ -1733,18 +1774,15 @@ class GateMonitoringPage extends StatelessWidget {
                   child: TimelineTile(
                     compact: true,
                     icon: event.direction == 'IN'
-                        ? Icons.login
-                        : event.direction == 'OUT'
-                            ? Icons.logout
-                            : Icons.location_off_outlined,
-                    color: event.status == 'Review'
-                        ? const Color(0xFFAA6870)
-                        : event.direction == 'IN'
-                            ? const Color(0xFF56886B)
-                            : const Color(0xFF627FA8),
-                    title: '${event.person} • ${event.direction}',
-                    subtitle: '${timeText(event.time)} • '
-                        '${event.verification}',
+                        ? Icons.login_rounded
+                        : Icons.logout_rounded,
+                    color: event.direction == 'IN'
+                        ? const Color(0xFF56886B)
+                        : const Color(0xFF627FA8),
+                    title:
+                        '${event.person} • ${event.direction == 'IN' ? 'Entered' : 'Exited'} perimeter',
+                    subtitle:
+                        '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verification}',
                     trailing: StatusPill(event.status),
                   ),
                 ),
@@ -1757,343 +1795,9 @@ class GateMonitoringPage extends StatelessWidget {
   }
 }
 
-class _GateReviewCard extends StatefulWidget {
-  const _GateReviewCard({
-    required this.review,
-  });
-
-  final GateReviewRecord review;
-
-  @override
-  State<_GateReviewCard> createState() => _GateReviewCardState();
-}
-
-class _GateReviewCardState extends State<_GateReviewCard> {
-  final note = TextEditingController();
-
-  @override
-  void dispose() {
-    note.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final review = widget.review;
-
-    return CarmelitaCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${review.event.person} • '
-                  '${review.event.direction}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 17,
-                  ),
-                ),
-              ),
-              StatusPill(review.reviewStatus),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${shortDate(review.event.time)} • '
-            '${timeText(review.event.time)} • '
-            '${review.event.verification}',
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: note,
-            maxLines: 2,
-            decoration: const InputDecoration(
-              labelText: 'Review note',
-              hintText: 'Optional note',
-            ),
-          ),
-          if (review.reviewStatus == 'Pending') ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => OwnerController.instance.reviewGateEvent(
-                      review,
-                      status: 'Escalated',
-                      note: note.text,
-                    ),
-                    child: const Text('Escalate'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => OwnerController.instance.reviewGateEvent(
-                      review,
-                      status: 'Resolved',
-                      note: note.text,
-                    ),
-                    child: const Text('Resolve'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class ManualGateOverridePage extends StatefulWidget {
-  const ManualGateOverridePage({super.key});
-
-  @override
-  State<ManualGateOverridePage> createState() => _ManualGateOverridePageState();
-}
-
-class _ManualGateOverridePageState extends State<ManualGateOverridePage> {
-  final reason = TextEditingController();
-  String action = 'OPEN';
-
-  @override
-  void dispose() {
-    reason.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return PageFrame(
-      title: 'Manual gate override',
-      subtitle: 'Record operator action and reason',
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
-        child: Column(
-          children: [
-            DropdownButtonFormField<String>(
-              initialValue: action,
-              decoration: const InputDecoration(labelText: 'Action'),
-              items: const ['OPEN', 'LOCK']
-                  .map(
-                    (value) => DropdownMenuItem(
-                      value: value,
-                      child: Text(value),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => action = value ?? action),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: reason,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Reason',
-                hintText: 'Example: power interruption or verified emergency',
-              ),
-            ),
-            const SizedBox(height: 14),
-            const CarmelitaCard(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.info_outline),
-                title: Text(
-                  'Audit-ready frontend',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                subtitle: Text(
-                  'The backend should later save the operator account, '
-                  'timestamp, reason, device state, and action.',
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  if (reason.text.trim().isEmpty) {
-                    showAppSnackBar(
-                      context,
-                      'Enter the reason for the override.',
-                    );
-                    return;
-                  }
-
-                  OwnerController.instance.addManualOverride(
-                    reason: reason.text,
-                    action: action,
-                  );
-                  showAppSnackBar(
-                    context,
-                    'Manual override recorded.',
-                  );
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Record override'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class CurfewMonitoringPage extends StatelessWidget {
-  const CurfewMonitoringPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = OwnerController.instance;
-
-    return PageFrame(
-      title: 'Curfew monitoring',
-      subtitle: 'Outside tenants, late records, and exceptions',
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AdaptiveGrid(
-              children: [
-                const MetricCard(
-                  label: 'Currently outside',
-                  value: '4',
-                  detail: 'Before curfew',
-                  icon: Icons.directions_walk_outlined,
-                ),
-                MetricCard(
-                  label: 'Approved exceptions',
-                  value:
-                      '${controller.curfewRequests.where((r) => r.ownerStatus == 'Approved').length}',
-                  detail: 'Current records',
-                  icon: Icons.event_available_outlined,
-                ),
-                const MetricCard(
-                  label: 'Late arrivals',
-                  value: '0',
-                  detail: 'Today',
-                  icon: Icons.warning_amber_outlined,
-                ),
-              ],
-            ),
-            const SizedBox(height: 22),
-            FilledButton.icon(
-              onPressed: () => _ownerPush(
-                context,
-                const CurfewRequestReviewPage(),
-              ),
-              icon: const Icon(Icons.approval_outlined),
-              label: const Text('Review curfew requests'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class CurfewRequestReviewPage extends StatelessWidget {
-  const CurfewRequestReviewPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = OwnerController.instance;
-
-    return PageFrame(
-      title: 'Curfew request review',
-      subtitle: 'Owner / caretaker decision',
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) => Column(
-          children: controller.curfewRequests
-              .map(
-                (request) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: CarmelitaCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                request.tenantName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 17,
-                                ),
-                              ),
-                            ),
-                            StatusPill(
-                              request.ownerStatus,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        InfoRow(
-                          label: 'Reason',
-                          value: request.reason,
-                        ),
-                        InfoRow(
-                          label: 'Destination',
-                          value: request.destination,
-                        ),
-                        InfoRow(
-                          label: 'Guardian',
-                          value: request.guardianStatus,
-                        ),
-                        InfoRow(
-                          label: 'Return',
-                          value: '${shortDate(request.expectedReturn)} • '
-                              '${timeText(request.expectedReturn)}',
-                        ),
-                        if (request.guardianStatus == 'Approved' &&
-                            request.ownerStatus == 'Pending') ...[
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => controller.decideCurfew(
-                                    request,
-                                    false,
-                                  ),
-                                  child: const Text('Reject'),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: FilledButton(
-                                  onPressed: () => controller.decideCurfew(
-                                    request,
-                                    true,
-                                  ),
-                                  child: const Text('Approve'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-  }
-}
+typedef GateMonitoringPage = GeofenceMonitoringPage;
+typedef CurfewMonitoringPage = GeofenceMonitoringPage;
+typedef CurfewRequestReviewPage = GeofenceMonitoringPage;
 
 class VisitorManagementPage extends StatelessWidget {
   const VisitorManagementPage({super.key});
@@ -3632,10 +3336,10 @@ class ReportsAnalyticsPage extends StatelessWidget {
                 detail: '1 medium • 1 low',
                 icon: Icons.build_outlined),
             MetricCard(
-                label: 'Curfew flags',
-                value: '1',
-                detail: 'Awaiting final review',
-                icon: Icons.schedule_outlined),
+                label: 'Geofence coverage',
+                value: '100%',
+                detail: '50m perimeter monitoring',
+                icon: Icons.location_on_outlined),
           ]),
           SizedBox(height: 14),
           CarmelitaCard(
