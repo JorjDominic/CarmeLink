@@ -48,7 +48,8 @@ class SupabaseAuthService implements AuthService {
         .from('profiles')
         .select('id, full_name, role, phone')
         .eq('id', authUser.id)
-        .single();
+        .single()
+        .timeout(const Duration(seconds: 5));
 
     return AppUser(
       id: row['id'] as String,

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../controllers/guardian_controller.dart';
+import '../../core/constants/app_colors.dart';
 import '../../core/widgets/common_widgets.dart';
-import '../../data/mock_data.dart';
+import '../../services/announcement_service.dart';
+import '../../services/table_refresh_subscription.dart';
 import '../../services/usage_stats_service.dart';
 
 class GuardianDashboardPage extends StatelessWidget {
@@ -683,27 +685,341 @@ class GuardianPaymentStatusPage extends StatelessWidget {
   }
 }
 
-class GuardianAnnouncementsPage extends StatelessWidget {
+class GuardianAnnouncementsPage extends StatefulWidget {
   const GuardianAnnouncementsPage({super.key});
+
   @override
-  Widget build(BuildContext context) => PageFrame(
+  State<GuardianAnnouncementsPage> createState() =>
+      _GuardianAnnouncementsPageState();
+}
+
+class _GuardianAnnouncementsPageState extends State<GuardianAnnouncementsPage> {
+  final _service = const AnnouncementService();
+  List<AnnouncementRecord>? _announcements;
+  bool _loading = true;
+  String? _errorMessage;
+  late final TableRefreshSubscription _subscription;
+
+  String _selectedCategory = 'all';
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+
+  static const _categories = [
+    ('all', 'All', Icons.apps_outlined),
+    ('general', 'General', Icons.campaign_outlined),
+    ('maintenance', 'Maintenance', Icons.build_outlined),
+    ('utility', 'Utility', Icons.bolt_outlined),
+    ('billing', 'Billing', Icons.payments_outlined),
+    ('emergency', 'Emergency', Icons.warning_amber_rounded),
+    ('event', 'Event', Icons.event_outlined),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _announcements = AnnouncementService.cachedAnnouncements('guardians');
+    _loading = _announcements == null;
+    _fetchAnnouncements(showSpinner: _announcements == null);
+    _subscription = TableRefreshSubscription(
+      'guardian-announcements-page',
+      ['announcements'],
+      () => _fetchAnnouncements(showSpinner: false),
+    );
+  }
+
+  @override
+  void dispose() {
+    _subscription.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchAnnouncements({bool showSpinner = false}) async {
+    if (showSpinner && mounted) {
+      setState(() {
+        _loading = true;
+        _errorMessage = null;
+      });
+    }
+
+    try {
+      final items = await _service.listAnnouncements(
+        forceRefresh: true,
+        audienceFilter: 'guardians',
+      );
+      if (mounted) {
+        setState(() {
+          _announcements = items;
+          _loading = false;
+          _errorMessage = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = 'Failed to load notices: $e';
+        });
+      }
+    }
+  }
+
+  Color _categoryColor(String category) => switch (category.toLowerCase()) {
+        'emergency' => AppColors.danger,
+        'maintenance' => AppColors.warning,
+        'utility' => AppColors.info,
+        'billing' => const Color(0xFFAA8A45),
+        'event' => AppColors.success,
+        _ => AppColors.taupe,
+      };
+
+  IconData _categoryIcon(String category) => switch (category.toLowerCase()) {
+        'emergency' => Icons.warning_amber_rounded,
+        'maintenance' => Icons.build_outlined,
+        'utility' => Icons.bolt_outlined,
+        'billing' => Icons.payments_outlined,
+        'event' => Icons.event_outlined,
+        _ => Icons.campaign_outlined,
+      };
+
+  String _categoryTitle(String category) {
+    for (final c in _categories) {
+      if (c.$1 == category.toLowerCase()) return c.$2;
+    }
+    return category;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rawList = _announcements ?? [];
+    final filtered = rawList.where((item) {
+      if (_selectedCategory != 'all' &&
+          item.category.toLowerCase() != _selectedCategory) {
+        return false;
+      }
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.toLowerCase();
+        final inTitle = item.title.toLowerCase().contains(q);
+        final inBody = item.body.toLowerCase().contains(q);
+        if (!inTitle && !inBody) return false;
+      }
+      return true;
+    }).toList();
+
+    return PageFrame(
       title: 'Announcements',
       subtitle: 'Notices relevant to guardians',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh board',
+          onPressed: () => _fetchAnnouncements(showSpinner: true),
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
       child: Column(
-          children: MockData.announcements
-              .map((a) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: CarmelitaCard(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                        Text(a.title,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 7),
-                        Text(a.body)
-                      ]))))
-              .toList()));
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search notices...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                  : null,
+            ),
+            onChanged: (val) => setState(() => _searchQuery = val.trim()),
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _categories.map((cat) {
+                final isSelected = _selectedCategory == cat.$1;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: FilterChip(
+                    avatar: Icon(
+                      cat.$3,
+                      size: 16,
+                      color: isSelected ? Colors.white : _categoryColor(cat.$1),
+                    ),
+                    label: Text(cat.$2),
+                    selected: isSelected,
+                    onSelected: (_) =>
+                        setState(() => _selectedCategory = cat.$1),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (_loading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_errorMessage != null)
+            CarmelitaCard(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.danger),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(_errorMessage!)),
+                    TextButton(
+                      onPressed: () => _fetchAnnouncements(showSpinner: true),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (filtered.isEmpty)
+            EmptyState(
+              icon: Icons.campaign_outlined,
+              title: 'No announcements',
+              message: _searchQuery.isNotEmpty || _selectedCategory != 'all'
+                  ? 'No notices match your filter.'
+                  : 'There are no announcements posted at this time.',
+            )
+          else
+            ...filtered.map((item) {
+              final color = _categoryColor(item.category);
+              final icon = _categoryIcon(item.category);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: CarmelitaCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(icon, size: 14, color: color),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _categoryTitle(item.category),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: color,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (item.isPinned) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF7E6),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xFFFFD591),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.push_pin,
+                                    size: 12,
+                                    color: Color(0xFFD48806),
+                                  ),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'Pinned',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFD48806),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        item.title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        item.body,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          height: 1.45,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.person_outline,
+                            size: 14,
+                            color: AppColors.taupe,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            item.authorName,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(width: 10),
+                          const Icon(
+                            Icons.schedule,
+                            size: 14,
+                            color: AppColors.taupe,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${shortDate(item.createdAt)} • ${timeText(item.createdAt)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
 }
 
 class GuardianMessagesPage extends StatelessWidget {

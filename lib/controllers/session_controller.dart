@@ -38,9 +38,14 @@ class SessionController extends ChangeNotifier {
       }
     });
     try {
-      _currentUser = await _authService.restoreSession();
-    } catch (_) {
-      await _authService.signOut();
+      _currentUser = await _authService
+          .restoreSession()
+          .timeout(const Duration(seconds: 4));
+    } catch (e) {
+      debugPrint('Session restore failed or timed out: $e');
+      try {
+        await _authService.signOut().timeout(const Duration(seconds: 2));
+      } catch (_) {}
       _currentUser = null;
     } finally {
       _loading = false;

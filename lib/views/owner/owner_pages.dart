@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/owner_controller.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/constants/app_colors.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/tenant_service.dart';
+import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../widgets/feature_widgets.dart';
 import '../shared/account_management_page.dart';
@@ -2272,123 +2274,786 @@ class AnnouncementsManagementPage extends StatefulWidget {
 
 class _AnnouncementsManagementPageState
     extends State<AnnouncementsManagementPage> {
-  final title = TextEditingController();
-  final body = TextEditingController();
-  String audience = 'All tenants';
+  final _service = const AnnouncementService();
+  List<AnnouncementRecord>? _announcements;
+  bool _loading = true;
+  String? _errorMessage;
+  late final TableRefreshSubscription _subscription;
+
+  String _selectedCategory = 'all';
+  String _selectedAudience = 'all';
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+
+  static const _categories = [
+    ('all', 'All', Icons.apps_outlined),
+    ('general', 'General', Icons.campaign_outlined),
+    ('maintenance', 'Maintenance', Icons.build_outlined),
+    ('utility', 'Utility', Icons.bolt_outlined),
+    ('billing', 'Billing', Icons.payments_outlined),
+    ('emergency', 'Emergency', Icons.warning_amber_rounded),
+    ('event', 'Event', Icons.event_outlined),
+  ];
+
+  static const _audiences = [
+    ('all', 'All Audiences'),
+    ('tenants', 'Tenants'),
+    ('guardians', 'Guardians'),
+    ('staff', 'Staff only'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _announcements = AnnouncementService.cachedAnnouncements('all');
+    _loading = _announcements == null;
+    _fetchAnnouncements(showSpinner: _announcements == null);
+    _subscription = TableRefreshSubscription(
+      'owner-announcements',
+      ['announcements'],
+      () => _fetchAnnouncements(showSpinner: false),
+    );
+  }
 
   @override
   void dispose() {
-    title.dispose();
-    body.dispose();
+    _subscription.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchAnnouncements({bool showSpinner = false}) async {
+    if (showSpinner && mounted) {
+      setState(() {
+        _loading = true;
+        _errorMessage = null;
+      });
+    }
+
+    try {
+      final items = await _service.listAnnouncements(forceRefresh: true);
+      if (mounted) {
+        setState(() {
+          _announcements = items;
+          _loading = false;
+          _errorMessage = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = 'Failed to load announcements: $e';
+        });
+      }
+    }
+  }
+
+  Future<void> _openComposer({AnnouncementRecord? editing}) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => _AnnouncementComposerSheet(announcement: editing),
+    );
+
+    if (changed == true && mounted) {
+      _fetchAnnouncements(showSpinner: false);
+    }
+  }
+
+  Future<void> _togglePin(AnnouncementRecord item) async {
+    try {
+      await _service.togglePin(item.id, !item.isPinned);
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          item.isPinned ? 'Notice unpinned.' : 'Notice pinned to top of board.',
+        );
+      }
+      _fetchAnnouncements(showSpinner: false);
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, 'Failed to update pin: $e');
+      }
+    }
+  }
+
+  Future<void> _confirmDelete(AnnouncementRecord item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete notice?'),
+        content: Text(
+          'Are you sure you want to delete "${item.title}"? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _service.deleteAnnouncement(item.id);
+        if (mounted) {
+          showAppSnackBar(context, 'Notice deleted.');
+        }
+        _fetchAnnouncements(showSpinner: false);
+      } catch (e) {
+        if (mounted) {
+          showAppSnackBar(context, 'Failed to delete notice: $e');
+        }
+      }
+    }
+  }
+
+  Color _categoryColor(String category) => switch (category.toLowerCase()) {
+        'emergency' => AppColors.danger,
+        'maintenance' => AppColors.warning,
+        'utility' => AppColors.info,
+        'billing' => const Color(0xFFAA8A45),
+        'event' => AppColors.success,
+        _ => AppColors.taupe,
+      };
+
+  IconData _categoryIcon(String category) => switch (category.toLowerCase()) {
+        'emergency' => Icons.warning_amber_rounded,
+        'maintenance' => Icons.build_outlined,
+        'utility' => Icons.bolt_outlined,
+        'billing' => Icons.payments_outlined,
+        'event' => Icons.event_outlined,
+        _ => Icons.campaign_outlined,
+      };
+
+  String _categoryTitle(String category) {
+    for (final c in _categories) {
+      if (c.$1 == category.toLowerCase()) return c.$2;
+    }
+    return category;
+  }
+
+  String _audienceTitle(String audience) {
+    for (final a in _audiences) {
+      if (a.$1 == audience.toLowerCase()) return a.$2;
+    }
+    return audience;
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = OwnerController.instance;
+    final rawList = _announcements ?? [];
+    final filtered = rawList.where((item) {
+      if (_selectedCategory != 'all' &&
+          item.category.toLowerCase() != _selectedCategory) {
+        return false;
+      }
+      if (_selectedAudience != 'all' &&
+          item.audience.toLowerCase() != _selectedAudience) {
+        return false;
+      }
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.toLowerCase();
+        final inTitle = item.title.toLowerCase().contains(q);
+        final inBody = item.body.toLowerCase().contains(q);
+        final inAuthor = item.authorName.toLowerCase().contains(q);
+        if (!inTitle && !inBody && !inAuthor) return false;
+      }
+      return true;
+    }).toList();
 
     return PageFrame(
       title: 'Announcements',
-      subtitle: 'Create and publish dormitory notices',
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) => Column(
-          children: [
-            CarmelitaCard(
-              child: Column(
-                children: [
-                  TextField(
-                    controller: title,
-                    decoration: const InputDecoration(
-                      labelText: 'Title',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: body,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText: 'Announcement',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: audience,
-                    decoration: const InputDecoration(
-                      labelText: 'Audience',
-                    ),
-                    items: const [
-                      'All tenants',
-                      'Guardians',
-                      'All users',
-                    ]
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) => setState(
-                      () => audience = value ?? audience,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
+      subtitle: 'Post and manage dormitory notices',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh board',
+          onPressed: () => _fetchAnnouncements(showSpinner: true),
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openComposer(),
+        icon: const Icon(Icons.campaign),
+        label: const Text('Post notice'),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search notices by title, keyword, or author...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
                       onPressed: () {
-                        if (title.text.trim().isEmpty ||
-                            body.text.trim().isEmpty) {
-                          showAppSnackBar(
-                            context,
-                            'Enter a title and announcement.',
-                          );
-                          return;
-                        }
-
-                        controller.publishAnnouncement(
-                          title: title.text,
-                          body: body.text,
-                          audience: audience,
-                        );
-                        title.clear();
-                        body.clear();
-                        showAppSnackBar(
-                          context,
-                          'Announcement published in the frontend.',
-                        );
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
                       },
-                      child: const Text('Publish'),
-                    ),
-                  ),
-                ],
-              ),
+                    )
+                  : null,
             ),
-            const SizedBox(height: 18),
-            const SectionTitle('Published'),
-            const SizedBox(height: 10),
-            ...controller.announcements.map(
-              (announcement) => Padding(
+            onChanged: (val) => setState(() => _searchQuery = val.trim()),
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _categories.map((cat) {
+                final isSelected = _selectedCategory == cat.$1;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: FilterChip(
+                    avatar: Icon(
+                      cat.$3,
+                      size: 16,
+                      color: isSelected ? Colors.white : _categoryColor(cat.$1),
+                    ),
+                    label: Text(cat.$2),
+                    selected: isSelected,
+                    onSelected: (_) =>
+                        setState(() => _selectedCategory = cat.$1),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _audiences.map((aud) {
+                final isSelected = _selectedAudience == aud.$1;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ChoiceChip(
+                    label: Text(aud.$2),
+                    selected: isSelected,
+                    onSelected: (_) =>
+                        setState(() => _selectedAudience = aud.$1),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (_loading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_errorMessage != null)
+            CarmelitaCard(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.danger),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(_errorMessage!)),
+                    TextButton(
+                      onPressed: () => _fetchAnnouncements(showSpinner: true),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (filtered.isEmpty)
+            EmptyState(
+              icon: Icons.campaign_outlined,
+              title: 'No announcements',
+              message: _searchQuery.isNotEmpty ||
+                      _selectedCategory != 'all' ||
+                      _selectedAudience != 'all'
+                  ? 'No notices match your selected filters.'
+                  : 'No notices posted yet. Tap "Post notice" to create one.',
+            )
+          else
+            ...filtered.map((item) {
+              final color = _categoryColor(item.category);
+              final icon = _categoryIcon(item.category);
+
+              return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: CarmelitaCard(
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(
-                      Icons.campaign_outlined,
-                    ),
-                    title: Text(
-                      announcement.title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(icon, size: 14, color: color),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _categoryTitle(item.category),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: color,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              _audienceTitle(item.audience),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ),
+                          if (item.isPinned) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF7E6),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xFFFFD591),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.push_pin,
+                                    size: 12,
+                                    color: Color(0xFFD48806),
+                                  ),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'Pinned',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFD48806),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const Spacer(),
+                          PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_vert, size: 18),
+                            onSelected: (action) {
+                              if (action == 'pin') {
+                                _togglePin(item);
+                              } else if (action == 'edit') {
+                                _openComposer(editing: item);
+                              } else if (action == 'delete') {
+                                _confirmDelete(item);
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'pin',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      item.isPinned
+                                          ? Icons.push_pin_outlined
+                                          : Icons.push_pin,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      item.isPinned
+                                          ? 'Unpin notice'
+                                          : 'Pin to top',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit_outlined, size: 18),
+                                    const SizedBox(width: 8),
+                                    Text('Edit notice'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.delete_outline,
+                                      size: 18,
+                                      color: AppColors.danger,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Delete notice',
+                                      style: TextStyle(color: AppColors.danger),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ),
-                    subtitle: Text(
-                      '${announcement.audience}\n'
-                      '${announcement.body}',
-                    ),
+                      const SizedBox(height: 10),
+                      Text(
+                        item.title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        item.body,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          height: 1.45,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.person_outline,
+                            size: 14,
+                            color: AppColors.taupe,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            item.authorName,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(width: 10),
+                          const Icon(
+                            Icons.schedule,
+                            size: 14,
+                            color: AppColors.taupe,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${shortDate(item.createdAt)} • ${timeText(item.createdAt)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
+              );
+            }),
+          const SizedBox(height: 60),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnnouncementComposerSheet extends StatefulWidget {
+  const _AnnouncementComposerSheet({this.announcement});
+
+  final AnnouncementRecord? announcement;
+
+  @override
+  State<_AnnouncementComposerSheet> createState() =>
+      _AnnouncementComposerSheetState();
+}
+
+class _AnnouncementComposerSheetState
+    extends State<_AnnouncementComposerSheet> {
+  final _service = const AnnouncementService();
+  late final TextEditingController _titleController;
+  late final TextEditingController _bodyController;
+  late String _category;
+  late String _audience;
+  late bool _isPinned;
+  bool _saving = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    final a = widget.announcement;
+    _titleController = TextEditingController(text: a?.title ?? '');
+    _bodyController = TextEditingController(text: a?.body ?? '');
+    _category = a?.category ?? 'general';
+    _audience = a?.audience ?? 'all';
+    _isPinned = a?.isPinned ?? false;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _bodyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final title = _titleController.text.trim();
+    final body = _bodyController.text.trim();
+
+    if (title.isEmpty || body.isEmpty) {
+      setState(() => _errorMessage = 'Please enter both a title and content.');
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _errorMessage = null;
+    });
+
+    try {
+      if (widget.announcement == null) {
+        await _service.createAnnouncement(
+          title: title,
+          body: body,
+          category: _category,
+          audience: _audience,
+          isPinned: _isPinned,
+        );
+      } else {
+        await _service.updateAnnouncement(
+          id: widget.announcement!.id,
+          title: title,
+          body: body,
+          category: _category,
+          audience: _audience,
+          isPinned: _isPinned,
+        );
+      }
+
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          widget.announcement == null
+              ? 'Notice posted successfully.'
+              : 'Notice updated successfully.',
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _errorMessage = 'Failed to save notice: $e';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEditing = widget.announcement != null;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isEditing ? 'Edit announcement' : 'Post announcement',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isEditing
+                  ? 'Update the announcement details below'
+                  : 'Publish a new notice to tenants and guardians',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 18),
+            if (_errorMessage != null)
+              Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: AppColors.danger,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(
+                          color: AppColors.danger,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            TextField(
+              controller: _titleController,
+              enabled: !_saving,
+              decoration: const InputDecoration(
+                labelText: 'Notice Title',
+                hintText: 'e.g., Scheduled Water Interruption',
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _category,
+                    decoration: const InputDecoration(labelText: 'Category'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'general',
+                        child: Text('General'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'maintenance',
+                        child: Text('Maintenance'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'utility',
+                        child: Text('Utility'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'billing',
+                        child: Text('Billing'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'emergency',
+                        child: Text('Emergency'),
+                      ),
+                      DropdownMenuItem(value: 'event', child: Text('Event')),
+                    ],
+                    onChanged: _saving
+                        ? null
+                        : (val) {
+                            if (val != null) setState(() => _category = val);
+                          },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _audience,
+                    decoration: const InputDecoration(labelText: 'Audience'),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('All users')),
+                      DropdownMenuItem(
+                        value: 'tenants',
+                        child: Text('Tenants only'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'guardians',
+                        child: Text('Guardians only'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'staff',
+                        child: Text('Staff only'),
+                      ),
+                    ],
+                    onChanged: _saving
+                        ? null
+                        : (val) {
+                            if (val != null) setState(() => _audience = val);
+                          },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _bodyController,
+              enabled: !_saving,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                labelText: 'Notice Content',
+                hintText: 'Write the details of the announcement here...',
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Pin to top of board'),
+              subtitle: const Text(
+                'Pinned notices remain visible at the very top of all feeds',
+              ),
+              value: _isPinned,
+              onChanged: _saving
+                  ? null
+                  : (val) => setState(() => _isPinned = val),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(isEditing ? 'Save Changes' : 'Publish Notice'),
               ),
             ),
           ],
