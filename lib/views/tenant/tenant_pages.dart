@@ -1550,6 +1550,90 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
     return category;
   }
 
+  void _openFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final hasActive = _selectedCategory != 'all';
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Filter Notices',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      if (hasActive)
+                        TextButton(
+                          onPressed: () {
+                            setState(() => _selectedCategory = 'all');
+                            setSheetState(() {});
+                          },
+                          child: const Text('Reset'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'CATEGORY',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: AppColors.taupe,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.1,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _categories.map((cat) {
+                      final isSelected = _selectedCategory == cat.$1;
+                      return FilterChip(
+                        avatar: Icon(
+                          cat.$3,
+                          size: 16,
+                          color: isSelected
+                              ? Colors.white
+                              : _categoryColor(cat.$1),
+                        ),
+                        label: Text(cat.$2),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          setState(() => _selectedCategory = cat.$1);
+                          setSheetState(() {});
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('Apply Filter'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rawList = _announcements ?? [];
@@ -1567,6 +1651,8 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
       return true;
     }).toList();
 
+    final hasActiveFilter = _selectedCategory != 'all';
+
     return PageFrame(
       title: 'Announcements',
       subtitle: 'Dormitory notices and updates',
@@ -1580,47 +1666,117 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search notices...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    )
-                  : null,
-            ),
-            onChanged: (val) => setState(() => _searchQuery = val.trim()),
-          ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _categories.map((cat) {
-                final isSelected = _selectedCategory == cat.$1;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: FilterChip(
-                    avatar: Icon(
-                      cat.$3,
-                      size: 16,
-                      color: isSelected ? Colors.white : _categoryColor(cat.$1),
-                    ),
-                    label: Text(cat.$2),
-                    selected: isSelected,
-                    onSelected: (_) =>
-                        setState(() => _selectedCategory = cat.$1),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search notices...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
                   ),
-                );
-              }).toList(),
-            ),
+                  onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Material(
+                color: hasActiveFilter
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: _openFilterSheet,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: hasActiveFilter
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context)
+                                .dividerColor
+                                .withValues(alpha: 0.6),
+                      ),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(
+                          Icons.tune_rounded,
+                          size: 22,
+                          color: hasActiveFilter
+                              ? Colors.white
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                        ),
+                        if (hasActiveFilter)
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFFFB800),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          if (hasActiveFilter) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  'Filter:',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.taupe,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                InputChip(
+                  visualDensity: VisualDensity.compact,
+                  label: Text(_categoryTitle(_selectedCategory)),
+                  avatar: Icon(_categoryIcon(_selectedCategory), size: 14),
+                  onDeleted: () => setState(() => _selectedCategory = 'all'),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                  ),
+                  onPressed: () => setState(() => _selectedCategory = 'all'),
+                  child: const Text('Clear', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
           if (_loading)
             const Center(
               child: Padding(
@@ -1650,8 +1806,8 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
               icon: Icons.campaign_outlined,
               title: 'No announcements',
               message: _searchQuery.isNotEmpty || _selectedCategory != 'all'
-                  ? 'No notices match your filter.'
-                  : 'There are no announcements posted at this time.',
+                ? 'No notices match your filter.'
+                : 'There are no announcements posted at this time.',
             )
           else
             ...filtered.map((item) {
@@ -1659,17 +1815,22 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
               final icon = _categoryIcon(item.category);
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: CarmelitaCard(
+                  emphasis: item.isPinned,
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                              horizontal: 7,
+                              vertical: 2.5,
                             ),
                             decoration: BoxDecoration(
                               color: color.withValues(alpha: 0.12),
@@ -1678,12 +1839,12 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(icon, size: 14, color: color),
+                                Icon(icon, size: 13, color: color),
                                 const SizedBox(width: 4),
                                 Text(
                                   _categoryTitle(item.category),
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 11.5,
                                     fontWeight: FontWeight.w600,
                                     color: color,
                                   ),
@@ -1691,12 +1852,11 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
                               ],
                             ),
                           ),
-                          if (item.isPinned) ...[
-                            const SizedBox(width: 6),
+                          if (item.isPinned)
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                                horizontal: 7,
+                                vertical: 2.5,
                               ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFF7E6),
@@ -1710,14 +1870,14 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
                                 children: [
                                   Icon(
                                     Icons.push_pin,
-                                    size: 12,
+                                    size: 11,
                                     color: Color(0xFFD48806),
                                   ),
                                   SizedBox(width: 3),
                                   Text(
                                     'Pinned',
                                     style: TextStyle(
-                                      fontSize: 11,
+                                      fontSize: 10.5,
                                       fontWeight: FontWeight.w700,
                                       color: Color(0xFFD48806),
                                     ),
@@ -1725,49 +1885,72 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
                                 ],
                               ),
                             ),
-                          ],
                         ],
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       Text(
                         item.title,
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 15.5,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text(
                         item.body,
                         style: const TextStyle(
-                          fontSize: 14,
-                          height: 1.45,
+                          fontSize: 13.5,
+                          height: 1.38,
                           color: Colors.black87,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Row(
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          const Icon(
-                            Icons.person_outline,
-                            size: 14,
-                            color: AppColors.taupe,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.person_outline,
+                                size: 13,
+                                color: AppColors.taupe,
+                              ),
+                              const SizedBox(width: 4),
+                              ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints(maxWidth: 160),
+                                child: Text(
+                                  item.authorName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(fontSize: 11.5),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            item.authorName,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(width: 10),
-                          const Icon(
-                            Icons.schedule,
-                            size: 14,
-                            color: AppColors.taupe,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${shortDate(item.createdAt)} • ${timeText(item.createdAt)}',
-                            style: Theme.of(context).textTheme.bodySmall,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.schedule,
+                                size: 13,
+                                color: AppColors.taupe,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${shortDate(item.createdAt)} • ${timeText(item.createdAt)}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(fontSize: 11.5),
+                              ),
+                            ],
                           ),
                         ],
                       ),

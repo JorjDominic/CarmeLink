@@ -2449,6 +2449,119 @@ class _AnnouncementsManagementPageState
     return audience;
   }
 
+  void _openFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final hasActive =
+                _selectedCategory != 'all' || _selectedAudience != 'all';
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Filter Notices',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      if (hasActive)
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedCategory = 'all';
+                              _selectedAudience = 'all';
+                            });
+                            setSheetState(() {});
+                          },
+                          child: const Text('Reset all'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'CATEGORY',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: AppColors.taupe,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.1,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _categories.map((cat) {
+                      final isSelected = _selectedCategory == cat.$1;
+                      return FilterChip(
+                        avatar: Icon(
+                          cat.$3,
+                          size: 16,
+                          color: isSelected
+                              ? Colors.white
+                              : _categoryColor(cat.$1),
+                        ),
+                        label: Text(cat.$2),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          setState(() => _selectedCategory = cat.$1);
+                          setSheetState(() {});
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'TARGET AUDIENCE',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: AppColors.taupe,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.1,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _audiences.map((aud) {
+                      final isSelected = _selectedAudience == aud.$1;
+                      return ChoiceChip(
+                        label: Text(aud.$2),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          setState(() => _selectedAudience = aud.$1);
+                          setSheetState(() {});
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('Apply Filters'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rawList = _announcements ?? [];
@@ -2471,6 +2584,9 @@ class _AnnouncementsManagementPageState
       return true;
     }).toList();
 
+    final hasActiveFilter =
+        _selectedCategory != 'all' || _selectedAudience != 'all';
+
     return PageFrame(
       title: 'Announcements',
       subtitle: 'Post and manage dormitory notices',
@@ -2489,65 +2605,129 @@ class _AnnouncementsManagementPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search notices by title, keyword, or author...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    )
-                  : null,
-            ),
-            onChanged: (val) => setState(() => _searchQuery = val.trim()),
-          ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _categories.map((cat) {
-                final isSelected = _selectedCategory == cat.$1;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: FilterChip(
-                    avatar: Icon(
-                      cat.$3,
-                      size: 16,
-                      color: isSelected ? Colors.white : _categoryColor(cat.$1),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search notices by title, keyword...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                  ),
+                  onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Material(
+                color: hasActiveFilter
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: _openFilterSheet,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: hasActiveFilter
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context)
+                                .dividerColor
+                                .withValues(alpha: 0.6),
+                      ),
                     ),
-                    label: Text(cat.$2),
-                    selected: isSelected,
-                    onSelected: (_) =>
-                        setState(() => _selectedCategory = cat.$1),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(
+                          Icons.tune_rounded,
+                          size: 22,
+                          color: hasActiveFilter
+                              ? Colors.white
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                        ),
+                        if (hasActiveFilter)
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFFFB800),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                );
-              }).toList(),
-            ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _audiences.map((aud) {
-                final isSelected = _selectedAudience == aud.$1;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ChoiceChip(
-                    label: Text(aud.$2),
-                    selected: isSelected,
-                    onSelected: (_) =>
-                        setState(() => _selectedAudience = aud.$1),
+          if (hasActiveFilter) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  'Filters:',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.taupe,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                if (_selectedCategory != 'all')
+                  InputChip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text(_categoryTitle(_selectedCategory)),
+                    avatar: Icon(_categoryIcon(_selectedCategory), size: 14),
+                    onDeleted: () =>
+                        setState(() => _selectedCategory = 'all'),
                   ),
-                );
-              }).toList(),
+                if (_selectedAudience != 'all')
+                  InputChip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text(_audienceTitle(_selectedAudience)),
+                    onDeleted: () =>
+                        setState(() => _selectedAudience = 'all'),
+                  ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                  ),
+                  onPressed: () => setState(() {
+                    _selectedCategory = 'all';
+                    _selectedAudience = 'all';
+                  }),
+                  child: const Text('Clear', style: TextStyle(fontSize: 12)),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
+          ],
+          const SizedBox(height: 12),
           if (_loading)
             const Center(
               child: Padding(
@@ -2588,96 +2768,105 @@ class _AnnouncementsManagementPageState
               final icon = _categoryIcon(item.category);
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: CarmelitaCard(
+                  emphasis: item.isPinned,
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                          Expanded(
+                            child: Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                Icon(icon, size: 14, color: color),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _categoryTitle(item.category),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: color,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 2.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(icon, size: 13, color: color),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _categoryTitle(item.category),
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: color,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 2.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    _audienceTitle(item.audience),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ),
+                                if (item.isPinned)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2.5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFF7E6),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: const Color(0xFFFFD591),
+                                      ),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.push_pin,
+                                          size: 11,
+                                          color: Color(0xFFD48806),
+                                        ),
+                                        SizedBox(width: 3),
+                                        Text(
+                                          'Pinned',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFFD48806),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              _audienceTitle(item.audience),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black54,
-                              ),
-                            ),
-                          ),
-                          if (item.isPinned) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFF7E6),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: const Color(0xFFFFD591),
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.push_pin,
-                                    size: 12,
-                                    color: Color(0xFFD48806),
-                                  ),
-                                  SizedBox(width: 3),
-                                  Text(
-                                    'Pinned',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFFD48806),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          const Spacer(),
                           PopupMenuButton<String>(
                             icon: const Icon(Icons.more_vert, size: 18),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
                             onSelected: (action) {
                               if (action == 'pin') {
                                 _togglePin(item);
@@ -2738,46 +2927,70 @@ class _AnnouncementsManagementPageState
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       Text(
                         item.title,
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 15.5,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text(
                         item.body,
                         style: const TextStyle(
-                          fontSize: 14,
-                          height: 1.45,
+                          fontSize: 13.5,
+                          height: 1.38,
                           color: Colors.black87,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Row(
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          const Icon(
-                            Icons.person_outline,
-                            size: 14,
-                            color: AppColors.taupe,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.person_outline,
+                                size: 13,
+                                color: AppColors.taupe,
+                              ),
+                              const SizedBox(width: 4),
+                              ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints(maxWidth: 160),
+                                child: Text(
+                                  item.authorName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(fontSize: 11.5),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            item.authorName,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(width: 10),
-                          const Icon(
-                            Icons.schedule,
-                            size: 14,
-                            color: AppColors.taupe,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${shortDate(item.createdAt)} • ${timeText(item.createdAt)}',
-                            style: Theme.of(context).textTheme.bodySmall,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.schedule,
+                                size: 13,
+                                color: AppColors.taupe,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${shortDate(item.createdAt)} • ${timeText(item.createdAt)}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(fontSize: 11.5),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -2888,175 +3101,202 @@ class _AnnouncementComposerSheetState
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.announcement != null;
+    final viewInsetsBottom = MediaQuery.viewInsetsOf(context).bottom;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        0,
-        20,
-        20 + MediaQuery.viewInsetsOf(context).bottom,
+    final categoryDropdown = DropdownButtonFormField<String>(
+      initialValue: _category,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Category'),
+      items: const [
+        DropdownMenuItem(
+          value: 'general',
+          child: Text('General', overflow: TextOverflow.ellipsis),
+        ),
+        DropdownMenuItem(
+          value: 'maintenance',
+          child: Text('Maintenance', overflow: TextOverflow.ellipsis),
+        ),
+        DropdownMenuItem(
+          value: 'utility',
+          child: Text('Utility', overflow: TextOverflow.ellipsis),
+        ),
+        DropdownMenuItem(
+          value: 'billing',
+          child: Text('Billing', overflow: TextOverflow.ellipsis),
+        ),
+        DropdownMenuItem(
+          value: 'emergency',
+          child: Text('Emergency', overflow: TextOverflow.ellipsis),
+        ),
+        DropdownMenuItem(
+          value: 'event',
+          child: Text('Event', overflow: TextOverflow.ellipsis),
+        ),
+      ],
+      onChanged: _saving
+          ? null
+          : (val) {
+              if (val != null) setState(() => _category = val);
+            },
+    );
+
+    final audienceDropdown = DropdownButtonFormField<String>(
+      initialValue: _audience,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Audience'),
+      items: const [
+        DropdownMenuItem(
+          value: 'all',
+          child: Text('All users', overflow: TextOverflow.ellipsis),
+        ),
+        DropdownMenuItem(
+          value: 'tenants',
+          child: Text('Tenants only', overflow: TextOverflow.ellipsis),
+        ),
+        DropdownMenuItem(
+          value: 'guardians',
+          child: Text('Guardians only', overflow: TextOverflow.ellipsis),
+        ),
+        DropdownMenuItem(
+          value: 'staff',
+          child: Text('Staff only', overflow: TextOverflow.ellipsis),
+        ),
+      ],
+      onChanged: _saving
+          ? null
+          : (val) {
+              if (val != null) setState(() => _audience = val);
+            },
+    );
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.88,
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isEditing ? 'Edit announcement' : 'Post announcement',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              isEditing
-                  ? 'Update the announcement details below'
-                  : 'Publish a new notice to tenants and guardians',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 18),
-            if (_errorMessage != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 14),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.danger.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      color: AppColors.danger,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(
-                          color: AppColors.danger,
-                          fontSize: 13,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          20 + viewInsetsBottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isEditing ? 'Edit announcement' : 'Post announcement',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                isEditing
+                    ? 'Update the announcement details below'
+                    : 'Publish a new notice to tenants and guardians',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 18),
+              if (_errorMessage != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppColors.danger,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(
+                            color: AppColors.danger,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            TextField(
-              controller: _titleController,
-              enabled: !_saving,
-              decoration: const InputDecoration(
-                labelText: 'Notice Title',
-                hintText: 'e.g., Scheduled Water Interruption',
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _category,
-                    decoration: const InputDecoration(labelText: 'Category'),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'general',
-                        child: Text('General'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'maintenance',
-                        child: Text('Maintenance'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'utility',
-                        child: Text('Utility'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'billing',
-                        child: Text('Billing'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'emergency',
-                        child: Text('Emergency'),
-                      ),
-                      DropdownMenuItem(value: 'event', child: Text('Event')),
                     ],
-                    onChanged: _saving
-                        ? null
-                        : (val) {
-                            if (val != null) setState(() => _category = val);
-                          },
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _audience,
-                    decoration: const InputDecoration(labelText: 'Audience'),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('All users')),
-                      DropdownMenuItem(
-                        value: 'tenants',
-                        child: Text('Tenants only'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'guardians',
-                        child: Text('Guardians only'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'staff',
-                        child: Text('Staff only'),
-                      ),
-                    ],
-                    onChanged: _saving
-                        ? null
-                        : (val) {
-                            if (val != null) setState(() => _audience = val);
-                          },
-                  ),
+              TextField(
+                controller: _titleController,
+                enabled: !_saving,
+                decoration: const InputDecoration(
+                  labelText: 'Notice Title',
+                  hintText: 'e.g., Scheduled Water Interruption',
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _bodyController,
-              enabled: !_saving,
-              maxLines: 5,
-              decoration: const InputDecoration(
-                labelText: 'Notice Content',
-                hintText: 'Write the details of the announcement here...',
-                alignLabelWithHint: true,
               ),
-            ),
-            const SizedBox(height: 10),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Pin to top of board'),
-              subtitle: const Text(
-                'Pinned notices remain visible at the very top of all feeds',
+              const SizedBox(height: 14),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 360) {
+                    return Column(
+                      children: [
+                        categoryDropdown,
+                        const SizedBox(height: 14),
+                        audienceDropdown,
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: categoryDropdown),
+                      const SizedBox(width: 12),
+                      Expanded(child: audienceDropdown),
+                    ],
+                  );
+                },
               ),
-              value: _isPinned,
-              onChanged: _saving
-                  ? null
-                  : (val) => setState(() => _isPinned = val),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: FilledButton(
-                onPressed: _saving ? null : _save,
-                child: _saving
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(isEditing ? 'Save Changes' : 'Publish Notice'),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _bodyController,
+                enabled: !_saving,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  labelText: 'Notice Content',
+                  hintText: 'Write the details of the announcement here...',
+                  alignLabelWithHint: true,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Pin to top of board'),
+                subtitle: const Text(
+                  'Pinned notices remain visible at the very top of all feeds',
+                ),
+                value: _isPinned,
+                onChanged: _saving
+                    ? null
+                    : (val) => setState(() => _isPinned = val),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(isEditing ? 'Save Changes' : 'Publish Notice'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
