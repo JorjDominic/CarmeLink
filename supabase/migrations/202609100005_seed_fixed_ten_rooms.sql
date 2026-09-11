@@ -30,11 +30,18 @@ begin
 
     select id into new_room_id from public.rooms where room_number = r.number;
 
-    -- Ensure exactly 4 bed spaces exist per room
+    -- Ensure exactly 4 bed spaces exist per room without exceeding capacity
     for bed_num in 1..4 loop
-      insert into public.bed_spaces (room_id, label, status)
-      values (new_room_id, 'Bed ' || bed_num, 'available')
-      on conflict (room_id, label) do nothing;
+      if not exists (
+        select 1 from public.bed_spaces
+        where room_id = new_room_id and label = 'Bed ' || bed_num
+      ) and (
+        select count(*) from public.bed_spaces where room_id = new_room_id
+      ) < 4 then
+        insert into public.bed_spaces (room_id, label, status)
+        values (new_room_id, 'Bed ' || bed_num, 'available')
+        on conflict (room_id, label) do nothing;
+      end if;
     end loop;
   end loop;
 

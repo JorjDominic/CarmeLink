@@ -32,6 +32,12 @@ class CaretakerShell extends StatelessWidget {
               page: RoomMonitoringPage(),
             ),
             AppDestination(
+              label: 'Payments',
+              icon: Icons.payments_outlined,
+              selectedIcon: Icons.payments,
+              page: PaymentVerificationPage(),
+            ),
+            AppDestination(
               label: 'Maintenance',
               icon: Icons.build_outlined,
               selectedIcon: Icons.build,

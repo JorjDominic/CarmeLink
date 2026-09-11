@@ -225,8 +225,9 @@ class _FloatingIslandNavigation extends StatelessWidget {
       ),
       child: Center(
         heightFactor: 1,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
+        child: SizedBox(
+          width: maxWidth,
+          height: 68,
           child: ClipRRect(
             borderRadius: const BorderRadius.all(
               Radius.circular(30),
@@ -237,6 +238,7 @@ class _FloatingIslandNavigation extends StatelessWidget {
                 sigmaY: 7,
               ),
               child: Container(
+                width: maxWidth,
                 height: 68,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 8,
@@ -271,15 +273,12 @@ class _FloatingIslandNavigation extends StatelessWidget {
                       final selected = navIndex == selectedIndex;
 
                       return Expanded(
-                        child: Tooltip(
-                          message: item.label,
-                          child: _IslandItem(
-                            label: item.label,
-                            icon: item.icon,
-                            selectedIcon: item.selectedIcon,
-                            selected: selected,
-                            onTap: () => onSelected(navIndex),
-                          ),
+                        child: _IslandItem(
+                          label: item.label,
+                          icon: item.icon,
+                          selectedIcon: item.selectedIcon,
+                          selected: selected,
+                          onTap: () => onSelected(navIndex),
                         ),
                       );
                     },
@@ -313,43 +312,38 @@ class _IslandItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: InkWell(
-          borderRadius: const BorderRadius.all(
-            Radius.circular(22),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: InkWell(
+        borderRadius: const BorderRadius.all(
+          Radius.circular(22),
+        ),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          constraints: const BoxConstraints(
+            minWidth: 48,
+            minHeight: 48,
           ),
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            constraints: const BoxConstraints(
-              minWidth: 48,
-              minHeight: 48,
+          decoration: BoxDecoration(
+            color: selected
+                ? scheme.primary.withValues(alpha: .12)
+                : Colors.transparent,
+            borderRadius: const BorderRadius.all(
+              Radius.circular(22),
             ),
-            decoration: BoxDecoration(
+          ),
+          alignment: Alignment.center,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 160),
+            child: Icon(
+              selected ? selectedIcon : icon,
+              key: ValueKey(selected),
+              size: 23,
               color: selected
-                  ? scheme.primary.withValues(alpha: .12)
-                  : Colors.transparent,
-              borderRadius: const BorderRadius.all(
-                Radius.circular(22),
-              ),
-            ),
-            alignment: Alignment.center,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 160),
-              child: Icon(
-                selected ? selectedIcon : icon,
-                key: ValueKey(selected),
-                size: 23,
-                color: selected
-                    ? scheme.primary
-                    : scheme.onSurface.withValues(alpha: .56),
-              ),
+                  ? scheme.primary
+                  : scheme.onSurface.withValues(alpha: .56),
             ),
           ),
         ),
@@ -477,28 +471,26 @@ class _RoleMenu extends StatelessWidget {
             (navIndex) {
               final item = destinations[navIndex];
               final selected = navIndex == currentIndex;
-              return Semantics(
+              return ListTile(
                 selected: selected,
-                child: ListTile(
-                  minTileHeight: 54,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(16)),
-                  ),
-                  tileColor: selected
-                      ? Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: .08)
-                      : null,
-                  leading: Icon(
-                    selected ? item.selectedIcon : item.icon,
-                    color:
-                        selected ? Theme.of(context).colorScheme.primary : null,
-                  ),
-                  title: Text(item.label),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => onSelect(navIndex),
+                minTileHeight: 54,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(16)),
                 ),
+                tileColor: selected
+                    ? Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: .08)
+                    : null,
+                leading: Icon(
+                  selected ? item.selectedIcon : item.icon,
+                  color:
+                      selected ? Theme.of(context).colorScheme.primary : null,
+                ),
+                title: Text(item.label),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => onSelect(navIndex),
               );
             },
           ),

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'package:flutter/services.dart';
+
 import '../../controllers/owner_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
+import '../../services/payment_service.dart';
 import '../../services/tenant_service.dart';
 import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
@@ -1537,8 +1540,110 @@ class LegacyRoomMonitoringPage extends StatelessWidget {
   }
 }
 
-class PaymentVerificationPage extends StatelessWidget {
+class PaymentVerificationPage extends StatefulWidget {
   const PaymentVerificationPage({super.key});
+
+  @override
+  State<PaymentVerificationPage> createState() =>
+      _PaymentVerificationPageState();
+}
+
+class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
+  String _filter = 'pending'; // 'pending', 'verified', 'rejected', 'all'
+  late final TableRefreshSubscription _subscription;
+  String? _processingPaymentId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        OwnerController.instance.loadPayments();
+      }
+    });
+
+    _subscription = TableRefreshSubscription(
+      'owner-payment-verification',
+      ['payments'],
+      () {
+        if (mounted) {
+          OwnerController.instance.loadPayments(force: true);
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _subscription.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleVerify(Payment payment, bool approve, {String? notes}) async {
+    setState(() => _processingPaymentId = payment.id);
+    try {
+      await OwnerController.instance.verifyPayment(
+        payment,
+        approve,
+        notes: notes,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            approve
+                ? 'Payment of ${money(payment.amount)} from ${payment.tenantName ?? "tenant"} verified.'
+                : 'Payment marked as rejected.',
+          ),
+          backgroundColor: approve ? const Color(0xFF56886B) : const Color(0xFFB3261E),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update payment: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _processingPaymentId = null);
+      }
+    }
+  }
+
+  void _promptRejectDialog(Payment payment) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (bottomSheetContext) => _RejectReasonSheet(
+        payment: payment,
+        onConfirmReject: (reason) {
+          Navigator.of(bottomSheetContext).pop();
+          _handleVerify(payment, false, notes: reason);
+        },
+      ),
+    );
+  }
+
+  void _openReceiptViewer(Payment payment, String imageUrl) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _ReceiptViewerModal(
+          payment: payment,
+          imageUrl: imageUrl,
+          onConfirm: () => _handleVerify(payment, true),
+          onReject: () => _promptRejectDialog(payment),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1546,92 +1651,953 @@ class PaymentVerificationPage extends StatelessWidget {
 
     return PageFrame(
       title: 'Payment review',
-      subtitle: 'Confirm or correct OCR-extracted receipt details',
+      subtitle: 'Inspect tenant receipts and verify balances',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh payments',
+          icon: controller.paymentsLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded),
+          onPressed: controller.paymentsLoading
+              ? null
+              : () => controller.loadPayments(force: true),
+        ),
+      ],
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
-          final pending = controller.payments
-              .where(
-                (payment) =>
-                    payment.status == 'Pending verification' ||
-                    payment.status == 'Pending review',
-              )
-              .toList();
+          final allPayments = controller.payments;
+          final pendingCount = allPayments.where((p) => p.isPending).length;
+          final verifiedCount = allPayments.where((p) => p.isVerified).length;
+          final rejectedCount = allPayments.where((p) => p.isRejected).length;
 
-          if (pending.isEmpty) {
-            return const EmptyState(
-              icon: Icons.task_alt,
-              title: 'No pending payment reviews',
-              message:
-                  'New receipts and their OCR-extracted values will appear here.',
-            );
-          }
+          final displayed = switch (_filter) {
+            'pending' => allPayments.where((p) => p.isPending).toList(),
+            'verified' => allPayments.where((p) => p.isVerified).toList(),
+            'rejected' => allPayments.where((p) => p.isRejected).toList(),
+            _ => allPayments,
+          };
 
           return Column(
-            children: pending
-                .map(
-                  (payment) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: CarmelitaCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            payment.label,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 17,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const InfoRow(
-                            label: 'Tenant',
-                            value: 'Anna Dela Cruz',
-                          ),
-                          InfoRow(
-                            label: 'Amount',
-                            value: money(payment.amount),
-                          ),
-                          InfoRow(
-                            label: 'Reference',
-                            value: payment.reference ?? '—',
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => controller.verifyPayment(
-                                    payment,
-                                    false,
-                                  ),
-                                  child: const Text('Reject'),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: FilledButton(
-                                  onPressed: () => controller.verifyPayment(
-                                    payment,
-                                    true,
-                                  ),
-                                  child: const Text('Confirm'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Filter Chips Row
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _FilterChip(
+                      label: 'Pending ($pendingCount)',
+                      selected: _filter == 'pending',
+                      badgeColor: const Color(0xFFAA8A45),
+                      onTap: () => setState(() => _filter = 'pending'),
                     ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Verified ($verifiedCount)',
+                      selected: _filter == 'verified',
+                      badgeColor: const Color(0xFF56886B),
+                      onTap: () => setState(() => _filter = 'verified'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Rejected ($rejectedCount)',
+                      selected: _filter == 'rejected',
+                      badgeColor: const Color(0xFFB3261E),
+                      onTap: () => setState(() => _filter = 'rejected'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'All (${allPayments.length})',
+                      selected: _filter == 'all',
+                      badgeColor: Colors.grey,
+                      onTap: () => setState(() => _filter = 'all'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (controller.paymentsLoading && displayed.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(),
                   ),
                 )
-                .toList(),
+              else if (displayed.isEmpty)
+                EmptyState(
+                  icon: _filter == 'pending'
+                      ? Icons.task_alt_outlined
+                      : Icons.receipt_long_outlined,
+                  title: _filter == 'pending'
+                      ? 'No pending reviews'
+                      : 'No payments in this tab',
+                  message: _filter == 'pending'
+                      ? 'All resident proof uploads have been reviewed and verified.'
+                      : 'Payments will appear here once submitted or updated.',
+                )
+              else
+                ...displayed.map(
+                  (payment) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: _PaymentReviewCard(
+                      payment: payment,
+                      isProcessing: _processingPaymentId == payment.id,
+                      onOpenReceipt: (url) => _openReceiptViewer(payment, url),
+                      onConfirm: () => _handleVerify(payment, true),
+                      onReject: () => _promptRejectDialog(payment),
+                      onReEvaluate: () => _handleVerify(payment, true),
+                    ),
+                  ),
+                ),
+            ],
           );
         },
       ),
     );
   }
 }
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.badgeColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Color badgeColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primary.withValues(alpha: .14)
+              : isDark
+                  ? const Color(0xFF28231F)
+                  : const Color(0xFFF1EBE4),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected
+                ? theme.colorScheme.primary
+                : theme.dividerColor.withValues(alpha: .2),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: badgeColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                fontSize: 13,
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentReviewCard extends StatelessWidget {
+  const _PaymentReviewCard({
+    required this.payment,
+    required this.isProcessing,
+    required this.onOpenReceipt,
+    required this.onConfirm,
+    required this.onReject,
+    required this.onReEvaluate,
+  });
+
+  final Payment payment;
+  final bool isProcessing;
+  final ValueChanged<String> onOpenReceipt;
+  final VoidCallback onConfirm;
+  final VoidCallback onReject;
+  final VoidCallback onReEvaluate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tenantName = payment.tenantName ?? 'Tenant';
+    final roomName = payment.tenantRoom ?? 'Room 204 • Bed 2';
+
+    return CarmelitaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Tenant header & Status Pill
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: theme.colorScheme.primary.withValues(alpha: .12),
+                child: Text(
+                  tenantName.isNotEmpty ? tenantName[0].toUpperCase() : 'T',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tenantName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      roomName,
+                      style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              StatusPill(payment.status),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+
+          // Payment details
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      payment.label,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${payment.category.toUpperCase()} • ${payment.paymentMethod ?? "GCash"}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        letterSpacing: .5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                money(payment.amount),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 20,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Reference row with copy action
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .4),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.receipt_outlined,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Ref: ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    payment.reference ?? 'Not specified',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                if (payment.reference != null && payment.reference!.isNotEmpty)
+                  InkWell(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: payment.reference!));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Reference number copied to clipboard.'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.copy_rounded, size: 14, color: theme.colorScheme.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Copy',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // RECEIPT PROOF IMAGE SECTION
+          _ReceiptProofThumbnail(
+            receiptPath: payment.receiptPath,
+            onTapFullscreen: onOpenReceipt,
+          ),
+
+          // Review Notes if rejected
+          if (payment.reviewNotes != null && payment.reviewNotes!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.errorContainer.withValues(alpha: .35),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: theme.colorScheme.error.withValues(alpha: .3),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: 16, color: theme.colorScheme.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Rejection reason: ${payment.reviewNotes}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 14),
+
+          // ACTION BUTTONS
+          if (payment.isPending)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: isProcessing ? null : onReject,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFB3261E),
+                      side: const BorderSide(color: Color(0xFFB3261E)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text(
+                      'Reject',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: isProcessing ? null : onConfirm,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF56886B),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: isProcessing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.check_circle_outline_rounded, size: 18),
+                    label: const Text(
+                      'Confirm',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onReEvaluate,
+                icon: const Icon(Icons.sync_alt_rounded, size: 16),
+                label: Text(
+                  payment.isVerified ? 'Mark as rejected' : 'Re-verify payment',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReceiptProofThumbnail extends StatefulWidget {
+  const _ReceiptProofThumbnail({
+    required this.receiptPath,
+    required this.onTapFullscreen,
+  });
+
+  final String? receiptPath;
+  final ValueChanged<String> onTapFullscreen;
+
+  @override
+  State<_ReceiptProofThumbnail> createState() => _ReceiptProofThumbnailState();
+}
+
+class _ReceiptProofThumbnailState extends State<_ReceiptProofThumbnail> {
+  String? _resolvedUrl;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveUrl();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReceiptProofThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.receiptPath != widget.receiptPath) {
+      _resolveUrl();
+    }
+  }
+
+  Future<void> _resolveUrl() async {
+    final path = widget.receiptPath;
+    if (path == null || path.isEmpty) {
+      setState(() => _resolvedUrl = null);
+      return;
+    }
+
+    setState(() => _loading = true);
+    final url = await const PaymentService().createReceiptUrl(path);
+    if (mounted) {
+      setState(() {
+        _resolvedUrl = url;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (widget.receiptPath == null || widget.receiptPath!.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .25),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: theme.dividerColor.withValues(alpha: .3),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.image_not_supported_outlined,
+                size: 18, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Text(
+              'No photo receipt attached (Reference provided)',
+              style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_loading) {
+      return Container(
+        width: double.infinity,
+        height: 140,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .3),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        alignment: Alignment.center,
+        child: const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    final url = _resolvedUrl;
+    if (url == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.errorContainer.withValues(alpha: .2),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.broken_image_outlined,
+                size: 18, color: theme.colorScheme.error),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Receipt photo unavailable or expired.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final isAsset = url.startsWith('assets/');
+
+    return InkWell(
+      onTap: () => widget.onTapFullscreen(url),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: double.infinity,
+        height: 180,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: theme.dividerColor.withValues(alpha: .4),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: .06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(13),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (isAsset)
+                Image.asset(
+                  url,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Icon(Icons.broken_image_outlined, size: 36),
+                  ),
+                )
+              else
+                Image.network(
+                  url,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Icon(Icons.broken_image_outlined, size: 36),
+                  ),
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        value: progress.expectedTotalBytes != null
+                            ? progress.cumulativeBytesLoaded /
+                                progress.expectedTotalBytes!
+                            : null,
+                      ),
+                    );
+                  },
+                ),
+              // Bottom gradient inspection banner
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black87,
+                      ],
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.zoom_in_rounded, color: Colors.white, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Tap to inspect receipt full screen',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReceiptViewerModal extends StatelessWidget {
+  const _ReceiptViewerModal({
+    required this.payment,
+    required this.imageUrl,
+    required this.onConfirm,
+    required this.onReject,
+  });
+
+  final Payment payment;
+  final String imageUrl;
+  final VoidCallback onConfirm;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final isAsset = imageUrl.startsWith('assets/');
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black.withValues(alpha: .85),
+        foregroundColor: Colors.white,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${payment.tenantName ?? "Tenant"} - Receipt Proof',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              '${payment.label} • ${money(payment.amount)} • Ref: ${payment.reference ?? "—"}',
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+          ],
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 5.0,
+                child: Center(
+                  child: isAsset
+                      ? Image.asset(imageUrl)
+                      : Image.network(
+                          imageUrl,
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return const Center(
+                              child: CircularProgressIndicator(color: Colors.white),
+                            );
+                          },
+                        ),
+                ),
+              ),
+            ),
+            if (payment.isPending)
+              Container(
+                color: Colors.black.withValues(alpha: .9),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          onReject();
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFFF8A80),
+                          side: const BorderSide(color: Color(0xFFFF8A80)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        label: const Text(
+                          'Reject',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          onConfirm();
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF56886B),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                        label: const Text(
+                          'Confirm',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RejectReasonSheet extends StatefulWidget {
+  const _RejectReasonSheet({
+    required this.payment,
+    required this.onConfirmReject,
+  });
+
+  final Payment payment;
+  final ValueChanged<String> onConfirmReject;
+
+  @override
+  State<_RejectReasonSheet> createState() => _RejectReasonSheetState();
+}
+
+class _RejectReasonSheetState extends State<_RejectReasonSheet> {
+  final TextEditingController _notesController = TextEditingController();
+  String _selectedReason = 'Screenshot is blurred or unreadable';
+
+  final List<String> _quickReasons = const [
+    'Screenshot is blurred or unreadable',
+    'Reference number not found in GCash/Bank records',
+    'Amount paid is less than invoice amount',
+    'Sent to wrong account name/number',
+    'Duplicate payment receipt',
+    'Other reason (details below)',
+  ];
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB3261E).withValues(alpha: .1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.cancel_outlined, color: Color(0xFFB3261E), size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Reject Payment Proof',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+                    ),
+                    Text(
+                      'Tenant will be notified to correct and re-upload.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Select rejection reason:',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
+          const SizedBox(height: 8),
+          ..._quickReasons.map(
+            (reason) {
+              final isSelected = _selectedReason == reason;
+              return InkWell(
+                onTap: () => setState(() => _selectedReason = reason),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isSelected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_off,
+                        size: 18,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          reason,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _notesController,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              hintText: 'Additional remarks / instructions for tenant...',
+              labelText: 'Remarks (Optional)',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFB3261E),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    final extra = _notesController.text.trim();
+                    final fullReason = extra.isNotEmpty
+                        ? '$_selectedReason: $extra'
+                        : _selectedReason;
+                    widget.onConfirmReject(fullReason);
+                  },
+                  child: const Text('Confirm Rejection'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 class MaintenanceManagementPage extends StatelessWidget {
   const MaintenanceManagementPage({super.key});

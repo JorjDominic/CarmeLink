@@ -46,7 +46,13 @@ class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
   @override
   Widget build(BuildContext context) {
-    final user = SessionController.instance.currentUser!;
+    final user = SessionController.instance.currentUser ??
+        const AppUser(
+          id: 'guest-profile',
+          name: 'Carmelita Resident',
+          email: 'resident@carmelitas.com',
+          role: UserRole.tenant,
+        );
     return PageFrame(
       title: 'Profile',
       subtitle: 'Personal and contact information',
@@ -564,60 +570,53 @@ class _ThemeModeChoice extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: '$label theme',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: const BorderRadius.all(
-          Radius.circular(16),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: const BorderRadius.all(
+        Radius.circular(16),
+      ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        constraints: const BoxConstraints(minHeight: 52),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 11,
         ),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          constraints: const BoxConstraints(minHeight: 52),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 11,
+        decoration: BoxDecoration(
+          color: selected
+              ? scheme.primary.withValues(alpha: .12)
+              : scheme.surface,
+          borderRadius: const BorderRadius.all(
+            Radius.circular(16),
           ),
-          decoration: BoxDecoration(
+          border: Border.all(
             color: selected
-                ? scheme.primary.withValues(alpha: .11)
-                : Colors.transparent,
-            borderRadius: const BorderRadius.all(
-              Radius.circular(16),
-            ),
-            border: Border.all(
-              color: selected
-                  ? scheme.primary.withValues(alpha: .35)
-                  : Theme.of(context).dividerColor,
-            ),
+                ? scheme.primary
+                : Theme.of(context).dividerColor,
+            width: selected ? 1.6 : 1,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 19,
-                color: selected
-                    ? scheme.primary
-                    : scheme.onSurface.withValues(alpha: .68),
-              ),
-              const SizedBox(width: 7),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: selected ? scheme.primary : scheme.onSurface,
-                  ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: selected ? scheme.primary : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: selected ? scheme.primary : scheme.onSurface,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

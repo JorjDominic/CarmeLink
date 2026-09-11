@@ -46,14 +46,141 @@ class Payment {
     required this.dueDate,
     required this.status,
     this.reference,
-  });
+    this.tenantId = '',
+    this.tenantName,
+    this.tenantRoom,
+    this.category = 'rent',
+    this.paymentMethod,
+    this.receiptPath,
+    this.paidAt,
+    this.reviewedBy,
+    this.reviewedAt,
+    this.reviewNotes,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? dueDate;
 
   final String id;
+  final String tenantId;
+  final String? tenantName;
+  final String? tenantRoom;
   final String label;
+  final String category;
   final double amount;
   final DateTime dueDate;
   String status;
+  final String? paymentMethod;
   final String? reference;
+  final String? receiptPath;
+  final DateTime? paidAt;
+  final String? reviewedBy;
+  final DateTime? reviewedAt;
+  final String? reviewNotes;
+  final DateTime createdAt;
+
+  bool get isPending => status.toLowerCase().contains('pending');
+  bool get isVerified => status.toLowerCase().contains('verified');
+  bool get isRejected => status.toLowerCase().contains('rejected');
+  bool get isDue => status.toLowerCase() == 'due';
+
+  static String formatStatus(String raw) {
+    return switch (raw.toLowerCase().replaceAll(' ', '_')) {
+      'pending_verification' || 'pending_review' || 'pending' =>
+        'Pending verification',
+      'verified' || 'paid' || 'approved' => 'Verified',
+      'rejected' => 'Rejected',
+      _ => 'Due',
+    };
+  }
+
+  static String toDbStatus(String ui) {
+    return switch (ui.toLowerCase().replaceAll(' ', '_')) {
+      'pending_verification' || 'pending_review' || 'pending' =>
+        'pending_verification',
+      'verified' || 'paid' || 'approved' => 'verified',
+      'rejected' => 'rejected',
+      _ => 'due',
+    };
+  }
+
+  factory Payment.fromJson(
+    Map<String, dynamic> json, {
+    String? tenantName,
+    String? tenantRoom,
+  }) {
+    final rawDueDate = json['due_date'];
+    final DateTime parsedDueDate;
+    if (rawDueDate is String) {
+      parsedDueDate = DateTime.tryParse(rawDueDate) ?? DateTime.now();
+    } else {
+      parsedDueDate = DateTime.now();
+    }
+
+    final rawCreatedAt = json['created_at'];
+    final DateTime? parsedCreatedAt =
+        rawCreatedAt is String ? DateTime.tryParse(rawCreatedAt) : null;
+
+    final rawPaidAt = json['paid_at'];
+    final DateTime? parsedPaidAt =
+        rawPaidAt is String ? DateTime.tryParse(rawPaidAt) : null;
+
+    final rawReviewedAt = json['reviewed_at'];
+    final DateTime? parsedReviewedAt =
+        rawReviewedAt is String ? DateTime.tryParse(rawReviewedAt) : null;
+
+    final rawAmount = json['amount'];
+    final double parsedAmount = rawAmount is num
+        ? rawAmount.toDouble()
+        : double.tryParse(rawAmount?.toString() ?? '') ?? 0.0;
+
+    final rawStatus = json['status'] as String? ?? 'due';
+
+    return Payment(
+      id: json['id'] as String? ?? '',
+      tenantId: json['tenant_id'] as String? ?? '',
+      tenantName: tenantName ?? json['tenant_name'] as String?,
+      tenantRoom: tenantRoom ?? json['tenant_room'] as String?,
+      label: json['title'] as String? ?? json['label'] as String? ?? 'Payment',
+      category: json['category'] as String? ?? 'rent',
+      amount: parsedAmount,
+      dueDate: parsedDueDate,
+      status: formatStatus(rawStatus),
+      paymentMethod: json['payment_method'] as String?,
+      reference: json['reference_number'] as String? ??
+          json['reference'] as String?,
+      receiptPath: json['receipt_path'] as String?,
+      paidAt: parsedPaidAt,
+      reviewedBy: json['reviewed_by'] as String?,
+      reviewedAt: parsedReviewedAt,
+      reviewNotes: json['review_notes'] as String?,
+      createdAt: parsedCreatedAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'tenant_id': tenantId,
+        'title': label,
+        'category': category,
+        'amount': amount,
+        'due_date':
+            '${dueDate.year.toString().padLeft(4, '0')}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}',
+        'status': toDbStatus(status),
+        if (paymentMethod != null) 'payment_method': paymentMethod,
+        if (reference != null) 'reference_number': reference,
+        if (receiptPath != null) 'receipt_path': receiptPath,
+        if (paidAt != null) 'paid_at': paidAt!.toIso8601String(),
+        if (reviewedBy != null) 'reviewed_by': reviewedBy,
+        if (reviewedAt != null) 'reviewed_at': reviewedAt!.toIso8601String(),
+        if (reviewNotes != null) 'review_notes': reviewNotes,
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Payment && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 class MaintenanceReport {

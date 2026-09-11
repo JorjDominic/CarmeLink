@@ -292,115 +292,454 @@ class MyRoomPage extends StatelessWidget {
   }
 }
 
-class PaymentsPage extends StatelessWidget {
+class PaymentsPage extends StatefulWidget {
   const PaymentsPage({super.key});
+
+  @override
+  State<PaymentsPage> createState() => _PaymentsPageState();
+}
+
+class _PaymentsPageState extends State<PaymentsPage> {
+  late final TableRefreshSubscription _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        TenantController.instance.loadPayments();
+      }
+    });
+    _subscription = TableRefreshSubscription(
+      'tenant-payments',
+      ['payments'],
+      () {
+        if (mounted) {
+          TenantController.instance.loadPayments(force: true);
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _subscription.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = TenantController.instance;
     return PageFrame(
       title: 'Payments & utilities',
       subtitle: 'Balances, due dates, and history',
-      floatingActionButton: FloatingActionButton(
+      actions: [
+        IconButton(
+          tooltip: 'Refresh payments',
+          icon: c.paymentsLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded),
+          onPressed: c.paymentsLoading ? null : () => c.loadPayments(force: true),
+        ),
+      ],
+      floatingActionButton: FloatingActionButton.extended(
         tooltip: 'Upload payment proof',
         backgroundColor: const Color(0xFF627FA8),
         foregroundColor: Colors.white,
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const UploadPaymentProofPage()),
         ),
-        child: const Icon(Icons.upload_file_outlined),
+        icon: const Icon(Icons.upload_file_outlined),
+        label: const Text('Pay now'),
       ),
       child: AnimatedBuilder(
-          animation: c,
-          builder: (context, _) =>
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(
-                  'ACCOUNT SUMMARY',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        animation: c,
+        builder: (context, _) {
+          final nextDue = c.nextDuePayment;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'ACCOUNT SUMMARY',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      letterSpacing: 1.3,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              MutedDashboardGrid(
+                compact: true,
+                items: [
+                  MutedDashboardItem(
+                    label: 'Outstanding',
+                    value: money(c.outstandingBalance),
+                    detail: c.outstandingBalance > 0
+                        ? 'Unpaid records'
+                        : 'All clear',
+                    icon: Icons.account_balance_wallet_outlined,
+                    color: c.outstandingBalance > 0
+                        ? const Color(0xFFAA8A45)
+                        : const Color(0xFF56886B),
+                  ),
+                  MutedDashboardItem(
+                    label: 'Next due date',
+                    value: nextDue != null ? shortDate(nextDue.dueDate) : 'None',
+                    detail: nextDue?.label ?? 'No pending bills',
+                    icon: Icons.event_outlined,
+                    color: const Color(0xFF627FA8),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              SectionTitle(
+                'Payment records',
+                trailing: c.paymentsLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : null,
+              ),
+              const SizedBox(height: 10),
+              if (c.payments.isEmpty)
+                const EmptyState(
+                  icon: Icons.receipt_long_outlined,
+                  title: 'No payment records',
+                  message: 'Invoices and billing statements will appear here.',
+                )
+              else
+                ...c.payments.map((p) => _TenantPaymentCard(payment: p)),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _TenantPaymentCard extends StatelessWidget {
+  const _TenantPaymentCard({required this.payment});
+  final Payment payment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: CarmelitaCard(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 10,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      payment.label,
+                      style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 15,
-                        letterSpacing: 1.3,
-                        color: Theme.of(context).colorScheme.primary,
                       ),
-                ),
-                const SizedBox(height: 8),
-                const MutedDashboardGrid(compact: true, items: [
-                  MutedDashboardItem(
-                      label: 'Outstanding',
-                      value: '₱4,400',
-                      detail: 'Rent + utilities',
-                      icon: Icons.account_balance_wallet_outlined,
-                      color: Color(0xFFAA8A45)),
-                  MutedDashboardItem(
-                      label: 'Next due date',
-                      value: 'Aug 10',
-                      detail: 'Utilities',
-                      icon: Icons.event_outlined,
-                      color: Color(0xFF627FA8)),
-                ]),
-                const SizedBox(height: 22),
-                const SectionTitle('Payment records'),
-                const SizedBox(height: 10),
-                ...c.payments.map(
-                  (p) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: CarmelitaCard(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      child: TimelineTile(
-                          compact: true,
-                          icon: Icons.receipt_long_outlined,
-                          color: p.status.toLowerCase().contains('verified')
-                              ? const Color(0xFF56886B)
-                              : p.status.toLowerCase().contains('rejected')
-                                  ? const Color(0xFFAA6870)
-                                  : const Color(0xFFAA8A45),
-                          title: p.label,
-                          subtitle:
-                              '${money(p.amount)} • Due ${shortDate(p.dueDate)}',
-                          trailing: StatusPill(p.status)),
                     ),
                   ),
+                  StatusPill(payment.status),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    money(payment.amount),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  Text(
+                    'Due ${shortDate(payment.dueDate)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+              if (payment.reference != null && payment.reference!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Ref: ${payment.reference}',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(fontFamily: 'monospace'),
                 ),
-              ])),
+              ],
+              if (payment.reviewNotes != null &&
+                  payment.reviewNotes!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Note: ${payment.reviewNotes}',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFFAA6870)),
+                ),
+              ],
+              if (payment.isDue || payment.isRejected) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            UploadPaymentProofPage(targetPayment: payment),
+                      ),
+                    ),
+                    icon: const Icon(Icons.upload_file_outlined, size: 16),
+                    label: const Text('Submit payment proof'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
 class UploadPaymentProofPage extends StatefulWidget {
-  const UploadPaymentProofPage({super.key});
+  const UploadPaymentProofPage({this.targetPayment, super.key});
+  final Payment? targetPayment;
 
   @override
   State<UploadPaymentProofPage> createState() => _UploadPaymentProofPageState();
 }
 
 class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
-  final amount = TextEditingController();
-  final reference = TextEditingController();
-  final receiptDate = TextEditingController();
+  final ImagePicker _imagePicker = ImagePicker();
+
+  late final TextEditingController amountController;
+  final referenceController = TextEditingController();
   String method = 'GCash';
-  bool receiptSelected = false;
+  Payment? selectedPayment;
+
+  Uint8List? receiptBytes;
+  String? receiptFileName;
+  String? receiptMimeType;
+  bool submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedPayment = widget.targetPayment;
+    amountController = TextEditingController(
+      text: widget.targetPayment != null
+          ? widget.targetPayment!.amount.toStringAsFixed(2)
+          : '',
+    );
+  }
 
   @override
   void dispose() {
-    amount.dispose();
-    reference.dispose();
-    receiptDate.dispose();
+    amountController.dispose();
+    referenceController.dispose();
     super.dispose();
+  }
+
+  Future<void> _showPhotoSource() async {
+    if (submitting) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take photo with camera'),
+              subtitle: const Text('Capture printed receipt or terminal slip'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _pickReceipt(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              subtitle: const Text('Upload GCash or bank transfer screenshot'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _pickReceipt(ImageSource.gallery);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickReceipt(ImageSource source) async {
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1800,
+        maxHeight: 1800,
+        imageQuality: 85,
+      );
+
+      if (picked == null) return;
+
+      final bytes = await picked.readAsBytes();
+      if (bytes.length > 5 * 1024 * 1024) {
+        if (!mounted) return;
+        showAppSnackBar(context, 'Receipt image must be smaller than 5 MB.');
+        return;
+      }
+
+      setState(() {
+        receiptBytes = bytes;
+        receiptFileName = picked.name;
+        receiptMimeType = picked.mimeType ?? 'image/jpeg';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(context, 'Could not open receipt image: $e');
+    }
+  }
+
+  Future<void> _submit() async {
+    final parsedAmount = double.tryParse(amountController.text.trim());
+    if (parsedAmount == null || parsedAmount <= 0) {
+      showAppSnackBar(context, 'Enter a valid payment amount.');
+      return;
+    }
+
+    if (receiptBytes == null && method != 'Cash') {
+      showAppSnackBar(
+        context,
+        'Please attach your GCash or bank transfer screenshot.',
+      );
+      return;
+    }
+
+    setState(() => submitting = true);
+
+    try {
+      await TenantController.instance.submitPaymentProof(
+        paymentId: selectedPayment?.id,
+        amount: parsedAmount,
+        method: method,
+        reference: referenceController.text.trim(),
+        receiptBytes: receiptBytes,
+        fileName: receiptFileName,
+        mimeType: receiptMimeType,
+      );
+
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        'Payment proof submitted for owner/caretaker review.',
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(context, 'Failed to submit payment proof: $e');
+    } finally {
+      if (mounted) setState(() => submitting = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final unpaidBills = TenantController.instance.payments
+        .where((p) => p.isDue || p.isRejected)
+        .toList();
+
     return PageFrame(
       title: 'Upload payment proof',
-      subtitle: 'Extract receipt details with OCR, review, then submit',
+      subtitle: 'Submit transaction receipt for verification',
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (widget.targetPayment != null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: CarmelitaCard(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.receipt_long_outlined,
+                        color: Color(0xFF627FA8),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.targetPayment!.label,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              'Due ${shortDate(widget.targetPayment!.dueDate)} • ${money(widget.targetPayment!.amount)}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      StatusPill(widget.targetPayment!.status),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ] else if (unpaidBills.isNotEmpty) ...[
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: selectedPayment?.id,
+                decoration:
+                    const InputDecoration(labelText: 'Select bill to pay'),
+                items: unpaidBills
+                    .map(
+                      (p) => DropdownMenuItem<String>(
+                        value: p.id,
+                        child: Text(
+                          '${p.label} (${money(p.amount)})',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    selectedPayment = unpaidBills.firstWhere(
+                      (p) => p.id == value,
+                      orElse: () => unpaidBills.first,
+                    );
+                    amountController.text =
+                        selectedPayment!.amount.toStringAsFixed(2);
+                  });
+                },
+              ),
+              const SizedBox(height: 14),
+            ],
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: method,
               decoration: const InputDecoration(labelText: 'Payment method'),
               items: const ['GCash', 'Maya', 'Bank transfer', 'Cash']
@@ -415,83 +754,111 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
             ),
             const SizedBox(height: 14),
             TextField(
-                controller: receiptDate,
-                decoration: const InputDecoration(
-                    labelText: 'Receipt date', hintText: 'Extracted by OCR')),
-            const SizedBox(height: 14),
-            TextField(
-              controller: amount,
+              controller: amountController,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Amount'),
+              decoration: const InputDecoration(labelText: 'Amount (PHP)'),
             ),
             const SizedBox(height: 14),
             TextField(
-              controller: reference,
-              decoration: const InputDecoration(
+              controller: referenceController,
+              decoration: InputDecoration(
                 labelText: 'Reference number',
-                hintText: 'Optional for cash payments',
+                hintText: method == 'Cash'
+                    ? 'Optional notes'
+                    : 'e.g. 1002 9384 1029 (from receipt)',
               ),
             ),
             const SizedBox(height: 14),
-            CarmelitaCard(
-              onTap: () {
-                setState(() => receiptSelected = true);
-                showAppSnackBar(
-                  context,
-                  'Receipt selected. OCR backend is not connected; review or enter the values manually.',
-                );
-              },
-              child: Row(
-                children: [
-                  Icon(
-                    receiptSelected
-                        ? Icons.check_circle_outline
-                        : Icons.add_photo_alternate_outlined,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      receiptSelected
-                          ? 'Receipt selected • OCR values ready for review'
-                          : 'Add receipt or screenshot',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
             SizedBox(
               width: double.infinity,
+              child: receiptBytes != null
+                  ? CarmelitaCard(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.memory(
+                              receiptBytes!,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  receiptFileName ?? 'Receipt selected',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                InkWell(
+                                  onTap: _showPhotoSource,
+                                  child: const Text(
+                                    'Change screenshot',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF627FA8),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Remove photo',
+                            icon: const Icon(Icons.close),
+                            onPressed: () => setState(() {
+                              receiptBytes = null;
+                              receiptFileName = null;
+                              receiptMimeType = null;
+                            }),
+                          ),
+                        ],
+                      ),
+                    )
+                  : CarmelitaCard(
+                      onTap: _showPhotoSource,
+                      child: const Row(
+                        children: [
+                          Icon(Icons.add_photo_alternate_outlined),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Attach GCash or bank screenshot',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          Icon(Icons.chevron_right),
+                        ],
+                      ),
+                    ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
               child: FilledButton(
-                onPressed: () {
-                  final parsedAmount = double.tryParse(amount.text.trim());
-                  if (parsedAmount == null || parsedAmount <= 0) {
-                    showAppSnackBar(context, 'Enter a valid payment amount.');
-                    return;
-                  }
-                  if (!receiptSelected && method != 'Cash') {
-                    showAppSnackBar(
-                      context,
-                      'Add the receipt or screenshot first.',
-                    );
-                    return;
-                  }
-
-                  TenantController.instance.submitPaymentProof(
-                    amount: parsedAmount,
-                    method: method,
-                    reference: reference.text,
-                  );
-                  showAppSnackBar(
-                    context,
-                    'Payment proof submitted for owner/caretaker review.',
-                  );
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Submit for review'),
+                onPressed: submitting ? null : _submit,
+                child: submitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Submit proof for review'),
               ),
             ),
           ],
@@ -2140,7 +2507,7 @@ class TenantPresencePage extends StatelessWidget {
       title: 'Curfew',
       subtitle: 'Geofence tracking and presence status',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             'CURFEW STATUS',
@@ -2152,73 +2519,76 @@ class TenantPresencePage extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: 8),
-          CarmelitaCard(
-            padding: const EdgeInsets.all(14),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final compact = constraints.maxWidth < 330;
-                const copy = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'CURRENT STATUS',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      'Inside dormitory',
-                      style: TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    SizedBox(height: 6),
-                    Text('Last IN: 8:14 PM • GPS Geofence confirmed'),
-                  ],
-                );
-
-                if (compact) {
-                  return const Column(
+          SizedBox(
+            width: double.infinity,
+            child: CarmelitaCard(
+              padding: const EdgeInsets.all(14),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 330;
+                  const copy = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 24,
-                            backgroundColor: Color(0x1356886B),
-                            foregroundColor: Color(0xFF56886B),
-                            child: Icon(Icons.location_on_outlined),
-                          ),
-                          SizedBox(width: 12),
-                          StatusPill('IN'),
-                        ],
+                      Text(
+                        'CURRENT STATUS',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      SizedBox(height: 12),
-                      copy,
+                      SizedBox(height: 3),
+                      Text(
+                        'Inside dormitory',
+                        style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text('Last IN: 8:14 PM • GPS Geofence confirmed'),
                     ],
                   );
-                }
 
-                return const Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: Color(0x1356886B),
-                      foregroundColor: Color(0xFF56886B),
-                      child: Icon(Icons.location_on_outlined),
-                    ),
-                    SizedBox(width: 16),
-                    Expanded(child: copy),
-                    SizedBox(width: 10),
-                    StatusPill('IN'),
-                  ],
-                );
-              },
+                  if (compact) {
+                    return const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 24,
+                              backgroundColor: Color(0x1356886B),
+                              foregroundColor: Color(0xFF56886B),
+                              child: Icon(Icons.location_on_outlined),
+                            ),
+                            SizedBox(width: 12),
+                            StatusPill('IN'),
+                          ],
+                        ),
+                        SizedBox(height: 12),
+                        copy,
+                      ],
+                    );
+                  }
+
+                  return const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: Color(0x1356886B),
+                        foregroundColor: Color(0xFF56886B),
+                        child: Icon(Icons.location_on_outlined),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(child: copy),
+                      SizedBox(width: 10),
+                      StatusPill('IN'),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
           const SizedBox(height: 18),

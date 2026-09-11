@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/maintenance_service.dart';
+import '../services/payment_service.dart';
 
 class TenantController extends ChangeNotifier {
   TenantController._();
@@ -10,15 +11,37 @@ class TenantController extends ChangeNotifier {
   static final TenantController instance = TenantController._();
 
   final MaintenanceService _maintenanceService = const MaintenanceService();
+  final PaymentService _paymentService = const PaymentService();
 
   final List<MaintenanceReport> _maintenance = [];
+  final List<Payment> _payments = [];
 
   bool _maintenanceLoading = false;
   String? _maintenanceError;
 
+  bool _paymentsLoading = false;
+  String? _paymentsError;
+
   Room get room => MockData.room;
 
-  List<Payment> get payments => List.unmodifiable(MockData.payments);
+  List<Payment> get payments =>
+      _payments.isEmpty ? List.unmodifiable(MockData.payments) : List.unmodifiable(_payments);
+
+  bool get paymentsLoading => _paymentsLoading;
+  String? get paymentsError => _paymentsError;
+
+  double get outstandingBalance {
+    final list = payments;
+    return list
+        .where((p) => !p.isVerified)
+        .fold<double>(0.0, (sum, p) => sum + p.amount);
+  }
+
+  Payment? get nextDuePayment {
+    final due = payments.where((p) => p.isDue).toList()
+      ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    return due.isNotEmpty ? due.first : null;
+  }
 
   List<MaintenanceReport> get maintenance => List.unmodifiable(_maintenance);
 
@@ -66,25 +89,80 @@ class TenantController extends ChangeNotifier {
     }
   }
 
-  void submitPaymentProof({
+  Future<void> loadPayments({bool force = false}) async {
+    if (_paymentsLoading && !force) return;
+    _paymentsLoading = true;
+    _paymentsError = null;
+    notifyListeners();
+
+    try {
+      final latest = await _paymentService.listOwnPayments();
+      _payments
+        ..clear()
+        ..addAll(latest);
+    } catch (e) {
+      _paymentsError = _message(e);
+    } finally {
+      _paymentsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Payment> submitPaymentProof({
+    String? paymentId,
     required double amount,
     required String method,
     required String reference,
-  }) {
-    MockData.payments.insert(
-      0,
-      Payment(
-        id: 'p${DateTime.now().millisecondsSinceEpoch}',
+    Uint8List? receiptBytes,
+    String? fileName,
+    String? mimeType,
+  }) async {
+    final targetId = paymentId ??
+        (payments.isNotEmpty
+            ? payments.first.id
+            : 'p${DateTime.now().millisecondsSinceEpoch}');
+
+    try {
+      final updated = await _paymentService.submitPaymentProof(
+        paymentId: targetId,
+        method: method,
+        referenceNumber: reference,
+        receiptBytes: receiptBytes,
+        fileName: fileName,
+        mimeType: mimeType,
+      );
+
+      final index = _payments.indexWhere((p) => p.id == targetId);
+      if (index != -1) {
+        _payments[index] = updated;
+      } else {
+        _payments.insert(0, updated);
+      }
+      notifyListeners();
+      return updated;
+    } catch (_) {
+      final mock = Payment(
+        id: targetId,
         label: '$method payment submission',
         amount: amount,
         dueDate: DateTime.now(),
-        status: 'Pending review',
+        status: 'Pending verification',
         reference: reference.trim().isEmpty ? null : reference.trim(),
-      ),
-    );
-
-    notifyListeners();
+        paymentMethod: method,
+      );
+      final index = MockData.payments.indexWhere((p) => p.id == targetId);
+      if (index != -1) {
+        MockData.payments[index] = mock;
+      } else {
+        MockData.payments.insert(0, mock);
+      }
+      notifyListeners();
+      return mock;
+    }
   }
+
+  Future<String?> paymentReceiptUrl(String? path) =>
+      _paymentService.createReceiptUrl(path);
 
   Future<void> submitMaintenance({
     required String category,

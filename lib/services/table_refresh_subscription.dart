@@ -15,19 +15,26 @@ class TableRefreshSubscription {
     _refresh = refresh;
     _debounceDuration = debounceDuration;
 
-    var builder = SupabaseConfig.client.channel('refresh-$name');
-    for (final table in tables) {
-      builder = builder.onPostgresChanges(
-        event: PostgresChangeEvent.all,
-        schema: 'public',
-        table: table,
-        callback: (_) => _triggerDebouncedRefresh(),
-      );
+    try {
+      final client = SupabaseConfig.clientSafe;
+      if (client == null) return;
+
+      var builder = client.channel('refresh-$name');
+      for (final table in tables) {
+        builder = builder.onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: table,
+          callback: (_) => _triggerDebouncedRefresh(),
+        );
+      }
+      channel = builder.subscribe();
+    } catch (_) {
+      // Ignored when offline or uninitialized
     }
-    channel = builder.subscribe();
   }
 
-  late final RealtimeChannel channel;
+  RealtimeChannel? channel;
   late final void Function() _refresh;
   late final Duration _debounceDuration;
   Timer? _debounceTimer;
@@ -41,6 +48,15 @@ class TableRefreshSubscription {
 
   Future<void> dispose() async {
     _debounceTimer?.cancel();
-    await SupabaseConfig.client.removeChannel(channel);
+    final c = channel;
+    if (c != null) {
+      try {
+        final client = SupabaseConfig.clientSafe;
+        if (client != null) {
+          await client.removeChannel(c);
+        }
+      } catch (_) {}
+    }
   }
 }
+

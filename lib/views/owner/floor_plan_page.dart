@@ -478,67 +478,62 @@ class _RoomTile extends StatelessWidget {
         : room.isFull
             ? const Color(0xFFAA6870)
             : const Color(0xFF56886B);
-    return Semantics(
-      button: true,
-      label:
-          'Room ${room.number}, ${room.occupied} of ${room.capacity} occupied',
-      child: Material(
-        color: color.withValues(alpha: selected ? .24 : .12),
-        shape: RoundedRectangleBorder(
-          side: BorderSide(color: color, width: selected ? 4 : 2),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(6),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Icon(Icons.meeting_room_outlined, color: color, size: 20),
-                  const SizedBox(width: 6),
-                  Text(room.number,
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w900)),
-                  if (maintenanceCount > 0) ...[
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFB47A52),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text('$maintenanceCount',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900)),
+    return Material(
+      color: color.withValues(alpha: selected ? .24 : .12),
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: color, width: selected ? 4 : 2),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Icon(Icons.meeting_room_outlined, color: color, size: 20),
+                const SizedBox(width: 6),
+                Text(room.number,
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w900)),
+                if (maintenanceCount > 0) ...[
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFB47A52),
+                      borderRadius: BorderRadius.circular(99),
                     ),
-                  ],
-                ]),
-                const Spacer(),
-                Text(
-                    mode == _PlanMode.maintenance
-                        ? maintenanceCount == 0
-                            ? 'No open issues'
-                            : '$maintenanceCount open issue(s)'
-                        : room.isAmenity
-                            ? 'Shared space'
-                            : '${room.occupied}/${room.capacity} beds',
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                if (!room.isAmenity && mode == _PlanMode.occupancy) ...[
-                  const SizedBox(height: 4),
-                  LinearProgressIndicator(
-                    value: room.occupied / room.capacity,
-                    color: color,
-                    backgroundColor: color.withValues(alpha: .18),
+                    child: Text('$maintenanceCount',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900)),
                   ),
                 ],
+              ]),
+              const Spacer(),
+              Text(
+                  mode == _PlanMode.maintenance
+                      ? maintenanceCount == 0
+                          ? 'No open issues'
+                          : '$maintenanceCount open issue(s)'
+                      : room.isAmenity
+                          ? 'Shared space'
+                          : '${room.occupied}/${room.capacity} beds',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              if (!room.isAmenity && mode == _PlanMode.occupancy) ...[
+                const SizedBox(height: 4),
+                LinearProgressIndicator(
+                  value: room.occupied / room.capacity,
+                  color: color,
+                  backgroundColor: color.withValues(alpha: .18),
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ),

@@ -582,21 +582,15 @@ class CarmelitaCard extends StatelessWidget {
 
     if (onTap == null) return content;
 
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 1, end: 1),
-      duration: const Duration(milliseconds: 120),
-      builder: (context, value, _) {
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: const BorderRadius.all(
-              Radius.circular(20),
-            ),
-            onTap: onTap,
-            child: content,
-          ),
-        );
-      },
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: const BorderRadius.all(
+          Radius.circular(20),
+        ),
+        onTap: onTap,
+        child: content,
+      ),
     );
   }
 }

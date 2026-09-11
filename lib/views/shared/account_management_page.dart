@@ -427,33 +427,30 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
                 ),
                 if (errorMessage != null) ...[
                   const SizedBox(height: 14),
-                  Semantics(
-                    liveRegion: true,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .errorContainer
+                          .withValues(alpha: .55),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
                         color: Theme.of(context)
                             .colorScheme
-                            .errorContainer
-                            .withValues(alpha: .55),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .error
-                              .withValues(alpha: .35),
-                        ),
+                            .error
+                            .withValues(alpha: .35),
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.error_outline,
-                              color: Theme.of(context).colorScheme.error),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text(errorMessage!)),
-                        ],
-                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.error_outline,
+                            color: Theme.of(context).colorScheme.error),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(errorMessage!)),
+                      ],
                     ),
                   ),
                 ],
@@ -487,30 +484,28 @@ class _InlineError extends StatelessWidget {
   final String message;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-        liveRegion: true,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Theme.of(context)
-                .colorScheme
-                .errorContainer
-                .withValues(alpha: .55),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.error.withValues(alpha: .35),
-            ),
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Theme.of(context)
+              .colorScheme
+              .errorContainer
+              .withValues(alpha: .55),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.error.withValues(alpha: .35),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.error_outline,
-                  color: Theme.of(context).colorScheme.error),
-              const SizedBox(width: 10),
-              Expanded(child: Text(message)),
-            ],
-          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline,
+                color: Theme.of(context).colorScheme.error),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+          ],
         ),
       );
 }
+

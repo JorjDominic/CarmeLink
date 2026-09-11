@@ -3,15 +3,21 @@ import 'package:flutter/foundation.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 
+import '../services/payment_service.dart';
+
 class OwnerController extends ChangeNotifier {
   OwnerController._();
 
   static final OwnerController instance = OwnerController._();
 
+  final PaymentService _paymentService = const PaymentService();
+  final List<Payment> _payments = [];
+  bool _paymentsLoading = false;
+  String? _paymentsError;
+
   List<TenantDirectoryEntry> get tenants =>
       List.unmodifiable(MockData.tenantDirectory);
   List<DormRoomStatus> get rooms => List.unmodifiable(MockData.roomStatuses);
-  List<Payment> get payments => List.unmodifiable(MockData.payments);
   List<MaintenanceReport> get maintenance =>
       List.unmodifiable(MockData.maintenance);
   List<MaintenanceReport> get maintenanceByPriority {
@@ -59,10 +65,52 @@ class OwnerController extends ChangeNotifier {
       .where((t) => t.gateStatus == 'OUT' || t.gateStatus == 'Outside')
       .length;
 
-  void verifyPayment(Payment payment, bool approve) {
-    payment.status = approve ? 'Verified' : 'Rejected';
+  List<Payment> get payments =>
+      _payments.isEmpty ? List.unmodifiable(MockData.payments) : List.unmodifiable(_payments);
+  bool get paymentsLoading => _paymentsLoading;
+  String? get paymentsError => _paymentsError;
+
+  Future<void> loadPayments({bool force = false}) async {
+    if (_paymentsLoading) return;
+    if (_payments.isNotEmpty && !force) return;
+
+    _paymentsLoading = true;
+    _paymentsError = null;
+    notifyListeners();
+
+    try {
+      final list = await _paymentService.listAllPayments();
+      _payments
+        ..clear()
+        ..addAll(list);
+    } catch (e) {
+      _paymentsError = e.toString();
+    } finally {
+      _paymentsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> verifyPayment(Payment payment, bool approve, {String? notes}) async {
+    try {
+      final updated = await _paymentService.verifyPayment(
+        paymentId: payment.id,
+        approve: approve,
+        reviewNotes: notes,
+      );
+
+      final index = _payments.indexWhere((p) => p.id == payment.id);
+      if (index != -1) {
+        _payments[index] = updated;
+      }
+      payment.status = updated.status;
+    } catch (_) {
+      // Local fallback
+      payment.status = approve ? 'Verified' : 'Rejected';
+    }
     notifyListeners();
   }
+
 
   void updateMaintenance(
     MaintenanceReport report,
