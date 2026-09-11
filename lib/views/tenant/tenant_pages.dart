@@ -8,6 +8,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/announcement_service.dart';
+import '../../services/receipt_ocr_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../widgets/feature_widgets.dart';
 
@@ -526,6 +527,7 @@ class UploadPaymentProofPage extends StatefulWidget {
 
 class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
   final ImagePicker _imagePicker = ImagePicker();
+  final ReceiptOcrService _ocrService = const ReceiptOcrService();
 
   late final TextEditingController amountController;
   final referenceController = TextEditingController();
@@ -536,6 +538,8 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
   String? receiptFileName;
   String? receiptMimeType;
   bool submitting = false;
+  bool _scanningOcr = false;
+  ReceiptExtractionResult? _lastOcrResult;
 
   @override
   void initState() {
@@ -611,7 +615,53 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
         receiptBytes = bytes;
         receiptFileName = picked.name;
         receiptMimeType = picked.mimeType ?? 'image/jpeg';
+        _scanningOcr = true;
       });
+
+      // Run on-device OCR scan to instantly capture amount, ref number, and method
+      try {
+        final result = await _ocrService.scanReceiptFile(picked.path);
+        if (!mounted) return;
+
+        setState(() {
+          _scanningOcr = false;
+          _lastOcrResult = result;
+
+          if (result.referenceNumber != null &&
+              result.referenceNumber!.isNotEmpty) {
+            referenceController.text = result.referenceNumber!;
+          }
+
+          if (result.amount != null) {
+            amountController.text = result.amount!.toStringAsFixed(2);
+          }
+
+          if (result.paymentMethod != null) {
+            method = result.paymentMethod!;
+          }
+        });
+
+        if (result.hasMatches) {
+          final captured = <String>[];
+          if (result.amount != null) {
+            captured.add('Amount: ₱${result.amount!.toStringAsFixed(2)}');
+          }
+          if (result.referenceNumber != null) {
+            captured.add('Ref: ${result.referenceNumber}');
+          }
+          if (result.paymentMethod != null) {
+            captured.add(result.paymentMethod!);
+          }
+          showAppSnackBar(
+            context,
+            'Receipt auto-scanned! Captured: ${captured.join(' • ')}',
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() => _scanningOcr = false);
+        }
+      }
     } catch (e) {
       if (!mounted) return;
       showAppSnackBar(context, 'Could not open receipt image: $e');
@@ -739,6 +789,7 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
               const SizedBox(height: 14),
             ],
             DropdownButtonFormField<String>(
+              key: ValueKey(method),
               isExpanded: true,
               initialValue: method,
               decoration: const InputDecoration(labelText: 'Payment method'),
@@ -757,7 +808,19 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
               controller: amountController,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Amount (PHP)'),
+              decoration: InputDecoration(
+                labelText: 'Amount (PHP)',
+                suffixIcon: _lastOcrResult?.amount != null
+                    ? const Tooltip(
+                        message: 'Auto-captured from receipt',
+                        child: Icon(
+                          Icons.auto_awesome,
+                          size: 18,
+                          color: Color(0xFF059669),
+                        ),
+                      )
+                    : null,
+              ),
             ),
             const SizedBox(height: 14),
             TextField(
@@ -767,6 +830,16 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
                 hintText: method == 'Cash'
                     ? 'Optional notes'
                     : 'e.g. 1002 9384 1029 (from receipt)',
+                suffixIcon: _lastOcrResult?.referenceNumber != null
+                    ? const Tooltip(
+                        message: 'Auto-captured from receipt',
+                        child: Icon(
+                          Icons.auto_awesome,
+                          size: 18,
+                          color: Color(0xFF059669),
+                        ),
+                      )
+                    : null,
               ),
             ),
             const SizedBox(height: 14),
@@ -821,6 +894,7 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
                               receiptBytes = null;
                               receiptFileName = null;
                               receiptMimeType = null;
+                              _lastOcrResult = null;
                             }),
                           ),
                         ],
@@ -843,6 +917,69 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
                       ),
                     ),
             ),
+            if (_scanningOcr) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF627FA8).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Scanning receipt with OCR for amount & ref number...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (_lastOcrResult != null && _lastOcrResult!.hasMatches) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.auto_awesome,
+                      size: 16,
+                      color: Color(0xFF059669),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Auto-captured from receipt. Please verify details before submitting.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
