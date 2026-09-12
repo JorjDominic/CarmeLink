@@ -1,12 +1,26 @@
 import 'package:flutter/material.dart';
+import '../../controllers/owner_controller.dart';
 import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../shared/shared_views.dart';
 import 'owner_pages.dart';
 
-class OwnerShell extends StatelessWidget {
+class OwnerShell extends StatefulWidget {
   const OwnerShell({super.key});
+
+  @override
+  State<OwnerShell> createState() => _OwnerShellState();
+}
+
+class _OwnerShellState extends State<OwnerShell> {
+  @override
+  void initState() {
+    super.initState();
+    OwnerController.instance.loadRooms();
+    OwnerController.instance.loadPayments();
+  }
+
   @override
   Widget build(BuildContext context) => const RoleGuard(
         allowedRoles: {UserRole.owner},

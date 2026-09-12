@@ -53,7 +53,8 @@ class AnnouncementService {
   static final Map<String, List<AnnouncementRecord>> _cache = {};
   static final Map<String, DateTime> _lastFetch = {};
 
-  static List<AnnouncementRecord>? cachedAnnouncements([String? audienceFilter]) =>
+  static List<AnnouncementRecord>? cachedAnnouncements(
+          [String? audienceFilter]) =>
       _cache[audienceFilter ?? 'all'];
 
   static void invalidateCache() {
@@ -78,9 +79,8 @@ class AnnouncementService {
       return cached;
     }
 
-    var query = _client
-        .from('announcements')
-        .select('id, author_id, title, body, category, audience, is_pinned, fcm_sent, created_at, updated_at, profiles!author_id(full_name)');
+    var query = _client.from('announcements').select(
+        'id, author_id, title, body, category, audience, is_pinned, fcm_sent, created_at, updated_at, profiles!author_id(full_name)');
 
     if (audienceFilter != null && audienceFilter != 'all') {
       query = query.or('audience.eq.all,audience.eq.$audienceFilter');
@@ -122,7 +122,8 @@ class AnnouncementService {
     final inserted = await _client
         .from('announcements')
         .insert(payload)
-        .select('id, author_id, title, body, category, audience, is_pinned, fcm_sent, created_at, updated_at')
+        .select(
+            'id, author_id, title, body, category, audience, is_pinned, fcm_sent, created_at, updated_at')
         .single();
 
     invalidateCache();
@@ -167,7 +168,8 @@ class AnnouncementService {
   /// 1. Broadcasts to FCM topic (e.g. `topics/announcements_all`, `topics/announcements_tenants`)
   /// 2. Or invokes a Supabase Edge Function to dispatch push notifications to device tokens
   /// 3. Marks `fcm_sent = true` once delivered
-  Future<void> _dispatchFCMNotificationIfConfigured(Map<String, dynamic> record) async {
+  Future<void> _dispatchFCMNotificationIfConfigured(
+      Map<String, dynamic> record) async {
     try {
       // Integration point for FCM:
       // final audience = record['audience'];

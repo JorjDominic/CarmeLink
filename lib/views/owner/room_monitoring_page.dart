@@ -5,6 +5,8 @@ import '../../core/constants/app_colors.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../services/room_service.dart';
 import '../../services/table_refresh_subscription.dart';
+import '../../services/tenant_service.dart';
+import 'owner_pages.dart';
 
 class RoomMonitoringPage extends StatefulWidget {
   const RoomMonitoringPage({super.key});
@@ -344,11 +346,251 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     }
   }
 
+  Future<void> _moveTenant(BedRecord bed) async {
+    if (bed.tenantId == null) {
+      showAppSnackBar(context, 'No tenant assigned to this bed space.');
+      return;
+    }
+    final tenantName = bed.tenantName ?? 'Tenant';
+
+    try {
+      final availableRooms =
+          await const TenantService().loadAvailableBedsGroupedByRoom();
+      if (!mounted) return;
+
+      if (availableRooms.isEmpty) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('No available beds'),
+            content: const Text(
+              'All other beds are currently occupied or unavailable. Please add or free up a bed before moving this tenant.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      final selected = await showModalBottomSheet<AvailableBed>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (context) => RoomBedSelectorSheet(
+          rooms: availableRooms,
+          tenantName: tenantName,
+        ),
+      );
+
+      if (selected == null || !mounted) return;
+
+      await widget.service.reassignTenantBed(
+        tenantId: bed.tenantId!,
+        newBedId: selected.id,
+      );
+
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          'Moved $tenantName to Room ${selected.room} • ${selected.label}',
+        );
+        await _refreshRoom();
+      }
+    } catch (error) {
+      if (mounted) {
+        showAppSnackBar(context, tenantAssignmentError(error));
+      }
+    }
+  }
+
+  Future<void> _endAssignment(BedRecord bed) async {
+    if (bed.tenantId == null) return;
+    final tenantName = bed.tenantName ?? 'Tenant';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('End bed assignment?'),
+        content: Text(
+          'Are you sure you want to end $tenantName\'s assignment to ${bed.label}? This bed will become available for other tenants.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('End assignment'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await widget.service.endTenantAssignment(tenantId: bed.tenantId!);
+      if (mounted) {
+        showAppSnackBar(context, 'Ended assignment for $tenantName.');
+        await _refreshRoom();
+      }
+    } catch (error) {
+      if (mounted) {
+        showAppSnackBar(context, tenantAssignmentError(error));
+      }
+    }
+  }
+
+  void _showOccupiedBedActions(BedRecord bed) {
+    final tenantName = bed.tenantName ?? 'Tenant';
+    final theme = Theme.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color:
+                      theme.colorScheme.onSurfaceVariant.withValues(alpha: .3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor:
+                      const Color(0xFF56886B).withValues(alpha: .15),
+                  foregroundColor: const Color(0xFF56886B),
+                  child: const Icon(Icons.person),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Room ${room.number} • ${bed.label}',
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'Occupant: $tenantName'
+                        '${bed.tenantPhone != null && bed.tenantPhone!.isNotEmpty ? ' (${bed.tenantPhone})' : ''}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0x192563EB),
+                foregroundColor: Color(0xFF2563EB),
+                child: Icon(Icons.swap_horiz_rounded),
+              ),
+              title: const Text(
+                'Move to another bed',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle:
+                  const Text('Reassign this tenant to any open bed space'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _moveTenant(bed);
+              },
+            ),
+            const SizedBox(height: 4),
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: theme.colorScheme.error.withValues(alpha: .12),
+                foregroundColor: theme.colorScheme.error,
+                child: const Icon(Icons.person_remove_outlined),
+              ),
+              title: Text(
+                'End assignment',
+                style: TextStyle(
+                  color: theme.colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: const Text('Remove tenant and mark bed as available'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _endAssignment(bed);
+              },
+            ),
+            const SizedBox(height: 4),
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                foregroundColor: theme.colorScheme.onSurfaceVariant,
+                child: const Icon(Icons.edit_outlined),
+              ),
+              title: const Text(
+                'Edit bed label',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text('Change bed space name or label'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                editBed(bed);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PageFrame(
       title: 'Room ${room.number}',
-      subtitle: '${room.floor} • ${room.beds.length}/${room.capacity} bed spaces',
+      subtitle:
+          '${room.floor} • ${room.beds.length}/${room.capacity} bed spaces',
       useScriptTitle: false,
       actions: [
         IconButton(
@@ -403,7 +645,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           const SizedBox(height: 22),
           const SectionTitle(
             'Bed spaces',
-            subtitle: 'Manage availability, labels, and maintenance for each bed',
+            subtitle:
+                'Manage availability, labels, and maintenance for each bed',
           ),
           const SizedBox(height: 12),
           if (room.beds.isEmpty)
@@ -417,75 +660,110 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: CarmelitaCard(
                     padding: const EdgeInsets.all(14),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: bed.occupied
-                              ? const Color(0xFF56886B).withValues(alpha: .15)
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .surfaceContainerHighest,
-                          foregroundColor: bed.occupied
-                              ? const Color(0xFF56886B)
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                          child: Icon(
-                            bed.occupied
-                                ? Icons.person
-                                : Icons.bed_outlined,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: bed.occupied
+                          ? () => _showOccupiedBedActions(bed)
+                          : () => editBed(bed),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: bed.occupied
+                                ? const Color(0xFF56886B).withValues(alpha: .15)
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHighest,
+                            foregroundColor: bed.occupied
+                                ? const Color(0xFF56886B)
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                            child: Icon(
+                              bed.occupied ? Icons.person : Icons.bed_outlined,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                bed.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  bed.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                bed.occupied
-                                    ? 'Occupied by active assignment'
-                                    : 'Status: ${bedStatusLabel(bed.status)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: bed.occupied
-                                      ? const Color(0xFF56886B)
-                                      : Theme.of(context)
+                                const SizedBox(height: 2),
+                                if (bed.occupied) ...[
+                                  Text(
+                                    bed.tenantName != null &&
+                                            bed.tenantName!.isNotEmpty
+                                        ? bed.tenantName!
+                                        : 'Occupied by active assignment',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13.5,
+                                      color: Color(0xFF56886B),
+                                    ),
+                                  ),
+                                  if (bed.tenantPhone != null &&
+                                      bed.tenantPhone!.isNotEmpty)
+                                    Text(
+                                      bed.tenantPhone!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(fontSize: 12),
+                                    ),
+                                ] else
+                                  Text(
+                                    'Status: ${bedStatusLabel(bed.status)}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Theme.of(context)
                                           .textTheme
                                           .bodySmall
                                           ?.color,
-                                ),
-                              ),
-                            ],
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                        StatusPill(
-                          bed.occupied ? 'Occupied' : bedStatusLabel(bed.status),
-                          icon: bed.occupied
-                              ? Icons.lock_outline
-                              : Icons.check_circle_outline,
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          tooltip: bed.occupied
-                              ? 'Occupied beds cannot be edited'
-                              : 'Edit bed',
-                          onPressed:
-                              bed.occupied ? null : () => editBed(bed),
-                          icon: const Icon(Icons.edit_outlined),
-                        ),
-                      ],
+                          StatusPill(
+                            bed.occupied
+                                ? 'Occupied'
+                                : bedStatusLabel(bed.status),
+                            icon: bed.occupied
+                                ? Icons.lock_outline
+                                : Icons.check_circle_outline,
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            tooltip: bed.occupied
+                                ? 'Move or manage assignment'
+                                : 'Edit bed',
+                            onPressed: bed.occupied
+                                ? () => _showOccupiedBedActions(bed)
+                                : () => editBed(bed),
+                            icon: Icon(
+                              bed.occupied
+                                  ? Icons.swap_horiz_rounded
+                                  : Icons.edit_outlined,
+                              color:
+                                  bed.occupied ? const Color(0xFF2563EB) : null,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 )),
@@ -683,4 +961,3 @@ String _formatOccupancy(RoomRecord room) {
   }
   return '${room.occupied}/${room.capacity} • ${room.physicallyAvailable} open';
 }
-

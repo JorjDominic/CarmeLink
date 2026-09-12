@@ -6,6 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
+import '../services/room_service.dart';
+import '../services/tenant_service.dart';
+import 'tenant_controller.dart';
 
 class SessionController extends ChangeNotifier {
   SessionController._();
@@ -34,6 +37,9 @@ class SessionController extends ChangeNotifier {
       } else if (state.event == AuthChangeEvent.signedOut) {
         _currentUser = null;
         _passwordRecovery = false;
+        TenantController.instance.clear();
+        RoomService.invalidateCache();
+        TenantService.invalidateCache();
         notifyListeners();
       }
     });
@@ -75,6 +81,9 @@ class SessionController extends ChangeNotifier {
     _currentUser = null;
     _error = null;
     _justSignedOut = true;
+    TenantController.instance.clear();
+    RoomService.invalidateCache();
+    TenantService.invalidateCache();
     notifyListeners();
   }
 

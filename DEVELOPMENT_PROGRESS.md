@@ -42,7 +42,7 @@ page exists but its important backend workflow is unfinished.
 ### Tenant pages
 
 - [ ] **Home** — live room, balance, maintenance, gate, and announcement summary.
-- [ ] **My Room** — assigned room, bed, roommates, capacity, and utilities.
+- [✓] **My Room** — assigned room, bed, roommates, capacity, and utilities with live database sync and real-time refresh.
 - [ ] **Payments** — charges, outstanding balance, due dates, and payment history.
 - [ ] **Upload Payment Proof** — secure Storage upload and verification status.
 - [ ] **Reports Hub** — live maintenance and confidential-report summaries.
@@ -72,7 +72,7 @@ page exists but its important backend workflow is unfinished.
 ### Caretaker pages
 
 - [ ] **Tenants** — live directory and operational tenant information.
-- [✓] **Rooms** — live room/bed CRUD, vacancies, bed status, and assignments without owner-only finance.
+- [✓] **Rooms** — live room/bed CRUD, vacancies, bed occupant details (name, contact), bed reassignment/transfers across rooms, and unassignment.
 - [ ] **Maintenance** — triage, assign, update, and resolve tenant reports.
 - [ ] **Gate** — review events and record authorized manual overrides.
 - [✓] **Accounts** — CRUD limited to tenant and guardian accounts.
@@ -83,7 +83,7 @@ page exists but its important backend workflow is unfinished.
 - [ ] **Dashboard** — prioritized live occupancy, payment, maintenance, and gate metrics.
 - [ ] **Tenants** — full tenant directory, relationships, assignments, and contracts.
 - [ ] **Operations** — live grouped access to every management workflow.
-- [✓] **Rooms** — live room and bed-space CRUD with assignment-aware occupancy.
+- [✓] **Rooms** — live room and bed-space CRUD with assignment-aware occupancy, occupant tenant details (name, phone), inter-room bed transfer/reassignment, and assignment termination.
 - [ ] **Floor Plan** — replace demonstration geometry and maintenance markers with live property data.
 - [ ] **Payments** — review receipts, correct records, and maintain an audit trail.
 - [ ] **Maintenance** — assign work, update status, and record resolution details.

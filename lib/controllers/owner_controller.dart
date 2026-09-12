@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 
 import '../data/mock_data.dart';
 import '../models/models.dart';
-
 import '../services/payment_service.dart';
+import '../services/room_service.dart';
 
 class OwnerController extends ChangeNotifier {
   OwnerController._();
@@ -15,9 +15,35 @@ class OwnerController extends ChangeNotifier {
   bool _paymentsLoading = false;
   String? _paymentsError;
 
+  final RoomService _roomService = const RoomService();
+  final List<RoomRecord> _roomRecords = [];
+  bool _roomsLoading = false;
+  String? _roomsError;
+
   List<TenantDirectoryEntry> get tenants =>
       List.unmodifiable(MockData.tenantDirectory);
-  List<DormRoomStatus> get rooms => List.unmodifiable(MockData.roomStatuses);
+
+  List<DormRoomStatus> get rooms {
+    if (_roomRecords.isEmpty) {
+      return List.unmodifiable(MockData.roomStatuses);
+    }
+    return _roomRecords.map((r) {
+      final status = r.occupied >= r.capacity
+          ? 'Full'
+          : (r.occupied > 0 ? 'Partially occupied' : 'Available');
+      return DormRoomStatus(
+        roomNumber: r.number,
+        floor: r.floor,
+        capacity: r.capacity,
+        occupied: r.occupied,
+        status: status,
+      );
+    }).toList();
+  }
+
+  List<RoomRecord> get roomRecords => List.unmodifiable(_roomRecords);
+  bool get roomsLoading => _roomsLoading;
+  String? get roomsError => _roomsError;
   List<MaintenanceReport> get maintenance =>
       List.unmodifiable(MockData.maintenance);
   List<MaintenanceReport> get maintenanceByPriority {
@@ -65,8 +91,9 @@ class OwnerController extends ChangeNotifier {
       .where((t) => t.gateStatus == 'OUT' || t.gateStatus == 'Outside')
       .length;
 
-  List<Payment> get payments =>
-      _payments.isEmpty ? List.unmodifiable(MockData.payments) : List.unmodifiable(_payments);
+  List<Payment> get payments => _payments.isEmpty
+      ? List.unmodifiable(MockData.payments)
+      : List.unmodifiable(_payments);
   bool get paymentsLoading => _paymentsLoading;
   String? get paymentsError => _paymentsError;
 
@@ -91,7 +118,29 @@ class OwnerController extends ChangeNotifier {
     }
   }
 
-  Future<void> verifyPayment(Payment payment, bool approve, {String? notes}) async {
+  Future<void> loadRooms({bool force = false}) async {
+    if (_roomsLoading) return;
+    if (_roomRecords.isNotEmpty && !force) return;
+
+    _roomsLoading = true;
+    _roomsError = null;
+    notifyListeners();
+
+    try {
+      final list = await _roomService.listRooms(forceRefresh: force);
+      _roomRecords
+        ..clear()
+        ..addAll(list);
+    } catch (e) {
+      _roomsError = e.toString();
+    } finally {
+      _roomsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> verifyPayment(Payment payment, bool approve,
+      {String? notes}) async {
     try {
       final updated = await _paymentService.verifyPayment(
         paymentId: payment.id,
@@ -110,7 +159,6 @@ class OwnerController extends ChangeNotifier {
     }
     notifyListeners();
   }
-
 
   void updateMaintenance(
     MaintenanceReport report,
@@ -174,5 +222,4 @@ class OwnerController extends ChangeNotifier {
     );
     notifyListeners();
   }
-
 }

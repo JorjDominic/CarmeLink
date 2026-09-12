@@ -16,6 +16,24 @@ class AppUser {
   final String phone;
 }
 
+class Roommate {
+  const Roommate({
+    required this.name,
+    required this.bed,
+    this.isSelf = false,
+  });
+
+  factory Roommate.fromJson(Map<String, dynamic> json) => Roommate(
+        name: json['name'] as String? ?? 'Resident',
+        bed: json['bed'] as String? ?? '',
+        isSelf: json['is_self'] as bool? ?? false,
+      );
+
+  final String name;
+  final String bed;
+  final bool isSelf;
+}
+
 class Room {
   const Room({
     required this.id,
@@ -26,7 +44,43 @@ class Room {
     required this.bedSpace,
     required this.roommates,
     required this.utilitySummary,
+    this.description = '',
+    this.roommateDetails = const [],
   });
+
+  factory Room.fromJson(Map<String, dynamic> json) {
+    final rawRoommates = json['roommates'] as List<dynamic>? ?? const [];
+    final roommateList = <Roommate>[];
+    final roommateNames = <String>[];
+    for (final item in rawRoommates) {
+      if (item is Map<String, dynamic>) {
+        final r = Roommate.fromJson(item);
+        roommateList.add(r);
+        if (!r.isSelf) {
+          roommateNames.add(r.name);
+        }
+      } else if (item is String) {
+        roommateNames.add(item);
+        roommateList.add(Roommate(name: item, bed: ''));
+      }
+    }
+
+    return Room(
+      id: json['room_id'] as String? ?? json['id'] as String? ?? '',
+      number: json['room_number'] as String? ?? json['number'] as String? ?? '',
+      floor: json['floor'] as String? ?? '',
+      capacity: (json['capacity'] as num?)?.toInt() ?? 4,
+      occupied: (json['occupied'] as num?)?.toInt() ?? 0,
+      bedSpace:
+          json['bed_space'] as String? ?? json['bedSpace'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      utilitySummary: json['utility_summary'] as String? ??
+          json['utilitySummary'] as String? ??
+          'Electricity & water included • Submetered AC',
+      roommates: roommateNames,
+      roommateDetails: roommateList,
+    );
+  }
 
   final String id;
   final String number;
@@ -36,6 +90,8 @@ class Room {
   final String bedSpace;
   final List<String> roommates;
   final String utilitySummary;
+  final String description;
+  final List<Roommate> roommateDetails;
 }
 
 class Payment {
@@ -84,7 +140,9 @@ class Payment {
 
   static String formatStatus(String raw) {
     return switch (raw.toLowerCase().replaceAll(' ', '_')) {
-      'pending_verification' || 'pending_review' || 'pending' =>
+      'pending_verification' ||
+      'pending_review' ||
+      'pending' =>
         'Pending verification',
       'verified' || 'paid' || 'approved' => 'Verified',
       'rejected' => 'Rejected',
@@ -94,7 +152,9 @@ class Payment {
 
   static String toDbStatus(String ui) {
     return switch (ui.toLowerCase().replaceAll(' ', '_')) {
-      'pending_verification' || 'pending_review' || 'pending' =>
+      'pending_verification' ||
+      'pending_review' ||
+      'pending' =>
         'pending_verification',
       'verified' || 'paid' || 'approved' => 'verified',
       'rejected' => 'rejected',
@@ -145,8 +205,8 @@ class Payment {
       dueDate: parsedDueDate,
       status: formatStatus(rawStatus),
       paymentMethod: json['payment_method'] as String?,
-      reference: json['reference_number'] as String? ??
-          json['reference'] as String?,
+      reference:
+          json['reference_number'] as String? ?? json['reference'] as String?,
       receiptPath: json['receipt_path'] as String?,
       paidAt: parsedPaidAt,
       reviewedBy: json['reviewed_by'] as String?,

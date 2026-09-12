@@ -14,11 +14,13 @@ class TenantService {
     _lastTenantFetch = null;
   }
 
-  Future<List<TenantDirectoryEntry>> loadTenants({bool forceRefresh = false}) async {
+  Future<List<TenantDirectoryEntry>> loadTenants(
+      {bool forceRefresh = false}) async {
     if (!forceRefresh &&
         _cachedTenants != null &&
         _lastTenantFetch != null &&
-        DateTime.now().difference(_lastTenantFetch!) < const Duration(seconds: 30)) {
+        DateTime.now().difference(_lastTenantFetch!) <
+            const Duration(seconds: 30)) {
       return _cachedTenants!;
     }
     final client = SupabaseConfig.client;
@@ -127,8 +129,7 @@ class TenantService {
     }
 
     final rooms = grouped.entries.map((e) {
-      final roomBeds = e.value
-        ..sort((a, b) => a.label.compareTo(b.label));
+      final roomBeds = e.value..sort((a, b) => a.label.compareTo(b.label));
       return RoomWithAvailableBeds(
         roomNumber: e.key,
         floor: floorByRoom[e.key] ?? '',

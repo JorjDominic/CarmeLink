@@ -4,6 +4,7 @@ import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/maintenance_service.dart';
 import '../services/payment_service.dart';
+import '../services/room_service.dart';
 
 class TenantController extends ChangeNotifier {
   TenantController._();
@@ -12,9 +13,11 @@ class TenantController extends ChangeNotifier {
 
   final MaintenanceService _maintenanceService = const MaintenanceService();
   final PaymentService _paymentService = const PaymentService();
+  final RoomService _roomService = const RoomService();
 
   final List<MaintenanceReport> _maintenance = [];
   final List<Payment> _payments = [];
+  Room? _room;
 
   bool _maintenanceLoading = false;
   String? _maintenanceError;
@@ -22,10 +25,18 @@ class TenantController extends ChangeNotifier {
   bool _paymentsLoading = false;
   String? _paymentsError;
 
-  Room get room => MockData.room;
+  bool _roomLoading = false;
+  String? _roomError;
+  bool _roomLoadedOnce = false;
 
-  List<Payment> get payments =>
-      _payments.isEmpty ? List.unmodifiable(MockData.payments) : List.unmodifiable(_payments);
+  Room? get room => _room;
+  bool get roomLoading => _roomLoading;
+  String? get roomError => _roomError;
+  bool get isRoomAssigned => _room != null;
+
+  List<Payment> get payments => _payments.isEmpty
+      ? List.unmodifiable(MockData.payments)
+      : List.unmodifiable(_payments);
 
   bool get paymentsLoading => _paymentsLoading;
   String? get paymentsError => _paymentsError;
@@ -85,6 +96,39 @@ class TenantController extends ChangeNotifier {
       _maintenanceError = _message(error);
     } finally {
       _maintenanceLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void clear() {
+    _room = null;
+    _roomLoadedOnce = false;
+    _roomLoading = false;
+    _roomError = null;
+    _maintenance.clear();
+    _payments.clear();
+    notifyListeners();
+  }
+
+  Future<void> loadMyRoom({bool force = false}) async {
+    if (_roomLoading && !force) {
+      return;
+    }
+    if (_room != null && _roomLoadedOnce && !force) {
+      return;
+    }
+
+    _roomLoading = true;
+    _roomError = null;
+    notifyListeners();
+
+    try {
+      _room = await _roomService.getMyRoomDetails();
+      _roomLoadedOnce = true;
+    } catch (error) {
+      _roomError = _message(error);
+    } finally {
+      _roomLoading = false;
       notifyListeners();
     }
   }

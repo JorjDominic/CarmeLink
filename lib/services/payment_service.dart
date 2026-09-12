@@ -162,7 +162,8 @@ class PaymentService {
 
       return rows.map<Payment>((row) {
         final tenantMap = row['tenant'] as Map<String, dynamic>?;
-        final tenantName = tenantMap?['full_name'] as String? ?? 'Anna Dela Cruz';
+        final tenantName =
+            tenantMap?['full_name'] as String? ?? 'Anna Dela Cruz';
         return Payment.fromJson(row, tenantName: tenantName);
       }).toList(growable: false);
     } catch (_) {
@@ -179,7 +180,9 @@ class PaymentService {
     try {
       var query = _client.from('payments').select(_columnsWithTenant);
 
-      if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'all') {
+      if (statusFilter != null &&
+          statusFilter.isNotEmpty &&
+          statusFilter != 'all') {
         query = query.eq('status', Payment.toDbStatus(statusFilter));
       }
 
@@ -306,7 +309,8 @@ class PaymentService {
 
     final normalizedMime = _normalizedMimeType(mimeType, fileName);
     final extension = _extensionFor(normalizedMime);
-    final path = '$tenantId/$paymentId/${DateTime.now().microsecondsSinceEpoch}.$extension';
+    final path =
+        '$tenantId/$paymentId/${DateTime.now().microsecondsSinceEpoch}.$extension';
 
     await _client.storage.from(_receiptBucket).uploadBinary(
           path,
@@ -350,4 +354,3 @@ class PaymentService {
         _ => 'jpg',
       };
 }
-

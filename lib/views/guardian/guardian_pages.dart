@@ -129,7 +129,8 @@ class GuardianDashboardPage extends StatelessWidget {
             CarmelitaCard(
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.verified_user_outlined, color: Color(0xFF56886B)),
+                leading: const Icon(Icons.verified_user_outlined,
+                    color: Color(0xFF56886B)),
                 title: const Text(
                   'Perimeter status: Safe & Inside',
                   style: TextStyle(fontWeight: FontWeight.w800),
@@ -353,8 +354,7 @@ class GuardianActivityPage extends StatefulWidget {
   const GuardianActivityPage({super.key});
 
   @override
-  State<GuardianActivityPage> createState() =>
-      _GuardianActivityPageState();
+  State<GuardianActivityPage> createState() => _GuardianActivityPageState();
 }
 
 typedef GuardianGateActivityPage = GuardianActivityPage;
@@ -856,9 +856,7 @@ class _GuardianAnnouncementsPageState extends State<GuardianAnnouncementsPage> {
                           size: 22,
                           color: hasActiveFilter
                               ? Colors.white
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         if (hasActiveFilter)
                           Positioned(
@@ -941,8 +939,8 @@ class _GuardianAnnouncementsPageState extends State<GuardianAnnouncementsPage> {
               icon: Icons.campaign_outlined,
               title: 'No announcements',
               message: _searchQuery.isNotEmpty || _selectedCategory != 'all'
-                ? 'No notices match your filter.'
-                : 'There are no announcements posted at this time.',
+                  ? 'No notices match your filter.'
+                  : 'There are no announcements posted at this time.',
             )
           else
             ...filtered.map((item) {

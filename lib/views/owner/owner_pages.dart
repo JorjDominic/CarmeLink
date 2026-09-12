@@ -145,7 +145,8 @@ class OwnerDashboardPage extends StatelessWidget {
               compact: true,
               icon: Icons.location_on_outlined,
               title: 'Dormitory geofencing active',
-              subtitle: 'GPS perimeter monitoring ${controller.tenants.length} registered residents.',
+              subtitle:
+                  'GPS perimeter monitoring ${controller.tenants.length} registered residents.',
               status: 'Active',
               onTap: () => _ownerPush(
                 context,
@@ -294,7 +295,8 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
                       backgroundColor:
                           const Color(0xFF56886B).withValues(alpha: .10),
                       foregroundColor: const Color(0xFF56886B),
-                      child: Text(tenant.name.isNotEmpty ? tenant.name[0] : '?'),
+                      child:
+                          Text(tenant.name.isNotEmpty ? tenant.name[0] : '?'),
                     ),
                     title: Text(
                       tenant.name,
@@ -302,13 +304,11 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    subtitle:
-                        Text('Room ${tenant.room} • ${tenant.bedSpace}'),
+                    subtitle: Text('Room ${tenant.room} • ${tenant.bedSpace}'),
                     trailing:
                         StatusPill(_residencyLabel(tenant.residencyStatus)),
                     onTap: () async {
-                      await Navigator.of(context)
-                          .push(MaterialPageRoute<void>(
+                      await Navigator.of(context).push(MaterialPageRoute<void>(
                         builder: (_) => TenantDetailsPage(tenant: tenant),
                       ));
                       if (mounted) _fetchTenants(showSpinner: false);
@@ -450,7 +450,7 @@ class _TenantAssignmentManagerState extends State<_TenantAssignmentManager> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        builder: (context) => _RoomBedSelectorSheet(
+        builder: (context) => RoomBedSelectorSheet(
           rooms: bedRooms,
           tenantName: widget.tenant.name,
         ),
@@ -466,7 +466,7 @@ class _TenantAssignmentManagerState extends State<_TenantAssignmentManager> {
       }
     } catch (error) {
       if (mounted) {
-        showAppSnackBar(context, _tenantAssignmentError(error));
+        showAppSnackBar(context, tenantAssignmentError(error));
       }
     } finally {
       if (mounted) setState(() => saving = false);
@@ -535,7 +535,7 @@ class _TenantAssignmentManagerState extends State<_TenantAssignmentManager> {
       ));
 }
 
-String _tenantAssignmentError(Object error) {
+String tenantAssignmentError(Object error) {
   final message = error.toString();
   if (message.contains('no longer available') ||
       message.contains('tenant_assignments_one_active_per_bed')) {
@@ -547,20 +547,21 @@ String _tenantAssignmentError(Object error) {
   return 'Unable to load or save bed assignments. Check your connection and retry.';
 }
 
-class _RoomBedSelectorSheet extends StatefulWidget {
-  const _RoomBedSelectorSheet({
+class RoomBedSelectorSheet extends StatefulWidget {
+  const RoomBedSelectorSheet({
     required this.rooms,
     required this.tenantName,
+    super.key,
   });
 
   final List<RoomWithAvailableBeds> rooms;
   final String tenantName;
 
   @override
-  State<_RoomBedSelectorSheet> createState() => _RoomBedSelectorSheetState();
+  State<RoomBedSelectorSheet> createState() => _RoomBedSelectorSheetState();
 }
 
-class _RoomBedSelectorSheetState extends State<_RoomBedSelectorSheet> {
+class _RoomBedSelectorSheetState extends State<RoomBedSelectorSheet> {
   String? _expandedRoom;
 
   @override
@@ -745,8 +746,7 @@ class _RoomBedSelectorSheetState extends State<_RoomBedSelectorSheet> {
                                         color: theme
                                             .colorScheme.surfaceContainerHighest
                                             .withValues(alpha: .35),
-                                        borderRadius:
-                                            BorderRadius.circular(10),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Row(
                                         children: [
@@ -790,8 +790,8 @@ class _RoomBedSelectorSheetState extends State<_RoomBedSelectorSheet> {
                                                 Icon(
                                                   Icons.arrow_forward_rounded,
                                                   size: 13,
-                                                  color: theme
-                                                      .colorScheme.primary,
+                                                  color:
+                                                      theme.colorScheme.primary,
                                                 ),
                                               ],
                                             ),
@@ -1165,8 +1165,11 @@ const _operationCategories = [
     Icons.health_and_safety_outlined,
     Color(0xFF627FA8),
     [
-      _OperationItem('Geofence presence', 'Review live tenant presence and boundary',
-          Icons.location_on_outlined, GeofenceMonitoringPage()),
+      _OperationItem(
+          'Geofence presence',
+          'Review live tenant presence and boundary',
+          Icons.location_on_outlined,
+          GeofenceMonitoringPage()),
       _OperationItem('Visitors', 'Manage visitor requests',
           Icons.people_outline, VisitorManagementPage()),
       _OperationItem('Confidential reports', 'Review private reports',
@@ -1579,7 +1582,8 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
     super.dispose();
   }
 
-  Future<void> _handleVerify(Payment payment, bool approve, {String? notes}) async {
+  Future<void> _handleVerify(Payment payment, bool approve,
+      {String? notes}) async {
     setState(() => _processingPaymentId = payment.id);
     try {
       await OwnerController.instance.verifyPayment(
@@ -1595,7 +1599,8 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                 ? 'Payment of ${money(payment.amount)} from ${payment.tenantName ?? "tenant"} verified.'
                 : 'Payment marked as rejected.',
           ),
-          backgroundColor: approve ? const Color(0xFF56886B) : const Color(0xFFB3261E),
+          backgroundColor:
+              approve ? const Color(0xFF56886B) : const Color(0xFFB3261E),
         ),
       );
     } catch (e) {
@@ -1862,7 +1867,8 @@ class _PaymentReviewCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 18,
-                backgroundColor: theme.colorScheme.primary.withValues(alpha: .12),
+                backgroundColor:
+                    theme.colorScheme.primary.withValues(alpha: .12),
                 child: Text(
                   tenantName.isNotEmpty ? tenantName[0].toUpperCase() : 'T',
                   style: TextStyle(
@@ -1941,7 +1947,8 @@ class _PaymentReviewCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .4),
+              color: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: .4),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -1972,21 +1979,25 @@ class _PaymentReviewCard extends StatelessWidget {
                 if (payment.reference != null && payment.reference!.isNotEmpty)
                   InkWell(
                     onTap: () {
-                      Clipboard.setData(ClipboardData(text: payment.reference!));
+                      Clipboard.setData(
+                          ClipboardData(text: payment.reference!));
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Reference number copied to clipboard.'),
+                          content:
+                              Text('Reference number copied to clipboard.'),
                           duration: Duration(seconds: 2),
                         ),
                       );
                     },
                     borderRadius: BorderRadius.circular(6),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.copy_rounded, size: 14, color: theme.colorScheme.primary),
+                          Icon(Icons.copy_rounded,
+                              size: 14, color: theme.colorScheme.primary),
                           const SizedBox(width: 4),
                           Text(
                             'Copy',
@@ -2012,7 +2023,8 @@ class _PaymentReviewCard extends StatelessWidget {
           ),
 
           // Review Notes if rejected
-          if (payment.reviewNotes != null && payment.reviewNotes!.isNotEmpty) ...[
+          if (payment.reviewNotes != null &&
+              payment.reviewNotes!.isNotEmpty) ...[
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
@@ -2083,7 +2095,8 @@ class _PaymentReviewCard extends StatelessWidget {
                               color: Colors.white,
                             ),
                           )
-                        : const Icon(Icons.check_circle_outline_rounded, size: 18),
+                        : const Icon(Icons.check_circle_outline_rounded,
+                            size: 18),
                     label: const Text(
                       'Confirm',
                       style: TextStyle(fontWeight: FontWeight.w700),
@@ -2100,7 +2113,8 @@ class _PaymentReviewCard extends StatelessWidget {
                 icon: const Icon(Icons.sync_alt_rounded, size: 16),
                 label: Text(
                   payment.isVerified ? 'Mark as rejected' : 'Re-verify payment',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),
             ),
@@ -2167,7 +2181,8 @@ class _ReceiptProofThumbnailState extends State<_ReceiptProofThumbnail> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .25),
+          color:
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: .25),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: theme.dividerColor.withValues(alpha: .3),
@@ -2192,7 +2207,8 @@ class _ReceiptProofThumbnailState extends State<_ReceiptProofThumbnail> {
         width: double.infinity,
         height: 140,
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .3),
+          color:
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: .3),
           borderRadius: BorderRadius.circular(14),
         ),
         alignment: Alignment.center,
@@ -2290,7 +2306,8 @@ class _ReceiptProofThumbnailState extends State<_ReceiptProofThumbnail> {
                 right: 0,
                 bottom: 0,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -2304,7 +2321,8 @@ class _ReceiptProofThumbnailState extends State<_ReceiptProofThumbnail> {
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.zoom_in_rounded, color: Colors.white, size: 16),
+                      Icon(Icons.zoom_in_rounded,
+                          color: Colors.white, size: 16),
                       SizedBox(width: 6),
                       Text(
                         'Tap to inspect receipt full screen',
@@ -2377,7 +2395,8 @@ class _ReceiptViewerModal extends StatelessWidget {
                           loadingBuilder: (context, child, progress) {
                             if (progress == null) return child;
                             return const Center(
-                              child: CircularProgressIndicator(color: Colors.white),
+                              child: CircularProgressIndicator(
+                                  color: Colors.white),
                             );
                           },
                         ),
@@ -2420,7 +2439,8 @@ class _ReceiptViewerModal extends StatelessWidget {
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                        icon: const Icon(Icons.check_circle_outline_rounded,
+                            size: 18),
                         label: const Text(
                           'Confirm',
                           style: TextStyle(fontWeight: FontWeight.w700),
@@ -2491,7 +2511,8 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                   color: const Color(0xFFB3261E).withValues(alpha: .1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.cancel_outlined, color: Color(0xFFB3261E), size: 20),
+                child: const Icon(Icons.cancel_outlined,
+                    color: Color(0xFFB3261E), size: 20),
               ),
               const SizedBox(width: 10),
               const Expanded(
@@ -2500,7 +2521,8 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                   children: [
                     Text(
                       'Reject Payment Proof',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+                      style:
+                          TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
                     ),
                     Text(
                       'Tenant will be notified to correct and re-upload.',
@@ -2524,7 +2546,8 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                 onTap: () => setState(() => _selectedReason = reason),
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                   child: Row(
                     children: [
                       Icon(
@@ -2542,7 +2565,8 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                           reason,
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w500,
                           ),
                         ),
                       ),
@@ -2597,7 +2621,6 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
     );
   }
 }
-
 
 class MaintenanceManagementPage extends StatelessWidget {
   const MaintenanceManagementPage({super.key});
@@ -2661,7 +2684,8 @@ class GeofenceMonitoringPage extends StatelessWidget {
             const SizedBox(height: 22),
             const SectionTitle(
               'Resident presence directory',
-              subtitle: 'Current presence verified via background GPS geofencing',
+              subtitle:
+                  'Current presence verified via background GPS geofencing',
             ),
             const SizedBox(height: 10),
             ...controller.tenants.map(
@@ -3330,9 +3354,7 @@ class _AnnouncementsManagementPageState
                           size: 22,
                           color: hasActiveFilter
                               ? Colors.white
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         if (hasActiveFilter)
                           Positioned(
@@ -3373,15 +3395,13 @@ class _AnnouncementsManagementPageState
                     visualDensity: VisualDensity.compact,
                     label: Text(_categoryTitle(_selectedCategory)),
                     avatar: Icon(_categoryIcon(_selectedCategory), size: 14),
-                    onDeleted: () =>
-                        setState(() => _selectedCategory = 'all'),
+                    onDeleted: () => setState(() => _selectedCategory = 'all'),
                   ),
                 if (_selectedAudience != 'all')
                   InputChip(
                     visualDensity: VisualDensity.compact,
                     label: Text(_audienceTitle(_selectedAudience)),
-                    onDeleted: () =>
-                        setState(() => _selectedAudience = 'all'),
+                    onDeleted: () => setState(() => _selectedAudience = 'all'),
                   ),
                 TextButton(
                   style: TextButton.styleFrom(
@@ -3943,9 +3963,8 @@ class _AnnouncementComposerSheetState
                   'Pinned notices remain visible at the very top of all feeds',
                 ),
                 value: _isPinned,
-                onChanged: _saving
-                    ? null
-                    : (val) => setState(() => _isPinned = val),
+                onChanged:
+                    _saving ? null : (val) => setState(() => _isPinned = val),
               ),
               const SizedBox(height: 18),
               SizedBox(

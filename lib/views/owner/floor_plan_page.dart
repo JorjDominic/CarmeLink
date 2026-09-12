@@ -501,8 +501,8 @@ class _RoomTile extends StatelessWidget {
                 if (maintenanceCount > 0) ...[
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
                       color: const Color(0xFFB47A52),
                       borderRadius: BorderRadius.circular(99),

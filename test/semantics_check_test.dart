@@ -11,7 +11,8 @@ import 'package:carmelitas_dormitory_system/views/shared/account_management_page
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('Check semantics tree on all role destinations and pages', (tester) async {
+  testWidgets('Check semantics tree on all role destinations and pages',
+      (tester) async {
     final handle = tester.ensureSemantics();
 
     // 1. Tenant Shell
@@ -207,4 +208,3 @@ void main() {
     handle.dispose();
   });
 }
-

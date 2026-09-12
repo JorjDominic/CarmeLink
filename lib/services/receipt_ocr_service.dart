@@ -72,7 +72,8 @@ class ReceiptOcrService {
       recognizer = TextRecognizer(script: TextRecognitionScript.latin);
       final recognizedText = await recognizer.processImage(inputImage);
 
-      debugPrint('ReceiptOcrService: Recognized text from receipt:\n${recognizedText.text}');
+      debugPrint(
+          'ReceiptOcrService: Recognized text from receipt:\n${recognizedText.text}');
       final result = parseReceiptText(recognizedText.text);
       debugPrint('ReceiptOcrService: Extracted result -> $result');
       return result;
@@ -100,7 +101,8 @@ class ReceiptOcrService {
 
     final paymentMethod = _detectPaymentMethod(normalized);
     final referenceNumber = _extractReferenceNumber(lines, normalized);
-    final amount = _extractAmount(lines, normalized, referenceNumber: referenceNumber);
+    final amount =
+        _extractAmount(lines, normalized, referenceNumber: referenceNumber);
 
     return ReceiptExtractionResult(
       amount: amount,
@@ -184,7 +186,9 @@ class ReceiptOcrService {
         // If line has a decimal amount to the right (e.g. "Ref No. 100 293 841 1,500.00"),
         // strip the amount so the reference regex does not bleed into the amount!
         final lineWithoutAmount = line.replaceFirst(
-          RegExp(r'\s+(?:php|php\.|₱|(?<![a-zA-Z])p\.?\s*)?[0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2}\b', caseSensitive: false),
+          RegExp(
+              r'\s+(?:php|php\.|₱|(?<![a-zA-Z])p\.?\s*)?[0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2}\b',
+              caseSensitive: false),
           '',
         );
 
@@ -211,7 +215,9 @@ class ReceiptOcrService {
           line == 'transaction id') {
         final nextLine = lines[i + 1].trim();
         final nextLineWithoutAmount = nextLine.replaceFirst(
-          RegExp(r'\s+(?:php|php\.|₱|(?<![a-zA-Z])p\.?\s*)?[0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2}\b', caseSensitive: false),
+          RegExp(
+              r'\s+(?:php|php\.|₱|(?<![a-zA-Z])p\.?\s*)?[0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2}\b',
+              caseSensitive: false),
           '',
         );
         final candidate = _cleanReferenceCandidate(nextLineWithoutAmount);
@@ -320,12 +326,14 @@ class ReceiptOcrService {
       if (cleanRefDigits != null && cleanRefDigits.isNotEmpty) {
         final parsedDigits = parsed.toInt().toString();
         // Disqualify if matching start of ref number (e.g. "100" from "100293841029")
-        if (cleanRefDigits.startsWith(parsedDigits) && parsedDigits.length <= 4) {
+        if (cleanRefDigits.startsWith(parsedDigits) &&
+            parsedDigits.length <= 4) {
           return;
         }
         // Disqualify if matching full or large portion of ref number
         if (cleanRefDigits == parsedDigits ||
-            (parsedDigits.length >= 6 && cleanRefDigits.contains(parsedDigits))) {
+            (parsedDigits.length >= 6 &&
+                cleanRefDigits.contains(parsedDigits))) {
           return;
         }
       }
@@ -366,7 +374,8 @@ class ReceiptOcrService {
 
       final match = labeledAmountRegex.firstMatch(line);
       if (match != null) {
-        addCandidate(match.group(1), 100, 'labeled_line: $line', isFeeLine: isFee);
+        addCandidate(match.group(1), 100, 'labeled_line: $line',
+            isFeeLine: isFee);
       }
     }
 
@@ -378,7 +387,9 @@ class ReceiptOcrService {
           (!line.contains('sent to') && line.contains('sent'));
 
       if (isAmountLabel && !line.contains('balance') && !line.contains('fee')) {
-        for (var offset = 1; offset <= 2 && (i + offset) < lines.length; offset++) {
+        for (var offset = 1;
+            offset <= 2 && (i + offset) < lines.length;
+            offset++) {
           final targetLine = lines[i + offset].trim();
           final isFee = targetLine.toLowerCase().contains('fee') ||
               targetLine.toLowerCase().contains('charge');
@@ -414,7 +425,8 @@ class ReceiptOcrService {
       if (lower.contains('balance')) continue;
 
       for (final match in currencyRegex.allMatches(line)) {
-        addCandidate(match.group(1), 85, 'currency_prefix: $line', isFeeLine: isFee);
+        addCandidate(match.group(1), 85, 'currency_prefix: $line',
+            isFeeLine: isFee);
       }
     }
 
@@ -431,7 +443,8 @@ class ReceiptOcrService {
       final isFee = lower.contains('fee') || lower.contains('charge');
 
       for (final match in decimalRegex.allMatches(line)) {
-        addCandidate(match.group(1), 75, 'standalone_decimal: $line', isFeeLine: isFee);
+        addCandidate(match.group(1), 75, 'standalone_decimal: $line',
+            isFeeLine: isFee);
       }
     }
 
@@ -482,6 +495,6 @@ class _AmountCandidate {
   final String source;
 
   @override
-  String toString() => '_AmountCandidate($amount, score: $score, from: $source)';
+  String toString() =>
+      '_AmountCandidate($amount, score: $score, from: $source)';
 }
-

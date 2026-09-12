@@ -508,4 +508,3 @@ class _InlineError extends StatelessWidget {
         ),
       );
 }
-

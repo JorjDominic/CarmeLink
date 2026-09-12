@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../controllers/session_controller.dart';
 import '../../controllers/tenant_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
@@ -25,271 +26,520 @@ class TenantDashboardPage extends StatelessWidget {
     return PageFrame(
       title: 'Home',
       subtitle: 'Tenant dashboard',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ElegantHeader(
-            eyebrow: 'Welcome home',
-            title: 'Good afternoon, Anna.',
-            subtitle: 'Room 204 • Bed 2 • Second Floor',
-            trailing: StatusPill(
-              'IN',
-              icon: Icons.home_rounded,
-            ),
-          ),
-          const SizedBox(height: 22),
-          CarmelitaCard(
-            emphasis: true,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const MyRoomPage(),
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          final session = SessionController.instance;
+          final room = controller.room;
+          final firstName =
+              session.currentUser?.name.trim().split(' ').first ?? 'Resident';
+
+          final roomSubtitle = room != null
+              ? 'Room ${room.number} • ${room.bedSpace} • Floor ${room.floor}'
+              : (controller.roomLoading
+                  ? 'Loading room assignment...'
+                  : 'No active room assignment');
+
+          final roomCardDetail = room != null
+              ? 'Room ${room.number} • ${room.bedSpace} • ${room.occupied}/${room.capacity} occupied'
+              : (controller.roomLoading
+                  ? 'Checking room status...'
+                  : 'No active assignment • Tap to view');
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ElegantHeader(
+                eyebrow: 'Welcome home',
+                title: 'Good afternoon, $firstName.',
+                subtitle: roomSubtitle,
+                trailing: const StatusPill(
+                  'IN',
+                  icon: Icons.home_rounded,
+                ),
               ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: .10),
-                    borderRadius: const BorderRadius.all(
-                      Radius.circular(18),
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.bed_outlined,
-                    color: Theme.of(context).colorScheme.primary,
+              const SizedBox(height: 22),
+              CarmelitaCard(
+                emphasis: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const MyRoomPage(),
                   ),
                 ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Your room',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: .10),
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(18),
                         ),
                       ),
-                      SizedBox(height: 3),
-                      Text(
-                        'Room 204 • Bed 2 • 4/4 occupied',
+                      child: Icon(
+                        Icons.bed_outlined,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Your room',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(roomCardDetail),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded),
+                  ],
                 ),
-                const Icon(Icons.chevron_right_rounded),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          const SectionTitle(
-            'Today',
-            subtitle: 'What matters right now',
-          ),
-          const SizedBox(height: 10),
-          MutedDashboardGrid(
-            items: [
-              MutedDashboardItem(
-                label: 'Amount due',
-                value: money(payment.amount),
-                detail: 'August rent • Due Aug 15',
-                icon: Icons.account_balance_wallet_outlined,
-                color: const Color(0xFFAA8A45),
+              ),
+              const SizedBox(height: 24),
+              const SectionTitle(
+                'Today',
+                subtitle: 'What matters right now',
+              ),
+              const SizedBox(height: 10),
+              MutedDashboardGrid(
+                items: [
+                  MutedDashboardItem(
+                    label: 'Amount due',
+                    value: money(payment.amount),
+                    detail: 'August rent • Due Aug 15',
+                    icon: Icons.account_balance_wallet_outlined,
+                    color: const Color(0xFFAA8A45),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PaymentsPage(),
+                      ),
+                    ),
+                  ),
+                  MutedDashboardItem(
+                    label: 'Curfew',
+                    value: 'Inside',
+                    detail: 'Geofence verified • 8:14 PM',
+                    icon: Icons.schedule_outlined,
+                    color: const Color(0xFF56886B),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TenantPresencePage(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const SectionTitle(
+                'Needs your attention',
+                subtitle: 'Important items before everything else',
+              ),
+              const SizedBox(height: 10),
+              AttentionCard(
+                icon: Icons.payments_outlined,
+                title: 'August rent is due soon',
+                subtitle: '${money(payment.amount)} • Due Aug 15',
+                status: payment.status,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => const PaymentsPage(),
                   ),
                 ),
               ),
-              MutedDashboardItem(
-                label: 'Curfew',
-                value: 'Inside',
-                detail: 'Geofence verified • 8:14 PM',
-                icon: Icons.schedule_outlined,
-                color: const Color(0xFF56886B),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const TenantPresencePage(),
+              const SizedBox(height: 10),
+              if (maintenance != null)
+                AttentionCard(
+                  icon: Icons.build_outlined,
+                  title: maintenance.category,
+                  subtitle:
+                      '${maintenance.location} • ${maintenance.description}',
+                  status: maintenance.status,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MaintenanceReportsPage(),
+                    ),
+                  ),
+                )
+              else
+                AttentionCard(
+                  icon: Icons.build_outlined,
+                  title: controller.maintenanceLoading
+                      ? 'Loading maintenance reports'
+                      : 'No maintenance reports',
+                  subtitle: controller.maintenanceError ??
+                      'No submitted maintenance issue needs attention.',
+                  status: controller.maintenanceLoading ? 'Loading' : 'Clear',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MaintenanceReportsPage(),
+                    ),
                   ),
                 ),
+              const SizedBox(height: 24),
+              const SectionTitle(
+                'Quick actions',
+                subtitle: 'Common tasks, one tap away',
               ),
+              const SizedBox(height: 10),
+              MutedActionGrid(
+                items: [
+                  MutedActionItem(
+                    label: 'Upload proof',
+                    detail: 'Submit a receipt',
+                    icon: Icons.upload_file_outlined,
+                    color: const Color(0xFF627FA8),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const UploadPaymentProofPage(),
+                      ),
+                    ),
+                  ),
+                  MutedActionItem(
+                    label: 'Report issue',
+                    detail: 'Request maintenance',
+                    icon: Icons.handyman_outlined,
+                    color: const Color(0xFFB47A52),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const SubmitMaintenancePage(),
+                      ),
+                    ),
+                  ),
+                  MutedActionItem(
+                    label: 'Curfew log',
+                    detail: 'Review geofence',
+                    icon: Icons.schedule_outlined,
+                    color: const Color(0xFF7D70A0),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TenantPresencePage(),
+                      ),
+                    ),
+                  ),
+                  MutedActionItem(
+                    label: 'Visitor',
+                    detail: 'Register a visitor',
+                    icon: Icons.person_add_alt_1_outlined,
+                    color: const Color(0xFF568F8E),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const VisitorRequestPage(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              SectionTitle(
+                'Latest announcement',
+                trailing: TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const TenantAnnouncementsPage(),
+                    ),
+                  ),
+                  child: const Text('View all'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const _TenantLatestAnnouncementCard(),
             ],
-          ),
-          const SizedBox(height: 24),
-          const SectionTitle(
-            'Needs your attention',
-            subtitle: 'Important items before everything else',
-          ),
-          const SizedBox(height: 10),
-          AttentionCard(
-            icon: Icons.payments_outlined,
-            title: 'August rent is due soon',
-            subtitle: '${money(payment.amount)} • Due Aug 15',
-            status: payment.status,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const PaymentsPage(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          if (maintenance != null)
-            AttentionCard(
-              icon: Icons.build_outlined,
-              title: maintenance.category,
-              subtitle: '${maintenance.location} • ${maintenance.description}',
-              status: maintenance.status,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const MaintenanceReportsPage(),
-                ),
-              ),
-            )
-          else
-            AttentionCard(
-              icon: Icons.build_outlined,
-              title: controller.maintenanceLoading
-                  ? 'Loading maintenance reports'
-                  : 'No maintenance reports',
-              subtitle: controller.maintenanceError ??
-                  'No submitted maintenance issue needs attention.',
-              status: controller.maintenanceLoading ? 'Loading' : 'Clear',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const MaintenanceReportsPage(),
-                ),
-              ),
-            ),
-          const SizedBox(height: 24),
-          const SectionTitle(
-            'Quick actions',
-            subtitle: 'Common tasks, one tap away',
-          ),
-          const SizedBox(height: 10),
-          MutedActionGrid(
-            items: [
-              MutedActionItem(
-                label: 'Upload proof',
-                detail: 'Submit a receipt',
-                icon: Icons.upload_file_outlined,
-                color: const Color(0xFF627FA8),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const UploadPaymentProofPage(),
-                  ),
-                ),
-              ),
-              MutedActionItem(
-                label: 'Report issue',
-                detail: 'Request maintenance',
-                icon: Icons.handyman_outlined,
-                color: const Color(0xFFB47A52),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const SubmitMaintenancePage(),
-                  ),
-                ),
-              ),
-              MutedActionItem(
-                label: 'Curfew log',
-                detail: 'Review geofence',
-                icon: Icons.schedule_outlined,
-                color: const Color(0xFF7D70A0),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const TenantPresencePage(),
-                  ),
-                ),
-              ),
-              MutedActionItem(
-                label: 'Visitor',
-                detail: 'Register a visitor',
-                icon: Icons.person_add_alt_1_outlined,
-                color: const Color(0xFF568F8E),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const VisitorRequestPage(),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          SectionTitle(
-            'Latest announcement',
-            trailing: TextButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const TenantAnnouncementsPage(),
-                ),
-              ),
-              child: const Text('View all'),
-            ),
-          ),
-          const SizedBox(height: 10),
-          const _TenantLatestAnnouncementCard(),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
-class MyRoomPage extends StatelessWidget {
+class MyRoomPage extends StatefulWidget {
   const MyRoomPage({super.key});
+
+  @override
+  State<MyRoomPage> createState() => _MyRoomPageState();
+}
+
+class _MyRoomPageState extends State<MyRoomPage> {
+  late final TableRefreshSubscription _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        TenantController.instance.loadMyRoom();
+      }
+    });
+    _subscription = TableRefreshSubscription(
+      'tenant-my-room',
+      ['tenant_assignments', 'bed_spaces', 'rooms'],
+      () {
+        if (mounted) {
+          TenantController.instance.loadMyRoom(force: true);
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _subscription.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final room = TenantController.instance.room;
+    final controller = TenantController.instance;
+
     return PageFrame(
-        title: 'My room',
-        subtitle: 'Assignment and utility information',
-        child: Column(children: [
-          const PhotoHero(
-              image: AppAssets.room,
-              title: 'Room 204',
-              subtitle: 'Second Floor • Bed 2',
-              height: 250),
-          const SizedBox(height: 16),
-          CarmelitaCard(
-              child: Column(children: [
-            InfoRow(
-                label: 'Room',
-                value: room.number,
-                icon: Icons.meeting_room_outlined),
-            InfoRow(
-                label: 'Bed space',
-                value: room.bedSpace,
-                icon: Icons.bed_outlined),
-            InfoRow(
-                label: 'Occupancy',
-                value: '${room.occupied}/${room.capacity}',
-                icon: Icons.groups_outlined),
-            InfoRow(
-                label: 'Utilities',
-                value: room.utilitySummary,
-                icon: Icons.bolt_outlined),
-          ])),
-          const SizedBox(height: 16),
-          CarmelitaCard(
+      title: 'My room',
+      subtitle: 'Assignment and utility information',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh',
+          onPressed: () => controller.loadMyRoom(force: true),
+          icon: const Icon(Icons.refresh_rounded),
+        ),
+      ],
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          final room = controller.room;
+          final loading = controller.roomLoading;
+          final error = controller.roomError;
+
+          if (loading && room == null) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 48),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          if (room == null) {
+            return CarmelitaCard(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.bed_outlined,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'No Active Room Assignment',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 17,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    error != null
+                        ? 'Could not load your room assignment: $error'
+                        : 'You are currently not assigned to a bed space. Please contact the dormitory management or administration office for assignment details.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () => controller.loadMyRoom(force: true),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              PhotoHero(
+                image: AppAssets.room,
+                title: 'Room ${room.number}',
+                subtitle: 'Floor ${room.floor} • ${room.bedSpace}',
+                height: 250,
+              ),
+              const SizedBox(height: 16),
+              CarmelitaCard(
+                child: Column(
+                  children: [
+                    InfoRow(
+                      label: 'Room',
+                      value: room.number,
+                      icon: Icons.meeting_room_outlined,
+                    ),
+                    InfoRow(
+                      label: 'Floor',
+                      value: room.floor,
+                      icon: Icons.layers_outlined,
+                    ),
+                    InfoRow(
+                      label: 'Bed space',
+                      value: room.bedSpace,
+                      icon: Icons.bed_outlined,
+                    ),
+                    InfoRow(
+                      label: 'Occupancy',
+                      value: '${room.occupied} of ${room.capacity} occupied',
+                      icon: Icons.groups_outlined,
+                    ),
+                    InfoRow(
+                      label: 'Utilities',
+                      value: room.utilitySummary,
+                      icon: Icons.bolt_outlined,
+                    ),
+                    if (room.description.isNotEmpty)
+                      InfoRow(
+                        label: 'Description',
+                        value: room.description,
+                        icon: Icons.info_outline,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              CarmelitaCard(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                const Text('Roommates',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-                const SizedBox(height: 8),
-                ...room.roommates.map((name) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading:
-                        const CircleAvatar(child: Icon(Icons.person_outline)),
-                    title: Text(name))),
-              ])),
-        ]));
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Roommates (${room.roommateDetails.length})',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 17,
+                          ),
+                        ),
+                        Text(
+                          'Room ${room.number}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (room.roommateDetails.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'No other residents assigned to this room yet.',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                        ),
+                      )
+                    else
+                      ...room.roommateDetails.map((mate) {
+                        final initials = mate.name.trim().isNotEmpty
+                            ? mate.name.trim().substring(0, 1).toUpperCase()
+                            : 'R';
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: CircleAvatar(
+                              backgroundColor: mate.isSelf
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: .15)
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest,
+                              foregroundColor: mate.isSelf
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                              child: Text(
+                                initials,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            title: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    mate.name,
+                                    style: TextStyle(
+                                      fontWeight: mate.isSelf
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (mate.isSelf) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: .12),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'You',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            subtitle: mate.bed.isNotEmpty
+                                ? Text(
+                                    mate.bed,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  )
+                                : null,
+                          ),
+                        );
+                      }),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -344,7 +594,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.refresh_rounded),
-          onPressed: c.paymentsLoading ? null : () => c.loadPayments(force: true),
+          onPressed:
+              c.paymentsLoading ? null : () => c.loadPayments(force: true),
         ),
       ],
       floatingActionButton: FloatingActionButton.extended(
@@ -390,7 +641,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
                   ),
                   MutedDashboardItem(
                     label: 'Next due date',
-                    value: nextDue != null ? shortDate(nextDue.dueDate) : 'None',
+                    value:
+                        nextDue != null ? shortDate(nextDue.dueDate) : 'None',
                     detail: nextDue?.label ?? 'No pending bills',
                     icon: Icons.event_outlined,
                     color: const Color(0xFF627FA8),
@@ -475,7 +727,8 @@ class _TenantPaymentCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (payment.reference != null && payment.reference!.isNotEmpty) ...[
+              if (payment.reference != null &&
+                  payment.reference!.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(
                   'Ref: ${payment.reference}',
@@ -490,7 +743,8 @@ class _TenantPaymentCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Note: ${payment.reviewNotes}',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFFAA6870)),
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFFAA6870)),
                 ),
               ],
               if (payment.isDue || payment.isRejected) ...[
@@ -946,7 +1200,8 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
                   ],
                 ),
               ),
-            ] else if (_lastOcrResult != null && _lastOcrResult!.hasMatches) ...[
+            ] else if (_lastOcrResult != null &&
+                _lastOcrResult!.hasMatches) ...[
               const SizedBox(height: 8),
               Container(
                 padding:
@@ -2225,9 +2480,7 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
                           size: 22,
                           color: hasActiveFilter
                               ? Colors.white
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         if (hasActiveFilter)
                           Positioned(
@@ -2310,8 +2563,8 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
               icon: Icons.campaign_outlined,
               title: 'No announcements',
               message: _searchQuery.isNotEmpty || _selectedCategory != 'all'
-                ? 'No notices match your filter.'
-                : 'There are no announcements posted at this time.',
+                  ? 'No notices match your filter.'
+                  : 'There are no announcements posted at this time.',
             )
           else
             ...filtered.map((item) {

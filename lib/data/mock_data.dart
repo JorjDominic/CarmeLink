@@ -73,7 +73,6 @@ class MockData {
     ),
   ];
 
-
   static List<MaintenanceReport> maintenance = [
     MaintenanceReport(
         id: 'm1',
@@ -384,7 +383,8 @@ class MockData {
         type: 'Maintenance'),
     AppNotification(
         title: 'Geofence arrival',
-        body: 'Anna Dela Cruz arrived at Carmelita\'s Dormitory (GPS verified).',
+        body:
+            'Anna Dela Cruz arrived at Carmelita\'s Dormitory (GPS verified).',
         time: DateTime(2026, 8, 8, 20, 14),
         type: 'Geofence'),
   ];

@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import '../models/models.dart';
 
 class RoomService {
   const RoomService();
@@ -34,14 +35,22 @@ class RoomService {
           .order('label'),
       _client
           .from('tenant_assignments')
-          .select('bed_space_id')
+          .select('id, bed_space_id, tenant_id, profiles(id, full_name, phone)')
           .eq('status', 'active'),
     ]);
-    final occupied =
-        results[2].map((row) => row['bed_space_id'] as String).toSet();
+    final activeAssignments = <String, Map<String, dynamic>>{};
+    for (final row in results[2]) {
+      final bedId = row['bed_space_id'] as String?;
+      if (bedId != null) {
+        activeAssignments[bedId] = row;
+      }
+    }
     final bedsByRoom = <String, List<BedRecord>>{};
     for (final row in results[1]) {
-      final bed = BedRecord.fromRow(row, occupied.contains(row['id']));
+      final bed = BedRecord.fromRow(
+        row,
+        assignment: activeAssignments[row['id'] as String],
+      );
       bedsByRoom.putIfAbsent(row['room_id'] as String, () => []).add(bed);
     }
     final list = results[0]
@@ -110,6 +119,82 @@ class RoomService {
     invalidateCache();
     await _client.from('bed_spaces').delete().eq('id', id);
   }
+
+  /// Retrieves the active room, bed space, live occupancy, and roommates for
+  /// the current authenticated tenant (or target tenant if called by guardian/staff).
+  ///
+  /// Returns `null` if the tenant has no active assignment.
+  Future<Room?> getMyRoomDetails({String? tenantId}) async {
+    // 1. Try server RPC function first (returns room details + co-assigned roommates)
+    try {
+      final params =
+          tenantId != null ? {'p_tenant_id': tenantId} : <String, dynamic>{};
+      final response = await _client.rpc('get_my_room_details', params: params);
+      if (response != null && response is Map) {
+        final map = Map<String, dynamic>.from(response);
+        if (map['assigned'] == true) {
+          return Room.fromJson(map);
+        }
+      }
+    } catch (_) {
+      // If RPC fails (e.g. schema caching or parameters), fall through to direct query.
+    }
+
+    // 2. Resilient direct table query fallback using existing RLS policies
+    try {
+      final targetId = tenantId ?? _client.auth.currentUser?.id;
+      if (targetId == null) return null;
+
+      final assignment = await _client
+          .from('tenant_assignments')
+          .select(
+              'id, bed_space_id, bed_spaces!inner(id, label, room_id, rooms!inner(id, room_number, floor, capacity, description))')
+          .eq('tenant_id', targetId)
+          .eq('status', 'active')
+          .maybeSingle();
+
+      if (assignment == null) return null;
+
+      final bed = assignment['bed_spaces'] as Map<String, dynamic>?;
+      final room = bed?['rooms'] as Map<String, dynamic>?;
+      if (bed == null || room == null) return null;
+
+      return Room(
+        id: room['id'] as String? ?? '',
+        number: room['room_number'] as String? ?? '',
+        floor: room['floor'] as String? ?? '',
+        capacity: (room['capacity'] as num?)?.toInt() ?? 4,
+        occupied: 1,
+        bedSpace: bed['label'] as String? ?? '',
+        description: room['description'] as String? ?? '',
+        roommates: const [],
+        roommateDetails: const [],
+        utilitySummary: 'Electricity & water included • Submetered AC',
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> reassignTenantBed({
+    required String tenantId,
+    required String newBedId,
+  }) async {
+    invalidateCache();
+    await _client.rpc('assign_tenant_bed', params: {
+      'p_tenant_id': tenantId,
+      'p_bed_space_id': newBedId,
+    });
+  }
+
+  Future<void> endTenantAssignment({
+    required String tenantId,
+  }) async {
+    invalidateCache();
+    await _client.rpc('end_tenant_assignment', params: {
+      'p_tenant_id': tenantId,
+    });
+  }
 }
 
 class RoomRecord {
@@ -137,19 +222,44 @@ class RoomRecord {
 }
 
 class BedRecord {
-  const BedRecord(
-      {required this.id,
-      required this.label,
-      required this.status,
-      required this.occupied});
-  factory BedRecord.fromRow(Map<String, dynamic> row, bool occupied) =>
-      BedRecord(
-          id: row['id'] as String,
-          label: row['label'] as String,
-          status: row['status'] as String,
-          occupied: occupied);
-  final String id, label, status;
+  const BedRecord({
+    required this.id,
+    required this.label,
+    required this.status,
+    required this.occupied,
+    this.assignmentId,
+    this.tenantId,
+    this.tenantName,
+    this.tenantPhone,
+  });
+
+  factory BedRecord.fromRow(
+    Map<String, dynamic> row, {
+    bool occupied = false,
+    Map<String, dynamic>? assignment,
+  }) {
+    final profile = assignment?['profiles'] as Map<String, dynamic>?;
+    final isOccupied = assignment != null || occupied;
+    return BedRecord(
+      id: row['id'] as String,
+      label: row['label'] as String,
+      status: row['status'] as String,
+      occupied: isOccupied,
+      assignmentId: assignment?['id'] as String?,
+      tenantId: assignment?['tenant_id'] as String?,
+      tenantName: profile?['full_name'] as String?,
+      tenantPhone: profile?['phone'] as String?,
+    );
+  }
+
+  final String id;
+  final String label;
+  final String status;
   final bool occupied;
+  final String? assignmentId;
+  final String? tenantId;
+  final String? tenantName;
+  final String? tenantPhone;
 }
 
 String roomServiceError(Object error) {

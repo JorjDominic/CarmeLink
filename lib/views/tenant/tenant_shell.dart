@@ -20,6 +20,7 @@ class _TenantShellState extends State<TenantShell> {
     super.initState();
 
     TenantController.instance.loadMaintenance();
+    TenantController.instance.loadMyRoom();
   }
 
   @override

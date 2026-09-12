@@ -584,16 +584,13 @@ class _ThemeModeChoice extends StatelessWidget {
           vertical: 11,
         ),
         decoration: BoxDecoration(
-          color: selected
-              ? scheme.primary.withValues(alpha: .12)
-              : scheme.surface,
+          color:
+              selected ? scheme.primary.withValues(alpha: .12) : scheme.surface,
           borderRadius: const BorderRadius.all(
             Radius.circular(16),
           ),
           border: Border.all(
-            color: selected
-                ? scheme.primary
-                : Theme.of(context).dividerColor,
+            color: selected ? scheme.primary : Theme.of(context).dividerColor,
             width: selected ? 1.6 : 1,
           ),
         ),

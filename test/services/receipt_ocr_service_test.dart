@@ -141,7 +141,8 @@ void main() {
       expect(result.referenceNumber, equals('1002 9384 1029'));
     });
 
-    test('extracts multiline Total Amount Sent and ignores convenience fee', () {
+    test('extracts multiline Total Amount Sent and ignores convenience fee',
+        () {
       const receiptWithFee = '''
         GCash
         Express Send
@@ -170,7 +171,9 @@ void main() {
       expect(result.referenceNumber, equals('94827103'));
     });
 
-    test('extracts amount when placed to the right of reference number on same line', () {
+    test(
+        'extracts amount when placed to the right of reference number on same line',
+        () {
       const receiptText = '''
         GCash
         Express Send
@@ -183,7 +186,9 @@ void main() {
       expect(result.amount, equals(1500.0));
     });
 
-    test('extracts amount when PHP currency is to the right of reference number', () {
+    test(
+        'extracts amount when PHP currency is to the right of reference number',
+        () {
       const receiptText = '''
         GCash
         Ref No. 1002 9384 1029 PHP 2,400.00
@@ -194,7 +199,9 @@ void main() {
       expect(result.amount, equals(2400.0));
     });
 
-    test('extracts amount under 1000 to the right of ref without picking ref digits', () {
+    test(
+        'extracts amount under 1000 to the right of ref without picking ref digits',
+        () {
       const receiptText = '''
         Ref: 9021345678 500.00
       ''';
@@ -214,4 +221,3 @@ void main() {
     });
   });
 }
-
