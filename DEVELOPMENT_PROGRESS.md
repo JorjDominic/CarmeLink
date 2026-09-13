@@ -59,13 +59,13 @@ page exists but its important backend workflow is unfinished.
 
 ### Guardian pages
 
-- [ ] **Home** — live linked-tenant, payment, request, gate, and notice summary.
-- [ ] **Tenant Information** — RLS-limited data for verified linked tenants only.
+- [✓] **Home** — live linked-tenant, payment, and notice summary with real-time refresh.
+- [✓] **Tenant Information** — live RLS-limited profile, room assignment, occupancy, and roommates for verified linked tenants.
 - [ ] **Curfew Overview** — linked tenant's current status and approved exceptions.
 - [ ] **Gate Activity** — verified activity for linked tenants only.
 - [ ] **Curfew Requests** — approve or reject requests with an audit timestamp.
-- [ ] **Payment Status** — read-only charges and verification for linked tenants.
-- [ ] **Announcements** — guardian-audience notices from Supabase.
+- [✓] **Payment Status** — live read-only charges, balances, and verification status for linked tenants.
+- [✓] **Announcements** — guardian-audience notices from Supabase with realtime subscription.
 - [ ] **Messages and Conversation** — persistent communication with authorized staff.
 - [ ] **Emergency and Safety Alerts** — urgent targeted alerts and acknowledgement.
 
@@ -357,12 +357,12 @@ Owned folders and files:
 
 ### Guardian pages
 
-- [ ] Home/dashboard — UI implemented, **Mock**
+- [✓] Home/dashboard — live linked-tenant, room, and payment summary with realtime sync — **Live**
 - [✓] Linked-tenant identity on Profile — **Live**
 - [ ] Curfew overview and gate activity — UI implemented, **Mock**
 - [ ] Curfew-request review — UI implemented, **Mock**
-- [ ] Payment status — UI implemented, **Mock**
-- [ ] Announcements — UI implemented, **Mock**
+- [✓] Payment status — linked tenant charges and verification state — **Live**
+- [✓] Announcements — guardian-audience notices from Supabase — **Live**
 - [ ] Messages and conversation — UI implemented, **Mock**
 - [ ] Emergency and safety alerts — UI implemented, **Mock**
 

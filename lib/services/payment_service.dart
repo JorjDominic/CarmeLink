@@ -67,6 +67,24 @@ class PaymentService {
     }
   }
 
+  /// Fetches all payment records for a specific tenant ID.
+  /// Allowed for guardians (if linked to the tenant) or staff members by RLS.
+  Future<List<Payment>> listPaymentsForTenant(String tenantId) async {
+    try {
+      final rows = await _client
+          .from('payments')
+          .select(_columns)
+          .eq('tenant_id', tenantId)
+          .order('due_date', ascending: false);
+
+      return rows
+          .map<Payment>((row) => Payment.fromJson(row))
+          .toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
   /// Submits proof of payment (GCash/bank reference + optional receipt photo).
   Future<Payment> submitPaymentProof({
     required String paymentId,

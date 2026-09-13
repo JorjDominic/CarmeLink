@@ -428,3 +428,43 @@ class OwnerConversation {
   final String personRole;
   final List<ChatMessage> messages;
 }
+
+class LinkedTenant {
+  const LinkedTenant({
+    required this.linkId,
+    required this.tenantId,
+    required this.name,
+    required this.phone,
+    required this.relationship,
+    this.email = '',
+    this.isPrimary = false,
+    this.schoolName = '',
+    this.courseOrProgram = '',
+    this.yearLevel,
+    this.emergencyContactName = '',
+    this.emergencyContactPhone = '',
+    this.residencyStatus = 'active',
+  });
+
+  final String linkId;
+  final String tenantId;
+  final String name;
+  final String phone;
+  final String email;
+  final String relationship;
+  final bool isPrimary;
+  final String schoolName;
+  final String courseOrProgram;
+  final int? yearLevel;
+  final String emergencyContactName;
+  final String emergencyContactPhone;
+  final String residencyStatus;
+
+  String get educationSummary {
+    final parts = <String>[];
+    if (courseOrProgram.isNotEmpty) parts.add(courseOrProgram);
+    if (yearLevel != null) parts.add('Year $yearLevel');
+    if (schoolName.isNotEmpty) parts.add(schoolName);
+    return parts.isEmpty ? 'Not specified' : parts.join(' • ');
+  }
+}
