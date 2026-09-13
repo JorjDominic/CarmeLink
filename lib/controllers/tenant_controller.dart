@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/mock_data.dart';
 import '../models/models.dart';
+import '../services/curfew_service.dart';
 import '../services/maintenance_service.dart';
 import '../services/payment_service.dart';
 import '../services/room_service.dart';
@@ -11,12 +12,14 @@ class TenantController extends ChangeNotifier {
 
   static final TenantController instance = TenantController._();
 
+  final CurfewService _curfewService = const CurfewService();
   final MaintenanceService _maintenanceService = const MaintenanceService();
   final PaymentService _paymentService = const PaymentService();
   final RoomService _roomService = const RoomService();
 
   final List<MaintenanceReport> _maintenance = [];
   final List<Payment> _payments = [];
+  final List<CurfewRequest> _curfewRequests = [];
   Room? _room;
 
   bool _maintenanceLoading = false;
@@ -24,6 +27,10 @@ class TenantController extends ChangeNotifier {
 
   bool _paymentsLoading = false;
   String? _paymentsError;
+
+  bool _curfewLoading = false;
+  String? _curfewError;
+  bool _curfewLoadedOnce = false;
 
   bool _roomLoading = false;
   String? _roomError;
@@ -56,6 +63,18 @@ class TenantController extends ChangeNotifier {
 
   List<MaintenanceReport> get maintenance => List.unmodifiable(_maintenance);
 
+  List<CurfewRequest> get curfewRequests =>
+      List.unmodifiable(_curfewRequests);
+  bool get curfewLoading => _curfewLoading;
+  String? get curfewError => _curfewError;
+  bool get curfewLoadedOnce => _curfewLoadedOnce;
+
+  CurfewRequest? get activeCurfewRequest {
+    final active =
+        _curfewRequests.where((r) => r.isPending || r.isApproved).toList();
+    return active.isNotEmpty ? active.first : null;
+  }
+
   List<GeofenceEvent> get geofenceEvents =>
       List.unmodifiable(MockData.gateEvents);
 
@@ -76,6 +95,58 @@ class TenantController extends ChangeNotifier {
   bool get maintenanceLoading => _maintenanceLoading;
 
   String? get maintenanceError => _maintenanceError;
+
+  Future<void> loadCurfewRequests({bool force = false}) async {
+    if (_curfewLoading && !force) return;
+    if (_curfewLoadedOnce && !force) return;
+
+    _curfewLoading = true;
+    _curfewError = null;
+    notifyListeners();
+
+    try {
+      final list = await _curfewService.listOwnRequests();
+      _curfewRequests
+        ..clear()
+        ..addAll(list);
+      _curfewLoadedOnce = true;
+    } catch (e) {
+      _curfewError = _message(e);
+    } finally {
+      _curfewLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<CurfewRequest> submitCurfewRequest({
+    required String destination,
+    required String reason,
+    required DateTime departureTime,
+    required DateTime expectedReturnTime,
+    String requestType = 'late_return',
+  }) async {
+    final created = await _curfewService.submitRequest(
+      destination: destination,
+      reason: reason,
+      departureTime: departureTime,
+      expectedReturnTime: expectedReturnTime,
+      requestType: requestType,
+    );
+
+    _curfewRequests.insert(0, created);
+    _curfewError = null;
+    notifyListeners();
+    return created;
+  }
+
+  Future<void> cancelCurfewRequest(String requestId) async {
+    final updated = await _curfewService.cancelRequest(requestId);
+    final index = _curfewRequests.indexWhere((r) => r.id == requestId);
+    if (index != -1) {
+      _curfewRequests[index] = updated;
+    }
+    notifyListeners();
+  }
 
   Future<void> loadMaintenance() async {
     if (_maintenanceLoading) {
@@ -107,6 +178,10 @@ class TenantController extends ChangeNotifier {
     _roomError = null;
     _maintenance.clear();
     _payments.clear();
+    _curfewRequests.clear();
+    _curfewLoading = false;
+    _curfewError = null;
+    _curfewLoadedOnce = false;
     notifyListeners();
   }
 

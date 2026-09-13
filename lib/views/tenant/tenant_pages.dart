@@ -2884,178 +2884,990 @@ class _TenantConversationPageState extends State<TenantConversationPage> {
   }
 }
 
-class TenantPresencePage extends StatelessWidget {
+class TenantPresencePage extends StatefulWidget {
   const TenantPresencePage({super.key});
 
   @override
+  State<TenantPresencePage> createState() => _TenantPresencePageState();
+}
+
+class _TenantPresencePageState extends State<TenantPresencePage> {
+  TableRefreshSubscription? _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        TenantController.instance.loadCurfewRequests();
+      }
+    });
+    _subscription = TableRefreshSubscription(
+      'tenant-curfew-presence',
+      ['curfew_requests'],
+      () {
+        if (mounted) {
+          TenantController.instance.loadCurfewRequests(force: true);
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _subscription?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirmCancel(CurfewRequest request) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Cancel curfew request?'),
+        content: Text(
+          'Are you sure you want to cancel your exception request to ${request.destination}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Keep request'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogCtx).colorScheme.error,
+            ),
+            child: const Text('Cancel request'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      try {
+        await TenantController.instance.cancelCurfewRequest(request.id);
+        if (mounted) {
+          showAppSnackBar(context, 'Curfew request cancelled.');
+        }
+      } catch (e) {
+        if (mounted) {
+          showAppSnackBar(context, 'Failed to cancel: $e');
+        }
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final events = TenantController.instance.geofenceEvents
+    final controller = TenantController.instance;
+    final events = controller.geofenceEvents
         .where((e) => e.person == 'Anna Dela Cruz')
         .toList();
 
     return PageFrame(
       title: 'Curfew',
-      subtitle: 'Geofence tracking and presence status',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'CURFEW STATUS',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15,
-                  letterSpacing: 1.3,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: CarmelitaCard(
-              padding: const EdgeInsets.all(14),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 330;
-                  const copy = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'CURRENT STATUS',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: 3),
-                      Text(
-                        'Inside dormitory',
-                        style: TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      SizedBox(height: 6),
-                      Text('Last IN: 8:14 PM • GPS Geofence confirmed'),
-                    ],
-                  );
+      subtitle: 'Geofence tracking and exception requests',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh requests',
+          icon: const Icon(Icons.refresh_rounded),
+          onPressed: () => controller.loadCurfewRequests(force: true),
+        ),
+      ],
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          final requests = controller.curfewRequests;
+          final loading = controller.curfewLoading;
+          final error = controller.curfewError;
 
-                  if (compact) {
-                    return const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 24,
-                              backgroundColor: Color(0x1356886B),
-                              foregroundColor: Color(0xFF56886B),
-                              child: Icon(Icons.location_on_outlined),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'CURFEW STATUS',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      letterSpacing: 1.3,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: CarmelitaCard(
+                  padding: const EdgeInsets.all(14),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 330;
+                      const copy = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'CURRENT STATUS',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                             ),
-                            SizedBox(width: 12),
-                            StatusPill('IN'),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Inside dormitory',
+                            style: TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text('Last IN: 8:14 PM • GPS Geofence confirmed'),
+                        ],
+                      );
+
+                      if (compact) {
+                        return const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: Color(0x1356886B),
+                                  foregroundColor: Color(0xFF56886B),
+                                  child: Icon(Icons.location_on_outlined),
+                                ),
+                                SizedBox(width: 12),
+                                StatusPill('IN'),
+                              ],
+                            ),
+                            SizedBox(height: 12),
+                            copy,
+                          ],
+                        );
+                      }
+
+                      return const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            radius: 28,
+                            backgroundColor: Color(0x1356886B),
+                            foregroundColor: Color(0xFF56886B),
+                            child: Icon(Icons.location_on_outlined),
+                          ),
+                          SizedBox(width: 16),
+                          Expanded(child: copy),
+                          SizedBox(width: 10),
+                          StatusPill('IN'),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const MutedDashboardGrid(
+                compact: true,
+                items: [
+                  MutedDashboardItem(
+                    label: 'Geofence boundary',
+                    value: '50m Radius',
+                    detail: 'Carmelita\'s Dormitory',
+                    icon: Icons.location_searching_outlined,
+                    color: Color(0xFF56886B),
+                  ),
+                  MutedDashboardItem(
+                    label: 'Detection signal',
+                    value: 'Active',
+                    detail: 'GPS Geofencing',
+                    icon: Icons.gps_fixed_outlined,
+                    color: Color(0xFF627FA8),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              MutedActionGrid(
+                items: [
+                  MutedActionItem(
+                    label: 'Curfew exception',
+                    detail: 'Late return / overnight leave',
+                    color: const Color(0xFFC77800),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TenantCurfewExceptionPage(),
+                      ),
+                    ),
+                    icon: Icons.access_time_outlined,
+                  ),
+                  MutedActionItem(
+                    label: 'Visitor request',
+                    detail: 'Register a visitor',
+                    color: const Color(0xFF568F8E),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const VisitorRequestPage(),
+                      ),
+                    ),
+                    icon: Icons.person_add_alt_outlined,
+                  ),
+                  MutedActionItem(
+                    label: 'Dormitory rules',
+                    detail: 'Guidelines & policies',
+                    color: const Color(0xFF7D70A0),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const DormitoryRulesPage(),
+                      ),
+                    ),
+                    icon: Icons.rule_outlined,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              SectionTitle(
+                'Curfew & leave requests',
+                trailing: TextButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const TenantCurfewExceptionPage(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('New request'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (loading && requests.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (error != null && requests.isEmpty)
+                CarmelitaCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: Theme.of(context).colorScheme.error,
+                        size: 32,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(error, textAlign: TextAlign.center),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: () =>
+                            controller.loadCurfewRequests(force: true),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              else if (requests.isEmpty)
+                CarmelitaCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFC77800).withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.nightlife_outlined,
+                          color: Color(0xFFC77800),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'No exception requests',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Standard curfew is 10:00 PM. Tap "New request" for late return or overnight leave.',
+                              style: TextStyle(fontSize: 13),
+                            ),
                           ],
                         ),
-                        SizedBox(height: 12),
-                        copy,
-                      ],
-                    );
-                  }
+                      ),
+                    ],
+                  ),
+                )
+              else
+                ...requests.map(
+                  (r) => _CurfewRequestCard(
+                    request: r,
+                    onCancel: () => _confirmCancel(r),
+                  ),
+                ),
+              const SizedBox(height: 22),
+              const SectionTitle('Recent presence records'),
+              const SizedBox(height: 10),
+              ...events.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: CarmelitaCard(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    child: TimelineTile(
+                      compact: true,
+                      icon: e.direction == 'IN'
+                          ? Icons.login_rounded
+                          : Icons.logout_rounded,
+                      color: e.direction == 'IN'
+                          ? const Color(0xFF56886B)
+                          : const Color(0xFF627FA8),
+                      title: e.direction == 'IN'
+                          ? 'Entered dormitory perimeter'
+                          : 'Exited dormitory perimeter',
+                      subtitle:
+                          '${shortDate(e.time)} • ${timeText(e.time)} • ${e.verification}',
+                      trailing: StatusPill(e.status),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
 
-                  return const Row(
+class _CurfewRequestCard extends StatelessWidget {
+  const _CurfewRequestCard({
+    required this.request,
+    required this.onCancel,
+  });
+
+  final CurfewRequest request;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: CarmelitaCard(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: Color(0x1356886B),
-                        foregroundColor: Color(0xFF56886B),
-                        child: Icon(Icons.location_on_outlined),
+                      Row(
+                        children: [
+                          Icon(
+                            request.isOvernightLeave
+                                ? Icons.hotel_outlined
+                                : Icons.nightlight_outlined,
+                            size: 14,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            request.requestTypeLabel.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(width: 16),
-                      Expanded(child: copy),
-                      SizedBox(width: 10),
-                      StatusPill('IN'),
+                      const SizedBox(height: 3),
+                      Text(
+                        request.destination,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
                     ],
-                  );
-                },
+                  ),
+                ),
+                StatusPill(request.statusLabel),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              request.reason,
+              style: TextStyle(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.8),
+                fontSize: 13,
               ),
             ),
-          ),
-          const SizedBox(height: 18),
-          const MutedDashboardGrid(
-            compact: true,
-            items: [
-              MutedDashboardItem(
-                label: 'Geofence boundary',
-                value: '50m Radius',
-                detail: 'Carmelita\'s Dormitory',
-                icon: Icons.location_searching_outlined,
-                color: Color(0xFF56886B),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest
+                    .withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
               ),
-              MutedDashboardItem(
-                label: 'Detection signal',
-                value: 'Active',
-                detail: 'GPS Geofencing',
-                icon: Icons.gps_fixed_outlined,
-                color: Color(0xFF627FA8),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.flight_takeoff_outlined, size: 16),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Departure: ',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        '${shortDate(request.departureTime)} ${timeText(request.departureTime)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.flight_land_outlined, size: 16),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Expected return: ',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        '${shortDate(request.expectedReturnTime)} ${timeText(request.expectedReturnTime)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (request.guardianNotes != null &&
+                request.guardianNotes!.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Guardian note: ${request.guardianNotes!}',
+                style: const TextStyle(
+                    fontSize: 12, fontStyle: FontStyle.italic),
               ),
             ],
-          ),
-          const SizedBox(height: 20),
-          MutedActionGrid(
-            items: [
-              MutedActionItem(
-                label: 'Visitor request',
-                detail: 'Register a visitor',
-                color: const Color(0xFF568F8E),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const VisitorRequestPage(),
-                  ),
-                ),
-                icon: Icons.person_add_alt_outlined,
-              ),
-              MutedActionItem(
-                label: 'Dormitory rules',
-                detail: 'Guidelines & policies',
-                color: const Color(0xFF7D70A0),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const DormitoryRulesPage(),
-                  ),
-                ),
-                icon: Icons.rule_outlined,
+            if (request.staffNotes != null &&
+                request.staffNotes!.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Staff note: ${request.staffNotes!}',
+                style: const TextStyle(
+                    fontSize: 12, fontStyle: FontStyle.italic),
               ),
             ],
-          ),
-          const SizedBox(height: 22),
-          const SectionTitle('Recent presence records'),
-          const SizedBox(height: 10),
-          ...events.map(
-            (e) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: CarmelitaCard(
+            if (request.canCancel) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onCancel,
+                  icon: const Icon(Icons.close, size: 16),
+                  label: const Text('Cancel request'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class TenantCurfewExceptionPage extends StatefulWidget {
+  const TenantCurfewExceptionPage({super.key});
+
+  @override
+  State<TenantCurfewExceptionPage> createState() =>
+      _TenantCurfewExceptionPageState();
+}
+
+class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
+  final _destinationController = TextEditingController();
+  final _reasonController = TextEditingController();
+
+  String _requestType = 'late_return';
+  DateTime _departureTime = DateTime.now().add(const Duration(hours: 2));
+  DateTime _expectedReturnTime = DateTime.now().add(const Duration(hours: 12));
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _destinationController.dispose();
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDateTime({
+    required bool isDeparture,
+  }) async {
+    final current = isDeparture ? _departureTime : _expectedReturnTime;
+    final initialDate = current;
+    final firstDate = DateTime.now().subtract(const Duration(days: 1));
+    final lastDate = DateTime.now().add(const Duration(days: 90));
+
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate.isBefore(firstDate) ? firstDate : initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+
+    if (pickedDate == null || !mounted) return;
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(current),
+    );
+
+    if (pickedTime == null || !mounted) return;
+
+    final combined = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+
+    setState(() {
+      if (isDeparture) {
+        _departureTime = combined;
+        if (_expectedReturnTime.isBefore(_departureTime)) {
+          _expectedReturnTime = _departureTime.add(const Duration(hours: 4));
+        }
+      } else {
+        _expectedReturnTime = combined;
+      }
+    });
+  }
+
+  Future<void> _submit() async {
+    final destination = _destinationController.text.trim();
+    final reason = _reasonController.text.trim();
+
+    if (destination.isEmpty) {
+      showAppSnackBar(context, 'Please enter your destination.');
+      return;
+    }
+
+    if (reason.isEmpty) {
+      showAppSnackBar(context, 'Please enter the reason for your request.');
+      return;
+    }
+
+    if (!_expectedReturnTime.isAfter(_departureTime)) {
+      showAppSnackBar(
+        context,
+        'Expected return time must be after departure time.',
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+
+    try {
+      await TenantController.instance.submitCurfewRequest(
+        destination: destination,
+        reason: reason,
+        departureTime: _departureTime,
+        expectedReturnTime: _expectedReturnTime,
+        requestType: _requestType,
+      );
+
+      if (mounted) {
+        final message = _requestType == 'late_return'
+            ? 'Late return request submitted directly for caretaker review!'
+            : 'Overnight leave submitted! Awaiting guardian approval.';
+        showAppSnackBar(context, message);
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, 'Failed to submit request: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLate = _requestType == 'late_return';
+
+    return PageFrame(
+      title: 'Curfew exception',
+      subtitle: 'Request late return or overnight leave',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'REQUEST TYPE',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    letterSpacing: 1.2,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _requestType = 'late_return'),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isLate
+                            ? Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.12)
+                            : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isLate
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.transparent,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.nightlight_outlined,
+                                size: 18,
+                                color: isLate
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.onSurface,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Late Return',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: isLate
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Direct Caretaker approval',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _requestType = 'overnight_leave'),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: !isLate
+                            ? Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.12)
+                            : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: !isLate
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.transparent,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.hotel_outlined,
+                                size: 18,
+                                color: !isLate
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.onSurface,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Overnight Leave',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: !isLate
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Guardian endorsement first',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            CarmelitaCard(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: (isLate
+                              ? const Color(0xFF56886B)
+                              : Theme.of(context).colorScheme.primary)
+                          .withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isLate
+                          ? Icons.bolt_outlined
+                          : Icons.shield_outlined,
+                      color: isLate
+                          ? const Color(0xFF56886B)
+                          : Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isLate
+                              ? 'Fast-track Caretaker Approval'
+                              : 'Two-tier Guardian & Caretaker Approval',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isLate
+                              ? 'Forwarded directly to the caretaker / owner on duty for fast gate approval. Your guardian will see this on their read-only curfew activity log.'
+                              : 'Since you will be off-premises overnight, your registered guardian must review and approve this first before caretaker sign-off.',
+                          style: const TextStyle(fontSize: 12, height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'REQUEST DETAILS',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    letterSpacing: 1.2,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+            const SizedBox(height: 10),
+            LabeledField(
+              label: 'Destination',
+              controller: _destinationController,
+              hint:
+                  'e.g., Home (Batangas), University Library, Friend\'s House',
+            ),
+            const SizedBox(height: 14),
+            LabeledField(
+              label: 'Reason for request',
+              controller: _reasonController,
+              hint: 'e.g., Family weekend gathering, Overnight project study',
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'SCHEDULE & TIMING',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    letterSpacing: 1.2,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+            const SizedBox(height: 10),
+            CarmelitaCard(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                children: [
+                  _DateTimeTile(
+                    title: 'Departure date & time',
+                    dateTime: _departureTime,
+                    icon: Icons.flight_takeoff_outlined,
+                    onTap: () => _pickDateTime(isDeparture: true),
+                  ),
+                  const Divider(height: 20),
+                  _DateTimeTile(
+                    title: 'Expected return date & time',
+                    dateTime: _expectedReturnTime,
+                    icon: Icons.flight_land_outlined,
+                    onTap: () => _pickDateTime(isDeparture: false),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _submitting ? null : _submit,
+                child: _submitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        isLate
+                            ? 'Submit late return request'
+                            : 'Submit overnight leave request',
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DateTimeTile extends StatelessWidget {
+  const _DateTimeTile({
+    required this.title,
+    required this.dateTime,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final DateTime dateTime;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${shortDate(dateTime)} at ${timeText(dateTime)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            OutlinedButton(
+              onPressed: onTap,
+              style: OutlinedButton.styleFrom(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                child: TimelineTile(
-                  compact: true,
-                  icon: e.direction == 'IN'
-                      ? Icons.login_rounded
-                      : Icons.logout_rounded,
-                  color: e.direction == 'IN'
-                      ? const Color(0xFF56886B)
-                      : const Color(0xFF627FA8),
-                  title: e.direction == 'IN'
-                      ? 'Entered dormitory perimeter'
-                      : 'Exited dormitory perimeter',
-                  subtitle:
-                      '${shortDate(e.time)} • ${timeText(e.time)} • ${e.verification}',
-                  trailing: StatusPill(e.status),
-                ),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
+              child: const Text('Change', style: TextStyle(fontSize: 12)),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

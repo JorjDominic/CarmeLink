@@ -468,3 +468,200 @@ class LinkedTenant {
     return parts.isEmpty ? 'Not specified' : parts.join(' • ');
   }
 }
+
+class CurfewRequest {
+  CurfewRequest({
+    required this.id,
+    required this.tenantId,
+    required this.destination,
+    required this.reason,
+    required this.departureTime,
+    required this.expectedReturnTime,
+    required this.status,
+    this.requestType = 'late_return',
+    this.tenantName,
+    this.guardianId,
+    this.guardianDecision,
+    this.guardianRemarks,
+    this.guardianDecidedAt,
+    this.staffId,
+    this.staffDecision,
+    this.staffNotes,
+    this.staffDecidedAt,
+    this.actualReturnTime,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory CurfewRequest.fromJson(Map<String, dynamic> json) {
+    final tenantObj = json['tenant'] as Map<String, dynamic>?;
+
+    return CurfewRequest(
+      id: json['id'] as String? ?? '',
+      tenantId: json['tenant_id'] as String? ?? '',
+      destination: json['destination'] as String? ?? '',
+      reason: json['reason'] as String? ?? '',
+      departureTime:
+          DateTime.tryParse(json['departure_time']?.toString() ?? '') ??
+              DateTime.now(),
+      expectedReturnTime:
+          DateTime.tryParse(json['expected_return_time']?.toString() ?? '') ??
+              DateTime.now().add(const Duration(hours: 4)),
+      status: json['status'] as String? ?? 'pending_guardian',
+      requestType: json['request_type'] as String? ?? 'late_return',
+      tenantName: tenantObj?['full_name'] as String?,
+      guardianId: json['guardian_id'] as String?,
+      guardianDecision: json['guardian_decision'] as String?,
+      guardianRemarks: (json['guardian_remarks'] ?? json['guardian_notes']) as String?,
+      guardianDecidedAt: json['guardian_decided_at'] != null
+          ? DateTime.tryParse(json['guardian_decided_at'].toString())
+          : null,
+      staffId: json['staff_id'] as String?,
+      staffDecision: json['staff_decision'] as String?,
+      staffNotes: json['staff_notes'] as String?,
+      staffDecidedAt: json['staff_decided_at'] != null
+          ? DateTime.tryParse(json['staff_decided_at'].toString())
+          : null,
+      actualReturnTime: json['actual_return_time'] != null
+          ? DateTime.tryParse(json['actual_return_time'].toString())
+          : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'].toString())
+          : null,
+    );
+  }
+
+  final String id;
+  final String tenantId;
+  final String destination;
+  final String reason;
+  final DateTime departureTime;
+  final DateTime expectedReturnTime;
+  String status;
+  final String requestType;
+  final String? tenantName;
+  final String? guardianId;
+  final String? guardianDecision;
+  final String? guardianRemarks;
+  final DateTime? guardianDecidedAt;
+  final String? staffId;
+  final String? staffDecision;
+  final String? staffNotes;
+  final DateTime? staffDecidedAt;
+  final DateTime? actualReturnTime;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  String? get guardianNotes => guardianRemarks;
+
+  bool get isLateReturn => requestType == 'late_return';
+  bool get isOvernightLeave => requestType == 'overnight_leave';
+  String get requestTypeLabel =>
+      isOvernightLeave ? 'Overnight Leave' : 'Late Return';
+
+  bool get isPending =>
+      status == 'pending_guardian' || status == 'pending_staff';
+  bool get isApproved => status == 'approved';
+  bool get isRejected => status == 'rejected';
+  bool get isCancelled => status == 'cancelled';
+  bool get isCompleted => status == 'completed';
+
+  bool get canCancel =>
+      status == 'pending_guardian' || status == 'pending_staff';
+  bool get canReviewGuardian => status == 'pending_guardian';
+  bool get canReviewStaff => status == 'pending_staff';
+
+  String get statusLabel {
+    switch (status) {
+      case 'pending_guardian':
+        return 'Awaiting Guardian';
+      case 'pending_staff':
+        return 'Awaiting Staff';
+      case 'approved':
+        return 'Approved';
+      case 'rejected':
+        return 'Rejected';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'completed':
+        return 'Completed';
+      default:
+        return status;
+    }
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'tenant_id': tenantId,
+        'destination': destination,
+        'reason': reason,
+        'departure_time': departureTime.toIso8601String(),
+        'expected_return_time': expectedReturnTime.toIso8601String(),
+        'status': status,
+        'request_type': requestType,
+        if (guardianId != null) 'guardian_id': guardianId,
+        if (guardianDecision != null) 'guardian_decision': guardianDecision,
+        if (guardianRemarks != null) 'guardian_remarks': guardianRemarks,
+        if (guardianDecidedAt != null)
+          'guardian_decided_at': guardianDecidedAt!.toIso8601String(),
+        if (staffId != null) 'staff_id': staffId,
+        if (staffDecision != null) 'staff_decision': staffDecision,
+        if (staffNotes != null) 'staff_notes': staffNotes,
+        if (staffDecidedAt != null)
+          'staff_decided_at': staffDecidedAt!.toIso8601String(),
+        if (actualReturnTime != null)
+          'actual_return_time': actualReturnTime!.toIso8601String(),
+        if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+        if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
+      };
+
+  CurfewRequest copyWith({
+    String? id,
+    String? tenantId,
+    String? destination,
+    String? reason,
+    DateTime? departureTime,
+    DateTime? expectedReturnTime,
+    String? status,
+    String? requestType,
+    String? tenantName,
+    String? guardianId,
+    String? guardianDecision,
+    String? guardianRemarks,
+    String? guardianNotes,
+    DateTime? guardianDecidedAt,
+    String? staffId,
+    String? staffDecision,
+    String? staffNotes,
+    DateTime? staffDecidedAt,
+    DateTime? actualReturnTime,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return CurfewRequest(
+      id: id ?? this.id,
+      tenantId: tenantId ?? this.tenantId,
+      destination: destination ?? this.destination,
+      reason: reason ?? this.reason,
+      departureTime: departureTime ?? this.departureTime,
+      expectedReturnTime: expectedReturnTime ?? this.expectedReturnTime,
+      status: status ?? this.status,
+      requestType: requestType ?? this.requestType,
+      tenantName: tenantName ?? this.tenantName,
+      guardianId: guardianId ?? this.guardianId,
+      guardianDecision: guardianDecision ?? this.guardianDecision,
+      guardianRemarks: guardianRemarks ?? guardianNotes ?? this.guardianRemarks,
+      guardianDecidedAt: guardianDecidedAt ?? this.guardianDecidedAt,
+      staffId: staffId ?? this.staffId,
+      staffDecision: staffDecision ?? this.staffDecision,
+      staffNotes: staffNotes ?? this.staffNotes,
+      staffDecidedAt: staffDecidedAt ?? this.staffDecidedAt,
+      actualReturnTime: actualReturnTime ?? this.actualReturnTime,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}

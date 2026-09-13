@@ -1,6 +1,6 @@
 # CarmeLink Development Progress
 
-Last updated: September 7, 2026
+Last updated: September 13, 2026
 
 This file tracks development separately from the README. Page ownership is
 divided between two developers to reduce merge conflicts.
@@ -52,7 +52,7 @@ page exists but its important backend workflow is unfinished.
 - [ ] **Announcements** — show only notices published for the tenant audience.
 - [ ] **Messages and Conversation** — persisted, role-scoped real-time messaging.
 - [ ] **Gate and Curfew** — verified IN/OUT events, curfew status, and exceptions.
-- [ ] **Curfew Exception** — tenant request with guardian and staff decisions.
+- [✓] **Curfew Exception (Tenant)** — differentiated request types ('Late Return' direct to caretaker vs 'Overnight Leave' with guardian endorsement), departure/return schedule pickers, status pills, cancellation of pending requests, and live Supabase real-time sync.
 - [ ] **Visitor Request** — visitor identity, schedule, status, and audit history.
 - [ ] **Confidential Concern** — encrypted/restricted submission visible only to authorized staff.
 - [✓] **Rules and Policies** — maintained dormitory rules and safety guidance.
