@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/room_service.dart';
 import '../services/tenant_service.dart';
 import 'guardian_controller.dart';
+import 'owner_controller.dart';
 import 'tenant_controller.dart';
 
 class SessionController extends ChangeNotifier {
@@ -84,6 +85,7 @@ class SessionController extends ChangeNotifier {
     _justSignedOut = true;
     TenantController.instance.clear();
     GuardianController.instance.clear();
+    OwnerController.instance.clear();
     RoomService.invalidateCache();
     TenantService.invalidateCache();
     notifyListeners();

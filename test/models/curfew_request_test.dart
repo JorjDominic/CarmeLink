@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/controllers/tenant_controller.dart';
+import 'package:carmelitas_dormitory_system/controllers/owner_controller.dart';
 
 void main() {
   group('CurfewRequest Model', () {
@@ -68,6 +69,8 @@ void main() {
       );
 
       expect(pendingGuardian.isPending, isTrue);
+      expect(pendingGuardian.isPendingGuardian, isTrue);
+      expect(pendingGuardian.isPendingStaff, isFalse);
       expect(pendingGuardian.isApproved, isFalse);
       expect(pendingGuardian.isRejected, isFalse);
       expect(pendingGuardian.isCancelled, isFalse);
@@ -78,6 +81,8 @@ void main() {
 
       final pendingStaff = pendingGuardian.copyWith(status: 'pending_staff');
       expect(pendingStaff.isPending, isTrue);
+      expect(pendingStaff.isPendingGuardian, isFalse);
+      expect(pendingStaff.isPendingStaff, isTrue);
       expect(pendingStaff.canCancel, isTrue);
       expect(pendingStaff.canReviewGuardian, isFalse);
       expect(pendingStaff.canReviewStaff, isTrue);
@@ -168,6 +173,23 @@ void main() {
       expect(controller.curfewError, isNull);
       expect(controller.curfewLoadedOnce, isFalse);
       expect(controller.activeCurfewRequest, isNull);
+    });
+  });
+
+  group('OwnerController Curfew State', () {
+    final controller = OwnerController.instance;
+
+    setUp(() {
+      controller.clear();
+    });
+
+    test('initial state and clear resets owner curfew properties', () {
+      expect(controller.curfewRequests, isEmpty);
+      expect(controller.curfewLoading, isFalse);
+      expect(controller.curfewError, isNull);
+      expect(controller.curfewLoadedOnce, isFalse);
+      expect(controller.pendingStaffCurfewCount, 0);
+      expect(controller.pendingTotalCurfewCount, 0);
     });
   });
 }

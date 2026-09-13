@@ -564,6 +564,8 @@ class CurfewRequest {
 
   bool get isPending =>
       status == 'pending_guardian' || status == 'pending_staff';
+  bool get isPendingGuardian => status == 'pending_guardian';
+  bool get isPendingStaff => status == 'pending_staff';
   bool get isApproved => status == 'approved';
   bool get isRejected => status == 'rejected';
   bool get isCancelled => status == 'cancelled';

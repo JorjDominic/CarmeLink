@@ -75,6 +75,7 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Rooms** — live room/bed CRUD, vacancies, bed occupant details (name, contact), bed reassignment/transfers across rooms, and unassignment.
 - [ ] **Maintenance** — triage, assign, update, and resolve tenant reports.
 - [ ] **Gate** — review events and record authorized manual overrides.
+- [✓] **Curfew & Exceptions** — review live late return and overnight leave requests, approve with gate instructions or reject with reason, real-time sync via Supabase table subscriptions.
 - [✓] **Accounts** — CRUD limited to tenant and guardian accounts.
 - [✓] **Profile** — authenticated caretaker identity and access level.
 
@@ -88,7 +89,7 @@ page exists but its important backend workflow is unfinished.
 - [ ] **Payments** — review receipts, correct records, and maintain an audit trail.
 - [ ] **Maintenance** — assign work, update status, and record resolution details.
 - [ ] **Gate and Manual Override** — auditable access decisions and system health.
-- [ ] **Curfew Review** — guardian input and final staff decisions.
+- [✓] **Curfew Review** — live request list, guardian input status, staff approval with gate instructions or rejection with reasons, emergency staff override, real-time Supabase sync, and prioritized dashboard attention card.
 - [ ] **Visitor Management** — approve, reject, and audit visitor access.
 - [ ] **Confidential Reports** — owner-authorized access with audit logging.
 - [ ] **Announcements** — create, target, publish, and archive notices.

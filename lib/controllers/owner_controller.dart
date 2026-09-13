@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/mock_data.dart';
 import '../models/models.dart';
+import '../services/curfew_service.dart';
 import '../services/payment_service.dart';
 import '../services/room_service.dart';
 
@@ -9,6 +10,12 @@ class OwnerController extends ChangeNotifier {
   OwnerController._();
 
   static final OwnerController instance = OwnerController._();
+
+  final CurfewService _curfewService = const CurfewService();
+  final List<CurfewRequest> _curfewRequests = [];
+  bool _curfewLoading = false;
+  String? _curfewError;
+  bool _curfewLoadedOnce = false;
 
   final PaymentService _paymentService = const PaymentService();
   final List<Payment> _payments = [];
@@ -19,6 +26,17 @@ class OwnerController extends ChangeNotifier {
   final List<RoomRecord> _roomRecords = [];
   bool _roomsLoading = false;
   String? _roomsError;
+
+  List<CurfewRequest> get curfewRequests => List.unmodifiable(_curfewRequests);
+  bool get curfewLoading => _curfewLoading;
+  String? get curfewError => _curfewError;
+  bool get curfewLoadedOnce => _curfewLoadedOnce;
+
+  int get pendingStaffCurfewCount =>
+      _curfewRequests.where((r) => r.status == 'pending_staff').length;
+
+  int get pendingTotalCurfewCount =>
+      _curfewRequests.where((r) => r.isPending).length;
 
   List<TenantDirectoryEntry> get tenants =>
       List.unmodifiable(MockData.tenantDirectory);
@@ -220,6 +238,63 @@ class OwnerController extends ChangeNotifier {
         sentAt: DateTime.now(),
       ),
     );
+    notifyListeners();
+  }
+
+  Future<void> loadCurfewRequests({bool force = false}) async {
+    if (_curfewLoading && !force) return;
+    if (_curfewLoadedOnce && !force) return;
+
+    _curfewLoading = true;
+    _curfewError = null;
+    notifyListeners();
+
+    try {
+      final list = await _curfewService.listStaffRequests();
+      _curfewRequests
+        ..clear()
+        ..addAll(list);
+      _curfewLoadedOnce = true;
+    } catch (e) {
+      _curfewError = e.toString();
+    } finally {
+      _curfewLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<CurfewRequest> decideCurfewRequest({
+    required String requestId,
+    required bool approve,
+    String? notes,
+  }) async {
+    final updated = await _curfewService.decideStaffRequest(
+      requestId: requestId,
+      approve: approve,
+      notes: notes,
+    );
+
+    final index = _curfewRequests.indexWhere((r) => r.id == requestId);
+    if (index != -1) {
+      _curfewRequests[index] = updated;
+    } else {
+      _curfewRequests.insert(0, updated);
+    }
+    notifyListeners();
+    return updated;
+  }
+
+  void clear() {
+    _payments.clear();
+    _paymentsLoading = false;
+    _paymentsError = null;
+    _roomRecords.clear();
+    _roomsLoading = false;
+    _roomsError = null;
+    _curfewRequests.clear();
+    _curfewLoading = false;
+    _curfewError = null;
+    _curfewLoadedOnce = false;
     notifyListeners();
   }
 }

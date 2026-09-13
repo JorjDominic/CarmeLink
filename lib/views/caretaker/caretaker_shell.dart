@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../controllers/owner_controller.dart';
 import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
@@ -9,8 +10,21 @@ import '../shared/shared_views.dart';
 import '../shared/account_management_page.dart';
 
 /// Operational workspace that excludes owner-only financial and analytics UI.
-class CaretakerShell extends StatelessWidget {
+class CaretakerShell extends StatefulWidget {
   const CaretakerShell({super.key});
+
+  @override
+  State<CaretakerShell> createState() => _CaretakerShellState();
+}
+
+class _CaretakerShellState extends State<CaretakerShell> {
+  @override
+  void initState() {
+    super.initState();
+    OwnerController.instance.loadRooms();
+    OwnerController.instance.loadPayments();
+    OwnerController.instance.loadCurfewRequests();
+  }
 
   @override
   Widget build(BuildContext context) => const RoleGuard(

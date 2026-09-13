@@ -90,5 +90,51 @@ class CurfewService {
 
     return CurfewRequest.fromJson(row);
   }
+
+  /// Lists all curfew requests across the dormitory for staff (owner/caretaker).
+  Future<List<CurfewRequest>> listStaffRequests() async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null) return const [];
+
+    try {
+      final rows = await client
+          .from('curfew_requests')
+          .select(columnsWithTenant)
+          .order('departure_time', ascending: false);
+
+      return rows
+          .map<CurfewRequest>((row) => CurfewRequest.fromJson(row))
+          .toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Staff decision on a curfew request (approve or reject with optional notes).
+  Future<CurfewRequest> decideStaffRequest({
+    required String requestId,
+    required bool approve,
+    String? notes,
+  }) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null) {
+      throw Exception('Database client not available');
+    }
+
+    final decision = approve ? 'approved' : 'rejected';
+    final payload = <String, dynamic>{
+      'staff_decision': decision,
+      if (notes != null && notes.trim().isNotEmpty) 'staff_notes': notes.trim(),
+    };
+
+    final row = await client
+        .from('curfew_requests')
+        .update(payload)
+        .eq('id', requestId)
+        .select(columnsWithTenant)
+        .single();
+
+    return CurfewRequest.fromJson(row);
+  }
 }
 

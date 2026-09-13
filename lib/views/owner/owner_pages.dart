@@ -102,7 +102,9 @@ class OwnerDashboardPage extends StatelessWidget {
                 MutedDashboardItem(
                   label: 'Curfew',
                   value: '${controller.tenantsInsideCount} Inside',
-                  detail: '${controller.tenantsOutsideCount} Outside',
+                  detail: controller.pendingStaffCurfewCount > 0
+                      ? '${controller.pendingStaffCurfewCount} waiting review'
+                      : '${controller.tenantsOutsideCount} Outside',
                   icon: Icons.schedule_outlined,
                   color: const Color(0xFF56886B),
                   onTap: () => _ownerPush(
@@ -118,6 +120,22 @@ class OwnerDashboardPage extends StatelessWidget {
               subtitle: 'Actionable items before routine monitoring',
             ),
             const SizedBox(height: 10),
+            if (controller.pendingStaffCurfewCount > 0) ...[
+              AttentionCard(
+                compact: true,
+                icon: Icons.pending_actions_outlined,
+                title:
+                    '${controller.pendingStaffCurfewCount} curfew exception(s) waiting',
+                subtitle:
+                    'Review pending late returns and overnight leave requests.',
+                status: 'Action needed',
+                onTap: () => _ownerPush(
+                  context,
+                  const CurfewRequestReviewPage(),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             AttentionCard(
               compact: true,
               icon: Icons.event_busy_outlined,
@@ -1169,7 +1187,12 @@ const _operationCategories = [
           'Geofence presence',
           'Review live tenant presence and boundary',
           Icons.location_on_outlined,
-          GeofenceMonitoringPage()),
+          GeofenceMonitoringPage(initialSegment: 1)),
+      _OperationItem(
+          'Curfew exceptions',
+          'Approve late returns and overnight leaves',
+          Icons.schedule_outlined,
+          CurfewRequestReviewPage()),
       _OperationItem('Visitors', 'Manage visitor requests',
           Icons.people_outline, VisitorManagementPage()),
       _OperationItem('Confidential reports', 'Review private reports',
@@ -2644,8 +2667,127 @@ class FloorPlanMonitoringPage extends StatelessWidget {
   }
 }
 
-class GeofenceMonitoringPage extends StatelessWidget {
-  const GeofenceMonitoringPage({super.key});
+class GeofenceMonitoringPage extends StatefulWidget {
+  const GeofenceMonitoringPage({
+    super.key,
+    this.initialSegment = 0,
+  });
+
+  final int initialSegment;
+
+  @override
+  State<GeofenceMonitoringPage> createState() => _GeofenceMonitoringPageState();
+}
+
+class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
+  late int _selectedSegment;
+  String _filter = 'pending'; // 'pending', 'approved', 'rejected', 'all'
+  TableRefreshSubscription? _subscription;
+  String? _processingRequestId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedSegment = widget.initialSegment;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        OwnerController.instance.loadCurfewRequests();
+      }
+    });
+
+    _subscription = TableRefreshSubscription(
+      'staff-curfew-monitoring',
+      ['curfew_requests'],
+      () {
+        if (mounted) {
+          OwnerController.instance.loadCurfewRequests(force: true);
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _subscription?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleDecision({
+    required CurfewRequest request,
+    required bool approve,
+    String? notes,
+  }) async {
+    setState(() => _processingRequestId = request.id);
+    try {
+      await OwnerController.instance.decideCurfewRequest(
+        requestId: request.id,
+        approve: approve,
+        notes: notes,
+      );
+      if (!mounted) return;
+      final name = request.tenantName ?? 'Resident';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            approve
+                ? 'Curfew request for $name approved.'
+                : 'Curfew request for $name rejected.',
+          ),
+          backgroundColor:
+              approve ? const Color(0xFF56886B) : const Color(0xFFB3261E),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update request: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _processingRequestId = null);
+      }
+    }
+  }
+
+  void _promptApproveDialog(CurfewRequest request) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (bottomSheetContext) => _StaffCurfewApproveSheet(
+        request: request,
+        onConfirmApprove: (notes) {
+          Navigator.of(bottomSheetContext).pop();
+          _handleDecision(request: request, approve: true, notes: notes);
+        },
+      ),
+    );
+  }
+
+  void _promptRejectDialog(CurfewRequest request) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (bottomSheetContext) => _StaffCurfewRejectSheet(
+        request: request,
+        onConfirmReject: (notes) {
+          Navigator.of(bottomSheetContext).pop();
+          _handleDecision(request: request, approve: false, notes: notes);
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2653,130 +2795,939 @@ class GeofenceMonitoringPage extends StatelessWidget {
 
     return PageFrame(
       title: 'Curfew',
-      subtitle: 'Geofence perimeter and live tenant status',
+      subtitle: 'Review exceptions and monitor perimeter',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh curfew data',
+          icon: controller.curfewLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded),
+          onPressed: controller.curfewLoading
+              ? null
+              : () => controller.loadCurfewRequests(force: true),
+        ),
+      ],
       child: AnimatedBuilder(
         animation: controller,
-        builder: (context, _) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AdaptiveGrid(
-              children: [
-                const MetricCard(
-                  label: 'Dormitory perimeter',
-                  value: '50m Radius',
-                  detail: 'Carmelita\'s Dormitory',
-                  icon: Icons.location_searching_outlined,
-                ),
-                MetricCard(
-                  label: 'Inside perimeter',
-                  value: '${controller.tenantsInsideCount}',
-                  detail: 'Residents on premises',
-                  icon: Icons.home_outlined,
-                ),
-                MetricCard(
-                  label: 'Outside perimeter',
-                  value: '${controller.tenantsOutsideCount}',
-                  detail: 'Residents away',
-                  icon: Icons.directions_walk_outlined,
-                ),
-              ],
-            ),
-            const SizedBox(height: 22),
-            const SectionTitle(
-              'Resident presence directory',
-              subtitle:
-                  'Current presence verified via background GPS geofencing',
-            ),
-            const SizedBox(height: 10),
-            ...controller.tenants.map(
-              (tenant) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: CarmelitaCard(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
+        builder: (context, _) {
+          final allRequests = controller.curfewRequests;
+          final pendingCount = controller.pendingStaffCurfewCount;
+          final approvedCount =
+              allRequests.where((r) => r.isApproved).length;
+          final rejectedCount =
+              allRequests.where((r) => r.isRejected).length;
+
+          final displayedRequests = switch (_filter) {
+            'pending' => allRequests
+                .where((r) => r.isPendingStaff || r.status == 'pending_guardian')
+                .toList(),
+            'approved' => allRequests.where((r) => r.isApproved).toList(),
+            'rejected' => allRequests.where((r) => r.isRejected).toList(),
+            _ => allRequests,
+          };
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AdaptiveGrid(
+                children: [
+                  MetricCard(
+                    label: 'Exceptions waiting',
+                    value: '$pendingCount',
+                    detail: pendingCount > 0
+                        ? 'Staff review required'
+                        : 'All clear',
+                    icon: Icons.pending_actions_outlined,
                   ),
+                  MetricCard(
+                    label: 'Inside perimeter',
+                    value: '${controller.tenantsInsideCount}',
+                    detail: 'Residents on premises',
+                    icon: Icons.home_outlined,
+                  ),
+                  MetricCard(
+                    label: 'Outside perimeter',
+                    value: '${controller.tenantsOutsideCount}',
+                    detail: 'Residents away',
+                    icon: Icons.directions_walk_outlined,
+                  ),
+                  const MetricCard(
+                    label: 'Perimeter radius',
+                    value: '50m Radius',
+                    detail: "Carmelita's Dormitory",
+                    icon: Icons.location_searching_outlined,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: SegmentedButton<int>(
+                      segments: [
+                        ButtonSegment<int>(
+                          value: 0,
+                          label: Text(
+                            pendingCount > 0
+                                ? 'Exceptions ($pendingCount)'
+                                : 'Exceptions',
+                          ),
+                          icon: const Icon(Icons.schedule_outlined),
+                        ),
+                        const ButtonSegment<int>(
+                          value: 1,
+                          label: Text('Perimeter & Presence'),
+                          icon: Icon(Icons.radar_outlined),
+                        ),
+                      ],
+                      selected: {_selectedSegment},
+                      onSelectionChanged: (value) {
+                        setState(() => _selectedSegment = value.first);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              if (_selectedSegment == 0) ...[
+                // Curfew Exceptions Tab
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: (tenant.gateStatus == 'IN' ||
-                                tenant.gateStatus == 'Inside')
-                            ? const Color(0x1556886B)
-                            : const Color(0x15627FA8),
-                        foregroundColor: (tenant.gateStatus == 'IN' ||
-                                tenant.gateStatus == 'Inside')
-                            ? const Color(0xFF56886B)
-                            : const Color(0xFF627FA8),
-                        child: Icon(
-                          (tenant.gateStatus == 'IN' ||
-                                  tenant.gateStatus == 'Inside')
-                              ? Icons.home_rounded
-                              : Icons.directions_walk_rounded,
-                          size: 20,
-                        ),
+                      _FilterChip(
+                        label: 'Pending ($pendingCount)',
+                        selected: _filter == 'pending',
+                        badgeColor: const Color(0xFFAA8A45),
+                        onTap: () => setState(() => _filter = 'pending'),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              tenant.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Room ${tenant.room} • Bed ${tenant.bedSpace}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Approved ($approvedCount)',
+                        selected: _filter == 'approved',
+                        badgeColor: const Color(0xFF56886B),
+                        onTap: () => setState(() => _filter = 'approved'),
                       ),
-                      StatusPill(
-                        (tenant.gateStatus == 'IN' ||
-                                tenant.gateStatus == 'Inside')
-                            ? 'Inside'
-                            : 'Outside',
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Rejected ($rejectedCount)',
+                        selected: _filter == 'rejected',
+                        badgeColor: const Color(0xFFB3261E),
+                        onTap: () => setState(() => _filter = 'rejected'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'All (${allRequests.length})',
+                        selected: _filter == 'all',
+                        badgeColor: Colors.grey,
+                        onTap: () => setState(() => _filter = 'all'),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 22),
-            const SectionTitle(
-              'Recent geofence transitions',
-              subtitle: 'Automated perimeter arrival and departure logs',
-            ),
-            const SizedBox(height: 10),
-            ...controller.geofenceEvents.map(
-              (event) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: CarmelitaCard(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
+                const SizedBox(height: 16),
+                if (controller.curfewLoading && displayedRequests.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (displayedRequests.isEmpty)
+                  EmptyState(
+                    icon: _filter == 'pending'
+                        ? Icons.task_alt_outlined
+                        : Icons.schedule_outlined,
+                    title: _filter == 'pending'
+                        ? 'No pending curfew exceptions'
+                        : 'No requests in this tab',
+                    message: _filter == 'pending'
+                        ? 'All resident late returns and overnight leave requests have been addressed.'
+                        : 'Curfew exception requests will appear here once submitted.',
+                  )
+                else
+                  ...displayedRequests.map(
+                    (req) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _StaffCurfewRequestCard(
+                        request: req,
+                        isProcessing: _processingRequestId == req.id,
+                        onApprove: () => _promptApproveDialog(req),
+                        onReject: () => _promptRejectDialog(req),
+                      ),
+                    ),
                   ),
-                  child: TimelineTile(
-                    compact: true,
-                    icon: event.direction == 'IN'
-                        ? Icons.login_rounded
-                        : Icons.logout_rounded,
-                    color: event.direction == 'IN'
-                        ? const Color(0xFF56886B)
-                        : const Color(0xFF627FA8),
-                    title:
-                        '${event.person} • ${event.direction == 'IN' ? 'Entered' : 'Exited'} perimeter',
-                    subtitle:
-                        '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verification}',
-                    trailing: StatusPill(event.status),
+              ] else ...[
+                // Perimeter & Presence Tab
+                const SectionTitle(
+                  'Resident presence directory',
+                  subtitle:
+                      'Current presence verified via background GPS geofencing',
+                ),
+                const SizedBox(height: 10),
+                ...controller.tenants.map(
+                  (tenant) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: CarmelitaCard(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: (tenant.gateStatus == 'IN' ||
+                                    tenant.gateStatus == 'Inside')
+                                ? const Color(0x1556886B)
+                                : const Color(0x15627FA8),
+                            foregroundColor: (tenant.gateStatus == 'IN' ||
+                                    tenant.gateStatus == 'Inside')
+                                ? const Color(0xFF56886B)
+                                : const Color(0xFF627FA8),
+                            child: Icon(
+                              (tenant.gateStatus == 'IN' ||
+                                      tenant.gateStatus == 'Inside')
+                                  ? Icons.home_rounded
+                                  : Icons.directions_walk_rounded,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  tenant.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Room ${tenant.room} • Bed ${tenant.bedSpace}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          StatusPill(
+                            (tenant.gateStatus == 'IN' ||
+                                    tenant.gateStatus == 'Inside')
+                                ? 'Inside'
+                                : 'Outside',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const SectionTitle(
+                  'Recent geofence transitions',
+                  subtitle: 'Automated perimeter arrival and departure logs',
+                ),
+                const SizedBox(height: 10),
+                ...controller.geofenceEvents.map(
+                  (event) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: CarmelitaCard(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      child: TimelineTile(
+                        compact: true,
+                        icon: event.direction == 'IN'
+                            ? Icons.login_rounded
+                            : Icons.logout_rounded,
+                        color: event.direction == 'IN'
+                            ? const Color(0xFF56886B)
+                            : const Color(0xFF627FA8),
+                        title:
+                            '${event.person} • ${event.direction == 'IN' ? 'Entered' : 'Exited'} perimeter',
+                        subtitle:
+                            '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verification}',
+                        trailing: StatusPill(event.status),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StaffCurfewRequestCard extends StatelessWidget {
+  const _StaffCurfewRequestCard({
+    required this.request,
+    required this.isProcessing,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final CurfewRequest request;
+  final bool isProcessing;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final residentName = request.tenantName ?? 'Resident';
+
+    return CarmelitaCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor:
+                    theme.colorScheme.primary.withValues(alpha: .12),
+                child: Text(
+                  residentName.isNotEmpty ? residentName[0].toUpperCase() : 'R',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
               ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      residentName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(
+                          request.isOvernightLeave
+                              ? Icons.hotel_outlined
+                              : Icons.nightlight_outlined,
+                          size: 13,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          request.requestTypeLabel.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              StatusPill(request.statusLabel),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.place_outlined,
+                  size: 16, color: Color(0xFF627FA8)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  request.destination,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (request.reason.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 22),
+              child: Text(
+                request.reason,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: .85),
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: .4),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.flight_takeoff_outlined, size: 15),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Departure: ',
+                      style:
+                          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    Expanded(
+                      child: Text(
+                        '${shortDate(request.departureTime)} • ${timeText(request.departureTime)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.flight_land_outlined, size: 15),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Expected return: ',
+                      style:
+                          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    Expanded(
+                      child: Text(
+                        '${shortDate(request.expectedReturnTime)} • ${timeText(request.expectedReturnTime)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                if (request.actualReturnTime != null) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.check_circle_outline,
+                          size: 15, color: Color(0xFF56886B)),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Actual return: ',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      Expanded(
+                        child: Text(
+                          '${shortDate(request.actualReturnTime!)} • ${timeText(request.actualReturnTime!)}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (request.isOvernightLeave) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: request.guardianDecision == 'approved'
+                    ? const Color(0x1556886B)
+                    : request.guardianDecision == 'rejected'
+                        ? const Color(0x15B3261E)
+                        : const Color(0x15AA8A45),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: request.guardianDecision == 'approved'
+                      ? const Color(0x4056886B)
+                      : request.guardianDecision == 'rejected'
+                          ? const Color(0x40B3261E)
+                          : const Color(0x40AA8A45),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    request.guardianDecision == 'approved'
+                        ? Icons.verified_user_outlined
+                        : request.guardianDecision == 'rejected'
+                            ? Icons.gpp_bad_outlined
+                            : Icons.hourglass_top_outlined,
+                    size: 15,
+                    color: request.guardianDecision == 'approved'
+                        ? const Color(0xFF56886B)
+                        : request.guardianDecision == 'rejected'
+                            ? const Color(0xFFB3261E)
+                            : const Color(0xFFAA8A45),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      request.guardianDecision == 'approved'
+                          ? 'Guardian endorsed${request.guardianRemarks != null && request.guardianRemarks!.isNotEmpty ? ": ${request.guardianRemarks}" : ""}'
+                          : request.guardianDecision == 'rejected'
+                              ? 'Guardian declined${request.guardianRemarks != null && request.guardianRemarks!.isNotEmpty ? ": ${request.guardianRemarks}" : ""}'
+                              : 'Awaiting guardian endorsement',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: request.guardianDecision == 'approved'
+                            ? const Color(0xFF56886B)
+                            : request.guardianDecision == 'rejected'
+                                ? const Color(0xFFB3261E)
+                                : const Color(0xFFAA8A45),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (request.staffNotes != null &&
+              request.staffNotes!.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: .3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.notes_rounded,
+                      size: 15, color: theme.colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Staff note: ${request.staffNotes!}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (request.canReviewStaff) ...[
+            const SizedBox(height: 14),
+            if (isProcessing)
+              const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onReject,
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      label: const Text(
+                        'Reject',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFB3261E),
+                        side: const BorderSide(color: Color(0x60B3261E)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: onApprove,
+                      icon: const Icon(Icons.check_circle_outline, size: 16),
+                      label: const Text(
+                        'Approve',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF56886B),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+          ] else if (request.status == 'pending_guardian') ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onApprove,
+                icon: const Icon(Icons.admin_panel_settings_outlined, size: 16),
+                label: const Text(
+                  'Override as Staff',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ] else if (request.isRejected) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onApprove,
+                icon: const Icon(Icons.sync_alt_rounded, size: 16),
+                label: const Text(
+                  'Re-evaluate & Approve',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StaffCurfewApproveSheet extends StatefulWidget {
+  const _StaffCurfewApproveSheet({
+    required this.request,
+    required this.onConfirmApprove,
+  });
+
+  final CurfewRequest request;
+  final ValueChanged<String?> onConfirmApprove;
+
+  @override
+  State<_StaffCurfewApproveSheet> createState() =>
+      _StaffCurfewApproveSheetState();
+}
+
+class _StaffCurfewApproveSheetState extends State<_StaffCurfewApproveSheet> {
+  final TextEditingController _notesController = TextEditingController();
+
+  final List<String> _quickInstructions = const [
+    'Gate locked after 10 PM. Buzz caretaker upon arrival.',
+    'Use side entrance gate.',
+    'Present student ID to guard upon entry.',
+    'Safe travels. Keep noise minimal upon return.',
+  ];
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = widget.request.tenantName ?? 'Resident';
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF56886B).withValues(alpha: .12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_circle_outline,
+                      color: Color(0xFF56886B), size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Approve Curfew Exception',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 17),
+                      ),
+                      Text(
+                        '$name • ${widget.request.requestTypeLabel}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Quick gate instructions / notes (tap to append):',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: _quickInstructions.map((instruction) {
+                return ActionChip(
+                  label:
+                      Text(instruction, style: const TextStyle(fontSize: 11)),
+                  onPressed: () {
+                    final current = _notesController.text.trim();
+                    if (current.isEmpty) {
+                      _notesController.text = instruction;
+                    } else {
+                      _notesController.text = '$current $instruction';
+                    }
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _notesController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                labelText: 'Gate instructions / staff note (optional)',
+                hintText: 'e.g. Call caretaker upon arriving at gate',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () =>
+                        widget.onConfirmApprove(_notesController.text.trim()),
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: const Text(
+                      'Approve',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF56886B),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StaffCurfewRejectSheet extends StatefulWidget {
+  const _StaffCurfewRejectSheet({
+    required this.request,
+    required this.onConfirmReject,
+  });
+
+  final CurfewRequest request;
+  final ValueChanged<String?> onConfirmReject;
+
+  @override
+  State<_StaffCurfewRejectSheet> createState() =>
+      _StaffCurfewRejectSheetState();
+}
+
+class _StaffCurfewRejectSheetState extends State<_StaffCurfewRejectSheet> {
+  final TextEditingController _notesController = TextEditingController();
+  String _selectedReason = 'Curfew policy strictly enforced tonight';
+
+  final List<String> _quickReasons = const [
+    'Curfew policy strictly enforced tonight',
+    'Guardian verification or endorsement required first',
+    'Excessive late returns this month',
+    'Safety or weather advisory in destination area',
+    'Incomplete or unclear departure details',
+    'Other reason (details below)',
+  ];
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = widget.request.tenantName ?? 'Resident';
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB3261E).withValues(alpha: .12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.cancel_outlined,
+                      color: Color(0xFFB3261E), size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Reject Curfew Exception',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 17),
+                      ),
+                      Text(
+                        '$name • ${widget.request.requestTypeLabel}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Select rejection reason:',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            ..._quickReasons.map(
+              (reason) {
+                final isSelected = _selectedReason == reason;
+                return InkWell(
+                  onTap: () => setState(() => _selectedReason = reason),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_off,
+                          size: 18,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            reason,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _notesController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                labelText: 'Additional notes for resident (optional)',
+                hintText: 'e.g. Please speak with caretaker during office hours',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      final custom = _notesController.text.trim();
+                      final finalReason = custom.isNotEmpty
+                          ? '$_selectedReason: $custom'
+                          : _selectedReason;
+                      widget.onConfirmReject(finalReason);
+                    },
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text(
+                      'Reject',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFB3261E),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -2787,7 +3738,14 @@ class GeofenceMonitoringPage extends StatelessWidget {
 
 typedef GateMonitoringPage = GeofenceMonitoringPage;
 typedef CurfewMonitoringPage = GeofenceMonitoringPage;
-typedef CurfewRequestReviewPage = GeofenceMonitoringPage;
+
+class CurfewRequestReviewPage extends StatelessWidget {
+  const CurfewRequestReviewPage({super.key});
+
+  @override
+  Widget build(BuildContext context) =>
+      const GeofenceMonitoringPage(initialSegment: 0);
+}
 
 class VisitorManagementPage extends StatelessWidget {
   const VisitorManagementPage({super.key});
