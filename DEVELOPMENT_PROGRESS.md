@@ -84,7 +84,7 @@ page exists but its important backend workflow is unfinished.
 - [ ] **Tenants** — full tenant directory, relationships, assignments, and contracts.
 - [ ] **Operations** — live grouped access to every management workflow.
 - [✓] **Rooms** — live room and bed-space CRUD with assignment-aware occupancy, occupant tenant details (name, phone), inter-room bed transfer/reassignment, and assignment termination.
-- [ ] **Floor Plan** — replace demonstration geometry and maintenance markers with live property data.
+- [✓] **Floor Plan (Integrated)** — merged as an interactive 2D map view inside Room Monitoring (`RoomMonitoringPage`) with live Supabase occupancy and bed details, rather than an isolated standalone page.
 - [ ] **Payments** — review receipts, correct records, and maintain an audit trail.
 - [ ] **Maintenance** — assign work, update status, and record resolution details.
 - [ ] **Gate and Manual Override** — auditable access decisions and system health.

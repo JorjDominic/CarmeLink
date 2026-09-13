@@ -3,21 +3,41 @@ import 'package:flutter/material.dart';
 import '../../controllers/owner_controller.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
+import '../../services/room_service.dart';
+import 'room_monitoring_page.dart';
 
-enum _PlanMode { occupancy, maintenance }
-
-class AdminFloorPlanPage extends StatefulWidget {
+/// Backward-compatible route entrypoint that navigates directly to the
+/// interactive floor plan map mode inside [RoomMonitoringPage].
+class AdminFloorPlanPage extends StatelessWidget {
   const AdminFloorPlanPage({super.key});
 
   @override
-  State<AdminFloorPlanPage> createState() => _AdminFloorPlanPageState();
+  Widget build(BuildContext context) {
+    return const RoomMonitoringPage(initialMode: RoomViewMode.floorPlan);
+  }
 }
 
-class _AdminFloorPlanPageState extends State<AdminFloorPlanPage> {
+enum PlanMode { occupancy, maintenance }
+
+class RoomFloorPlanView extends StatefulWidget {
+  const RoomFloorPlanView({
+    required this.rooms,
+    required this.onRoomTap,
+    super.key,
+  });
+
+  final List<RoomRecord> rooms;
+  final ValueChanged<RoomRecord> onRoomTap;
+
+  @override
+  State<RoomFloorPlanView> createState() => _RoomFloorPlanViewState();
+}
+
+class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
   final TransformationController _transform = TransformationController();
   int _floor = 0;
   String? _selectedRoom;
-  _PlanMode _mode = _PlanMode.occupancy;
+  PlanMode _mode = PlanMode.occupancy;
 
   static const _floors = ['Ground floor', 'Second floor'];
 
@@ -35,20 +55,26 @@ class _AdminFloorPlanPageState extends State<AdminFloorPlanPage> {
 
   void _reset() => _transform.value = Matrix4.identity();
 
-  List<_PlanRoom> _roomsFor(OwnerController controller) {
+  List<_PlanRoom> _roomsForCurrentFloor() {
     final layout = _floor == 0 ? _groundLayout : _secondLayout;
     return layout.map((slot) {
-      DormRoomStatus? status;
-      for (final room in controller.rooms) {
-        if (room.roomNumber == slot.number) status = room;
+      RoomRecord? liveRoom;
+      for (final room in widget.rooms) {
+        if (room.number == slot.number) {
+          liveRoom = room;
+          break;
+        }
       }
       return _PlanRoom(
         slot.number,
-        status?.occupied ?? 0,
-        status?.capacity ?? 0,
+        liveRoom?.occupied ?? 0,
+        liveRoom?.capacity ?? 0,
         slot.x,
         slot.y,
-        note: slot.note,
+        note: liveRoom != null
+            ? 'Floor ${liveRoom.floor} • ${liveRoom.occupied}/${liveRoom.capacity} occupied'
+            : slot.note,
+        roomRecord: liveRoom,
       );
     }).toList();
   }
@@ -57,208 +83,222 @@ class _AdminFloorPlanPageState extends State<AdminFloorPlanPage> {
   Widget build(BuildContext context) {
     final controller = OwnerController.instance;
 
-    return PageFrame(
-      title: 'Floor plan',
-      subtitle: 'Interactive admin occupancy map',
-      actions: [
-        IconButton(
-          tooltip: 'Full screen',
-          onPressed: () => _openFullScreen(_roomsFor(controller)),
-          icon: const Icon(Icons.fullscreen_rounded),
-        ),
-      ],
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) {
-          final rooms = _roomsFor(controller);
-          final bedrooms = rooms.where((room) => !room.isAmenity);
-          final occupied =
-              bedrooms.fold<int>(0, (sum, room) => sum + room.occupied);
-          final capacity =
-              bedrooms.fold<int>(0, (sum, room) => sum + room.capacity);
-          final maintenance = controller.maintenance
-              .where((report) =>
-                  report.status != 'Completed' && report.status != 'Closed')
-              .toList();
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final rooms = _roomsForCurrentFloor();
+        final bedrooms = rooms.where((room) => !room.isAmenity);
+        final occupied =
+            bedrooms.fold<int>(0, (sum, room) => sum + room.occupied);
+        final capacity =
+            bedrooms.fold<int>(0, (sum, room) => sum + room.capacity);
+        final maintenance = controller.maintenance
+            .where((report) =>
+                report.status != 'Completed' && report.status != 'Closed')
+            .toList();
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: SegmentedButton<int>(
-                      segments: List.generate(
-                        _floors.length,
-                        (index) => ButtonSegment(
-                          value: index,
-                          label: Text(_floors[index]),
-                          icon: const Icon(Icons.layers_outlined),
-                        ),
-                      ),
-                      selected: {_floor},
-                      onSelectionChanged: (value) {
-                        setState(() {
-                          _floor = value.first;
-                          _selectedRoom = null;
-                          _reset();
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        prefixIcon: Icon(Icons.search_rounded),
-                        hintText: 'Find room (for example, 204)',
-                      ),
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (value) =>
-                          _findRoom(value, rooms, maintenance),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    tooltip: 'Full-screen floor plan',
-                    onPressed: () => _openFullScreen(rooms),
-                    icon: const Icon(Icons.fullscreen_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              SegmentedButton<_PlanMode>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(
-                    value: _PlanMode.occupancy,
-                    icon: Icon(Icons.bed_outlined),
-                    label: Text('Occupancy'),
-                  ),
-                  ButtonSegment(
-                    value: _PlanMode.maintenance,
-                    icon: Icon(Icons.build_outlined),
-                    label: Text('Maintenance'),
-                  ),
-                ],
-                selected: {_mode},
-                onSelectionChanged: (value) =>
-                    setState(() => _mode = value.first),
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _SummaryChip(
-                    icon: Icons.bed_outlined,
-                    label: '$occupied / $capacity occupied',
-                  ),
-                  _SummaryChip(
-                    icon: Icons.event_available_outlined,
-                    label: '${capacity - occupied} beds available',
-                  ),
-                  const _LegendDot(
-                      label: 'Available', color: Color(0xFF56886B)),
-                  const _LegendDot(label: 'Full', color: Color(0xFFAA6870)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              CarmelitaCard(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 10, 8, 8),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.touch_app_outlined, size: 18),
-                          const SizedBox(width: 8),
-                          const Expanded(
-                            child: Text(
-                              'Tap a room for details • pinch or drag to explore',
-                              style: TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Zoom out',
-                            onPressed: () => _zoom(.8),
-                            icon: const Icon(Icons.remove),
-                          ),
-                          IconButton(
-                            tooltip: 'Fit to screen',
-                            onPressed: _reset,
-                            icon:
-                                const Icon(Icons.center_focus_strong_outlined),
-                          ),
-                          IconButton(
-                            tooltip: 'Zoom in',
-                            onPressed: () => _zoom(1.25),
-                            icon: const Icon(Icons.add),
-                          ),
-                        ],
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: SegmentedButton<int>(
+                    segments: List.generate(
+                      _floors.length,
+                      (index) => ButtonSegment(
+                        value: index,
+                        label: Text(_floors[index]),
+                        icon: const Icon(Icons.layers_outlined),
                       ),
                     ),
-                    Container(
-                      height: 440,
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerLowest,
-                        borderRadius: const BorderRadius.vertical(
-                          bottom: Radius.circular(20),
-                        ),
-                      ),
-                      child: InteractiveViewer(
-                        transformationController: _transform,
-                        minScale: .65,
-                        maxScale: 3.5,
-                        boundaryMargin: const EdgeInsets.all(90),
-                        constrained: false,
-                        child: _FloorCanvas(
-                          rooms: rooms,
-                          selectedRoom: _selectedRoom,
-                          mode: _mode,
-                          maintenance: maintenance,
-                          onRoomTap: (room) {
-                            setState(() => _selectedRoom = room.number);
-                            _showRoomDetails(room, maintenance);
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
+                    selected: {_floor},
+                    onSelectionChanged: (value) {
+                      setState(() {
+                        _floor = value.first;
+                        _selectedRoom = null;
+                        _reset();
+                      });
+                    },
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      prefixIcon: Icon(Icons.search_rounded),
+                      hintText: 'Find room (for example, 204)',
+                    ),
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (value) => _findRoom(value, maintenance),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  tooltip: 'Full-screen floor plan',
+                  onPressed: () => _openFullScreen(maintenance),
+                  icon: const Icon(Icons.fullscreen_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            SegmentedButton<PlanMode>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: PlanMode.occupancy,
+                  icon: Icon(Icons.bed_outlined),
+                  label: Text('Occupancy'),
+                ),
+                ButtonSegment(
+                  value: PlanMode.maintenance,
+                  icon: Icon(Icons.build_outlined),
+                  label: Text('Maintenance'),
+                ),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (value) =>
+                  setState(() => _mode = value.first),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _SummaryChip(
+                  icon: Icons.bed_outlined,
+                  label: '$occupied / $capacity occupied',
+                ),
+                _SummaryChip(
+                  icon: Icons.event_available_outlined,
+                  label: '${capacity - occupied} beds available',
+                ),
+                const _LegendDot(
+                    label: 'Available', color: Color(0xFF56886B)),
+                const _LegendDot(label: 'Full', color: Color(0xFFAA6870)),
+                if (_mode == PlanMode.maintenance)
+                  const _LegendDot(
+                      label: 'Has issues', color: Color(0xFFB47A52)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            CarmelitaCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 8, 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.touch_app_outlined, size: 18),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Tap a room for details • pinch or drag to explore',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Zoom out',
+                          onPressed: () => _zoom(.8),
+                          icon: const Icon(Icons.remove),
+                        ),
+                        IconButton(
+                          tooltip: 'Fit to screen',
+                          onPressed: _reset,
+                          icon:
+                              const Icon(Icons.center_focus_strong_outlined),
+                        ),
+                        IconButton(
+                          tooltip: 'Zoom in',
+                          onPressed: () => _zoom(1.25),
+                          icon: const Icon(Icons.add),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    height: 440,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerLowest,
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(20),
+                      ),
+                    ),
+                    child: InteractiveViewer(
+                      transformationController: _transform,
+                      minScale: .65,
+                      maxScale: 3.5,
+                      boundaryMargin: const EdgeInsets.all(90),
+                      constrained: false,
+                      child: _FloorCanvas(
+                        rooms: rooms,
+                        selectedRoom: _selectedRoom,
+                        mode: _mode,
+                        maintenance: maintenance,
+                        onRoomTap: (room) {
+                          setState(() => _selectedRoom = room.number);
+                          _showRoomDetails(room, maintenance);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
-              Text(
-                'Sample layout for administrator preview. Room positions can later be connected to your property database.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          );
-        },
-      ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Integrated layout synced with live room occupancy and maintenance records. Tap any room to view or manage assigned beds.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        );
+      },
     );
   }
 
-  void _findRoom(String query, List<_PlanRoom> rooms,
-      List<MaintenanceReport> maintenance) {
+  void _findRoom(String query, List<MaintenanceReport> maintenance) {
     final clean = query.trim().toUpperCase().replaceFirst('ROOM ', '');
-    for (final room in rooms) {
+    if (clean.isEmpty) return;
+
+    // 1. Search current floor
+    final currentRooms = _roomsForCurrentFloor();
+    for (final room in currentRooms) {
       if (room.number == clean) {
         setState(() => _selectedRoom = room.number);
         _showRoomDetails(room, maintenance);
         return;
       }
     }
-    showAppSnackBar(context, 'Room "$query" is not on this floor.');
+
+    // 2. Search other floor and switch automatically
+    final otherFloor = _floor == 0 ? 1 : 0;
+    final otherLayout = otherFloor == 0 ? _groundLayout : _secondLayout;
+    final existsOnOther = otherLayout.any((slot) => slot.number == clean);
+    if (existsOnOther) {
+      setState(() {
+        _floor = otherFloor;
+        _selectedRoom = clean;
+      });
+      final updatedRooms = _roomsForCurrentFloor();
+      for (final room in updatedRooms) {
+        if (room.number == clean) {
+          _showRoomDetails(room, maintenance);
+          return;
+        }
+      }
+      return;
+    }
+
+    showAppSnackBar(context, 'Room "$query" not found in layout.');
   }
 
   void _showRoomDetails(_PlanRoom room, List<MaintenanceReport> maintenance) {
@@ -266,7 +306,9 @@ class _AdminFloorPlanPageState extends State<AdminFloorPlanPage> {
         .where((report) =>
             report.location.toLowerCase().contains(room.number.toLowerCase()))
         .toList();
-    if (MediaQuery.sizeOf(context).width >= 700) {
+    final isDesktop = MediaQuery.sizeOf(context).width >= 700;
+
+    if (isDesktop) {
       showDialog<void>(
         context: context,
         barrierColor: Colors.black.withValues(alpha: .24),
@@ -292,14 +334,15 @@ class _AdminFloorPlanPageState extends State<AdminFloorPlanPage> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: _roomDetailContent(context, room, reports),
+      builder: (modalContext) => SafeArea(
+        child: _roomDetailContent(modalContext, room, reports),
       ),
     );
   }
 
   Widget _roomDetailContent(
       BuildContext context, _PlanRoom room, List<MaintenanceReport> reports) {
+    final live = room.roomRecord;
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 4, 22, 24),
       child: Column(
@@ -309,8 +352,12 @@ class _AdminFloorPlanPageState extends State<AdminFloorPlanPage> {
           Row(
             children: [
               Expanded(
-                child: Text('Room ${room.number}',
-                    style: Theme.of(context).textTheme.headlineSmall),
+                child: Text(
+                  room.isAmenity ? room.number : 'Room ${room.number}',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
               ),
               StatusPill(room.isAmenity
                   ? 'Shared space'
@@ -321,25 +368,48 @@ class _AdminFloorPlanPageState extends State<AdminFloorPlanPage> {
           ),
           const SizedBox(height: 16),
           if (!room.isAmenity) ...[
-            _DetailRow(Icons.bed_outlined,
-                '${room.occupied} of ${room.capacity} beds occupied'),
             _DetailRow(
-                Icons.person_outline,
-                room.occupied == 0
-                    ? 'No assigned tenants'
-                    : '${room.occupied} assigned tenant(s)'),
+              Icons.bed_outlined,
+              '${room.occupied} of ${room.capacity} beds occupied',
+            ),
+            _DetailRow(
+              Icons.event_available_outlined,
+              room.capacity > room.occupied
+                  ? '${room.capacity - room.occupied} bed(s) available for assignment'
+                  : 'No beds currently available',
+            ),
+            if (live != null)
+              _DetailRow(
+                Icons.layers_outlined,
+                'Floor ${live.floor} • ${live.beds.length} configured bed space(s)',
+              ),
           ],
           _DetailRow(Icons.home_work_outlined, room.note),
           if (reports.isNotEmpty)
-            _DetailRow(Icons.build_outlined,
-                '${reports.length} open maintenance issue(s)'),
-          const SizedBox(height: 12),
+            _DetailRow(
+              Icons.build_outlined,
+              '${reports.length} open maintenance issue(s)',
+            ),
+          const SizedBox(height: 16),
+          if (live != null) ...[
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onRoomTap(live);
+                },
+                icon: const Icon(Icons.meeting_room_outlined),
+                label: const Text('Manage Room & Beds'),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           SizedBox(
             width: double.infinity,
-            child: FilledButton.icon(
+            child: OutlinedButton(
               onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.check),
-              label: const Text('Done'),
+              child: const Text('Close'),
             ),
           ),
         ],
@@ -347,14 +417,13 @@ class _AdminFloorPlanPageState extends State<AdminFloorPlanPage> {
     );
   }
 
-  void _openFullScreen(List<_PlanRoom> rooms) {
-    final maintenance = OwnerController.instance.maintenance
-        .where((report) =>
-            report.status != 'Completed' && report.status != 'Closed')
-        .toList();
+  void _openFullScreen(List<MaintenanceReport> maintenance) {
+    final rooms = _roomsForCurrentFloor();
     Navigator.of(context).push(MaterialPageRoute(
       builder: (context) => Scaffold(
-        appBar: AppBar(title: Text(_floors[_floor])),
+        appBar: AppBar(
+          title: Text('${_floors[_floor]} • Floor Plan'),
+        ),
         body: InteractiveViewer(
           minScale: .5,
           maxScale: 4,
@@ -384,7 +453,7 @@ class _FloorCanvas extends StatelessWidget {
 
   final List<_PlanRoom> rooms;
   final String? selectedRoom;
-  final _PlanMode mode;
+  final PlanMode mode;
   final List<MaintenanceReport> maintenance;
   final ValueChanged<_PlanRoom> onRoomTap;
 
@@ -457,21 +526,23 @@ class _FloorCanvas extends StatelessWidget {
 }
 
 class _RoomTile extends StatelessWidget {
-  const _RoomTile(
-      {required this.room,
-      required this.selected,
-      required this.mode,
-      required this.maintenanceCount,
-      required this.onTap});
+  const _RoomTile({
+    required this.room,
+    required this.selected,
+    required this.mode,
+    required this.maintenanceCount,
+    required this.onTap,
+  });
+
   final _PlanRoom room;
   final bool selected;
-  final _PlanMode mode;
+  final PlanMode mode;
   final int maintenanceCount;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = mode == _PlanMode.maintenance
+    final color = mode == PlanMode.maintenance
         ? maintenanceCount > 0
             ? const Color(0xFFB47A52)
             : const Color(0xFF718077)
@@ -517,7 +588,7 @@ class _RoomTile extends StatelessWidget {
               ]),
               const Spacer(),
               Text(
-                  mode == _PlanMode.maintenance
+                  mode == PlanMode.maintenance
                       ? maintenanceCount == 0
                           ? 'No open issues'
                           : '$maintenanceCount open issue(s)'
@@ -525,10 +596,12 @@ class _RoomTile extends StatelessWidget {
                           ? 'Shared space'
                           : '${room.occupied}/${room.capacity} beds',
                   style: const TextStyle(fontWeight: FontWeight.w700)),
-              if (!room.isAmenity && mode == _PlanMode.occupancy) ...[
+              if (!room.isAmenity && mode == PlanMode.occupancy) ...[
                 const SizedBox(height: 4),
                 LinearProgressIndicator(
-                  value: room.occupied / room.capacity,
+                  value: room.capacity > 0
+                      ? (room.occupied / room.capacity).clamp(0.0, 1.0)
+                      : 0.0,
                   color: color,
                   backgroundColor: color.withValues(alpha: .18),
                 ),
@@ -542,17 +615,27 @@ class _RoomTile extends StatelessWidget {
 }
 
 class _PlanRoom {
-  const _PlanRoom(this.number, this.occupied, this.capacity, this.x, this.y,
-      {this.note = 'Standard shared room'});
+  const _PlanRoom(
+    this.number,
+    this.occupied,
+    this.capacity,
+    this.x,
+    this.y, {
+    this.note = 'Standard shared room',
+    this.roomRecord,
+  });
+
   final String number;
   final int occupied;
   final int capacity;
   final double x, y;
   final String note;
+  final RoomRecord? roomRecord;
+
   double get width => 270;
   double get height => 105;
   bool get isAmenity => number == 'COMMON' || number == 'LAUNDRY';
-  bool get isFull => !isAmenity && occupied >= capacity;
+  bool get isFull => !isAmenity && capacity > 0 && occupied >= capacity;
 }
 
 class _PlanSlot {

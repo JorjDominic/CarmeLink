@@ -11,6 +11,7 @@ class RoomService {
   static DateTime? _lastFetch;
 
   static List<RoomRecord>? get cachedRooms => _cachedRooms;
+  static set cachedRooms(List<RoomRecord>? rooms) => _cachedRooms = rooms;
 
   static void invalidateCache() {
     _cachedRooms = null;

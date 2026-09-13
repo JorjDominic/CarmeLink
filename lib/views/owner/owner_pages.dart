@@ -13,7 +13,6 @@ import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../widgets/feature_widgets.dart';
 import '../shared/account_management_page.dart';
-import 'floor_plan_page.dart';
 import 'guardian_link_management_page.dart';
 import 'staff_maintenance_page.dart';
 import 'room_monitoring_page.dart';
@@ -1170,9 +1169,9 @@ const _operationCategories = [
     Color(0xFF56886B),
     [
       _OperationItem('Rooms', 'Manage room occupancy', Icons.bed_outlined,
-          RoomMonitoringPage()),
-      _OperationItem('Floor plan', 'Explore the interactive room map',
-          Icons.map_outlined, AdminFloorPlanPage()),
+          RoomMonitoringPage(initialMode: RoomViewMode.list)),
+      _OperationItem('Floor plan', 'Interactive 2D room occupancy map',
+          Icons.map_outlined, RoomMonitoringPage(initialMode: RoomViewMode.floorPlan)),
       _OperationItem('Maintenance', 'Manage repair requests',
           Icons.build_outlined, MaintenanceManagementPage()),
     ],

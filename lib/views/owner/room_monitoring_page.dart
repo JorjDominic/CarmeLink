@@ -6,15 +6,25 @@ import '../../core/widgets/common_widgets.dart';
 import '../../services/room_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/tenant_service.dart';
+import 'floor_plan_page.dart';
 import 'owner_pages.dart';
 
+enum RoomViewMode { list, floorPlan }
+
 class RoomMonitoringPage extends StatefulWidget {
-  const RoomMonitoringPage({super.key});
+  const RoomMonitoringPage({
+    super.key,
+    this.initialMode = RoomViewMode.list,
+  });
+
+  final RoomViewMode initialMode;
+
   @override
   State<RoomMonitoringPage> createState() => _RoomMonitoringPageState();
 }
 
 class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
+  late RoomViewMode _viewMode = widget.initialMode;
   final service = const RoomService();
   List<RoomRecord>? rooms;
   bool loading = true;
@@ -134,17 +144,51 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
             ),
           ]),
           const SizedBox(height: 18),
-          AdaptiveGrid(
-            minTileWidth: 260,
-            children: currentRooms.map(roomCard).toList(),
+          Row(
+            children: [
+              Expanded(
+                child: SegmentedButton<RoomViewMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: RoomViewMode.list,
+                      label: Text('List view'),
+                      icon: Icon(Icons.view_agenda_outlined),
+                    ),
+                    ButtonSegment(
+                      value: RoomViewMode.floorPlan,
+                      label: Text('Floor plan map'),
+                      icon: Icon(Icons.map_outlined),
+                    ),
+                  ],
+                  selected: {_viewMode},
+                  onSelectionChanged: (selection) {
+                    setState(() => _viewMode = selection.first);
+                  },
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 18),
+          if (_viewMode == RoomViewMode.list)
+            AdaptiveGrid(
+              minTileWidth: 260,
+              children: currentRooms.map(roomCard).toList(),
+            )
+          else
+            RoomFloorPlanView(
+              rooms: currentRooms,
+              onRoomTap: _openRoomDetail,
+            ),
         ],
       );
     }
 
     return PageFrame(
       title: 'Room monitoring',
-      subtitle: 'Live rooms, bed spaces, occupancy, and availability',
+      subtitle: _viewMode == RoomViewMode.list
+          ? 'Live rooms, bed spaces, occupancy, and availability'
+          : 'Interactive building layout, occupancy, and room status',
+      onRefresh: () => _loadRooms(showSpinner: currentRooms == null),
       actions: [
         IconButton(
           onPressed: () => _loadRooms(showSpinner: currentRooms == null),
