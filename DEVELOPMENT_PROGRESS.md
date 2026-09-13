@@ -60,10 +60,9 @@ page exists but its important backend workflow is unfinished.
 ### Guardian pages
 
 - [✓] **Home** — live linked-tenant, payment, and notice summary with real-time refresh.
-- [✓] **Tenant Information** — live RLS-limited profile, room assignment, occupancy, and roommates for verified linked tenants.
-- [ ] **Curfew Overview** — linked tenant's current status and approved exceptions.
+- [✓] **Curfew Overview** — linked tenant's current status, overnight leave endorsements, and approved exceptions with live real-time sync.
 - [ ] **Gate Activity** — verified activity for linked tenants only.
-- [ ] **Curfew Requests** — approve or reject requests with an audit timestamp.
+- [✓] **Curfew Requests** — review overnight leave requests with parental remarks, endorse/decline actions, audit timestamps, and real-time Supabase sync.
 - [✓] **Payment Status** — live read-only charges, balances, and verification status for linked tenants.
 - [✓] **Announcements** — guardian-audience notices from Supabase with realtime subscription.
 - [ ] **Messages and Conversation** — persistent communication with authorized staff.
@@ -154,8 +153,8 @@ need to be agreed on before implementation.
 - [✓] View the existing verified guardian-to-tenant relationship.
 - [✓] Use local theme/settings and view Dormitory Information.
 - [ ] Edit only the guardian's permitted personal contact fields.
-- [ ] View curfew requests submitted by an already-linked tenant.
-- [ ] Approve or reject those requests with remarks and a decision timestamp.
+- [✓] View curfew requests submitted by an already-linked tenant.
+- [✓] Approve or reject those requests with remarks and a decision timestamp.
 - [ ] Persist the guardian's own notification preferences.
 
 The curfew workflow above depends on the Tenant and Guardian implementations,
@@ -172,7 +171,7 @@ but it does not require the Owner page. The request may remain
 - [ ] Staff messaging needs a staff participant and response workflow.
 - [ ] Gate activity needs verified geofence or manual staff records.
 - [ ] Visitor requests need staff approval for a completed workflow.
-- [ ] Curfew requests need a final staff decision for a completed workflow.
+- [✓] Curfew requests need a final staff decision for a completed workflow.
 - [ ] Geofencing, OCR, and analytics need external services.
 
 ### Recommended independent implementation order

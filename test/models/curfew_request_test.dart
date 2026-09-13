@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/controllers/tenant_controller.dart';
 import 'package:carmelitas_dormitory_system/controllers/owner_controller.dart';
+import 'package:carmelitas_dormitory_system/controllers/guardian_controller.dart';
 
 void main() {
   group('CurfewRequest Model', () {
@@ -190,6 +191,22 @@ void main() {
       expect(controller.curfewLoadedOnce, isFalse);
       expect(controller.pendingStaffCurfewCount, 0);
       expect(controller.pendingTotalCurfewCount, 0);
+    });
+  });
+
+  group('GuardianController Curfew State', () {
+    final controller = GuardianController.instance;
+
+    setUp(() {
+      controller.clear();
+    });
+
+    test('initial state and clear resets guardian curfew properties', () {
+      expect(controller.curfewRequests, isEmpty);
+      expect(controller.curfewLoading, isFalse);
+      expect(controller.curfewError, isNull);
+      expect(controller.curfewLoadedOnce, isFalse);
+      expect(controller.pendingGuardianCurfewCount, 0);
     });
   });
 }

@@ -265,6 +265,7 @@ class PageFrame extends StatelessWidget {
     this.floatingActionButton,
     this.heroTitle,
     this.useScriptTitle = true,
+    this.onRefresh,
     super.key,
   });
 
@@ -275,6 +276,7 @@ class PageFrame extends StatelessWidget {
   final Widget child;
   final List<Widget>? actions;
   final Widget? floatingActionButton;
+  final Future<void> Function()? onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -418,18 +420,37 @@ class PageFrame extends StatelessWidget {
         floatingActionButton: resolvedFloatingActionButton,
         body: SafeArea(
           top: false,
-          child: SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            child: ResponsiveContent(
-              padding: EdgeInsets.fromLTRB(
-                AppBreakpoints.horizontalPadding(context),
-                6,
-                AppBreakpoints.horizontalPadding(context),
-                extraBottom,
-              ),
-              child: RepaintBoundary(child: pageChild),
-            ),
-          ),
+          child: onRefresh != null
+              ? RefreshIndicator(
+                  onRefresh: onRefresh!,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: ResponsiveContent(
+                      padding: EdgeInsets.fromLTRB(
+                        AppBreakpoints.horizontalPadding(context),
+                        6,
+                        AppBreakpoints.horizontalPadding(context),
+                        extraBottom,
+                      ),
+                      child: RepaintBoundary(child: pageChild),
+                    ),
+                  ),
+                )
+              : SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: ResponsiveContent(
+                    padding: EdgeInsets.fromLTRB(
+                      AppBreakpoints.horizontalPadding(context),
+                      6,
+                      AppBreakpoints.horizontalPadding(context),
+                      extraBottom,
+                    ),
+                    child: RepaintBoundary(child: pageChild),
+                  ),
+                ),
         ),
       ),
     );

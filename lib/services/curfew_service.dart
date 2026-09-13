@@ -136,5 +136,57 @@ class CurfewService {
 
     return CurfewRequest.fromJson(row);
   }
+
+  /// Lists curfew requests for the guardian's linked resident(s).
+  Future<List<CurfewRequest>> listGuardianRequests({String? tenantId}) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null) return const [];
+
+    try {
+      var query = client
+          .from('curfew_requests')
+          .select(columnsWithTenant);
+
+      if (tenantId != null && tenantId.trim().isNotEmpty) {
+        query = query.eq('tenant_id', tenantId.trim());
+      }
+
+      final rows = await query.order('departure_time', ascending: false);
+
+      return rows
+          .map<CurfewRequest>((row) => CurfewRequest.fromJson(row))
+          .toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Guardian decision on an overnight leave request (endorse/approve or decline/reject with remarks).
+  Future<CurfewRequest> decideGuardianRequest({
+    required String requestId,
+    required bool approve,
+    String? remarks,
+  }) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null) {
+      throw Exception('Database client not available');
+    }
+
+    final decision = approve ? 'approved' : 'rejected';
+    final payload = <String, dynamic>{
+      'guardian_decision': decision,
+      if (remarks != null && remarks.trim().isNotEmpty)
+        'guardian_remarks': remarks.trim(),
+    };
+
+    final row = await client
+        .from('curfew_requests')
+        .update(payload)
+        .eq('id', requestId)
+        .select(columnsWithTenant)
+        .single();
+
+    return CurfewRequest.fromJson(row);
+  }
 }
 

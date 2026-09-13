@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../controllers/guardian_controller.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../models/models.dart';
 import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/usage_stats_service.dart';
@@ -20,6 +21,7 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       GuardianController.instance.loadData();
+      GuardianController.instance.loadCurfewRequests();
     });
   }
 
@@ -30,6 +32,7 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
     return PageFrame(
       title: 'Home',
       subtitle: 'Guardian dashboard',
+      onRefresh: () => controller.loadData(force: true),
       actions: [
         IconButton(
           tooltip: 'Safety alerts',
@@ -54,13 +57,9 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                   ? 'Loading resident details...'
                   : 'Welcome to Carmelita\'s Dormitory');
 
-          return RefreshIndicator(
-            onRefresh: () => controller.loadData(force: true),
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                   ElegantHeader(
                     eyebrow: 'Guardian view',
                     title: headerTitle,
@@ -82,12 +81,29 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                               t.tenantId == controller.selectedTenant?.tenantId;
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
-                            child: ChoiceChip(
+                            child: FilterChip(
                               label: Text(t.name),
                               selected: isSelected,
-                              onSelected: (val) {
-                                if (val) controller.selectTenant(t);
-                              },
+                              onSelected: (_) => controller.selectTenant(t),
+                              avatar: CircleAvatar(
+                                radius: 10,
+                                backgroundColor: isSelected
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .surfaceContainerHighest,
+                                child: Text(
+                                  t.name.isNotEmpty ? t.name[0] : '?',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
+                                  ),
+                                ),
+                              ),
                             ),
                           );
                         }).toList(),
@@ -95,54 +111,59 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                     ),
                   ],
                   const SizedBox(height: 16),
-                  if (tenant != null)
+                  if (controller.hasLinkedTenant)
                     CarmelitaCard(
-                      emphasis: true,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const GuardianTenantInfoPage(),
-                        ),
-                      ),
                       child: Row(
                         children: [
                           CircleAvatar(
-                            radius: 28,
-                            backgroundColor:
-                                const Color(0xFF56886B).withValues(alpha: .15),
-                            child: Text(
-                              tenant.name.isNotEmpty
-                                  ? tenant.name.substring(0, 1)
-                                  : 'R',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 20,
-                                color: Color(0xFF56886B),
-                              ),
-                            ),
+                            radius: 20,
+                            backgroundColor: const Color(0x1556886B),
+                            foregroundColor: const Color(0xFF56886B),
+                            child: const Icon(Icons.person, size: 22),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  tenant.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 17,
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      controller.linkedTenantName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0x1556886B),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text(
+                                        'Active Resident',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF56886B),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text(controller.linkedTenantRoomSubtitle),
-                                const SizedBox(height: 3),
+                                const SizedBox(height: 2),
                                 Text(
-                                  'Relationship: ${tenant.relationship}${tenant.isPrimary ? ' • Primary' : ''}',
+                                  controller.linkedTenantRoomSubtitle,
                                   style: const TextStyle(fontSize: 12),
                                 ),
                               ],
                             ),
                           ),
-                          const Icon(Icons.chevron_right_rounded),
                         ],
                       ),
                     )
@@ -160,6 +181,25 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                         ),
                       ),
                     ),
+                  if (controller.pendingGuardianCurfewCount > 0) ...[
+                    const SizedBox(height: 16),
+                    AttentionCard(
+                      compact: true,
+                      icon: Icons.pending_actions_outlined,
+                      title:
+                          '${controller.pendingGuardianCurfewCount} overnight leave request(s) waiting',
+                      subtitle:
+                          'Your parental endorsement is needed for ${controller.linkedTenantName}.',
+                      status: 'Action needed',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const GuardianPresenceMonitoringPage(
+                            initialSegment: 0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   const SectionTitle(
                     'At a glance',
@@ -171,13 +211,15 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                       MutedDashboardItem(
                         label: 'Curfew',
                         value: 'Inside',
-                        detail: 'GPS Geofence • 8:14 PM',
+                        detail: controller.pendingGuardianCurfewCount > 0
+                            ? '${controller.pendingGuardianCurfewCount} waiting your review'
+                            : 'GPS Geofence • 8:14 PM',
                         icon: Icons.schedule_outlined,
                         color: const Color(0xFF56886B),
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) =>
-                                const GuardianPresenceMonitoringPage(),
+                                const GuardianPresenceMonitoringPage(initialSegment: 0),
                           ),
                         ),
                       ),
@@ -284,9 +326,7 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                     ],
                   ),
                 ],
-              ),
-            ),
-          );
+              );
         },
       ),
     );
@@ -303,6 +343,7 @@ class GuardianTenantInfoPage extends StatelessWidget {
     return PageFrame(
       title: 'Tenant information',
       subtitle: 'Linked resident profile & room assignment',
+      onRefresh: () => controller.loadData(force: true),
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
@@ -324,13 +365,9 @@ class GuardianTenantInfoPage extends StatelessWidget {
             );
           }
 
-          return RefreshIndicator(
-            onRefresh: () => controller.loadData(force: true),
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                   CarmelitaCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -504,17 +541,135 @@ class GuardianTenantInfoPage extends StatelessWidget {
                     ),
                   ],
                 ],
-              ),
-            ),
-          );
+              );
         },
       ),
     );
   }
 }
 
-class GuardianPresenceMonitoringPage extends StatelessWidget {
-  const GuardianPresenceMonitoringPage({super.key});
+class GuardianPresenceMonitoringPage extends StatefulWidget {
+  const GuardianPresenceMonitoringPage({
+    super.key,
+    this.initialSegment = 0,
+  });
+
+  final int initialSegment;
+
+  @override
+  State<GuardianPresenceMonitoringPage> createState() =>
+      _GuardianPresenceMonitoringPageState();
+}
+
+class _GuardianPresenceMonitoringPageState
+    extends State<GuardianPresenceMonitoringPage> {
+  late int _selectedSegment;
+  String _filter = 'pending'; // 'pending', 'approved', 'rejected', 'all'
+  TableRefreshSubscription? _subscription;
+  String? _processingRequestId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedSegment = widget.initialSegment;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        GuardianController.instance.loadCurfewRequests();
+      }
+    });
+
+    _subscription = TableRefreshSubscription(
+      'guardian-curfew-monitoring',
+      ['curfew_requests'],
+      () {
+        if (mounted) {
+          GuardianController.instance.loadCurfewRequests(force: true);
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _subscription?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleDecision({
+    required CurfewRequest request,
+    required bool approve,
+    String? remarks,
+  }) async {
+    setState(() => _processingRequestId = request.id);
+    try {
+      await GuardianController.instance.decideCurfewRequest(
+        requestId: request.id,
+        approve: approve,
+        remarks: remarks,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            approve
+                ? 'Overnight leave endorsed and sent to dormitory staff for review.'
+                : 'Overnight leave declined.',
+          ),
+          backgroundColor:
+              approve ? const Color(0xFF56886B) : const Color(0xFFB3261E),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update request: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _processingRequestId = null);
+      }
+    }
+  }
+
+  void _promptEndorseDialog(CurfewRequest request) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (bottomSheetContext) => _GuardianCurfewEndorseSheet(
+        request: request,
+        onConfirmEndorse: (remarks) {
+          Navigator.of(bottomSheetContext).pop();
+          _handleDecision(request: request, approve: true, remarks: remarks);
+        },
+      ),
+    );
+  }
+
+  void _promptDeclineDialog(CurfewRequest request) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (bottomSheetContext) => _GuardianCurfewDeclineSheet(
+        request: request,
+        onConfirmDecline: (remarks) {
+          Navigator.of(bottomSheetContext).pop();
+          _handleDecision(request: request, approve: false, remarks: remarks);
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -522,105 +677,1026 @@ class GuardianPresenceMonitoringPage extends StatelessWidget {
     final events = controller.geofenceEvents
         .where((event) => event.person == controller.linkedTenantName)
         .toList();
+
     return PageFrame(
       title: 'Curfew',
-      subtitle: 'Linked tenant curfew & geofence status',
+      subtitle: 'Linked resident exceptions & boundary tracking',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh curfew data',
+          icon: controller.curfewLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded),
+          onPressed: controller.curfewLoading
+              ? null
+              : () => controller.loadCurfewRequests(force: true),
+        ),
+      ],
       child: AnimatedBuilder(
         animation: controller,
-        builder: (context, _) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'CURFEW STATUS',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    letterSpacing: 1.3,
-                    color: Theme.of(context).colorScheme.primary,
+        builder: (context, _) {
+          final allRequests = controller.curfewRequests;
+          final pendingCount = controller.pendingGuardianCurfewCount;
+          final approvedCount =
+              allRequests.where((r) => r.isApproved).length;
+          final rejectedCount =
+              allRequests.where((r) => r.isRejected).length;
+
+          final displayedRequests = switch (_filter) {
+            'pending' => allRequests
+                .where((r) =>
+                    r.isPendingGuardian ||
+                    (r.isPending && r.status == 'pending_staff'))
+                .toList(),
+            'approved' => allRequests.where((r) => r.isApproved).toList(),
+            'rejected' => allRequests.where((r) => r.isRejected).toList(),
+            _ => allRequests,
+          };
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AdaptiveGrid(
+                children: [
+                  MetricCard(
+                    label: 'Endorsements waiting',
+                    value: '$pendingCount',
+                    detail: pendingCount > 0
+                        ? 'Parental action needed'
+                        : 'All clear',
+                    icon: Icons.pending_actions_outlined,
                   ),
-            ),
-            const SizedBox(height: 8),
-            const MutedDashboardGrid(
-              compact: true,
-              items: [
-                MutedDashboardItem(
-                  label: 'Current status',
-                  value: 'Inside',
-                  detail: 'Last IN 8:14 PM',
-                  icon: Icons.location_on_outlined,
-                  color: Color(0xFF56886B),
-                ),
-                MutedDashboardItem(
-                  label: 'Geofence zone',
-                  value: '50m Radius',
-                  detail: 'Carmelita\'s Dormitory',
-                  icon: Icons.location_searching_outlined,
-                  color: Color(0xFF627FA8),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            MutedActionGrid(
-              items: [
-                MutedActionItem(
-                  label: 'Tenant information',
-                  detail: 'View linked tenant',
-                  icon: Icons.person_outline,
-                  color: const Color(0xFF56886B),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const GuardianTenantInfoPage(),
-                  )),
-                ),
-                MutedActionItem(
-                  label: 'Payments',
-                  detail: 'Check balances',
-                  icon: Icons.payments_outlined,
-                  color: const Color(0xFFAA8A45),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const GuardianPaymentStatusPage(),
-                  )),
-                ),
-              ],
-            ),
-            const SizedBox(height: 22),
-            const SectionTitle(
-              'Recent presence records',
-              subtitle: 'Automated GPS geofence arrival and departure logs',
-            ),
-            const SizedBox(height: 10),
-            if (events.isEmpty)
-              const EmptyState(
-                icon: Icons.location_off_outlined,
-                title: 'No recent presence records',
-                message: 'Verified arrivals and departures will appear here.',
-              )
-            else
-              ...events.map(
-                (event) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: CarmelitaCard(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
+                  MetricCard(
+                    label: 'Resident presence',
+                    value: controller.linkedTenantPresence,
+                    detail: controller.hasLinkedTenant
+                        ? controller.linkedTenantName
+                        : 'No active linked resident',
+                    icon: Icons.location_on_outlined,
+                  ),
+                  const MetricCard(
+                    label: 'Perimeter radius',
+                    value: '50m Radius',
+                    detail: "Carmelita's Dormitory",
+                    icon: Icons.location_searching_outlined,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: SegmentedButton<int>(
+                      segments: [
+                        ButtonSegment<int>(
+                          value: 0,
+                          label: Text(
+                            pendingCount > 0
+                                ? 'Exceptions ($pendingCount)'
+                                : 'Exceptions',
+                          ),
+                          icon: const Icon(Icons.schedule_outlined),
+                        ),
+                        const ButtonSegment<int>(
+                          value: 1,
+                          label: Text('Perimeter & Presence'),
+                          icon: Icon(Icons.radar_outlined),
+                        ),
+                      ],
+                      selected: {_selectedSegment},
+                      onSelectionChanged: (value) {
+                        setState(() => _selectedSegment = value.first);
+                      },
                     ),
-                    child: TimelineTile(
-                      compact: true,
-                      icon: event.direction == 'IN'
-                          ? Icons.login_rounded
-                          : Icons.logout_rounded,
-                      color: event.direction == 'IN'
-                          ? const Color(0xFF56886B)
-                          : const Color(0xFF627FA8),
-                      title: event.direction == 'IN'
-                          ? 'Entered dormitory perimeter'
-                          : 'Exited dormitory perimeter',
-                      subtitle:
-                          '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verification}',
-                      trailing: StatusPill(event.status),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              if (_selectedSegment == 0) ...[
+                // Curfew Exceptions Tab
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _CurfewFilterChip(
+                        label: 'Pending ($pendingCount)',
+                        selected: _filter == 'pending',
+                        badgeColor: const Color(0xFFAA8A45),
+                        onTap: () => setState(() => _filter = 'pending'),
+                      ),
+                      const SizedBox(width: 8),
+                      _CurfewFilterChip(
+                        label: 'Approved ($approvedCount)',
+                        selected: _filter == 'approved',
+                        badgeColor: const Color(0xFF56886B),
+                        onTap: () => setState(() => _filter = 'approved'),
+                      ),
+                      const SizedBox(width: 8),
+                      _CurfewFilterChip(
+                        label: 'Rejected ($rejectedCount)',
+                        selected: _filter == 'rejected',
+                        badgeColor: const Color(0xFFB3261E),
+                        onTap: () => setState(() => _filter = 'rejected'),
+                      ),
+                      const SizedBox(width: 8),
+                      _CurfewFilterChip(
+                        label: 'All (${allRequests.length})',
+                        selected: _filter == 'all',
+                        badgeColor: Colors.grey,
+                        onTap: () => setState(() => _filter = 'all'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (controller.curfewLoading && displayedRequests.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: CircularProgressIndicator(),
                     ),
+                  )
+                else if (displayedRequests.isEmpty)
+                  EmptyState(
+                    icon: _filter == 'pending'
+                        ? Icons.task_alt_outlined
+                        : Icons.schedule_outlined,
+                    title: _filter == 'pending'
+                        ? 'No pending curfew endorsements'
+                        : 'No requests in this tab',
+                    message: _filter == 'pending'
+                        ? 'All resident curfew and leave requests have been reviewed.'
+                        : 'Curfew exception requests submitted by your linked resident will appear here.',
+                  )
+                else
+                  ...displayedRequests.map(
+                    (req) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _GuardianCurfewRequestCard(
+                        request: req,
+                        isProcessing: _processingRequestId == req.id,
+                        onEndorse: () => _promptEndorseDialog(req),
+                        onDecline: () => _promptDeclineDialog(req),
+                      ),
+                    ),
+                  ),
+              ] else ...[
+                // Perimeter & Presence Tab
+                Text(
+                  'CURFEW STATUS',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        letterSpacing: 1.3,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                const MutedDashboardGrid(
+                  compact: true,
+                  items: [
+                    MutedDashboardItem(
+                      label: 'Current status',
+                      value: 'Inside',
+                      detail: 'Last IN 8:14 PM',
+                      icon: Icons.location_on_outlined,
+                      color: Color(0xFF56886B),
+                    ),
+                    MutedDashboardItem(
+                      label: 'Geofence zone',
+                      value: '50m Radius',
+                      detail: 'Carmelita\'s Dormitory',
+                      icon: Icons.location_searching_outlined,
+                      color: Color(0xFF627FA8),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                MutedActionGrid(
+                  items: [
+                    MutedActionItem(
+                      label: 'Tenant information',
+                      detail: 'View linked tenant',
+                      icon: Icons.person_outline,
+                      color: const Color(0xFF56886B),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const GuardianTenantInfoPage(),
+                        ),
+                      ),
+                    ),
+                    MutedActionItem(
+                      label: 'Payments',
+                      detail: 'Check balances',
+                      icon: Icons.payments_outlined,
+                      color: const Color(0xFFAA8A45),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const GuardianPaymentStatusPage(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                const SectionTitle(
+                  'Recent presence records',
+                  subtitle:
+                      'Automated GPS geofence arrival and departure logs',
+                ),
+                const SizedBox(height: 10),
+                if (events.isEmpty)
+                  const EmptyState(
+                    icon: Icons.location_off_outlined,
+                    title: 'No recent presence records',
+                    message:
+                        'Verified arrivals and departures will appear here.',
+                  )
+                else
+                  ...events.map(
+                    (event) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: CarmelitaCard(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        child: TimelineTile(
+                          compact: true,
+                          icon: event.direction == 'IN'
+                              ? Icons.login_rounded
+                              : Icons.logout_rounded,
+                          color: event.direction == 'IN'
+                              ? const Color(0xFF56886B)
+                              : const Color(0xFF627FA8),
+                          title: event.direction == 'IN'
+                              ? 'Entered dormitory perimeter'
+                              : 'Exited dormitory perimeter',
+                          subtitle:
+                              '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verification}',
+                          trailing: StatusPill(event.status),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _GuardianCurfewRequestCard extends StatelessWidget {
+  const _GuardianCurfewRequestCard({
+    required this.request,
+    required this.isProcessing,
+    required this.onEndorse,
+    required this.onDecline,
+  });
+
+  final CurfewRequest request;
+  final bool isProcessing;
+  final VoidCallback onEndorse;
+  final VoidCallback onDecline;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final residentName = request.tenantName ??
+        GuardianController.instance.linkedTenantName;
+
+    return CarmelitaCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor:
+                    theme.colorScheme.primary.withValues(alpha: .12),
+                child: Text(
+                  residentName.isNotEmpty ? residentName[0].toUpperCase() : 'R',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
               ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      residentName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(
+                          request.isOvernightLeave
+                              ? Icons.hotel_outlined
+                              : Icons.nightlight_outlined,
+                          size: 13,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          request.requestTypeLabel.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              StatusPill(request.statusLabel),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.place_outlined,
+                  size: 16, color: Color(0xFF627FA8)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  request.destination,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (request.reason.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 22),
+              child: Text(
+                request.reason,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: .85),
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: .4),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.flight_takeoff_outlined, size: 15),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Departure: ',
+                      style:
+                          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    Expanded(
+                      child: Text(
+                        '${shortDate(request.departureTime)} • ${timeText(request.departureTime)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.flight_land_outlined, size: 15),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Expected return: ',
+                      style:
+                          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    Expanded(
+                      child: Text(
+                        '${shortDate(request.expectedReturnTime)} • ${timeText(request.expectedReturnTime)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (request.isLateReturn) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0x12627FA8),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0x35627FA8)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline,
+                      size: 15, color: Color(0xFF627FA8)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Same-night late returns past 10 PM are approved directly by Caretaker/Owner for fast gate clearance. Displayed here for your parental awareness.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: .85),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (request.staffNotes != null &&
+                request.staffNotes!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: .5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Staff remarks: ${request.staffNotes}',
+                  style: const TextStyle(
+                      fontSize: 11, fontStyle: FontStyle.italic),
+                ),
+              ),
+            ],
+          ] else if (request.isOvernightLeave) ...[
+            if (request.canReviewGuardian) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0x15AA8A45),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0x40AA8A45)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.notification_important_outlined,
+                        size: 16, color: Color(0xFFAA8A45)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Resident requested an overnight stay off-premises. Your parental approval is required before dormitory staff can evaluate and authorize gate release.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (isProcessing)
+                const Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onDecline,
+                        icon: const Icon(Icons.close_rounded, size: 16),
+                        label: const Text(
+                          'Decline',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFB3261E),
+                          side: const BorderSide(color: Color(0x60B3261E)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: onEndorse,
+                        icon: const Icon(Icons.check_circle_outline, size: 16),
+                        label: const Text(
+                          'Endorse Leave',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF56886B),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ] else if (request.guardianDecision == 'approved') ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0x1556886B),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0x4056886B)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.verified_user_outlined,
+                        size: 15, color: Color(0xFF56886B)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'You endorsed this leave${request.guardianRemarks != null && request.guardianRemarks!.isNotEmpty ? ": \"${request.guardianRemarks}\"" : ""}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF56886B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (request.status == 'pending_staff') ...[
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    'Forwarded to dormitory staff for final gate clearance.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color:
+                          theme.colorScheme.onSurface.withValues(alpha: .7),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ] else if (request.guardianDecision == 'rejected') ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0x15B3261E),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0x40B3261E)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.gpp_bad_outlined,
+                        size: 15, color: Color(0xFFB3261E)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'You declined this overnight leave${request.guardianRemarks != null && request.guardianRemarks!.isNotEmpty ? ": \"${request.guardianRemarks}\"" : ""}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFB3261E),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _GuardianCurfewEndorseSheet extends StatefulWidget {
+  const _GuardianCurfewEndorseSheet({
+    required this.request,
+    required this.onConfirmEndorse,
+  });
+
+  final CurfewRequest request;
+  final ValueChanged<String?> onConfirmEndorse;
+
+  @override
+  State<_GuardianCurfewEndorseSheet> createState() =>
+      _GuardianCurfewEndorseSheetState();
+}
+
+class _GuardianCurfewEndorseSheetState
+    extends State<_GuardianCurfewEndorseSheet> {
+  final TextEditingController _notesController = TextEditingController();
+
+  final List<String> _quickRemarks = const [
+    'Staying with family/relatives.',
+    'Authorized by parents for weekend visit.',
+    'I can be reached on my mobile phone.',
+    'Return travel arrangements confirmed.',
+  ];
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = widget.request.tenantName ?? 'Resident';
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF56886B).withValues(alpha: .12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.verified_user_outlined,
+                      color: Color(0xFF56886B), size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Endorse Overnight Leave',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 17),
+                      ),
+                      Text(
+                        '$name • ${widget.request.requestTypeLabel}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Quick parental notes (tap to append):',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: _quickRemarks.map((remark) {
+                return ActionChip(
+                  label: Text(remark, style: const TextStyle(fontSize: 11)),
+                  onPressed: () {
+                    final current = _notesController.text.trim();
+                    if (current.isEmpty) {
+                      _notesController.text = remark;
+                    } else {
+                      _notesController.text = '$current $remark';
+                    }
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _notesController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                labelText: 'Parental remarks for staff (optional)',
+                hintText: 'e.g. Accompanied by family members',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () =>
+                        widget.onConfirmEndorse(_notesController.text.trim()),
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: const Text(
+                      'Endorse Leave',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF56886B),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GuardianCurfewDeclineSheet extends StatefulWidget {
+  const _GuardianCurfewDeclineSheet({
+    required this.request,
+    required this.onConfirmDecline,
+  });
+
+  final CurfewRequest request;
+  final ValueChanged<String?> onConfirmDecline;
+
+  @override
+  State<_GuardianCurfewDeclineSheet> createState() =>
+      _GuardianCurfewDeclineSheetState();
+}
+
+class _GuardianCurfewDeclineSheetState
+    extends State<_GuardianCurfewDeclineSheet> {
+  final TextEditingController _notesController = TextEditingController();
+  String _selectedReason = 'Parental permission not granted';
+
+  final List<String> _quickReasons = const [
+    'Parental permission not granted',
+    'Midterms/academic obligations scheduled',
+    'Family commitment scheduled',
+    'Unclear destination or accommodations',
+    'Other reason (details below)',
+  ];
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = widget.request.tenantName ?? 'Resident';
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB3261E).withValues(alpha: .12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.cancel_outlined,
+                      color: Color(0xFFB3261E), size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Decline Overnight Leave',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 17),
+                      ),
+                      Text(
+                        '$name • ${widget.request.requestTypeLabel}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Select reason for declining:',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            ..._quickReasons.map(
+              (reason) {
+                final isSelected = _selectedReason == reason;
+                return InkWell(
+                  onTap: () => setState(() => _selectedReason = reason),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_off,
+                          size: 18,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            reason,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _notesController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                labelText: 'Additional notes for resident (optional)',
+                hintText: 'e.g. Please return home directly after classes',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      final custom = _notesController.text.trim();
+                      final finalReason = custom.isNotEmpty
+                          ? '$_selectedReason: $custom'
+                          : _selectedReason;
+                      widget.onConfirmDecline(finalReason);
+                    },
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text(
+                      'Decline',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFB3261E),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CurfewFilterChip extends StatelessWidget {
+  const _CurfewFilterChip({
+    required this.label,
+    required this.selected,
+    required this.badgeColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Color badgeColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primary.withValues(alpha: .14)
+              : isDark
+                  ? const Color(0xFF28231F)
+                  : const Color(0xFFF1EBE4),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected
+                ? theme.colorScheme.primary
+                : theme.dividerColor.withValues(alpha: .2),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: badgeColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                fontSize: 13,
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface,
+              ),
+            ),
           ],
         ),
       ),
@@ -629,6 +1705,7 @@ class GuardianPresenceMonitoringPage extends StatelessWidget {
 }
 
 typedef GuardianCurfewOverviewPage = GuardianPresenceMonitoringPage;
+typedef GuardianCurfewRequestsPage = GuardianPresenceMonitoringPage;
 
 class GuardianActivityPage extends StatefulWidget {
   const GuardianActivityPage({super.key});
@@ -816,8 +1893,6 @@ class _GuardianPresenceRecords extends StatelessWidget {
   }
 }
 
-typedef GuardianCurfewRequestsPage = GuardianPresenceMonitoringPage;
-
 class GuardianPaymentStatusPage extends StatelessWidget {
   const GuardianPaymentStatusPage({super.key});
 
@@ -828,59 +1903,54 @@ class GuardianPaymentStatusPage extends StatelessWidget {
     return PageFrame(
       title: 'Payment status',
       subtitle: 'Linked resident balances and verification',
+      onRefresh: () => controller.loadData(force: true),
       child: AnimatedBuilder(
         animation: controller,
-        builder: (context, _) => RefreshIndicator(
-          onRefresh: () => controller.loadData(force: true),
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                MetricCard(
-                  label: 'Outstanding total',
-                  value: money(controller.outstandingTotal),
-                  detail: controller.payments.isEmpty
-                      ? 'No pending dues'
-                      : 'Unverified and unpaid records',
-                  icon: Icons.account_balance_wallet_outlined,
-                ),
-                const SizedBox(height: 16),
-                if (controller.payments.isEmpty)
-                  CarmelitaCard(
-                    child: ListTile(
-                      leading: const Icon(Icons.receipt_long_outlined,
-                          color: Color(0xFF56886B)),
-                      title: const Text(
-                        'No payment records',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      subtitle: Text(
-                        controller.hasLinkedTenant
-                            ? 'No payment records found for ${controller.linkedTenantName}.'
-                            : 'No payment records available.',
-                      ),
-                    ),
-                  )
-                else
-                  CarmelitaCard(
-                    child: Column(
-                      children: controller.payments
-                          .map(
-                            (payment) => TimelineTile(
-                              icon: Icons.receipt_long_outlined,
-                              title: payment.label,
-                              subtitle: '${money(payment.amount)} • Due '
-                                  '${shortDate(payment.dueDate)}',
-                              trailing: StatusPill(payment.status),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
-              ],
+        builder: (context, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            MetricCard(
+              label: 'Outstanding total',
+              value: money(controller.outstandingTotal),
+              detail: controller.payments.isEmpty
+                  ? 'No pending dues'
+                  : 'Unverified and unpaid records',
+              icon: Icons.account_balance_wallet_outlined,
             ),
-          ),
+            const SizedBox(height: 16),
+            if (controller.payments.isEmpty)
+              CarmelitaCard(
+                child: ListTile(
+                  leading: const Icon(Icons.receipt_long_outlined,
+                      color: Color(0xFF56886B)),
+                  title: const Text(
+                    'No payment records',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: Text(
+                    controller.hasLinkedTenant
+                        ? 'No payment records found for ${controller.linkedTenantName}.'
+                        : 'No payment records available.',
+                  ),
+                ),
+              )
+            else
+              CarmelitaCard(
+                child: Column(
+                  children: controller.payments
+                      .map(
+                        (payment) => TimelineTile(
+                          icon: Icons.receipt_long_outlined,
+                          title: payment.label,
+                          subtitle: '${money(payment.amount)} • Due '
+                              '${shortDate(payment.dueDate)}',
+                          trailing: StatusPill(payment.status),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+          ],
         ),
       ),
     );

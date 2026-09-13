@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/mock_data.dart';
 import '../models/models.dart';
+import '../services/curfew_service.dart';
 import '../services/guardian_service.dart';
 import '../services/table_refresh_subscription.dart';
 
@@ -11,20 +12,34 @@ class GuardianController extends ChangeNotifier {
   static final GuardianController instance = GuardianController._();
 
   final GuardianService _guardianService = const GuardianService();
+  final CurfewService _curfewService = const CurfewService();
 
   final List<LinkedTenant> _linkedTenants = [];
   LinkedTenant? _selectedTenant;
   Room? _room;
   final List<Payment> _payments = [];
+  final List<CurfewRequest> _curfewRequests = [];
 
   bool _loading = false;
   String? _error;
   bool _loadedOnce = false;
+
+  bool _curfewLoading = false;
+  String? _curfewError;
+  bool _curfewLoadedOnce = false;
+
   TableRefreshSubscription? _refreshSub;
 
   List<LinkedTenant> get linkedTenants => List.unmodifiable(_linkedTenants);
   LinkedTenant? get selectedTenant => _selectedTenant;
   bool get hasLinkedTenant => _selectedTenant != null;
+
+  List<CurfewRequest> get curfewRequests => List.unmodifiable(_curfewRequests);
+  bool get curfewLoading => _curfewLoading;
+  String? get curfewError => _curfewError;
+  bool get curfewLoadedOnce => _curfewLoadedOnce;
+  int get pendingGuardianCurfewCount =>
+      _curfewRequests.where((r) => r.isPendingGuardian).length;
 
   String get linkedTenantName {
     if (_selectedTenant != null) {
@@ -100,10 +115,13 @@ class GuardianController extends ChangeNotifier {
         _payments
           ..clear()
           ..addAll(results[1] as List<Payment>);
+
+        await loadCurfewRequests(force: force);
       } else {
         _selectedTenant = null;
         _room = null;
         _payments.clear();
+        _curfewRequests.clear();
       }
 
       _initRealtimeSubscription();
@@ -135,6 +153,8 @@ class GuardianController extends ChangeNotifier {
       _payments
         ..clear()
         ..addAll(results[1] as List<Payment>);
+
+      await loadCurfewRequests(force: true);
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
     } finally {
@@ -143,12 +163,67 @@ class GuardianController extends ChangeNotifier {
     }
   }
 
+  /// Loads curfew exception requests for the linked tenant(s).
+  Future<void> loadCurfewRequests({bool force = false}) async {
+    if (_curfewLoading && !force) return;
+    if (_curfewLoadedOnce && !force) return;
+
+    _curfewLoading = true;
+    _curfewError = null;
+    notifyListeners();
+
+    try {
+      final list = await _curfewService.listGuardianRequests(
+        tenantId: _selectedTenant?.tenantId,
+      );
+      _curfewRequests
+        ..clear()
+        ..addAll(list);
+      _curfewLoadedOnce = true;
+    } catch (e) {
+      _curfewError = e.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _curfewLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Submits guardian endorsement or rejection on an overnight leave request.
+  Future<CurfewRequest> decideCurfewRequest({
+    required String requestId,
+    required bool approve,
+    String? remarks,
+  }) async {
+    final updated = await _curfewService.decideGuardianRequest(
+      requestId: requestId,
+      approve: approve,
+      remarks: remarks,
+    );
+
+    final index = _curfewRequests.indexWhere((r) => r.id == requestId);
+    if (index != -1) {
+      _curfewRequests[index] = updated;
+    } else {
+      _curfewRequests.insert(0, updated);
+    }
+    notifyListeners();
+    return updated;
+  }
+
   void _initRealtimeSubscription() {
     if (_refreshSub != null) return;
     _refreshSub = TableRefreshSubscription(
       'guardian-data-sync',
-      ['guardian_tenant_links', 'tenant_assignments', 'payments'],
-      () => loadData(force: true),
+      [
+        'guardian_tenant_links',
+        'tenant_assignments',
+        'payments',
+        'curfew_requests',
+      ],
+      () {
+        loadData(force: true);
+        loadCurfewRequests(force: true);
+      },
     );
   }
 
@@ -160,9 +235,13 @@ class GuardianController extends ChangeNotifier {
     _selectedTenant = null;
     _room = null;
     _payments.clear();
+    _curfewRequests.clear();
     _loading = false;
     _error = null;
     _loadedOnce = false;
+    _curfewLoading = false;
+    _curfewError = null;
+    _curfewLoadedOnce = false;
     GuardianService.invalidateCache();
     notifyListeners();
   }
