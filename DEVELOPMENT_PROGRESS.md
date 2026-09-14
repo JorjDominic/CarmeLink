@@ -45,10 +45,10 @@ page exists but its important backend workflow is unfinished.
 - [✓] **My Room** — assigned room, bed, roommates, capacity, and utilities with live database sync and real-time refresh.
 - [ ] **Payments** — charges, outstanding balance, due dates, and payment history.
 - [ ] **Upload Payment Proof** — secure Storage upload and verification status.
-- [ ] **Reports Hub** — live maintenance and confidential-report summaries.
-- [ ] **Maintenance Reports** — tenant-owned reports and current status.
-- [ ] **Submit Maintenance** — persist category, urgency, description, and location.
-- [ ] **Maintenance Floor Plan** — attach a valid room/location to a report.
+- [✓] **Reports Hub** — live maintenance and confidential-report summaries with pull-to-refresh and active issue alerts.
+- [✓] **Maintenance Reports** — live tenant-owned reports with status filters (All, Pending, In Progress, Resolved, Cancelled), interactive details sheet, photo zoom, caretaker notes, and cancellation for pending reports.
+- [✓] **Submit Maintenance** — validated category, urgency guidance, description, assigned room context, and photo attachment with 5MB validation.
+- [✓] **Maintenance Floor Plan** — interactive 2D floor plan map location picker integrated directly into report submission.
 - [ ] **Announcements** — show only notices published for the tenant audience.
 - [ ] **Messages and Conversation** — persisted, role-scoped real-time messaging.
 - [ ] **Gate and Curfew** — verified IN/OUT events, curfew status, and exceptions.

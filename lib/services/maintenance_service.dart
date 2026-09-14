@@ -15,7 +15,7 @@ class MaintenanceService {
 
   static const String _reportColumns =
       'id, tenant_id, category, description, location, urgency, '
-      'status, photo_path, created_at, updated_at';
+      'status, photo_path, staff_notes, resolved_at, created_at, updated_at';
 
   String _requireTenantId() {
     final user = _client.auth.currentUser;
@@ -336,6 +336,10 @@ class MaintenanceService {
         row['created_at'] as String,
       ).toLocal(),
       photoPath: row['photo_path'] as String?,
+      staffNotes: (row['staff_notes'] as String?)?.trim() ?? '',
+      resolvedAt: row['resolved_at'] == null
+          ? null
+          : DateTime.tryParse(row['resolved_at'] as String)?.toLocal(),
     );
   }
 

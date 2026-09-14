@@ -24,6 +24,7 @@ class TenantController extends ChangeNotifier {
 
   bool _maintenanceLoading = false;
   String? _maintenanceError;
+  bool _maintenanceLoadedOnce = false;
 
   bool _paymentsLoading = false;
   String? _paymentsError;
@@ -96,6 +97,8 @@ class TenantController extends ChangeNotifier {
 
   String? get maintenanceError => _maintenanceError;
 
+  bool get maintenanceLoadedOnce => _maintenanceLoadedOnce;
+
   Future<void> loadCurfewRequests({bool force = false}) async {
     if (_curfewLoading && !force) return;
     if (_curfewLoadedOnce && !force) return;
@@ -148,8 +151,11 @@ class TenantController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadMaintenance() async {
-    if (_maintenanceLoading) {
+  Future<void> loadMaintenance({bool force = false}) async {
+    if (_maintenanceLoading && !force) {
+      return;
+    }
+    if (_maintenanceLoadedOnce && !force) {
       return;
     }
 
@@ -163,6 +169,7 @@ class TenantController extends ChangeNotifier {
       _maintenance
         ..clear()
         ..addAll(reports);
+      _maintenanceLoadedOnce = true;
     } catch (error) {
       _maintenanceError = _message(error);
     } finally {
@@ -177,6 +184,9 @@ class TenantController extends ChangeNotifier {
     _roomLoading = false;
     _roomError = null;
     _maintenance.clear();
+    _maintenanceLoading = false;
+    _maintenanceError = null;
+    _maintenanceLoadedOnce = false;
     _payments.clear();
     _curfewRequests.clear();
     _curfewLoading = false;
@@ -355,10 +365,23 @@ class TenantController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> cancelMaintenance(String id) => deleteMaintenance(id);
+
   Future<String?> maintenancePhotoUrl(
     String? photoPath,
   ) {
     return _maintenanceService.createPhotoUrl(photoPath);
+  }
+
+  @visibleForTesting
+  void setMaintenanceForTesting(List<MaintenanceReport> list) {
+    _maintenance
+      ..clear()
+      ..addAll(list);
+    _maintenanceLoadedOnce = true;
+    _maintenanceLoading = false;
+    _maintenanceError = null;
+    notifyListeners();
   }
 
   void submitVisitor({

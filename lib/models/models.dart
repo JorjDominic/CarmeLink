@@ -254,6 +254,8 @@ class MaintenanceReport {
     required this.createdAt,
     this.photoPath,
     this.notes = '',
+    this.staffNotes = '',
+    this.resolvedAt,
   });
 
   final String id;
@@ -265,6 +267,58 @@ class MaintenanceReport {
   final DateTime createdAt;
   final String? photoPath;
   String notes;
+  final String staffNotes;
+  final DateTime? resolvedAt;
+
+  bool get isPending => status.trim().toLowerCase() == 'pending';
+  bool get isAssigned => status.trim().toLowerCase() == 'assigned';
+  bool get isInProgress {
+    final s = status.trim().toLowerCase();
+    return s == 'in progress' || s == 'in_progress';
+  }
+  bool get isResolved => status.trim().toLowerCase() == 'resolved';
+  bool get isCancelled => status.trim().toLowerCase() == 'cancelled';
+
+  bool get canCancel => isPending;
+  bool get canEdit => isPending;
+
+  MaintenanceReport copyWith({
+    String? id,
+    String? category,
+    String? description,
+    String? location,
+    String? urgency,
+    String? status,
+    DateTime? createdAt,
+    String? photoPath,
+    String? notes,
+    String? staffNotes,
+    DateTime? resolvedAt,
+  }) {
+    return MaintenanceReport(
+      id: id ?? this.id,
+      category: category ?? this.category,
+      description: description ?? this.description,
+      location: location ?? this.location,
+      urgency: urgency ?? this.urgency,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      photoPath: photoPath ?? this.photoPath,
+      notes: notes ?? this.notes,
+      staffNotes: staffNotes ?? this.staffNotes,
+      resolvedAt: resolvedAt ?? this.resolvedAt,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MaintenanceReport &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 class GeofenceEvent {

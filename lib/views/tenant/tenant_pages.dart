@@ -1270,87 +1270,185 @@ class TenantReportsHubPage extends StatelessWidget {
     return PageFrame(
       title: 'Reports',
       subtitle: 'Maintenance and confidential concerns',
+      onRefresh: () => controller.loadMaintenance(force: true),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const SubmitMaintenancePage(),
+          ),
+        ),
+        icon: const Icon(Icons.add),
+        label: const Text('Report issue'),
+      ),
       child: AnimatedBuilder(
         animation: controller,
-        builder: (context, _) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'REPORT SUMMARY',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    letterSpacing: 1.3,
-                    color: Theme.of(context).colorScheme.primary,
+        builder: (context, _) {
+          final reports = controller.maintenance;
+          final openMaintenance = reports
+              .where(
+                (report) => !{'Resolved', 'Cancelled'}.contains(report.status),
+              )
+              .length;
+          final resolvedMaintenance =
+              reports.where((report) => report.isResolved).length;
+          final latestOpen = reports
+              .where(
+                (report) => !{'Resolved', 'Cancelled'}.contains(report.status),
+              )
+              .firstOrNull;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'REPORT SUMMARY',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      letterSpacing: 1.3,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              MutedDashboardGrid(
+                compact: true,
+                items: [
+                  MutedDashboardItem(
+                    label: 'Maintenance',
+                    value: '${reports.length}',
+                    detail: openMaintenance == 0
+                        ? 'All resolved'
+                        : '$openMaintenance in progress',
+                    icon: Icons.build_outlined,
+                    color: const Color(0xFFB47A52),
                   ),
-            ),
-            const SizedBox(height: 8),
-            MutedDashboardGrid(
-              compact: true,
-              items: [
-                MutedDashboardItem(
-                  label: 'Maintenance',
-                  value: '${controller.maintenance.length}',
-                  detail: 'Submitted issues',
-                  icon: Icons.build_outlined,
-                  color: const Color(0xFFB47A52),
+                  MutedDashboardItem(
+                    label: 'Resolved',
+                    value: '$resolvedMaintenance',
+                    detail: 'Completed issues',
+                    icon: Icons.check_circle_outline,
+                    color: const Color(0xFF568F8E),
+                  ),
+                  MutedDashboardItem(
+                    label: 'Confidential',
+                    value: '${controller.concerns.length}',
+                    detail: 'Private concerns',
+                    icon: Icons.shield_outlined,
+                    color: const Color(0xFF7D70A0),
+                  ),
+                ],
+              ),
+              if (latestOpen != null) ...[
+                const SizedBox(height: 18),
+                Text(
+                  'ACTIVE MAINTENANCE ISSUE',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        letterSpacing: 1.1,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                 ),
-                MutedDashboardItem(
-                  label: 'Confidential',
-                  value: '${controller.concerns.length}',
-                  detail: 'Private concerns',
-                  icon: Icons.shield_outlined,
-                  color: const Color(0xFF7D70A0),
+                const SizedBox(height: 8),
+                CarmelitaCard(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MaintenanceReportsPage(),
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFB47A52).withValues(alpha: .1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.handyman_outlined,
+                          color: Color(0xFFB47A52),
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${latestOpen.category} • ${latestOpen.location}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              latestOpen.description,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      StatusPill(latestOpen.status),
+                    ],
+                  ),
                 ),
               ],
-            ),
-            const SizedBox(height: 22),
-            const SectionTitle('Report options'),
-            const SizedBox(height: 10),
-            _hub(
-              context,
-              'Maintenance reports',
-              'Report room or property issues and follow progress.',
-              Icons.build_outlined,
-              const Color(0xFFB47A52),
-              const MaintenanceReportsPage(),
-            ),
-            const SizedBox(height: 12),
-            _hub(
-              context,
-              'Confidential concern',
-              'Securely report a rule, safety, or roommate concern.',
-              Icons.shield_outlined,
-              const Color(0xFF7D70A0),
-              const ConfidentialConcernPage(),
-            ),
-            if (controller.concerns.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              const SectionTitle('Submitted confidential concerns'),
+              const SizedBox(height: 22),
+              const SectionTitle('Report options'),
               const SizedBox(height: 10),
-              ...controller.concerns.map(
-                (report) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: CarmelitaCard(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    child: TimelineTile(
-                      compact: true,
-                      icon: Icons.shield_outlined,
-                      color: const Color(0xFF7D70A0),
-                      title: report.category,
-                      subtitle:
-                          '${report.summary}\n${shortDate(report.createdAt)}',
-                      trailing: StatusPill(report.status),
+              _hub(
+                context,
+                'Maintenance reports',
+                'Report room or property issues and follow progress.',
+                Icons.build_outlined,
+                const Color(0xFFB47A52),
+                const MaintenanceReportsPage(),
+                badge: openMaintenance > 0 ? '$openMaintenance active' : null,
+              ),
+              const SizedBox(height: 12),
+              _hub(
+                context,
+                'Confidential concern',
+                'Securely report a rule, safety, or roommate concern.',
+                Icons.shield_outlined,
+                const Color(0xFF7D70A0),
+                const ConfidentialConcernPage(),
+              ),
+              if (controller.concerns.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                const SectionTitle('Submitted confidential concerns'),
+                const SizedBox(height: 10),
+                ...controller.concerns.map(
+                  (report) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: CarmelitaCard(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      child: TimelineTile(
+                        compact: true,
+                        icon: Icons.shield_outlined,
+                        color: const Color(0xFF7D70A0),
+                        title: report.category,
+                        subtitle:
+                            '${report.summary}\n${shortDate(report.createdAt)}',
+                        trailing: StatusPill(report.status),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -1361,8 +1459,9 @@ class TenantReportsHubPage extends StatelessWidget {
     String subtitle,
     IconData icon,
     Color color,
-    Widget page,
-  ) {
+    Widget page, {
+    String? badge,
+  }) {
     return CarmelitaCard(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => page),
@@ -1386,7 +1485,16 @@ class TenantReportsHubPage extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
         ),
         subtitle: Text(subtitle, style: const TextStyle(fontSize: 11)),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (badge != null) ...[
+              StatusPill(badge),
+              const SizedBox(width: 4),
+            ],
+            const Icon(Icons.chevron_right),
+          ],
+        ),
       ),
     );
   }
@@ -1402,13 +1510,25 @@ class MaintenanceReportsPage extends StatefulWidget {
 class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
   final controller = TenantController.instance;
   late final TableRefreshSubscription subscription;
+  String _selectedFilter = 'All';
+
+  static const List<String> _filters = [
+    'All',
+    'Pending',
+    'In Progress',
+    'Resolved',
+    'Cancelled',
+  ];
 
   @override
   void initState() {
     super.initState();
     controller.loadMaintenance();
-    subscription = TableRefreshSubscription('tenant-maintenance',
-        ['maintenance_reports'], controller.loadMaintenance);
+    subscription = TableRefreshSubscription(
+      'tenant-maintenance',
+      ['maintenance_reports'],
+      () => controller.loadMaintenance(force: true),
+    );
   }
 
   @override
@@ -1429,19 +1549,22 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete maintenance report?'),
+        title: const Text('Cancel maintenance report?'),
         content: Text(
-          'Delete the ${report.category.toLowerCase()} report for '
+          'Cancel the ${report.category.toLowerCase()} report for '
           '${report.location}? This cannot be undone.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: const Text('Keep report'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Delete'),
+            child: const Text('Cancel report'),
           ),
         ],
       ),
@@ -1452,7 +1575,7 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
     try {
       await controller.deleteMaintenance(report.id);
       if (!mounted) return;
-      showAppSnackBar(context, 'Maintenance report deleted.');
+      showAppSnackBar(context, 'Maintenance report cancelled.');
     } catch (error) {
       if (!mounted) return;
       showAppSnackBar(
@@ -1462,16 +1585,395 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
     }
   }
 
+  void _showReportDetails(BuildContext context, MaintenanceReport report) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: (report.urgency == 'High'
+                                ? const Color(0xFFAA6870)
+                                : report.urgency == 'Medium'
+                                    ? const Color(0xFFB47A52)
+                                    : const Color(0xFF627FA8))
+                            .withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        Icons.build_outlined,
+                        color: report.urgency == 'High'
+                            ? const Color(0xFFAA6870)
+                            : report.urgency == 'Medium'
+                                ? const Color(0xFFB47A52)
+                                : const Color(0xFF627FA8),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            report.category,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on_outlined,
+                                size: 14,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  report.location,
+                                  style: Theme.of(sheetContext)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    StatusPill(report.status),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    StatusPill(
+                      '${report.urgency} priority',
+                      icon: Icons.priority_high_rounded,
+                    ),
+                    StatusPill(
+                      'Reported ${shortDate(report.createdAt)}',
+                      icon: Icons.access_time_outlined,
+                    ),
+                    if (report.resolvedAt != null)
+                      StatusPill(
+                        'Resolved ${shortDate(report.resolvedAt!)}',
+                        icon: Icons.check_circle_outline,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'DESCRIPTION',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                CarmelitaCard(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    report.description,
+                    style: const TextStyle(fontSize: 14, height: 1.4),
+                  ),
+                ),
+                if (report.photoPath != null) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'ATTACHED PHOTO',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  FutureBuilder<String?>(
+                    future: controller.maintenancePhotoUrl(report.photoPath),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const CarmelitaCard(
+                          child: SizedBox(
+                            height: 100,
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                        );
+                      }
+
+                      final url = snapshot.data;
+                      if (url == null) {
+                        return const CarmelitaCard(
+                          child: Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                Icon(Icons.broken_image_outlined),
+                                SizedBox(width: 8),
+                                Text('Photo could not be loaded.'),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      return InkWell(
+                        onTap: () => _showFullScreenPhoto(context, url),
+                        borderRadius: BorderRadius.circular(14),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Stack(
+                            alignment: Alignment.bottomRight,
+                            children: [
+                              Image.network(
+                                url,
+                                height: 160,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
+                              Container(
+                                margin: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black54,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.zoom_in,
+                                      size: 14,
+                                      color: Colors.white,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'View full photo',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+                const SizedBox(height: 16),
+                const Text(
+                  'STAFF UPDATES',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                if (report.staffNotes.isNotEmpty)
+                  CarmelitaCard(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.assignment_ind_outlined,
+                          size: 20,
+                          color: Color(0xFF568F8E),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Caretaker / Staff remark:',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                report.staffNotes,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  CarmelitaCard(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Icon(
+                          report.isPending
+                              ? Icons.hourglass_top_outlined
+                              : (report.isResolved
+                                  ? Icons.check_circle_outline
+                                  : Icons.engineering_outlined),
+                          size: 20,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            report.isPending
+                                ? 'Your request has been submitted and is queued for staff review.'
+                                : (report.isResolved
+                                    ? 'This issue has been marked as resolved.'
+                                    : 'A caretaker has been assigned and is addressing this issue.'),
+                            style: Theme.of(sheetContext).textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 20),
+                if (report.canEdit) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            _edit(report);
+                          },
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('Edit report'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          style: FilledButton.styleFrom(
+                            foregroundColor:
+                                Theme.of(sheetContext).colorScheme.error,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            _delete(report);
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                          label: const Text('Cancel request'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFullScreenPhoto(BuildContext context, String photoUrl) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.black.withValues(alpha: 0.9),
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.network(
+                  photoUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      color: Colors.white70,
+                      size: 48,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 12,
+              right: 12,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  tooltip: 'Close full view',
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(dialogContext),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PageFrame(
       title: 'Maintenance reports',
       subtitle: 'Submitted issues and progress',
+      onRefresh: () => controller.loadMaintenance(force: true),
       actions: [
         IconButton(
           tooltip: 'Refresh reports',
-          onPressed:
-              controller.maintenanceLoading ? null : controller.loadMaintenance,
+          onPressed: controller.maintenanceLoading
+              ? null
+              : () => controller.loadMaintenance(force: true),
           icon: const Icon(Icons.refresh),
         ),
       ],
@@ -1501,6 +2003,21 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
               )
               .length;
 
+          final pendingCount = reports.where((r) => r.isPending).length;
+          final inProgressCount =
+              reports.where((r) => r.isAssigned || r.isInProgress).length;
+          final resolvedCount = reports.where((r) => r.isResolved).length;
+          final cancelledCount = reports.where((r) => r.isCancelled).length;
+
+          final filteredReports = switch (_selectedFilter) {
+            'Pending' => reports.where((r) => r.isPending).toList(),
+            'In Progress' =>
+              reports.where((r) => r.isAssigned || r.isInProgress).toList(),
+            'Resolved' => reports.where((r) => r.isResolved).toList(),
+            'Cancelled' => reports.where((r) => r.isCancelled).toList(),
+            _ => reports,
+          };
+
           if (controller.maintenanceLoading && reports.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -1528,7 +2045,7 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
                     ),
                     const SizedBox(height: 16),
                     FilledButton.icon(
-                      onPressed: controller.loadMaintenance,
+                      onPressed: () => controller.loadMaintenance(force: true),
                       icon: const Icon(Icons.refresh),
                       label: const Text('Try again'),
                     ),
@@ -1570,8 +2087,54 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 22),
-              const SectionTitle('Submitted reports'),
+              const SizedBox(height: 20),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _filters.map((filter) {
+                    final isSelected = _selectedFilter == filter;
+                    final count = switch (filter) {
+                      'Pending' => pendingCount,
+                      'In Progress' => inProgressCount,
+                      'Resolved' => resolvedCount,
+                      'Cancelled' => cancelledCount,
+                      _ => reports.length,
+                    };
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text('$filter ($count)'),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() => _selectedFilter = filter);
+                          }
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _selectedFilter == 'All'
+                        ? 'All reports'
+                        : '$_selectedFilter reports',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    '${filteredReports.length} ${filteredReports.length == 1 ? 'item' : 'items'}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
               const SizedBox(height: 10),
               if (controller.maintenanceError != null) ...[
                 CarmelitaCard(
@@ -1581,7 +2144,8 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
                       const SizedBox(width: 10),
                       Expanded(child: Text(controller.maintenanceError!)),
                       TextButton(
-                        onPressed: controller.loadMaintenance,
+                        onPressed: () =>
+                            controller.loadMaintenance(force: true),
                         child: const Text('Retry'),
                       ),
                     ],
@@ -1606,14 +2170,36 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
                     ),
                   ),
                 )
+              else if (filteredReports.isEmpty)
+                CarmelitaCard(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.filter_list_off, size: 36),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No $_selectedFilter maintenance reports.',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => setState(() => _selectedFilter = 'All'),
+                          child: const Text('Show all reports'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               else
-                ...reports.map(
+                ...filteredReports.map(
                   (report) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: CarmelitaCard(
+                      onTap: () => _showReportDetails(context, report),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
-                        vertical: 5,
+                        vertical: 6,
                       ),
                       child: TimelineTile(
                         compact: true,
@@ -1625,12 +2211,14 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
                                 : const Color(0xFF627FA8),
                         title: '${report.category} • ${report.location}',
                         subtitle:
-                            '${report.description}\n${shortDate(report.createdAt)}${report.photoPath == null ? '' : '\nPhoto attached'}',
+                            '${report.description}\n${shortDate(report.createdAt)}'
+                            '${report.photoPath != null ? ' • Photo attached' : ''}'
+                            '${report.staffNotes.isNotEmpty ? ' • Staff updated' : ''}',
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             StatusPill(report.status),
-                            if (report.status == 'Pending') ...[
+                            if (report.canEdit) ...[
                               const SizedBox(width: 4),
                               PopupMenuButton<String>(
                                 tooltip: 'Report actions',
@@ -1658,7 +2246,7 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
                                       children: [
                                         Icon(Icons.delete_outline),
                                         SizedBox(width: 10),
-                                        Text('Delete'),
+                                        Text('Cancel request'),
                                       ],
                                     ),
                                   ),
@@ -1694,16 +2282,9 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
     'Electrical',
     'Furniture',
     'Air conditioning',
+    'Locks & Keys',
+    'Structural',
     'Other',
-  ];
-
-  static const locations = [
-    'Room 204',
-    'Room 204 • Bathroom',
-    'Second-floor corridor',
-    'Kitchen',
-    'Laundry area',
-    'Other common area',
   ];
 
   static const urgencies = ['Low', 'Medium', 'High'];
@@ -1729,18 +2310,45 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
       widget.report?.photoPath != null && !removeExistingPhoto;
   bool get hasPhoto => selectedPhotoBytes != null || hasExistingPhoto;
 
+  List<String> get _availableLocations {
+    final room = TenantController.instance.room;
+    final locs = <String>[];
+    if (room != null) {
+      locs.add('Room ${room.number}');
+      locs.add('Room ${room.number} • Bathroom');
+    } else {
+      locs.add('Room 204');
+      locs.add('Room 204 • Bathroom');
+    }
+    locs.addAll(const [
+      'Second-floor corridor',
+      'First-floor hallway',
+      'Kitchen / Dining area',
+      'Laundry area',
+      'Study lounge',
+      'Ground floor lobby',
+      'Other common area',
+    ]);
+    if (!locs.contains(location)) {
+      locs.insert(0, location);
+    }
+    return locs;
+  }
+
   @override
   void initState() {
     super.initState();
     final report = widget.report;
+    final room = TenantController.instance.room;
+    final defaultLocation =
+        room != null ? 'Room ${room.number}' : 'Room 204';
+
     description = TextEditingController(text: report?.description ?? '');
     category = categories.contains(report?.category)
         ? report!.category
         : categories.first;
     urgency = urgencies.contains(report?.urgency) ? report!.urgency : 'Medium';
-    location = locations.contains(report?.location)
-        ? report!.location
-        : locations.first;
+    location = report?.location ?? defaultLocation;
 
     if (report?.photoPath != null) {
       _loadExistingPhoto();
@@ -1853,10 +2461,54 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
     });
   }
 
+  void _pickLocationFromFloorPlan() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Select room on floor plan',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Tap a room or area on the interactive map to set it as your maintenance location.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 14),
+              FloorPlanCanvas(
+                onLocationSelected: (pickedRoom) {
+                  setState(() {
+                    location = pickedRoom;
+                  });
+                  Navigator.pop(sheetContext);
+                  showAppSnackBar(context, 'Selected $pickedRoom from floor plan.');
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _save() async {
     final cleanDescription = description.text.trim();
-    if (cleanDescription.length < 3) {
-      showAppSnackBar(context, 'Enter a short description first.');
+    if (cleanDescription.length < 5) {
+      showAppSnackBar(context, 'Please enter a description (at least 5 characters).');
       return;
     }
 
@@ -1890,7 +2542,7 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
       if (!mounted) return;
       showAppSnackBar(
         context,
-        editing ? 'Maintenance report updated.' : 'Maintenance report added.',
+        editing ? 'Maintenance report updated.' : 'Maintenance report submitted.',
       );
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -1911,7 +2563,7 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
           selectedPhotoBytes!,
           fit: BoxFit.cover,
           width: double.infinity,
-          height: 220,
+          height: 200,
         ),
         onChange: _showPhotoSource,
         onRemove: _removePhoto,
@@ -1922,7 +2574,7 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
       if (photoLoading) {
         return const CarmelitaCard(
           child: SizedBox(
-            height: 120,
+            height: 100,
             child: Center(child: CircularProgressIndicator()),
           ),
         );
@@ -1934,9 +2586,9 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
             existingPhotoUrl!,
             fit: BoxFit.cover,
             width: double.infinity,
-            height: 220,
+            height: 200,
             errorBuilder: (_, __, ___) => const SizedBox(
-              height: 180,
+              height: 140,
               child: Center(
                 child: Icon(Icons.broken_image_outlined, size: 44),
               ),
@@ -1959,11 +2611,11 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Add photo',
+                  'Add photo (optional)',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 SizedBox(height: 2),
-                Text('Take a photo or choose one from the gallery'),
+                Text('Take a photo or choose from gallery (max 5 MB)'),
               ],
             ),
           ),
@@ -2008,25 +2660,53 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
                 maxLines: 4,
               ),
               const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                initialValue: location,
-                decoration: const InputDecoration(labelText: 'Room / area'),
-                items: locations
-                    .map(
-                      (value) => DropdownMenuItem(
-                        value: value,
-                        child: Text(value),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey('location-$location'),
+                      initialValue: location,
+                      decoration: const InputDecoration(
+                        labelText: 'Room / area',
+                        prefixIcon: Icon(Icons.location_on_outlined, size: 20),
                       ),
-                    )
-                    .toList(),
-                onChanged: saving
-                    ? null
-                    : (value) => setState(() => location = value ?? location),
+                      items: _availableLocations
+                          .map(
+                            (value) => DropdownMenuItem(
+                              value: value,
+                              child: Text(value),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: saving
+                          ? null
+                          : (value) =>
+                              setState(() => location = value ?? location),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: IconButton.outlined(
+                      tooltip: 'Pick on floor plan',
+                      onPressed: saving ? null : _pickLocationFromFloorPlan,
+                      icon: const Icon(Icons.map_outlined),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
                 initialValue: urgency,
-                decoration: const InputDecoration(labelText: 'Urgency'),
+                decoration: InputDecoration(
+                  labelText: 'Urgency',
+                  helperText: urgency == 'High'
+                      ? 'High: Urgent safety hazard or active water leak'
+                      : urgency == 'Medium'
+                          ? 'Medium: Issue affecting daily routine'
+                          : 'Low: Minor cosmetic or low priority issue',
+                ),
                 items: urgencies
                     .map(
                       (value) => DropdownMenuItem(
@@ -2039,9 +2719,9 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
                     ? null
                     : (value) => setState(() => urgency = value ?? urgency),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               _photoSection(context),
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
