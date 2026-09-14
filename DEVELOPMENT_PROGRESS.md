@@ -48,6 +48,7 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Reports Hub** — live maintenance and confidential-report summaries with pull-to-refresh and active issue alerts.
 - [✓] **Maintenance Reports** — live tenant-owned reports with status filters (All, Pending, In Progress, Resolved, Cancelled), interactive details sheet, photo zoom, caretaker notes, and cancellation for pending reports.
 - [✓] **Submit Maintenance** — validated category, urgency guidance, description, assigned room context, and photo attachment with 5MB validation.
+  - *Planned Media Upgrade*: **Cloudinary Integration** — dynamic compression (`f_auto,q_auto`), progressive loading, thumbnail transformations (`c_thumb`), and offloaded media bandwidth.
 - [✓] **Maintenance Floor Plan** — interactive 2D floor plan map location picker integrated directly into report submission.
 - [ ] **Announcements** — show only notices published for the tenant audience.
 - [ ] **Messages and Conversation** — persisted, role-scoped real-time messaging.
@@ -123,6 +124,15 @@ page exists but its important backend workflow is unfinished.
 - [ ] Responsive phone, tablet, and wide-screen testing.
 - [ ] Unit, widget, integration, and role-access tests.
 - [ ] No production page may depend on `MockData`.
+
+### Media Pipeline & Upgrades
+
+- [ ] **Cloudinary Media Storage & CDN Integration** *(Planned Upgrade)*:
+  - Migrate binary photo storage (maintenance evidence, payment proof receipts, user avatars) from direct Supabase storage buckets to **Cloudinary**.
+  - **Dynamic optimization**: Automatic format delivery (`f_auto` to WebP/AVIF) and network-aware compression (`q_auto`).
+  - **Dynamic transformations**: Responsive thumbnail cropping for cards and lists (`c_thumb,w_150,h_150`) alongside high-resolution deliveries for full-screen inspection.
+  - **Egress & bandwidth savings**: Offloads binary file uploads directly from mobile devices, preserving database bandwidth and accelerating load times.
+  - **Backward-compatible schema**: Store Cloudinary public IDs or secure URLs in `maintenance_reports.photo_path` without requiring breaking schema redesigns.
 
 ## Development handoff
 

@@ -26,6 +26,7 @@ The current project already uses one shared Flutter codebase and one Supabase ba
 - **Supabase Edge Functions** — protected administrative actions such as account creation and account management.
 - **Supabase Storage** — planned for payment proofs, maintenance photos, incident evidence, and other uploads.
 - **Supabase Realtime** — planned where live messages, notifications, gate events, and status updates are required.
+- **Cloudinary (Planned Media Upgrade)** — planned media CDN and transformation pipeline to optimize photo uploads (maintenance evidence, payment receipts, avatars), providing automatic WebP compression (`f_auto,q_auto`), dynamic thumbnail transformations, and responsive delivery over mobile networks.
 
 ## Current High-Level Architecture
 
@@ -776,6 +777,14 @@ Completed
 ## Maintenance Floor Plan
 
 The tenant can use an interactive floor plan to identify the exact room or dormitory location connected to the report.
+
+## Media Storage & Optimization Upgrade (Cloudinary)
+
+To optimize storage costs, upload speeds, and mobile bandwidth, an architectural upgrade integrates **Cloudinary** for maintenance photo attachments:
+- **Direct Client Upload**: Mobile clients upload compressed images directly to Cloudinary using an upload preset, offloading heavy binary payload storage from Supabase database servers.
+- **Dynamic Optimization**: Serves photos using automatic format conversion (`f_auto`) and quality compression (`q_auto`) tailored to the resident's network connection.
+- **On-the-Fly Transformations**: Automatically generates thumbnails for report cards (`c_thumb,w_150,h_150`) while retaining full-resolution images for the interactive zoom viewer.
+- **Database Schema Compatibility**: Stores the Cloudinary public ID or secure URL in `maintenance_reports.photo_path`, keeping the existing schema backward-compatible.
 
 ---
 

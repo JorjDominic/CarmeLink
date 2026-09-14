@@ -484,6 +484,7 @@ For implementation details, see the official [Supabase user invitation guide](ht
 - Operational records primarily come from `lib/data/mock_data.dart` and in-memory controllers.
 - Supabase is included as a dependency and configuration scaffold, but the documented demo workflows should not be assumed to persist remotely.
 - OCR, geofencing, biometrics, and device binding are simulated product workflows pending production integrations.
+- Photo and receipt attachments currently use Supabase Storage buckets, with a planned upgrade path to Cloudinary for media CDN delivery, dynamic WebP compression (`f_auto,q_auto`), and on-the-fly thumbnail generation.
 - Some finance, contract, discipline, and analytics pages explicitly mark where backend data is required.
 
 Before release, connect secured backend services, enforce server-side role permissions, add persistent uploads and messaging, test device permissions, and replace demo records with validated live data.
