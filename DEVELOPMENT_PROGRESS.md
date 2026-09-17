@@ -26,6 +26,17 @@ geofencing or advanced analytics.
 7. **Communication** — announcements, notifications, and role-scoped messaging.
 8. **Safety and privacy** — confidential reports, audit logs, retention, and permissions.
 
+## Completed Milestones History
+
+| Date | Module / Feature | Roles Covered | Summary & Verification |
+|---|---|---|---|
+| Sep 13, 2026 | **Auth & Role Routing** | All | Supabase session restore, `RoleGuard`, server-role routing, profile and password management. |
+| Sep 14, 2026 | **Rooms & Bed Space Management** | Tenant, Caretaker, Owner | Live room/bed CRUD, assignments/transfers, occupant details, and 2D floor plan visualization merged into Room Monitoring. |
+| Sep 15, 2026 | **Curfew & Overnight Leave System** | Tenant, Guardian, Staff | 'Late Return' and 'Overnight Leave' dual workflows, guardian endorsement, staff review with gate instructions, and real-time sync. |
+| Sep 16, 2026 | **Maintenance Management System** | Tenant, Caretaker, Owner | Full lifecycle triage: report submission with 5MB photo and floor plan pin, triage queue, metric cards, `InteractiveViewer` zoom, mandatory resolution notes, and audit trail (`maintenance_staff_history`). 56/56 tests passing. |
+| Sep 17, 2026 | **Cloudinary Media Architecture (Documented)** | All | Documented media CDN upgrade in system plan and progress tracking (`f_auto,q_auto`, dynamic thumbnails, mobile bandwidth offloading). |
+| Sep 17, 2026 | **Tenant Payments & Upload Proof** | Tenant | Account summary, filter chips (All, Due, Pending, Verified), overdue indicators, receipt zoom inspection, GCash/Maya/Bank instructions, and 5MB proof submission with OCR auto-fill. 71/71 tests passing. |
+
 ## Core requirements by page
 
 `[✓]` means the page's core requirement is live or complete. `[ ]` means the
@@ -43,8 +54,8 @@ page exists but its important backend workflow is unfinished.
 
 - [ ] **Home** — live room, balance, maintenance, gate, and announcement summary.
 - [✓] **My Room** — assigned room, bed, roommates, capacity, and utilities with live database sync and real-time refresh.
-- [ ] **Payments** — charges, outstanding balance, due dates, and payment history.
-- [ ] **Upload Payment Proof** — secure Storage upload and verification status.
+- [✓] **Payments** — charges, outstanding balance, due dates, filter chips, overdue badges, receipt inspection, and payment history.
+- [✓] **Upload Payment Proof** — payment destination instructions, 5MB receipt attachment with interactive zoom, on-device OCR auto-capture, and live submission.
 - [✓] **Reports Hub** — live maintenance and confidential-report summaries with pull-to-refresh and active issue alerts.
 - [✓] **Maintenance Reports** — live tenant-owned reports with status filters (All, Pending, In Progress, Resolved, Cancelled), interactive details sheet, photo zoom, caretaker notes, and cancellation for pending reports.
 - [✓] **Submit Maintenance** — validated category, urgency guidance, description, assigned room context, and photo attachment with 5MB validation.

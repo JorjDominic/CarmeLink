@@ -138,6 +138,58 @@ class Payment {
   bool get isRejected => status.toLowerCase().contains('rejected');
   bool get isDue => status.toLowerCase() == 'due';
 
+  bool get isOverdue {
+    if (!isDue) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    return due.isBefore(today);
+  }
+
+  bool get canSubmitProof => isDue || isRejected;
+
+  String get formattedAmount => '₱${amount.toStringAsFixed(2)}';
+
+  Payment copyWith({
+    String? id,
+    String? tenantId,
+    String? tenantName,
+    String? tenantRoom,
+    String? label,
+    String? category,
+    double? amount,
+    DateTime? dueDate,
+    String? status,
+    String? paymentMethod,
+    String? reference,
+    String? receiptPath,
+    DateTime? paidAt,
+    String? reviewedBy,
+    DateTime? reviewedAt,
+    String? reviewNotes,
+    DateTime? createdAt,
+  }) {
+    return Payment(
+      id: id ?? this.id,
+      tenantId: tenantId ?? this.tenantId,
+      tenantName: tenantName ?? this.tenantName,
+      tenantRoom: tenantRoom ?? this.tenantRoom,
+      label: label ?? this.label,
+      category: category ?? this.category,
+      amount: amount ?? this.amount,
+      dueDate: dueDate ?? this.dueDate,
+      status: status ?? this.status,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      reference: reference ?? this.reference,
+      receiptPath: receiptPath ?? this.receiptPath,
+      paidAt: paidAt ?? this.paidAt,
+      reviewedBy: reviewedBy ?? this.reviewedBy,
+      reviewedAt: reviewedAt ?? this.reviewedAt,
+      reviewNotes: reviewNotes ?? this.reviewNotes,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   static String formatStatus(String raw) {
     return switch (raw.toLowerCase().replaceAll(' ', '_')) {
       'pending_verification' ||

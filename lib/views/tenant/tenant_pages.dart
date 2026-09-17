@@ -19,9 +19,6 @@ class TenantDashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = TenantController.instance;
-    final payment = controller.payments.first;
-    final maintenance =
-        controller.maintenance.isEmpty ? null : controller.maintenance.first;
 
     return PageFrame(
       title: 'Home',
@@ -33,6 +30,13 @@ class TenantDashboardPage extends StatelessWidget {
           final room = controller.room;
           final firstName =
               session.currentUser?.name.trim().split(' ').first ?? 'Resident';
+
+          final nextDue = controller.nextDuePayment ??
+              (controller.payments.isNotEmpty ? controller.payments.first : null);
+          final outstanding = controller.outstandingBalance;
+          final maintenance = controller.maintenance.isEmpty
+              ? null
+              : controller.maintenance.first;
 
           final roomSubtitle = room != null
               ? 'Room ${room.number} • ${room.bedSpace} • Floor ${room.floor}'
@@ -116,10 +120,14 @@ class TenantDashboardPage extends StatelessWidget {
                 items: [
                   MutedDashboardItem(
                     label: 'Amount due',
-                    value: money(payment.amount),
-                    detail: 'August rent • Due Aug 15',
+                    value: nextDue != null ? money(nextDue.amount) : '₱0.00',
+                    detail: nextDue != null
+                        ? '${nextDue.label} • Due ${shortDate(nextDue.dueDate)}'
+                        : (outstanding > 0 ? '₱${outstanding.toStringAsFixed(2)} balance' : 'All bills settled'),
                     icon: Icons.account_balance_wallet_outlined,
-                    color: const Color(0xFFAA8A45),
+                    color: (nextDue != null || outstanding > 0)
+                        ? const Color(0xFFAA8A45)
+                        : const Color(0xFF56886B),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => const PaymentsPage(),
@@ -146,17 +154,33 @@ class TenantDashboardPage extends StatelessWidget {
                 subtitle: 'Important items before everything else',
               ),
               const SizedBox(height: 10),
-              AttentionCard(
-                icon: Icons.payments_outlined,
-                title: 'August rent is due soon',
-                subtitle: '${money(payment.amount)} • Due Aug 15',
-                status: payment.status,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const PaymentsPage(),
+              if (nextDue != null)
+                AttentionCard(
+                  icon: Icons.payments_outlined,
+                  title: nextDue.isOverdue
+                      ? '${nextDue.label} is overdue'
+                      : '${nextDue.label} is due soon',
+                  subtitle:
+                      '${money(nextDue.amount)} • Due ${shortDate(nextDue.dueDate)}',
+                  status: nextDue.isOverdue ? 'Overdue' : nextDue.status,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const PaymentsPage(),
+                    ),
+                  ),
+                )
+              else
+                AttentionCard(
+                  icon: Icons.payments_outlined,
+                  title: 'All bills are up to date',
+                  subtitle: 'No outstanding dormitory charges at this time.',
+                  status: 'Clear',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const PaymentsPage(),
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(height: 10),
               if (maintenance != null)
                 AttentionCard(
@@ -552,6 +576,7 @@ class PaymentsPage extends StatefulWidget {
 
 class _PaymentsPageState extends State<PaymentsPage> {
   late final TableRefreshSubscription _subscription;
+  String _selectedFilter = 'all';
 
   @override
   void initState() {
@@ -612,6 +637,19 @@ class _PaymentsPageState extends State<PaymentsPage> {
         animation: c,
         builder: (context, _) {
           final nextDue = c.nextDuePayment;
+          final allPayments = c.payments;
+          final duePayments = c.duePayments;
+          final pendingPayments = c.pendingPayments;
+          final verifiedPayments = c.verifiedPayments;
+          final overdueCount = c.overduePayments.length;
+
+          final displayedPayments = switch (_selectedFilter) {
+            'due' => duePayments,
+            'pending' => pendingPayments,
+            'verified' => verifiedPayments,
+            _ => allPayments,
+          };
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -631,25 +669,70 @@ class _PaymentsPageState extends State<PaymentsPage> {
                   MutedDashboardItem(
                     label: 'Outstanding',
                     value: money(c.outstandingBalance),
-                    detail: c.outstandingBalance > 0
-                        ? 'Unpaid records'
-                        : 'All clear',
+                    detail: overdueCount > 0
+                        ? '$overdueCount overdue bill${overdueCount > 1 ? 's' : ''}'
+                        : (c.outstandingBalance > 0
+                            ? '${duePayments.length} unpaid bill${duePayments.length > 1 ? 's' : ''}'
+                            : 'All clear'),
                     icon: Icons.account_balance_wallet_outlined,
-                    color: c.outstandingBalance > 0
-                        ? const Color(0xFFAA8A45)
-                        : const Color(0xFF56886B),
+                    color: overdueCount > 0
+                        ? const Color(0xFFDC2626)
+                        : (c.outstandingBalance > 0
+                            ? const Color(0xFFAA8A45)
+                            : const Color(0xFF56886B)),
                   ),
                   MutedDashboardItem(
                     label: 'Next due date',
                     value:
                         nextDue != null ? shortDate(nextDue.dueDate) : 'None',
-                    detail: nextDue?.label ?? 'No pending bills',
+                    detail: nextDue != null
+                        ? (nextDue.isOverdue
+                            ? 'Overdue bill!'
+                            : nextDue.label)
+                        : 'No pending bills',
                     icon: Icons.event_outlined,
-                    color: const Color(0xFF627FA8),
+                    color: nextDue?.isOverdue == true
+                        ? const Color(0xFFDC2626)
+                        : const Color(0xFF627FA8),
                   ),
                 ],
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 18),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    FilterChip(
+                      selected: _selectedFilter == 'all',
+                      label: Text('All (${allPayments.length})'),
+                      onSelected: (_) =>
+                          setState(() => _selectedFilter = 'all'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      selected: _selectedFilter == 'due',
+                      label: Text('Due (${duePayments.length})'),
+                      onSelected: (_) =>
+                          setState(() => _selectedFilter = 'due'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      selected: _selectedFilter == 'pending',
+                      label: Text('Pending (${pendingPayments.length})'),
+                      onSelected: (_) =>
+                          setState(() => _selectedFilter = 'pending'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      selected: _selectedFilter == 'verified',
+                      label: Text('Verified (${verifiedPayments.length})'),
+                      onSelected: (_) =>
+                          setState(() => _selectedFilter = 'verified'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
               SectionTitle(
                 'Payment records',
                 trailing: c.paymentsLoading
@@ -661,14 +744,16 @@ class _PaymentsPageState extends State<PaymentsPage> {
                     : null,
               ),
               const SizedBox(height: 10),
-              if (c.payments.isEmpty)
-                const EmptyState(
+              if (displayedPayments.isEmpty)
+                EmptyState(
                   icon: Icons.receipt_long_outlined,
                   title: 'No payment records',
-                  message: 'Invoices and billing statements will appear here.',
+                  message: _selectedFilter == 'all'
+                      ? 'Invoices and billing statements will appear here.'
+                      : 'No $_selectedFilter payments found.',
                 )
               else
-                ...c.payments.map((p) => _TenantPaymentCard(payment: p)),
+                ...displayedPayments.map((p) => _TenantPaymentCard(payment: p)),
             ],
           );
         },
@@ -681,35 +766,187 @@ class _TenantPaymentCard extends StatelessWidget {
   const _TenantPaymentCard({required this.payment});
   final Payment payment;
 
+  IconData _categoryIcon(String category) =>
+      switch (category.toLowerCase().trim()) {
+        'rent' => Icons.home_work_outlined,
+        'electricity' || 'electric' || 'power' => Icons.bolt_outlined,
+        'water' => Icons.water_drop_outlined,
+        'internet' || 'wifi' => Icons.wifi_outlined,
+        _ => Icons.receipt_long_outlined,
+      };
+
+  Color _categoryColor(BuildContext context, String category) =>
+      switch (category.toLowerCase().trim()) {
+        'rent' => Theme.of(context).colorScheme.primary,
+        'electricity' || 'electric' || 'power' => const Color(0xFFD97706),
+        'water' => const Color(0xFF0284C7),
+        'internet' || 'wifi' => const Color(0xFF7C3AED),
+        _ => const Color(0xFF627FA8),
+      };
+
+  void _showReceiptDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.receipt_outlined, color: Color(0xFF627FA8)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${payment.label} Receipt',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(dialogCtx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (payment.reference != null && payment.reference!.isNotEmpty)
+                Text(
+                  'Reference: ${payment.reference}',
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              if (payment.paymentMethod != null)
+                Text('Method: ${payment.paymentMethod}'),
+              if (payment.paidAt != null)
+                Text('Submitted: ${shortDate(payment.paidAt!)}'),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  height: 280,
+                  width: double.infinity,
+                  child: FutureBuilder<String?>(
+                    future: TenantController.instance
+                        .paymentReceiptUrl(payment.receiptPath),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        );
+                      }
+                      final url = snapshot.data;
+                      if (url == null || url.isEmpty) {
+                        return Container(
+                          color: Colors.grey.shade200,
+                          child: const Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 40,
+                                  color: Colors.grey,
+                                ),
+                                SizedBox(height: 6),
+                                Text('Receipt photo unavailable'),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      return InteractiveViewer(
+                        panEnabled: true,
+                        minScale: 0.8,
+                        maxScale: 3.5,
+                        child: Image.network(
+                          url,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Colors.grey.shade200,
+                            child: const Center(
+                              child: Text('Could not load receipt photo'),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final catColor = _categoryColor(context, payment.category);
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: SizedBox(
         width: double.infinity,
         child: CarmelitaCard(
           padding: const EdgeInsets.symmetric(
             horizontal: 14,
-            vertical: 10,
+            vertical: 12,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: catColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      _categoryIcon(payment.category),
+                      color: catColor,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      payment.label,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          payment.label,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
+                        Text(
+                          payment.category.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                            color: catColor,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   StatusPill(payment.status),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -717,50 +954,140 @@ class _TenantPaymentCard extends StatelessWidget {
                     money(payment.amount),
                     style: TextStyle(
                       fontWeight: FontWeight.w900,
-                      fontSize: 16,
+                      fontSize: 17,
                       color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                  Text(
-                    'Due ${shortDate(payment.dueDate)}',
-                    style: Theme.of(context).textTheme.bodySmall,
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: payment.isOverdue
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.red.shade300),
+                            ),
+                            child: Text(
+                              'Overdue • Due ${shortDate(payment.dueDate)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.red.shade800,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            'Due ${shortDate(payment.dueDate)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                   ),
                 ],
               ),
               if (payment.reference != null &&
                   payment.reference!.isNotEmpty) ...[
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
-                  'Ref: ${payment.reference}',
+                  'Ref: ${payment.reference}${payment.paymentMethod != null ? ' (${payment.paymentMethod})' : ''}',
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
                       ?.copyWith(fontFamily: 'monospace'),
                 ),
               ],
-              if (payment.reviewNotes != null &&
-                  payment.reviewNotes!.isNotEmpty) ...[
-                const SizedBox(height: 4),
+              if (payment.paidAt != null) ...[
+                const SizedBox(height: 2),
                 Text(
-                  'Note: ${payment.reviewNotes}',
-                  style:
-                      const TextStyle(fontSize: 12, color: Color(0xFFAA6870)),
+                  'Submitted ${shortDate(payment.paidAt!)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                      ),
                 ),
               ],
-              if (payment.isDue || payment.isRejected) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            UploadPaymentProofPage(targetPayment: payment),
-                      ),
+              if (payment.reviewNotes != null &&
+                  payment.reviewNotes!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: payment.isRejected
+                        ? Colors.red.shade50
+                        : const Color(0xFF627FA8).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: payment.isRejected
+                          ? Colors.red.shade200
+                          : const Color(0xFF627FA8).withValues(alpha: 0.2),
                     ),
-                    icon: const Icon(Icons.upload_file_outlined, size: 16),
-                    label: const Text('Submit payment proof'),
                   ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        payment.isRejected
+                            ? Icons.error_outline
+                            : Icons.info_outline,
+                        size: 16,
+                        color: payment.isRejected
+                            ? Colors.red.shade700
+                            : const Color(0xFF627FA8),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          payment.reviewNotes!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: payment.isRejected
+                                ? Colors.red.shade800
+                                : Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (payment.canSubmitProof ||
+                  (payment.receiptPath != null &&
+                      payment.receiptPath!.isNotEmpty)) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    if (payment.canSubmitProof)
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  UploadPaymentProofPage(targetPayment: payment),
+                            ),
+                          ),
+                          icon: const Icon(Icons.upload_file_outlined, size: 16),
+                          label: const Text('Submit proof'),
+                        ),
+                      ),
+                    if (payment.canSubmitProof &&
+                        payment.receiptPath != null &&
+                        payment.receiptPath!.isNotEmpty)
+                      const SizedBox(width: 8),
+                    if (payment.receiptPath != null &&
+                        payment.receiptPath!.isNotEmpty)
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showReceiptDialog(context),
+                          icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                          label: const Text('View receipt'),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ],
@@ -922,6 +1249,40 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
     }
   }
 
+  void _previewSelectedReceipt() {
+    if (receiptBytes == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.black.withValues(alpha: 0.85),
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            Center(
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.8,
+                maxScale: 3.5,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.memory(
+                    receiptBytes!,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     final parsedAmount = double.tryParse(amountController.text.trim());
     if (parsedAmount == null || parsedAmount <= 0) {
@@ -1057,6 +1418,8 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
                   .toList(),
               onChanged: (value) => setState(() => method = value ?? method),
             ),
+            const SizedBox(height: 10),
+            _PaymentMethodInstructionCard(method: method),
             const SizedBox(height: 14),
             TextField(
               controller: amountController,
@@ -1104,13 +1467,40 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
                       padding: const EdgeInsets.all(12),
                       child: Row(
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.memory(
-                              receiptBytes!,
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover,
+                          GestureDetector(
+                            onTap: _previewSelectedReceipt,
+                            child: Tooltip(
+                              message: 'Tap to zoom receipt',
+                              child: Stack(
+                                alignment: Alignment.bottomRight,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.memory(
+                                      receiptBytes!,
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black
+                                          .withValues(alpha: 0.6),
+                                      borderRadius: const BorderRadius.only(
+                                        bottomRight: Radius.circular(8),
+                                        topLeft: Radius.circular(4),
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.zoom_in,
+                                      size: 14,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -1255,6 +1645,90 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PaymentMethodInstructionCard extends StatelessWidget {
+  const _PaymentMethodInstructionCard({required this.method});
+  final String method;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, title, account, note) = switch (method.toLowerCase().trim()) {
+      'gcash' => (
+          Icons.account_balance_wallet_outlined,
+          'GCash Account',
+          '0917-123-4567 (Carmelita D.)',
+          'Ensure the 13-digit reference number is clearly visible on your screenshot.'
+        ),
+      'maya' => (
+          Icons.account_balance_wallet_outlined,
+          'Maya Account',
+          '0917-123-4567 (Carmelita D.)',
+          'Ensure the reference number and date are clearly readable.'
+        ),
+      'bank transfer' || 'bank' => (
+          Icons.account_balance_outlined,
+          'BDO Bank Deposit / Transfer',
+          '0012-3456-7890 (Carmelita Dormitory Management)',
+          'Attach a clear photo or screenshot of the deposit slip or mobile banking transfer.'
+        ),
+      _ => (
+          Icons.payments_outlined,
+          'Cash at Front Desk',
+          'Dormitory Administration Office',
+          'Hand payment directly to the caretaker and request an official receipt slip.'
+        ),
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF627FA8).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0xFF627FA8).withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFF627FA8), size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  account,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: Color(0xFF2C4A6F),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  note,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        color: Colors.grey.shade700,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

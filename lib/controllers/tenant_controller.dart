@@ -28,6 +28,7 @@ class TenantController extends ChangeNotifier {
 
   bool _paymentsLoading = false;
   String? _paymentsError;
+  bool _paymentsLoadedOnce = false;
 
   bool _curfewLoading = false;
   String? _curfewError;
@@ -48,6 +49,7 @@ class TenantController extends ChangeNotifier {
 
   bool get paymentsLoading => _paymentsLoading;
   String? get paymentsError => _paymentsError;
+  bool get paymentsLoadedOnce => _paymentsLoadedOnce;
 
   double get outstandingBalance {
     final list = payments;
@@ -61,6 +63,14 @@ class TenantController extends ChangeNotifier {
       ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
     return due.isNotEmpty ? due.first : null;
   }
+
+  List<Payment> get duePayments => payments.where((p) => p.isDue).toList();
+  List<Payment> get pendingPayments =>
+      payments.where((p) => p.isPending).toList();
+  List<Payment> get verifiedPayments =>
+      payments.where((p) => p.isVerified).toList();
+  List<Payment> get overduePayments =>
+      payments.where((p) => p.isOverdue).toList();
 
   List<MaintenanceReport> get maintenance => List.unmodifiable(_maintenance);
 
@@ -188,6 +198,9 @@ class TenantController extends ChangeNotifier {
     _maintenanceError = null;
     _maintenanceLoadedOnce = false;
     _payments.clear();
+    _paymentsLoading = false;
+    _paymentsError = null;
+    _paymentsLoadedOnce = false;
     _curfewRequests.clear();
     _curfewLoading = false;
     _curfewError = null;
@@ -220,6 +233,7 @@ class TenantController extends ChangeNotifier {
 
   Future<void> loadPayments({bool force = false}) async {
     if (_paymentsLoading && !force) return;
+    if (_paymentsLoadedOnce && !force) return;
     _paymentsLoading = true;
     _paymentsError = null;
     notifyListeners();
@@ -229,12 +243,24 @@ class TenantController extends ChangeNotifier {
       _payments
         ..clear()
         ..addAll(latest);
+      _paymentsLoadedOnce = true;
     } catch (e) {
       _paymentsError = _message(e);
     } finally {
       _paymentsLoading = false;
       notifyListeners();
     }
+  }
+
+  @visibleForTesting
+  void setPaymentsForTesting(List<Payment> items) {
+    _payments
+      ..clear()
+      ..addAll(items);
+    _paymentsLoadedOnce = true;
+    _paymentsLoading = false;
+    _paymentsError = null;
+    notifyListeners();
   }
 
   Future<Payment> submitPaymentProof({
@@ -279,6 +305,12 @@ class TenantController extends ChangeNotifier {
         reference: reference.trim().isEmpty ? null : reference.trim(),
         paymentMethod: method,
       );
+      final localIndex = _payments.indexWhere((p) => p.id == targetId);
+      if (localIndex != -1) {
+        _payments[localIndex] = mock;
+      } else {
+        _payments.insert(0, mock);
+      }
       final index = MockData.payments.indexWhere((p) => p.id == targetId);
       if (index != -1) {
         MockData.payments[index] = mock;
