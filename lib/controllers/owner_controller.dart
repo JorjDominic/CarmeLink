@@ -22,6 +22,7 @@ class OwnerController extends ChangeNotifier {
   final List<Payment> _payments = [];
   bool _paymentsLoading = false;
   String? _paymentsError;
+  bool _paymentsLoadedOnce = false;
 
   final RoomService _roomService = const RoomService();
   final List<RoomRecord> _roomRecords = [];
@@ -135,10 +136,19 @@ class OwnerController extends ChangeNotifier {
       rooms.fold<int>(0, (sum, room) => sum + room.capacity);
 
   int get pendingPaymentProofs => payments
-      .where((payment) =>
-          payment.status == 'Pending verification' ||
-          payment.status == 'Pending review')
+      .where((payment) => payment.isPending)
       .length;
+
+  int get overduePaymentCount =>
+      payments.where((payment) => payment.isOverdue).length;
+
+  double get totalCollectedRevenue => payments
+      .where((payment) => payment.isVerified)
+      .fold<double>(0.0, (sum, p) => sum + p.amount);
+
+  double get totalOutstandingRevenue => payments
+      .where((payment) => payment.isDue || payment.isPending)
+      .fold<double>(0.0, (sum, p) => sum + p.amount);
 
   int get openMaintenance => _maintenanceLoadedOnce
       ? _staffMaintenanceReports.where((report) => report.isOpen).length
@@ -168,10 +178,11 @@ class OwnerController extends ChangeNotifier {
       : List.unmodifiable(_payments);
   bool get paymentsLoading => _paymentsLoading;
   String? get paymentsError => _paymentsError;
+  bool get paymentsLoadedOnce => _paymentsLoadedOnce;
 
   Future<void> loadPayments({bool force = false}) async {
-    if (_paymentsLoading) return;
-    if (_payments.isNotEmpty && !force) return;
+    if (_paymentsLoading && !force) return;
+    if (_paymentsLoadedOnce && !force) return;
 
     _paymentsLoading = true;
     _paymentsError = null;
@@ -182,6 +193,7 @@ class OwnerController extends ChangeNotifier {
       _payments
         ..clear()
         ..addAll(list);
+      _paymentsLoadedOnce = true;
     } catch (e) {
       _paymentsError = e.toString();
     } finally {
@@ -230,6 +242,31 @@ class OwnerController extends ChangeNotifier {
       payment.status = approve ? 'Verified' : 'Rejected';
     }
     notifyListeners();
+  }
+
+  Future<Payment> createInvoice({
+    required String tenantId,
+    required String title,
+    required String category,
+    required double amount,
+    required DateTime dueDate,
+  }) async {
+    final invoice = await _paymentService.createInvoice(
+      tenantId: tenantId,
+      title: title,
+      category: category,
+      amount: amount,
+      dueDate: dueDate,
+    );
+
+    final index = _payments.indexWhere((p) => p.id == invoice.id);
+    if (index != -1) {
+      _payments[index] = invoice;
+    } else {
+      _payments.insert(0, invoice);
+    }
+    notifyListeners();
+    return invoice;
   }
 
   void updateMaintenance(
@@ -380,10 +417,22 @@ class OwnerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  @visibleForTesting
+  void setPaymentsForTesting(List<Payment> items) {
+    _payments
+      ..clear()
+      ..addAll(items);
+    _paymentsLoadedOnce = true;
+    _paymentsLoading = false;
+    _paymentsError = null;
+    notifyListeners();
+  }
+
   void clear() {
     _payments.clear();
     _paymentsLoading = false;
     _paymentsError = null;
+    _paymentsLoadedOnce = false;
     _roomRecords.clear();
     _roomsLoading = false;
     _roomsError = null;

@@ -1550,9 +1550,11 @@ class PaymentVerificationPage extends StatefulWidget {
 }
 
 class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
-  String _filter = 'pending'; // 'pending', 'verified', 'rejected', 'all'
+  String _filter = 'pending'; // 'pending', 'due', 'overdue', 'verified', 'rejected', 'all'
   late final TableRefreshSubscription _subscription;
   String? _processingPaymentId;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -1577,7 +1579,15 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
   @override
   void dispose() {
     _subscription.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  void _openCreateInvoiceDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => const _CreateInvoiceDialog(),
+    );
   }
 
   Future<void> _handleVerify(Payment payment, bool approve, {String? notes}) async {
@@ -1652,8 +1662,19 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
 
     return PageFrame(
       title: 'Payment review',
-      subtitle: 'Inspect tenant receipts and verify balances',
+      subtitle: 'Inspect tenant receipts, issue invoices, and verify balances',
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openCreateInvoiceDialog(context),
+        icon: const Icon(Icons.add_card_rounded),
+        label: const Text('Issue invoice', style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      onRefresh: () => OwnerController.instance.loadPayments(force: true),
       actions: [
+        IconButton(
+          tooltip: 'Issue invoice',
+          icon: const Icon(Icons.post_add_rounded),
+          onPressed: () => _openCreateInvoiceDialog(context),
+        ),
         IconButton(
           tooltip: 'Refresh payments',
           icon: controller.paymentsLoading
@@ -1672,20 +1693,119 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
         animation: controller,
         builder: (context, _) {
           final allPayments = controller.payments;
-          final pendingCount = allPayments.where((p) => p.isPending).length;
+          final pendingCount = controller.pendingPaymentProofs;
+          final overdueCount = controller.overduePaymentCount;
           final verifiedCount = allPayments.where((p) => p.isVerified).length;
+          final dueCount = allPayments.where((p) => p.isDue && !p.isOverdue).length;
           final rejectedCount = allPayments.where((p) => p.isRejected).length;
 
-          final displayed = switch (_filter) {
+          final totalCollected = controller.totalCollectedRevenue;
+          final totalOutstanding = controller.totalOutstandingRevenue;
+
+          final dashboardItems = [
+            MutedDashboardItem(
+              label: 'Pending review',
+              value: '$pendingCount',
+              detail: pendingCount > 0 ? 'Needs staff action' : 'All clear',
+              icon: Icons.pending_actions_rounded,
+              color: const Color(0xFFAA8A45),
+              onTap: () => setState(() => _filter = 'pending'),
+            ),
+            MutedDashboardItem(
+              label: 'Collected',
+              value: money(totalCollected),
+              detail: '$verifiedCount verified',
+              icon: Icons.check_circle_outline_rounded,
+              color: const Color(0xFF56886B),
+              onTap: () => setState(() => _filter = 'verified'),
+            ),
+            MutedDashboardItem(
+              label: 'Outstanding',
+              value: money(totalOutstanding),
+              detail: '${dueCount + pendingCount + overdueCount} uncollected',
+              icon: Icons.account_balance_wallet_outlined,
+              color: const Color(0xFF8C7355),
+              onTap: () => setState(() => _filter = 'due'),
+            ),
+            MutedDashboardItem(
+              label: 'Overdue',
+              value: '$overdueCount',
+              detail: overdueCount > 0 ? 'Urgent attention' : 'None overdue',
+              icon: Icons.warning_amber_rounded,
+              color: const Color(0xFFB3261E),
+              onTap: () => setState(() => _filter = 'overdue'),
+            ),
+          ];
+
+          final filteredByTab = switch (_filter) {
             'pending' => allPayments.where((p) => p.isPending).toList(),
+            'due' => allPayments.where((p) => p.isDue && !p.isOverdue).toList(),
+            'overdue' => allPayments.where((p) => p.isOverdue).toList(),
             'verified' => allPayments.where((p) => p.isVerified).toList(),
             'rejected' => allPayments.where((p) => p.isRejected).toList(),
             _ => allPayments,
           };
 
+          final displayed = _searchQuery.trim().isEmpty
+              ? filteredByTab
+              : filteredByTab.where((p) {
+                  final q = _searchQuery.trim().toLowerCase();
+                  return (p.tenantName?.toLowerCase().contains(q) ?? false) ||
+                      (p.tenantRoom?.toLowerCase().contains(q) ?? false) ||
+                      p.label.toLowerCase().contains(q) ||
+                      p.category.toLowerCase().contains(q) ||
+                      (p.reference?.toLowerCase().contains(q) ?? false) ||
+                      (p.paymentMethod?.toLowerCase().contains(q) ?? false);
+                }).toList();
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Financial Summary Metrics
+              MutedDashboardGrid(items: dashboardItems),
+              const SizedBox(height: 16),
+
+              // Search Input
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search by resident, room, title, or ref...',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest
+                      .withValues(alpha: .35),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color:
+                          Theme.of(context).dividerColor.withValues(alpha: .2),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color:
+                          Theme.of(context).dividerColor.withValues(alpha: .2),
+                    ),
+                  ),
+                ),
+                onChanged: (val) => setState(() => _searchQuery = val),
+              ),
+              const SizedBox(height: 14),
+
               // Filter Chips Row
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -1696,6 +1816,20 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                       selected: _filter == 'pending',
                       badgeColor: const Color(0xFFAA8A45),
                       onTap: () => setState(() => _filter = 'pending'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Due ($dueCount)',
+                      selected: _filter == 'due',
+                      badgeColor: const Color(0xFF8C7355),
+                      onTap: () => setState(() => _filter = 'due'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Overdue ($overdueCount)',
+                      selected: _filter == 'overdue',
+                      badgeColor: const Color(0xFFB3261E),
+                      onTap: () => setState(() => _filter = 'overdue'),
                     ),
                     const SizedBox(width: 8),
                     _FilterChip(
@@ -1734,13 +1868,23 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                 EmptyState(
                   icon: _filter == 'pending'
                       ? Icons.task_alt_outlined
-                      : Icons.receipt_long_outlined,
-                  title: _filter == 'pending'
-                      ? 'No pending reviews'
-                      : 'No payments in this tab',
-                  message: _filter == 'pending'
-                      ? 'All resident proof uploads have been reviewed and verified.'
-                      : 'Payments will appear here once submitted or updated.',
+                      : _filter == 'overdue'
+                          ? Icons.check_circle_outline
+                          : Icons.receipt_long_outlined,
+                  title: _searchQuery.isNotEmpty
+                      ? 'No matching payments'
+                      : _filter == 'pending'
+                          ? 'No pending reviews'
+                          : _filter == 'overdue'
+                              ? 'No overdue payments'
+                              : 'No payments in this tab',
+                  message: _searchQuery.isNotEmpty
+                      ? 'Try searching with a different name, room, or reference.'
+                      : _filter == 'pending'
+                          ? 'All resident proof uploads have been reviewed and verified.'
+                          : _filter == 'overdue'
+                              ? 'All tenant balances are current and within terms.'
+                              : 'Payments will appear here once submitted or updated.',
                 )
               else
                 ...displayed.map(
@@ -1752,7 +1896,10 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                       onOpenReceipt: (url) => _openReceiptViewer(payment, url),
                       onConfirm: () => _handleVerify(payment, true),
                       onReject: () => _promptRejectDialog(payment),
-                      onReEvaluate: () => _handleVerify(payment, true),
+                      onReEvaluate: () => _handleVerify(
+                        payment,
+                        !payment.isVerified,
+                      ),
                     ),
                   ),
                 ),
@@ -1831,6 +1978,358 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
+class _CreateInvoiceDialog extends StatefulWidget {
+  const _CreateInvoiceDialog();
+
+  @override
+  State<_CreateInvoiceDialog> createState() => _CreateInvoiceDialogState();
+}
+
+class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late String _selectedTenantId;
+  String _selectedCategory = 'rent';
+  late final TextEditingController _titleController;
+  final TextEditingController _amountController = TextEditingController();
+  late DateTime _dueDate;
+  bool _isSubmitting = false;
+
+  final List<String> _categories = const [
+    'rent',
+    'electricity',
+    'water',
+    'internet',
+    'maintenance fee',
+    'penalty',
+    'other',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final tenants = OwnerController.instance.tenants;
+    _selectedTenantId = tenants.isNotEmpty ? tenants.first.id : 't1';
+    _dueDate = DateTime.now().add(const Duration(days: 7));
+    _titleController =
+        TextEditingController(text: _defaultTitleForCategory('rent'));
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  String _defaultTitleForCategory(String category) {
+    return switch (category.toLowerCase()) {
+      'rent' => 'Monthly Dorm Rent',
+      'electricity' => 'Electricity Utility Share',
+      'water' => 'Water Utility Share',
+      'internet' => 'WiFi Internet Fee',
+      'maintenance fee' => 'Maintenance / Repair Fee',
+      'penalty' => 'Late Fee / Violation Penalty',
+      _ => 'Dormitory Charge',
+    };
+  }
+
+  Future<void> _pickDueDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null && mounted) {
+      setState(() => _dueDate = picked);
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final amount = double.tryParse(_amountController.text.trim());
+    if (amount == null || amount <= 0) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      await OwnerController.instance.createInvoice(
+        tenantId: _selectedTenantId,
+        title: _titleController.text.trim(),
+        category: _selectedCategory,
+        amount: amount,
+        dueDate: _dueDate,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Invoice for ${_titleController.text.trim()} issued successfully.'),
+          backgroundColor: const Color(0xFF56886B),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to issue invoice: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tenants = OwnerController.instance.tenants;
+
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      actionsOverflowButtonSpacing: 8,
+      actionsOverflowDirection: VerticalDirection.down,
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.receipt_long_rounded,
+                color: theme.colorScheme.primary, size: 22),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Issue Invoice',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+            ),
+          ),
+        ],
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: _selectedTenantId,
+                  decoration: const InputDecoration(
+                    labelText: 'Tenant / Resident',
+                    prefixIcon: Icon(Icons.person_outline_rounded),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                  ),
+                  items: tenants.isNotEmpty
+                      ? tenants.map((t) {
+                          return DropdownMenuItem(
+                            value: t.id,
+                            child: Text(
+                              '${t.name} (${t.room})',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList()
+                      : const [
+                          DropdownMenuItem(
+                            value: 't1',
+                            child: Text(
+                              'Anna Dela Cruz (Room 204)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedTenantId = val);
+                  },
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: _selectedCategory,
+                  decoration: const InputDecoration(
+                    labelText: 'Billing Category',
+                    prefixIcon: Icon(Icons.category_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                  ),
+                  items: _categories.map((c) {
+                    final capitalized = c[0].toUpperCase() + c.substring(1);
+                    return DropdownMenuItem(
+                      value: c,
+                      child: Text(
+                        capitalized,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedCategory = val;
+                        _titleController.text = _defaultTitleForCategory(val);
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Invoice Title / Description',
+                    hintText: 'e.g. September Rent',
+                    prefixIcon: Icon(Icons.edit_note_rounded),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Please provide an invoice title';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _amountController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Amount',
+                    hintText: '0.00',
+                    prefixText: '₱ ',
+                    prefixIcon: Icon(Icons.payments_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Please enter an amount';
+                    }
+                    final parsed = double.tryParse(val.trim());
+                    if (parsed == null || parsed <= 0) {
+                      return 'Please enter a valid amount greater than 0';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                InkWell(
+                  onTap: _pickDueDate,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: theme.dividerColor.withValues(alpha: .5),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today_rounded,
+                            size: 20, color: theme.colorScheme.primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Due Date',
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(fontSize: 11),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_dueDate.year}-${_dueDate.month.toString().padLeft(2, '0')}-${_dueDate.day.toString().padLeft(2, '0')}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Change',
+                          style: TextStyle(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton.icon(
+          onPressed: _isSubmitting ? null : _submit,
+          icon: _isSubmitting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.send_rounded, size: 18),
+          label: const Text('Issue Invoice',
+              style: TextStyle(fontWeight: FontWeight.w700)),
+        ),
+      ],
+    );
+  }
+}
+
+IconData _paymentCategoryIcon(String category) =>
+    switch (category.toLowerCase()) {
+      'rent' => Icons.home_outlined,
+      'electricity' => Icons.bolt_outlined,
+      'water' => Icons.water_drop_outlined,
+      'internet' => Icons.wifi_rounded,
+      'maintenance' || 'maintenance fee' => Icons.build_outlined,
+      'penalty' => Icons.warning_amber_rounded,
+      _ => Icons.receipt_outlined,
+    };
+
+Color _paymentCategoryColor(String category) =>
+    switch (category.toLowerCase()) {
+      'rent' => const Color(0xFF1E88E5),
+      'electricity' => const Color(0xFFF57C00),
+      'water' => const Color(0xFF00ACC1),
+      'internet' => const Color(0xFF8E24AA),
+      'maintenance' || 'maintenance fee' => const Color(0xFFD84315),
+      'penalty' => const Color(0xFFC62828),
+      _ => const Color(0xFF757575),
+    };
+
 class _PaymentReviewCard extends StatelessWidget {
   const _PaymentReviewCard({
     required this.payment,
@@ -1860,10 +2359,12 @@ class _PaymentReviewCard extends StatelessWidget {
         children: [
           // Tenant header & Status Pill
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
                 radius: 18,
-                backgroundColor: theme.colorScheme.primary.withValues(alpha: .12),
+                backgroundColor:
+                    theme.colorScheme.primary.withValues(alpha: .12),
                 child: Text(
                   tenantName.isNotEmpty ? tenantName[0].toUpperCase() : 'T',
                   style: TextStyle(
@@ -1891,7 +2392,44 @@ class _PaymentReviewCard extends StatelessWidget {
                   ],
                 ),
               ),
-              StatusPill(payment.status),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  StatusPill(payment.status),
+                  if (payment.isOverdue) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB3261E).withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: const Color(0xFFB3261E).withValues(alpha: .3),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.warning_amber_rounded,
+                              size: 11, color: Color(0xFFB3261E)),
+                          SizedBox(width: 3),
+                          Text(
+                            'OVERDUE',
+                            style: TextStyle(
+                              color: Color(0xFFB3261E),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: .4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1899,15 +2437,99 @@ class _PaymentReviewCard extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Payment details
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Expanded(
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 320;
+
+              final categoryBadge = Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _paymentCategoryColor(payment.category)
+                      .withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _paymentCategoryIcon(payment.category),
+                      size: 12,
+                      color: _paymentCategoryColor(payment.category),
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        payment.category.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: _paymentCategoryColor(payment.category),
+                          letterSpacing: .4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              final amountText = FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  money(payment.amount),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              );
+
+              final dueDateText = Text(
+                'Due: ${_dateOrNone(payment.dueDate)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                      payment.isOverdue ? FontWeight.w700 : FontWeight.w500,
+                  color: payment.isOverdue
+                      ? const Color(0xFFB3261E)
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              );
+
+              if (isNarrow) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              categoryBadge,
+                              if (payment.paymentMethod != null &&
+                                  payment.paymentMethod!.isNotEmpty)
+                                Text(
+                                  '• ${payment.paymentMethod!}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontSize: 11,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(child: amountText),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     Text(
                       payment.label,
                       style: const TextStyle(
@@ -1916,25 +2538,53 @@ class _PaymentReviewCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '${payment.category.toUpperCase()} • ${payment.paymentMethod ?? "GCash"}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 12,
-                        letterSpacing: .5,
-                      ),
-                    ),
+                    dueDateText,
                   ],
-                ),
-              ),
-              Text(
-                money(payment.amount),
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 20,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            categoryBadge,
+                            if (payment.paymentMethod != null &&
+                                payment.paymentMethod!.isNotEmpty)
+                              Text(
+                                '• ${payment.paymentMethod!}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 11,
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          payment.label,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        dueDateText,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(child: amountText),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 10),
 
@@ -1942,7 +2592,8 @@ class _PaymentReviewCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .4),
+              color: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: .4),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -1963,6 +2614,7 @@ class _PaymentReviewCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     payment.reference ?? 'Not specified',
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.w700,
@@ -1976,18 +2628,21 @@ class _PaymentReviewCard extends StatelessWidget {
                       Clipboard.setData(ClipboardData(text: payment.reference!));
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Reference number copied to clipboard.'),
+                          content:
+                              Text('Reference number copied to clipboard.'),
                           duration: Duration(seconds: 2),
                         ),
                       );
                     },
                     borderRadius: BorderRadius.circular(6),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.copy_rounded, size: 14, color: theme.colorScheme.primary),
+                          Icon(Icons.copy_rounded,
+                              size: 14, color: theme.colorScheme.primary),
                           const SizedBox(width: 4),
                           Text(
                             'Copy',
@@ -2013,7 +2668,8 @@ class _PaymentReviewCard extends StatelessWidget {
           ),
 
           // Review Notes if rejected
-          if (payment.reviewNotes != null && payment.reviewNotes!.isNotEmpty) ...[
+          if (payment.reviewNotes != null &&
+              payment.reviewNotes!.isNotEmpty) ...[
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
@@ -2049,49 +2705,124 @@ class _PaymentReviewCard extends StatelessWidget {
 
           // ACTION BUTTONS
           if (payment.isPending)
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: isProcessing ? null : onReject,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFB3261E),
-                      side: const BorderSide(color: Color(0xFFB3261E)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    icon: const Icon(Icons.close_rounded, size: 18),
-                    label: const Text(
-                      'Reject',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 260;
+                final rejectBtn = OutlinedButton.icon(
+                  onPressed: isProcessing ? null : onReject,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFB3261E),
+                    side: const BorderSide(color: Color(0xFFB3261E)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: isProcessing ? null : onConfirm,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF56886B),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    icon: isProcessing
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.check_circle_outline_rounded, size: 18),
-                    label: const Text(
-                      'Confirm',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  label: const Text(
+                    'Reject',
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
-                ),
-              ],
+                );
+                final confirmBtn = FilledButton.icon(
+                  onPressed: isProcessing ? null : onConfirm,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF56886B),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  icon: isProcessing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.check_circle_outline_rounded,
+                          size: 18),
+                  label: const Text(
+                    'Confirm',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                );
+
+                if (isNarrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      confirmBtn,
+                      const SizedBox(height: 8),
+                      rejectBtn,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: rejectBtn),
+                    const SizedBox(width: 10),
+                    Expanded(child: confirmBtn),
+                  ],
+                );
+              },
+            )
+          else if (payment.isDue)
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 280;
+                final statusBanner = Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: .3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.schedule_rounded,
+                          size: 16,
+                          color: theme.colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Awaiting tenant proof',
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+                final markPaidBtn = OutlinedButton.icon(
+                  onPressed: isProcessing ? null : onConfirm,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                  ),
+                  icon: const Icon(Icons.point_of_sale_rounded, size: 16),
+                  label: const Text(
+                    'Mark paid',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                );
+
+                if (isNarrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      statusBanner,
+                      const SizedBox(height: 8),
+                      markPaidBtn,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: statusBanner),
+                    const SizedBox(width: 8),
+                    markPaidBtn,
+                  ],
+                );
+              },
             )
           else
             Align(
@@ -2100,8 +2831,11 @@ class _PaymentReviewCard extends StatelessWidget {
                 onPressed: onReEvaluate,
                 icon: const Icon(Icons.sync_alt_rounded, size: 16),
                 label: Text(
-                  payment.isVerified ? 'Mark as rejected' : 'Re-verify payment',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  payment.isVerified
+                      ? 'Mark as rejected'
+                      : 'Re-verify payment',
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),
             ),
@@ -2179,9 +2913,11 @@ class _ReceiptProofThumbnailState extends State<_ReceiptProofThumbnail> {
             Icon(Icons.image_not_supported_outlined,
                 size: 18, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(width: 8),
-            Text(
-              'No photo receipt attached (Reference provided)',
-              style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+            Expanded(
+              child: Text(
+                'No photo receipt attached (Reference provided)',
+                style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+              ),
             ),
           ],
         ),
@@ -2307,12 +3043,16 @@ class _ReceiptProofThumbnailState extends State<_ReceiptProofThumbnail> {
                     children: [
                       Icon(Icons.zoom_in_rounded, color: Colors.white, size: 16),
                       SizedBox(width: 6),
-                      Text(
-                        'Tap to inspect receipt full screen',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                      Flexible(
+                        child: Text(
+                          'Tap to inspect receipt full screen',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],
@@ -2354,10 +3094,14 @@ class _ReceiptViewerModal extends StatelessWidget {
           children: [
             Text(
               '${payment.tenantName ?? "Tenant"} - Receipt Proof',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
             Text(
               '${payment.label} • ${money(payment.amount)} • Ref: ${payment.reference ?? "—"}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12, color: Colors.white70),
             ),
           ],
@@ -2389,46 +3133,59 @@ class _ReceiptViewerModal extends StatelessWidget {
               Container(
                 color: Colors.black.withValues(alpha: .9),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          onReject();
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFFF8A80),
-                          side: const BorderSide(color: Color(0xFFFF8A80)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        label: const Text(
-                          'Reject',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final rejectBtn = OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onReject();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFFF8A80),
+                        side: const BorderSide(color: Color(0xFFFF8A80)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          onConfirm();
-                        },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF56886B),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-                        label: const Text(
-                          'Confirm',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      label: const Text(
+                        'Reject',
+                        style: TextStyle(fontWeight: FontWeight.w700),
                       ),
-                    ),
-                  ],
+                    );
+                    final confirmBtn = FilledButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onConfirm();
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF56886B),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                      label: const Text(
+                        'Confirm',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    );
+
+                    if (constraints.maxWidth < 280) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          confirmBtn,
+                          const SizedBox(height: 8),
+                          rejectBtn,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: rejectBtn),
+                        const SizedBox(width: 12),
+                        Expanded(child: confirmBtn),
+                      ],
+                    );
+                  },
                 ),
               ),
           ],
@@ -2472,111 +3229,112 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        20,
-        20,
-        MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFB3261E).withValues(alpha: .1),
-                  shape: BoxShape.circle,
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.85;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB3261E).withValues(alpha: .1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.cancel_outlined, color: Color(0xFFB3261E), size: 20),
                 ),
-                child: const Icon(Icons.cancel_outlined, color: Color(0xFFB3261E), size: 20),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Reject Payment Proof',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
-                    ),
-                    Text(
-                      'Tenant will be notified to correct and re-upload.',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Select rejection reason:',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-          ),
-          const SizedBox(height: 8),
-          ..._quickReasons.map(
-            (reason) {
-              final isSelected = _selectedReason == reason;
-              return InkWell(
-                onTap: () => setState(() => _selectedReason = reason),
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                  child: Row(
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        isSelected
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_off,
-                        size: 18,
-                        color: isSelected
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      Text(
+                        'Reject Payment Proof',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          reason,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                        ),
+                      Text(
+                        'Tenant will be notified to correct and re-upload.',
+                        style: TextStyle(fontSize: 12),
                       ),
                     ],
                   ),
                 ),
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _notesController,
-            maxLines: 2,
-            decoration: const InputDecoration(
-              hintText: 'Additional remarks / instructions for tenant...',
-              labelText: 'Remarks (Optional)',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(12)),
-              ),
+              ],
             ),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+            const SizedBox(height: 16),
+            const Text(
+              'Select rejection reason:',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            ..._quickReasons.map(
+              (reason) {
+                final isSelected = _selectedReason == reason;
+                return InkWell(
+                  onTap: () => setState(() => _selectedReason = reason),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_off,
+                          size: 18,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            reason,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _notesController,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                hintText: 'Additional remarks / instructions for tenant...',
+                labelText: 'Remarks (Optional)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton(
+            ),
+            const SizedBox(height: 18),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cancelBtn = OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                );
+                final confirmBtn = FilledButton(
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFFB3261E),
                     foregroundColor: Colors.white,
@@ -2589,11 +3347,29 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                     widget.onConfirmReject(fullReason);
                   },
                   child: const Text('Confirm Rejection'),
-                ),
-              ),
-            ],
-          ),
-        ],
+                );
+
+                if (constraints.maxWidth < 280) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      confirmBtn,
+                      const SizedBox(height: 8),
+                      cancelBtn,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: cancelBtn),
+                    const SizedBox(width: 10),
+                    Expanded(child: confirmBtn),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

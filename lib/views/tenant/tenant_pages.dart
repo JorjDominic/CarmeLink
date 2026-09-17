@@ -787,16 +787,20 @@ class _TenantPaymentCard extends StatelessWidget {
   void _showReceiptDialog(BuildContext context) {
     showDialog<void>(
       context: context,
-      builder: (dialogCtx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+      builder: (dialogCtx) {
+        final maxHeight = MediaQuery.sizeOf(dialogCtx).height * 0.85;
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Row(
+                    children: [
                   const Icon(Icons.receipt_outlined, color: Color(0xFF627FA8)),
                   const SizedBox(width: 8),
                   Expanded(
@@ -886,7 +890,9 @@ class _TenantPaymentCard extends StatelessWidget {
         ),
       ),
     );
-  }
+  },
+);
+}
 
   @override
   Widget build(BuildContext context) {
@@ -1059,35 +1065,62 @@ class _TenantPaymentCard extends StatelessWidget {
                   (payment.receiptPath != null &&
                       payment.receiptPath!.isNotEmpty)) ...[
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    if (payment.canSubmitProof)
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  UploadPaymentProofPage(targetPayment: payment),
-                            ),
-                          ),
-                          icon: const Icon(Icons.upload_file_outlined, size: 16),
-                          label: const Text('Submit proof'),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final canSubmit = payment.canSubmitProof;
+                    final hasReceipt = payment.receiptPath != null &&
+                        payment.receiptPath!.isNotEmpty;
+                    final isNarrow = constraints.maxWidth < 280;
+
+                    final submitBtn = FilledButton.tonalIcon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              UploadPaymentProofPage(targetPayment: payment),
                         ),
                       ),
-                    if (payment.canSubmitProof &&
-                        payment.receiptPath != null &&
-                        payment.receiptPath!.isNotEmpty)
-                      const SizedBox(width: 8),
-                    if (payment.receiptPath != null &&
-                        payment.receiptPath!.isNotEmpty)
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _showReceiptDialog(context),
-                          icon: const Icon(Icons.receipt_long_outlined, size: 16),
-                          label: const Text('View receipt'),
-                        ),
-                      ),
-                  ],
+                      icon: const Icon(Icons.upload_file_outlined, size: 16),
+                      label: const Text('Submit proof'),
+                    );
+
+                    final receiptBtn = OutlinedButton.icon(
+                      onPressed: () => _showReceiptDialog(context),
+                      icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                      label: const Text('View receipt'),
+                    );
+
+                    if (canSubmit && hasReceipt) {
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            submitBtn,
+                            const SizedBox(height: 8),
+                            receiptBtn,
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: submitBtn),
+                          const SizedBox(width: 8),
+                          Expanded(child: receiptBtn),
+                        ],
+                      );
+                    }
+
+                    if (canSubmit) {
+                      return SizedBox(
+                        width: double.infinity,
+                        child: submitBtn,
+                      );
+                    }
+
+                    return SizedBox(
+                      width: double.infinity,
+                      child: receiptBtn,
+                    );
+                  },
                 ),
               ],
             ],

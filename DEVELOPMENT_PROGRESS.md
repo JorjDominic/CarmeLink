@@ -36,6 +36,8 @@ geofencing or advanced analytics.
 | Sep 16, 2026 | **Maintenance Management System** | Tenant, Caretaker, Owner | Full lifecycle triage: report submission with 5MB photo and floor plan pin, triage queue, metric cards, `InteractiveViewer` zoom, mandatory resolution notes, and audit trail (`maintenance_staff_history`). 56/56 tests passing. |
 | Sep 17, 2026 | **Cloudinary Media Architecture (Documented)** | All | Documented media CDN upgrade in system plan and progress tracking (`f_auto,q_auto`, dynamic thumbnails, mobile bandwidth offloading). |
 | Sep 17, 2026 | **Tenant Payments & Upload Proof** | Tenant | Account summary, filter chips (All, Due, Pending, Verified), overdue indicators, receipt zoom inspection, GCash/Maya/Bank instructions, and 5MB proof submission with OCR auto-fill. 71/71 tests passing. |
+| Sep 17, 2026 | **Owner & Caretaker Payment Verification & Invoicing** | Caretaker, Owner | Full staff payment suite: financial dashboard grid (Pending, Collected, Outstanding, Overdue), live search (tenant/room/title/ref), status chips, issue invoice modal dialog with category & due date, zoomable receipt inspection (`InteractiveViewer`), approve/reject with mandatory reasons, and cash payment recording. 86/86 tests passing. |
+| Sep 17, 2026 | **Payments Overflow Audit & Layout Hardening** | Tenant, Guardian, Caretaker, Owner | Comprehensive overflow fixes across all payment pages: responsive `LayoutBuilder` for review card details & action buttons, `_RejectReasonSheet` scrollable maxHeight constraints with keyboard insets support, `_CreateInvoiceDialog` `isExpanded` dropdowns and responsive due date picker, `_TenantPaymentCard` full-width & stacked action buttons, and `_showReceiptDialog` constrained scrollable dialog. Verified with 7 dedicated narrow viewport (320px) and 1.35x font scale tests. 93/93 tests passing. |
 
 ## Core requirements by page
 
@@ -85,6 +87,7 @@ page exists but its important backend workflow is unfinished.
 - [ ] **Tenants** — live directory and operational tenant information.
 - [✓] **Rooms** — live room/bed CRUD, vacancies, bed occupant details (name, contact), bed reassignment/transfers across rooms, and unassignment.
 - [✓] **Maintenance** — triage, assign staff, start work, update status, record resolution notes, inspect photos with tap-to-zoom (InteractiveViewer), floor plan overview integration, and audit trail.
+- [✓] **Payment Verification & Invoicing** — staff payment review: financial dashboard metrics, proof verification, invoice generation, status filters, and cash payment recording.
 - [ ] **Gate** — review events and record authorized manual overrides.
 - [✓] **Curfew & Exceptions** — review live late return and overnight leave requests, approve with gate instructions or reject with reason, real-time sync via Supabase table subscriptions.
 - [✓] **Accounts** — CRUD limited to tenant and guardian accounts.
@@ -97,7 +100,7 @@ page exists but its important backend workflow is unfinished.
 - [ ] **Operations** — live grouped access to every management workflow.
 - [✓] **Rooms** — live room and bed-space CRUD with assignment-aware occupancy, occupant tenant details (name, phone), inter-room bed transfer/reassignment, and assignment termination.
 - [✓] **Floor Plan (Integrated)** — merged as an interactive 2D map view inside Room Monitoring (`RoomMonitoringPage`) with live Supabase occupancy and bed details, rather than an isolated standalone page.
-- [ ] **Payments** — review receipts, correct records, and maintain an audit trail.
+- [✓] **Payments (Payment Verification & Invoicing)** — financial metrics (Pending, Collected, Outstanding, Overdue), tenant search & filter chips, invoice issuance modal with billing categories, receipt proof zoom, approve/reject actions with audit notes, and mark-as-paid for cash payments.
 - [✓] **Maintenance** — live request triage, metric summary cards (Open, High Priority, In Progress, Resolved), search & status filtering, assign staff, record resolution details with mandatory notes validation, floor plan overview, photo zoom inspection, and audit history.
 - [ ] **Gate and Manual Override** — auditable access decisions and system health.
 - [✓] **Curfew Review** — live request list, guardian input status, staff approval with gate instructions or rejection with reasons, emergency staff override, real-time Supabase sync, and prioritized dashboard attention card.
