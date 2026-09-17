@@ -20,6 +20,7 @@ class _OwnerShellState extends State<OwnerShell> {
     OwnerController.instance.loadRooms();
     OwnerController.instance.loadPayments();
     OwnerController.instance.loadCurfewRequests();
+    OwnerController.instance.loadStaffMaintenance();
   }
 
   @override

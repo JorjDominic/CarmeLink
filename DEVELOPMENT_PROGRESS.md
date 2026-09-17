@@ -73,7 +73,7 @@ page exists but its important backend workflow is unfinished.
 
 - [ ] **Tenants** — live directory and operational tenant information.
 - [✓] **Rooms** — live room/bed CRUD, vacancies, bed occupant details (name, contact), bed reassignment/transfers across rooms, and unassignment.
-- [ ] **Maintenance** — triage, assign, update, and resolve tenant reports.
+- [✓] **Maintenance** — triage, assign staff, start work, update status, record resolution notes, inspect photos with tap-to-zoom (InteractiveViewer), floor plan overview integration, and audit trail.
 - [ ] **Gate** — review events and record authorized manual overrides.
 - [✓] **Curfew & Exceptions** — review live late return and overnight leave requests, approve with gate instructions or reject with reason, real-time sync via Supabase table subscriptions.
 - [✓] **Accounts** — CRUD limited to tenant and guardian accounts.
@@ -87,7 +87,7 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Rooms** — live room and bed-space CRUD with assignment-aware occupancy, occupant tenant details (name, phone), inter-room bed transfer/reassignment, and assignment termination.
 - [✓] **Floor Plan (Integrated)** — merged as an interactive 2D map view inside Room Monitoring (`RoomMonitoringPage`) with live Supabase occupancy and bed details, rather than an isolated standalone page.
 - [ ] **Payments** — review receipts, correct records, and maintain an audit trail.
-- [ ] **Maintenance** — assign work, update status, and record resolution details.
+- [✓] **Maintenance** — live request triage, metric summary cards (Open, High Priority, In Progress, Resolved), search & status filtering, assign staff, record resolution details with mandatory notes validation, floor plan overview, photo zoom inspection, and audit history.
 - [ ] **Gate and Manual Override** — auditable access decisions and system health.
 - [✓] **Curfew Review** — live request list, guardian input status, staff approval with gate instructions or rejection with reasons, emergency staff override, real-time Supabase sync, and prioritized dashboard attention card.
 - [ ] **Visitor Management** — approve, reject, and audit visitor access.

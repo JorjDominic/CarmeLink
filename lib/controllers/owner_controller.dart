@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../services/curfew_service.dart';
 import '../services/payment_service.dart';
 import '../services/room_service.dart';
+import '../services/staff_maintenance_service.dart';
 
 class OwnerController extends ChangeNotifier {
   OwnerController._();
@@ -27,6 +28,13 @@ class OwnerController extends ChangeNotifier {
   bool _roomsLoading = false;
   String? _roomsError;
 
+  final StaffMaintenanceService _staffMaintenanceService =
+      const StaffMaintenanceService();
+  final List<StaffMaintenanceReport> _staffMaintenanceReports = [];
+  bool _maintenanceLoading = false;
+  String? _maintenanceError;
+  bool _maintenanceLoadedOnce = false;
+
   List<CurfewRequest> get curfewRequests => List.unmodifiable(_curfewRequests);
   bool get curfewLoading => _curfewLoading;
   String? get curfewError => _curfewError;
@@ -37,6 +45,24 @@ class OwnerController extends ChangeNotifier {
 
   int get pendingTotalCurfewCount =>
       _curfewRequests.where((r) => r.isPending).length;
+
+  List<StaffMaintenanceReport> get staffMaintenanceReports =>
+      List.unmodifiable(_staffMaintenanceReports);
+  bool get maintenanceLoading => _maintenanceLoading;
+  String? get maintenanceError => _maintenanceError;
+  bool get maintenanceLoadedOnce => _maintenanceLoadedOnce;
+
+  int get highPriorityMaintenance => _staffMaintenanceReports
+      .where((r) => r.isOpen && r.isHighUrgency)
+      .length;
+
+  int get inProgressMaintenanceCount => _staffMaintenanceReports
+      .where((r) => r.isInProgress)
+      .length;
+
+  int get resolvedMaintenanceCount => _staffMaintenanceReports
+      .where((r) => r.isResolved)
+      .length;
 
   List<TenantDirectoryEntry> get tenants =>
       List.unmodifiable(MockData.tenantDirectory);
@@ -62,11 +88,33 @@ class OwnerController extends ChangeNotifier {
   List<RoomRecord> get roomRecords => List.unmodifiable(_roomRecords);
   bool get roomsLoading => _roomsLoading;
   String? get roomsError => _roomsError;
-  List<MaintenanceReport> get maintenance =>
-      List.unmodifiable(MockData.maintenance);
+  List<MaintenanceReport> get maintenance {
+    if (_staffMaintenanceReports.isNotEmpty) {
+      return _staffMaintenanceReports
+          .map((s) => MaintenanceReport(
+                id: s.id,
+                category: s.category,
+                description: s.description,
+                location: s.location,
+                urgency: s.urgency.isNotEmpty
+                    ? '${s.urgency[0].toUpperCase()}${s.urgency.substring(1).toLowerCase()}'
+                    : s.urgency,
+                status: s.statusLabel,
+                createdAt: s.createdAt,
+                photoPath: s.photoPath,
+                notes: s.notes,
+                staffNotes: s.notes,
+                resolvedAt: s.resolvedAt,
+              ))
+          .toList();
+    }
+    return List.unmodifiable(MockData.maintenance);
+  }
+
   List<MaintenanceReport> get maintenanceByPriority {
+    final list = [...maintenance];
     const rank = {'High': 3, 'Medium': 2, 'Low': 1};
-    return [...MockData.maintenance]
+    return list
       ..sort((a, b) => (rank[b.urgency] ?? 0).compareTo(rank[a.urgency] ?? 0));
   }
 
@@ -92,11 +140,17 @@ class OwnerController extends ChangeNotifier {
           payment.status == 'Pending review')
       .length;
 
-  int get openMaintenance => maintenance
-      .where(
-        (report) => report.status != 'Completed' && report.status != 'Closed',
-      )
-      .length;
+  int get openMaintenance => _maintenanceLoadedOnce
+      ? _staffMaintenanceReports.where((report) => report.isOpen).length
+      : maintenance
+          .where(
+            (report) =>
+                report.status != 'Completed' &&
+                report.status != 'Closed' &&
+                report.status != 'Resolved' &&
+                report.status != 'Cancelled',
+          )
+          .length;
 
   int get pendingVisitors =>
       visitors.where((visitor) => visitor.status == 'Pending').length;
@@ -284,6 +338,48 @@ class OwnerController extends ChangeNotifier {
     return updated;
   }
 
+  Future<void> loadStaffMaintenance({bool force = false}) async {
+    if (_maintenanceLoading && !force) return;
+    if (_maintenanceLoadedOnce && !force) return;
+
+    _maintenanceLoading = true;
+    _maintenanceError = null;
+    notifyListeners();
+
+    try {
+      final reports = await _staffMaintenanceService.listReports();
+      _staffMaintenanceReports
+        ..clear()
+        ..addAll(reports);
+      _maintenanceLoadedOnce = true;
+    } catch (e) {
+      _maintenanceError = staffMaintenanceError(e);
+    } finally {
+      _maintenanceLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateStaffMaintenance({
+    required StaffMaintenanceReport report,
+    required String status,
+    required String notes,
+  }) async {
+    await _staffMaintenanceService.save(report, status, notes);
+    await loadStaffMaintenance(force: true);
+  }
+
+  @visibleForTesting
+  void setStaffMaintenanceForTesting(List<StaffMaintenanceReport> reports) {
+    _staffMaintenanceReports
+      ..clear()
+      ..addAll(reports);
+    _maintenanceLoadedOnce = true;
+    _maintenanceLoading = false;
+    _maintenanceError = null;
+    notifyListeners();
+  }
+
   void clear() {
     _payments.clear();
     _paymentsLoading = false;
@@ -295,6 +391,10 @@ class OwnerController extends ChangeNotifier {
     _curfewLoading = false;
     _curfewError = null;
     _curfewLoadedOnce = false;
+    _staffMaintenanceReports.clear();
+    _maintenanceLoading = false;
+    _maintenanceError = null;
+    _maintenanceLoadedOnce = false;
     notifyListeners();
   }
 }

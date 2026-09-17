@@ -30,12 +30,29 @@ class StaffMaintenanceReport {
         urgency = row['urgency'] as String,
         status = row['status'] as String,
         photoPath = row['photo_path'] as String?,
-        notes = row['staff_notes'] as String,
-        updatedAt = row['updated_at'] as String,
-        createdAt = DateTime.parse(row['created_at'] as String).toLocal(),
+        notes = (row['staff_notes'] as String?) ?? '',
+        updatedAt = (row['updated_at'] as String?) ?? '',
+        createdAt = row['created_at'] != null
+            ? DateTime.parse(row['created_at'] as String).toLocal()
+            : DateTime.now(),
         resolvedAt = row['resolved_at'] == null
             ? null
             : DateTime.parse(row['resolved_at'] as String).toLocal();
+
+  const StaffMaintenanceReport({
+    required this.id,
+    required this.tenantName,
+    required this.category,
+    required this.description,
+    required this.location,
+    required this.urgency,
+    required this.status,
+    required this.notes,
+    required this.updatedAt,
+    this.photoPath,
+    required this.createdAt,
+    this.resolvedAt,
+  });
 
   final String id;
   final String tenantName;
@@ -56,12 +73,53 @@ class StaffMaintenanceReport {
   String get statusLabel => maintenanceStatusLabels[status] ?? status;
 
   bool get isOpen => status != 'resolved' && status != 'cancelled';
+  bool get isPending => status == 'pending';
+  bool get isAssigned => status == 'assigned';
+  bool get isInProgress => status == 'in_progress';
+  bool get isResolved => status == 'resolved';
+  bool get isCancelled => status == 'cancelled';
+
+  bool get isHighUrgency => urgency.toLowerCase() == 'high';
+  bool get isMediumUrgency => urgency.toLowerCase() == 'medium';
+  bool get isLowUrgency => urgency.toLowerCase() == 'low';
+
+  StaffMaintenanceReport copyWith({
+    String? id,
+    String? tenantName,
+    String? category,
+    String? description,
+    String? location,
+    String? urgency,
+    String? status,
+    String? notes,
+    String? updatedAt,
+    String? photoPath,
+    DateTime? createdAt,
+    DateTime? resolvedAt,
+  }) {
+    return StaffMaintenanceReport(
+      id: id ?? this.id,
+      tenantName: tenantName ?? this.tenantName,
+      category: category ?? this.category,
+      description: description ?? this.description,
+      location: location ?? this.location,
+      urgency: urgency ?? this.urgency,
+      status: status ?? this.status,
+      notes: notes ?? this.notes,
+      updatedAt: updatedAt ?? this.updatedAt,
+      photoPath: photoPath ?? this.photoPath,
+      createdAt: createdAt ?? this.createdAt,
+      resolvedAt: resolvedAt ?? this.resolvedAt,
+    );
+  }
 }
 
 class StaffMaintenanceService {
-  const StaffMaintenanceService();
+  const StaffMaintenanceService([SupabaseClient? client])
+      : _clientOverride = client;
 
-  SupabaseClient get _client => SupabaseConfig.client;
+  final SupabaseClient? _clientOverride;
+  SupabaseClient get _client => _clientOverride ?? SupabaseConfig.client;
 
   static const _columns =
       'id, category, description, location, urgency, status, photo_path, '
@@ -121,6 +179,10 @@ class StaffMaintenanceService {
   Future<String?> photoUrl(String? path) async {
     if (path == null || path.isEmpty) {
       return null;
+    }
+
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
     }
 
     return _client.storage

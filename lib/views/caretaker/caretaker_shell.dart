@@ -24,6 +24,7 @@ class _CaretakerShellState extends State<CaretakerShell> {
     OwnerController.instance.loadRooms();
     OwnerController.instance.loadPayments();
     OwnerController.instance.loadCurfewRequests();
+    OwnerController.instance.loadStaffMaintenance();
   }
 
   @override
