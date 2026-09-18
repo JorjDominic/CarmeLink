@@ -61,23 +61,15 @@ create policy "Authenticated users can read boundary configuration"
   to authenticated
   using (true);
 
--- Only owners and dorm managers can modify boundary config
-create policy "Owners and dorm managers can modify boundary config"
+-- Only owners and staff can modify boundary config
+create policy "Owners and staff can modify boundary config"
   on public.dorm_boundary_config
   for all
   to authenticated
   using (
-    exists (
-      select 1 from public.profiles
-      where id = auth.uid()
-      and role in ('owner', 'dorm_manager')
-    )
+    public.is_staff()
   )
   with check (
-    exists (
-      select 1 from public.profiles
-      where id = auth.uid()
-      and role in ('owner', 'dorm_manager')
-    )
+    public.is_staff()
   );
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter/services.dart';
 
+import '../../controllers/messaging_controller.dart';
 import '../../controllers/owner_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
@@ -5141,38 +5142,157 @@ class _AnnouncementComposerSheetState
   }
 }
 
-class OwnerMessagingPage extends StatelessWidget {
+class OwnerMessagingPage extends StatefulWidget {
   const OwnerMessagingPage({super.key});
 
   @override
+  State<OwnerMessagingPage> createState() => _OwnerMessagingPageState();
+}
+
+class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
+  final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      MessagingController.instance.loadConversations();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final controller = OwnerController.instance;
+    final messaging = MessagingController.instance;
 
     return PageFrame(
       title: 'Messages',
-      subtitle: 'Tenant and guardian conversations',
+      subtitle: 'Tenant, guardian and staff conversations',
       child: AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) => Column(
-          children: controller.conversations
-              .map(
-                (conversation) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: ConversationListCard(
-                    name: conversation.personName,
-                    role: conversation.personRole,
-                    lastMessage: conversation.messages.last,
-                    onTap: () => _ownerPush(
-                      context,
-                      OwnerConversationPage(
-                        conversation: conversation,
+        animation: messaging,
+        builder: (context, _) {
+          final filter = messaging.selectedFilter;
+          final conversations = messaging.filteredConversations;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Search bar
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search by resident name or room...',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded),
+                          onPressed: () {
+                            _searchController.clear();
+                            messaging.setSearchQuery('');
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: (value) => messaging.setSearchQuery(value),
+              ),
+              const SizedBox(height: 12),
+
+              // Filter chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _FilterChip(
+                      label: 'All',
+                      selected: filter == 'all',
+                      badgeColor: Theme.of(context).colorScheme.primary,
+                      onTap: () => messaging.setFilter('all'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Tenants',
+                      selected: filter == 'tenant',
+                      badgeColor: Theme.of(context).colorScheme.primary,
+                      onTap: () => messaging.setFilter('tenant'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Guardians',
+                      selected: filter == 'guardian',
+                      badgeColor: Theme.of(context).colorScheme.primary,
+                      onTap: () => messaging.setFilter('guardian'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Staff Channel',
+                      selected: filter == 'staff',
+                      badgeColor: Theme.of(context).colorScheme.primary,
+                      onTap: () => messaging.setFilter('staff'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Conversation list
+              if (messaging.loadingConversations && conversations.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (conversations.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 48,
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No conversations found',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.outline,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ...conversations.map(
+                  (conv) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: ConversationListCard(
+                      name: conv.title,
+                      role: conv.subtitle,
+                      lastMessageText: conv.lastMessagePreview ?? 'No messages yet',
+                      lastMessageTime: conv.lastMessageAt,
+                      unreadCount: conv.unreadCount,
+                      onTap: () => _ownerPush(
+                        context,
+                        OwnerConversationPage(
+                          record: conv,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              )
-              .toList(),
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -5180,11 +5300,13 @@ class OwnerMessagingPage extends StatelessWidget {
 
 class OwnerConversationPage extends StatefulWidget {
   const OwnerConversationPage({
-    required this.conversation,
+    this.conversation,
+    this.record,
     super.key,
-  });
+  }) : assert(conversation != null || record != null);
 
-  final OwnerConversation conversation;
+  final OwnerConversation? conversation;
+  final ConversationRecord? record;
 
   @override
   State<OwnerConversationPage> createState() => _OwnerConversationPageState();
@@ -5194,127 +5316,164 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
   final message = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    final rec = widget.record;
+    if (rec != null) {
+      MessagingController.instance.openConversation(rec);
+    }
+  }
+
+  @override
   void dispose() {
     message.dispose();
+    if (widget.record != null) {
+      MessagingController.instance.closeActiveConversation();
+    }
     super.dispose();
+  }
+
+  Future<void> _handleSend() async {
+    final text = message.text.trim();
+    if (text.isEmpty) return;
+    message.clear();
+
+    if (widget.record != null) {
+      await MessagingController.instance.sendMessage(text);
+    } else if (widget.conversation != null) {
+      OwnerController.instance.sendOwnerMessage(widget.conversation!, text);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = OwnerController.instance;
+    final messaging = MessagingController.instance;
+    final title = widget.record?.title ?? widget.conversation?.personName ?? 'Conversation';
+    final subtitle = widget.record?.subtitle ?? widget.conversation?.personRole ?? '';
 
     return PageFrame(
-      title: widget.conversation.personName,
-      subtitle: widget.conversation.personRole,
+      title: title,
+      subtitle: subtitle,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 780),
         child: AnimatedBuilder(
-          animation: controller,
-          builder: (context, _) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('CONVERSATION',
+          animation: messaging,
+          builder: (context, _) {
+            final messagesList = widget.record != null
+                ? messaging.activeMessages
+                : (widget.conversation?.messages ?? []);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CONVERSATION',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                      letterSpacing: 1.3,
-                      color: Theme.of(context).colorScheme.primary)),
-              const SizedBox(height: 8),
-              CarmelitaCard(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: widget.conversation.messages
-                      .map(
-                        (item) => Align(
-                          alignment: item.senderRole == 'ownerCaretaker'
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
-                          child: Container(
-                            constraints: const BoxConstraints(
-                              maxWidth: 560,
-                            ),
-                            margin: const EdgeInsets.symmetric(
-                              vertical: 6,
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 9),
-                            decoration: BoxDecoration(
-                              color: item.senderRole == 'ownerCaretaker'
-                                  ? const Color(0xFF627FA8)
-                                      .withValues(alpha: .10)
-                                  : Theme.of(context)
-                                      .colorScheme
-                                      .surfaceContainerHighest
-                                      .withValues(alpha: .55),
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(15),
-                                topRight: const Radius.circular(15),
-                                bottomLeft: Radius.circular(
-                                    item.senderRole == 'ownerCaretaker'
-                                        ? 15
-                                        : 4),
-                                bottomRight: Radius.circular(
-                                    item.senderRole == 'ownerCaretaker'
-                                        ? 4
-                                        : 15),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment:
-                                  item.senderRole == 'ownerCaretaker'
-                                      ? CrossAxisAlignment.end
-                                      : CrossAxisAlignment.start,
-                              children: [
-                                Text(item.senderName,
-                                    style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800)),
-                                const SizedBox(height: 2),
-                                Text(item.body,
-                                    style: const TextStyle(fontSize: 13)),
-                                const SizedBox(height: 3),
-                                Text(timeText(item.sentAt),
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall),
-                              ],
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        letterSpacing: 1.3,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                CarmelitaCard(
+                  padding: const EdgeInsets.all(12),
+                  child: messagesList.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(
+                            child: Text(
+                              'No messages yet. Send a message to start.',
+                              style: TextStyle(color: Colors.grey),
                             ),
                           ),
+                        )
+                      : Column(
+                          children: messagesList.map((item) {
+                            final isStaff = item.senderRole == 'owner' ||
+                                item.senderRole == 'caretaker' ||
+                                item.senderRole == 'ownerCaretaker';
+
+                            return Align(
+                              alignment: isStaff
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: Container(
+                                constraints: const BoxConstraints(maxWidth: 560),
+                                margin: const EdgeInsets.symmetric(vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 9,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isStaff
+                                      ? const Color(0xFF627FA8).withValues(alpha: .10)
+                                      : Theme.of(context)
+                                          .colorScheme
+                                          .surfaceContainerHighest
+                                          .withValues(alpha: .55),
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: const Radius.circular(15),
+                                    topRight: const Radius.circular(15),
+                                    bottomLeft: Radius.circular(isStaff ? 15 : 4),
+                                    bottomRight: Radius.circular(isStaff ? 4 : 15),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: isStaff
+                                      ? CrossAxisAlignment.end
+                                      : CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.senderName,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      item.body,
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      timeText(item.sentAt),
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
                         ),
-                      )
-                      .toList(),
                 ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: message,
-                decoration: InputDecoration(
-                  hintText: 'Write a message',
-                  prefixIcon: const Icon(Icons.chat_bubble_outline),
-                  suffixIcon: IconButton(
-                    onPressed: () {
-                      if (message.text.trim().isEmpty) {
-                        return;
-                      }
-                      controller.sendOwnerMessage(
-                        widget.conversation,
-                        message.text,
-                      );
-                      message.clear();
-                    },
-                    icon: const Icon(Icons.send_outlined),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: message,
+                  enabled: !messaging.sendingMessage,
+                  decoration: InputDecoration(
+                    hintText: 'Write a message...',
+                    prefixIcon: const Icon(Icons.chat_bubble_outline),
+                    suffixIcon: messaging.sendingMessage
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            onPressed: _handleSend,
+                            icon: const Icon(Icons.send_outlined),
+                          ),
                   ),
+                  onSubmitted: (_) => _handleSend(),
                 ),
-                onSubmitted: (value) {
-                  if (value.trim().isEmpty) return;
-                  controller.sendOwnerMessage(
-                    widget.conversation,
-                    value,
-                  );
-                  message.clear();
-                },
-              ),
-            ],
-          ),
+              ],
+            );
+          },
         ),
       ),
     );

@@ -1313,18 +1313,28 @@ class ConversationListCard extends StatelessWidget {
   const ConversationListCard({
     required this.name,
     required this.role,
-    required this.lastMessage,
+    this.lastMessage,
+    this.lastMessageText,
+    this.lastMessageTime,
+    this.unreadCount = 0,
     required this.onTap,
     super.key,
   });
 
   final String name;
   final String role;
-  final ChatMessage lastMessage;
+  final ChatMessage? lastMessage;
+  final String? lastMessageText;
+  final DateTime? lastMessageTime;
+  final int unreadCount;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final previewText =
+        lastMessage?.body ?? lastMessageText ?? 'No messages yet';
+    final previewTime = lastMessage?.sentAt ?? lastMessageTime;
+
     return CarmelitaCard(
       onTap: onTap,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1337,7 +1347,7 @@ class ConversationListCard extends StatelessWidget {
               Theme.of(context).colorScheme.primary.withValues(alpha: .10),
           foregroundColor: Theme.of(context).colorScheme.primary,
           child: Text(
-            name.substring(0, 1).toUpperCase(),
+            name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
         ),
@@ -1351,19 +1361,43 @@ class ConversationListCard extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              timeText(lastMessage.sentAt),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            if (previewTime != null) ...[
+              const SizedBox(width: 8),
+              Text(
+                timeText(previewTime),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ],
         ),
         subtitle: Text(
-          '$role • ${lastMessage.body}',
+          '$role • $previewText',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (unreadCount > 0)
+              Container(
+                margin: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  unreadCount.toString(),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            const Icon(Icons.chevron_right_rounded, size: 20),
+          ],
+        ),
       ),
     );
   }

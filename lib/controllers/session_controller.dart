@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/room_service.dart';
 import '../services/tenant_service.dart';
 import 'guardian_controller.dart';
+import 'messaging_controller.dart';
 import 'owner_controller.dart';
 import 'tenant_controller.dart';
 
@@ -40,6 +41,7 @@ class SessionController extends ChangeNotifier {
         _currentUser = null;
         _passwordRecovery = false;
         TenantController.instance.clear();
+        MessagingController.instance.clear();
         RoomService.invalidateCache();
         TenantService.invalidateCache();
         notifyListeners();

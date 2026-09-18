@@ -507,6 +507,9 @@ class ChatMessage {
     required this.senderRole,
     required this.body,
     required this.sentAt,
+    this.conversationId = '',
+    this.senderId = '',
+    this.isRead = false,
   });
 
   final String id;
@@ -514,6 +517,167 @@ class ChatMessage {
   final String senderRole;
   final String body;
   final DateTime sentAt;
+  final String conversationId;
+  final String senderId;
+  final bool isRead;
+
+  bool isMine(String? currentUserId) {
+    if (currentUserId == null || currentUserId.isEmpty) return false;
+    return senderId == currentUserId;
+  }
+
+  factory ChatMessage.fromRow(
+    Map<String, dynamic> row, {
+    String? currentUserId,
+  }) {
+    final profile = row['profiles'] as Map<String, dynamic>?;
+    final senderName = profile?['full_name'] as String? ??
+        row['sender_name'] as String? ??
+        'User';
+    final role = profile?['role'] as String? ??
+        row['sender_role'] as String? ??
+        'tenant';
+
+    return ChatMessage(
+      id: row['id'] as String,
+      conversationId: row['conversation_id'] as String? ?? '',
+      senderId: row['sender_id'] as String? ?? '',
+      senderName: senderName,
+      senderRole: role,
+      body: row['body'] as String? ?? '',
+      isRead: row['is_read'] as bool? ?? false,
+      sentAt: row['created_at'] != null
+          ? DateTime.parse(row['created_at'] as String).toLocal()
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toInsertRow() {
+    return {
+      'conversation_id': conversationId,
+      'sender_id': senderId,
+      'sender_role': senderRole,
+      'body': body,
+      'is_read': isRead,
+    };
+  }
+}
+
+class ConversationRecord {
+  const ConversationRecord({
+    required this.id,
+    required this.type,
+    this.tenantId,
+    this.guardianId,
+    this.title = '',
+    this.subtitle = '',
+    this.participantName = '',
+    this.participantRole = '',
+    this.roomNumber,
+    this.bedSpace,
+    this.lastMessagePreview,
+    this.lastMessageAt,
+    this.unreadCount = 0,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String type; // 'tenant_management', 'guardian_management', 'internal_staff'
+  final String? tenantId;
+  final String? guardianId;
+  final String title;
+  final String subtitle;
+  final String participantName;
+  final String participantRole;
+  final String? roomNumber;
+  final String? bedSpace;
+  final String? lastMessagePreview;
+  final DateTime? lastMessageAt;
+  final int unreadCount;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  bool get isInternalStaff => type == 'internal_staff';
+  bool get isTenantManagement => type == 'tenant_management';
+  bool get isGuardianManagement => type == 'guardian_management';
+
+  factory ConversationRecord.fromRow(
+    Map<String, dynamic> row, {
+    String? currentUserId,
+    String? currentRole,
+  }) {
+    final type = row['type'] as String? ?? 'tenant_management';
+    final tenantProfile = row['tenant_profile'] as Map<String, dynamic>?;
+    final guardianProfile = row['guardian_profile'] as Map<String, dynamic>?;
+
+    String participantName = '';
+    String participantRole = '';
+    String title = '';
+    String subtitle = '';
+    String? roomNumber;
+    String? bedSpace;
+
+    if (type == 'internal_staff') {
+      title = 'Staff Channel';
+      subtitle = 'Owner & Caretaker Coordination';
+      participantName = 'Staff Room';
+      participantRole = 'Staff Only';
+    } else if (type == 'guardian_management') {
+      final gName = guardianProfile?['full_name'] as String? ?? 'Guardian';
+      final tName = tenantProfile?['full_name'] as String?;
+      participantName = gName;
+      participantRole = 'Guardian';
+      title = gName;
+      subtitle = tName != null && tName.isNotEmpty
+          ? 'Guardian of $tName'
+          : 'Guardian Inquiry';
+    } else {
+      // tenant_management
+      final tName = tenantProfile?['full_name'] as String? ?? 'Tenant';
+      participantName = tName;
+      participantRole = 'Tenant';
+      title = tName;
+      subtitle = 'Resident';
+
+      final assignment = tenantProfile?['assignment'] as Map<String, dynamic>?;
+      if (assignment != null) {
+        roomNumber = assignment['room_number'] as String?;
+        bedSpace = assignment['bed_space'] as String?;
+        if (roomNumber != null) {
+          subtitle = 'Room $roomNumber${bedSpace != null ? ' ($bedSpace)' : ''}';
+        }
+      }
+    }
+
+    if (currentRole == 'tenant' || currentRole == 'guardian') {
+      title = 'Dormitory Management';
+      subtitle = 'Owner & Caretaker';
+    }
+
+    DateTime? lastMsgAt;
+    if (row['last_message_at'] != null) {
+      lastMsgAt = DateTime.parse(row['last_message_at'] as String).toLocal();
+    }
+
+    return ConversationRecord(
+      id: row['id'] as String,
+      type: type,
+      tenantId: row['tenant_id'] as String?,
+      guardianId: row['guardian_id'] as String?,
+      title: title,
+      subtitle: subtitle,
+      participantName: participantName,
+      participantRole: participantRole,
+      roomNumber: roomNumber,
+      bedSpace: bedSpace,
+      lastMessagePreview: row['last_message_preview'] as String?,
+      lastMessageAt: lastMsgAt,
+      unreadCount: (row['unread_count'] as num?)?.toInt() ?? 0,
+      createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+      updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
+    );
+  }
 }
 
 class DormRoomStatus {
