@@ -79,9 +79,11 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
                       const SizedBox(height: 18),
                       const Text('Staff sign in',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                          style: TextStyle(
+                              fontSize: 28, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      const Text('Authorized owner and caretaker accounts only.',
+                      const Text(
+                          'Authorized owner and caretaker accounts only.',
                           textAlign: TextAlign.center),
                       const SizedBox(height: 26),
                       TextFormField(
@@ -90,11 +92,14 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
                         autofillHints: const [AutofillHints.username],
                         textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(
-                          labelText: 'Email', prefixIcon: Icon(Icons.mail_outline),
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.mail_outline),
                           border: OutlineInputBorder(),
                         ),
-                        validator: (value) => (value == null || !value.contains('@'))
-                            ? 'Enter a valid email.' : null,
+                        validator: (value) =>
+                            (value == null || !value.contains('@'))
+                                ? 'Enter a valid email.'
+                                : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -107,34 +112,46 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
                           prefixIcon: const Icon(Icons.lock_outline),
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
-                            tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                            icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            tooltip: _obscurePassword
+                                ? 'Show password'
+                                : 'Hide password',
+                            icon: Icon(_obscurePassword
+                                ? Icons.visibility
+                                : Icons.visibility_off),
+                            onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword),
                           ),
                         ),
                         validator: (value) => (value == null || value.isEmpty)
-                            ? 'Enter your password.' : null,
+                            ? 'Enter your password.'
+                            : null,
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 12),
-                        Text(_error!, style: const TextStyle(color: Color(0xFFB3261E))),
+                        Text(_error!,
+                            style: const TextStyle(color: Color(0xFFB3261E))),
                       ],
                       const SizedBox(height: 22),
                       FilledButton(
                         onPressed: _busy ? null : _signIn,
                         style: FilledButton.styleFrom(
-                          backgroundColor: WebPalette.primary,
+                          backgroundColor: WebPalette.plum,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         child: _busy
-                            ? const SizedBox(width: 18, height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
                             : const Text('Sign in'),
                       ),
                       const SizedBox(height: 12),
-                      const Text('Use an existing staff account. Public registration is disabled.',
+                      const Text(
+                          'Use an existing staff account. Public registration is disabled.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12, color: Color(0xFF676174))),
+                          style: TextStyle(
+                              fontSize: 12, color: Color(0xFF676174))),
                     ],
                   ),
                 ),

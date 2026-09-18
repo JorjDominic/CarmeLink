@@ -2,37 +2,47 @@ import 'package:flutter/material.dart';
 
 import '../theme/web_theme.dart';
 
-/// Shared logo/wordmark for the public site and staff login.
+/// Compact, legible website wordmark. The small emblem is intentionally omitted.
+/// Existing mobile branding and source image assets are unchanged.
 class WebBrand extends StatelessWidget {
-  const WebBrand({super.key, this.compact = false});
+  const WebBrand({super.key, this.compact = false, this.onTap});
 
   final bool compact;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Image.asset(
-            'assets/branding/carmelita_logo.jpg',
-            width: compact ? 34 : 42,
-            height: compact ? 34 : 42,
-            fit: BoxFit.cover,
-          ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Carmelita's",
+              style: TextStyle(
+                color: WebPalette.ink,
+                fontFamily: 'GreatVibes',
+                fontSize: compact ? 32 : 38,
+                height: 1.0,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'D O R M I T O R Y',
+              style: TextStyle(
+                color: WebPalette.muted,
+                fontWeight: FontWeight.w700,
+                fontSize: compact ? 7 : 8,
+                letterSpacing: compact ? 0.6 : 0.9,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 10),
-        Text(
-          compact ? 'CarmeLink staff' : 'CARMELITA',
-          style: TextStyle(
-            color: WebPalette.ink,
-            fontSize: compact ? 17 : 19,
-            fontWeight: FontWeight.w800,
-            letterSpacing: compact ? 0 : 1.2,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

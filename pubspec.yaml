@@ -14,6 +14,8 @@ dependencies:
   google_mlkit_text_recognition: ^0.17.1
   supabase_flutter: ^2.17.2
   geolocator: ^14.0.3
+  # The public website's Facebook and Google Maps buttons use this package.
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -28,6 +30,8 @@ flutter:
   assets:
     - assets/branding/
     - assets/images/
+    - assets/web/brand/
+    - assets/web/photos/
 
   fonts:
     - family: GreatVibes

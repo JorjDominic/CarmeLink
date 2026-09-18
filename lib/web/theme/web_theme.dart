@@ -1,30 +1,63 @@
 import 'package:flutter/material.dart';
 
-/// Web-only design tokens; does not change the mobile AppTheme.
+/// Website-only tokens. Mobile AppTheme is intentionally untouched.
 abstract final class WebPalette {
-  static const primary = Color(0xFF755189);
-  static const ink = Color(0xFF2B263C);
-  static const muted = Color(0xFF676174);
-  static const soft = Color(0xFFF5F0F7);
-  static const background = Color(0xFFFBF9FC);
-  static const border = Color(0xFFE9E1EC);
+  static const ink = Color(0xFF292431);
+  static const plum = Color(0xFF47304C);
+  static const plumLight = Color(0xFF795D7C);
+  static const background = Color(0xFFFBF9F5);
+  static const cream = Color(0xFFF3EEE7);
+  static const sand = Color(0xFFE8DDCF);
+  static const muted = Color(0xFF665F69);
+  static const border = Color(0xFFDDD4CC);
+  static const gold = Color(0xFFCEAB79);
 }
 
 abstract final class WebTheme {
   static ThemeData light() {
-    final scheme = ColorScheme.fromSeed(seedColor: WebPalette.primary);
+    final scheme = ColorScheme.fromSeed(
+      seedColor: WebPalette.plum,
+      brightness: Brightness.light,
+      surface: WebPalette.background,
+    );
     return ThemeData(
       useMaterial3: true,
-      scaffoldBackgroundColor: WebPalette.background,
       colorScheme: scheme,
+      scaffoldBackgroundColor: WebPalette.background,
+      fontFamily: 'Roboto',
+      textTheme: const TextTheme(
+        bodyMedium: TextStyle(color: WebPalette.ink, height: 1.5),
+        bodyLarge: TextStyle(color: WebPalette.ink, height: 1.6),
+      ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.white,
+        backgroundColor: WebPalette.background,
         foregroundColor: WebPalette.ink,
-        surfaceTintColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
       ),
       filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(backgroundColor: WebPalette.primary),
+        style: FilledButton.styleFrom(
+          backgroundColor: WebPalette.plum,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 19),
+          minimumSize: const Size(48, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
       ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: WebPalette.plum,
+          side: const BorderSide(color: WebPalette.border),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 19),
+          minimumSize: const Size(48, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      dividerColor: WebPalette.border,
     );
   }
 }
