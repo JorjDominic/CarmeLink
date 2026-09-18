@@ -45,4 +45,31 @@ class ConfidentialReportService {
         .single();
     return ConcernReport.fromRow(row);
   }
+
+  Future<List<ConcernReport>> listForOwner() async {
+    _requireUserId();
+    final rows = await _client.rpc('owner_list_confidential_reports');
+    return (rows as List)
+        .map((row) => ConcernReport.fromRow(
+              Map<String, dynamic>.from(row as Map),
+            ))
+        .toList(growable: false);
+  }
+
+  Future<ConcernReport> review({
+    required String reportId,
+    required String status,
+    required String notes,
+  }) async {
+    _requireUserId();
+    final row = await _client.rpc(
+      'owner_review_confidential_report',
+      params: {
+        'p_report_id': reportId,
+        'p_status': status,
+        'p_notes': notes.trim(),
+      },
+    );
+    return ConcernReport.fromRow(Map<String, dynamic>.from(row as Map));
+  }
 }

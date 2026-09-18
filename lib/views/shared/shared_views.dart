@@ -4,13 +4,13 @@ import '../../controllers/session_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/role_guard.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../services/auth_service.dart';
 import '../../services/geofence_service.dart';
 import '../../services/guardian_alert_service.dart';
 import '../../services/profile_service.dart';
-import '../owner/geofence_dev_dashboard_page.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
@@ -629,6 +629,8 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = ThemeController.instance;
+    final isTenant =
+        SessionController.instance.currentUser?.role == UserRole.tenant;
 
     return PageFrame(
       title: 'Settings',
@@ -696,18 +698,20 @@ class SettingsPage extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const Divider(),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.phonelink_lock_outlined),
-                    title: const Text('Device binding',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: const Text(
-                        'Register this device for background geofence presence detection.'),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => const DeviceBindingPage())),
-                  ),
+                  if (isTenant) ...[
+                    const Divider(),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.phonelink_lock_outlined),
+                      title: const Text('Device binding',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: const Text(
+                          'Register this device for background geofence presence detection.'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => const DeviceBindingPage())),
+                    ),
+                  ],
                   const Divider(),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -771,31 +775,6 @@ class SettingsPage extends StatelessWidget {
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const FeedbackPage()),
-                ),
-              ),
-            ),
-            const SizedBox(height: 22),
-            const SectionTitle(
-              'Perimeter & Geofence',
-              subtitle: 'Diagnostic boundary visualization',
-            ),
-            const SizedBox(height: 10),
-            CarmelitaCard(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.map_outlined),
-                title: const Text(
-                  'Geofence Dev Dashboard',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                subtitle: const Text(
-                  'Polygon boundary visualizer, point evaluator, and in-memory test overrides.',
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const GeofenceDevDashboardPage(),
-                  ),
                 ),
               ),
             ),
@@ -1406,28 +1385,31 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 class DeviceBindingPage extends StatelessWidget {
   const DeviceBindingPage({super.key});
   @override
-  Widget build(BuildContext context) => PageFrame(
-        title: 'Device binding',
-        subtitle: 'One tenant account, one trusted device',
-        child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Column(children: [
-              const CarmelitaCard(
-                  child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.phonelink_lock_outlined),
-                      title: Text('Register this device'),
-                      subtitle: Text(
-                          'Binding registers this phone as your trusted device for background geofencing presence detection. Native background location and device-token services are not connected yet.'))),
-              const SizedBox(height: 14),
-              SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                      onPressed: () => showAppSnackBar(context,
-                          'Device binding requires native background location and hardware token registration.'),
-                      icon: const Icon(Icons.phonelink_lock_outlined),
-                      label: const Text('Bind trusted device'))),
-            ])),
+  Widget build(BuildContext context) => RoleGuard(
+        allowedRoles: const {UserRole.tenant},
+        child: PageFrame(
+          title: 'Device binding',
+          subtitle: 'One tenant account, one trusted device',
+          child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Column(children: [
+                const CarmelitaCard(
+                    child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.phonelink_lock_outlined),
+                        title: Text('Register this device'),
+                        subtitle: Text(
+                            'Binding registers this phone as your trusted device for background geofencing presence detection. Native background location and device-token services are not connected yet.'))),
+                const SizedBox(height: 14),
+                SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                        onPressed: () => showAppSnackBar(context,
+                            'Device binding requires native background location and hardware token registration.'),
+                        icon: const Icon(Icons.phonelink_lock_outlined),
+                        label: const Text('Bind trusted device'))),
+              ])),
+        ),
       );
 }
 

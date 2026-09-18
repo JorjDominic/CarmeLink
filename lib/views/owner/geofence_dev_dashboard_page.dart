@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/role_guard.dart';
+import '../../models/models.dart';
 import '../../services/geofence_service.dart';
 
 /// Available map layer backgrounds for the perimeter visualizer.
@@ -158,577 +160,637 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
       avgLng = GeofenceLocationService.carmelitaLongitude;
     }
 
-    return PageFrame(
-      title: 'Geofence Dev Dashboard',
-      subtitle: 'Perimeter map, ray-casting verification, and overrides',
-      actions: [
-        IconButton(
-          tooltip: 'Toggle Evaluation Mode',
-          icon: Icon(
-            GeofenceLocationService.usePolygonBoundary
-                ? Icons.polyline_rounded
-                : Icons.radio_button_checked_rounded,
-          ),
-          onPressed: () {
-            setState(() {
-              GeofenceLocationService.usePolygonBoundary =
-                  !GeofenceLocationService.usePolygonBoundary;
-            });
-            _evaluateTestPoint();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  GeofenceLocationService.usePolygonBoundary
-                      ? 'Switched to Polygon Boundary Mode (Production)'
-                      : 'Switched to Legacy Circular Mode (Fallback)',
-                ),
-                duration: const Duration(seconds: 2),
+    return RoleGuard(
+        allowedRoles: const {UserRole.owner},
+        child: PageFrame(
+          title: 'Geofence Dev Dashboard',
+          subtitle: 'Perimeter map, ray-casting verification, and overrides',
+          actions: [
+            IconButton(
+              tooltip: 'Toggle Evaluation Mode',
+              icon: Icon(
+                GeofenceLocationService.usePolygonBoundary
+                    ? Icons.polyline_rounded
+                    : Icons.radio_button_checked_rounded,
               ),
-            );
-          },
-        ),
-      ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (isOverridden)
-            Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.15),
-                border: Border.all(color: Colors.amber.shade700, width: 1.5),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.amber.shade800),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'ACTIVE TEST OVERRIDE: Boundary logic is currently using volatile in-memory parameters.',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _resetOverride,
-                    child: const Text('Reset'),
-                  ),
-                ],
-              ),
-            ),
-
-          // 1. Status & Mode Overview
-          CarmelitaCard(
-            emphasis: true,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'BOUNDARY STATUS',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    StatusPill(
+              onPressed: () {
+                setState(() {
+                  GeofenceLocationService.usePolygonBoundary =
+                      !GeofenceLocationService.usePolygonBoundary;
+                });
+                _evaluateTestPoint();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
                       GeofenceLocationService.usePolygonBoundary
-                          ? 'Polygon Model (Active)'
-                          : 'Circular Model (Legacy)',
+                          ? 'Switched to Polygon Boundary Mode (Production)'
+                          : 'Switched to Legacy Circular Mode (Fallback)',
                     ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  GeofenceLocationService.usePolygonBoundary
-                      ? 'Ray-casting point-in-polygon verification is active with ±3.0m edge hysteresis.'
-                      : 'Circular radius verification (50.0m) is active for rollback testing.',
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Zero-Coordinate Persistence: Lat/Lng coordinates are strictly discarded immediately following on-device computation. Gate logs persist only discrete presence state.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.green.shade700,
-                    fontWeight: FontWeight.w600,
+                    duration: const Duration(seconds: 2),
                   ),
-                ),
-              ],
+                );
+              },
             ),
-          ),
-          const SizedBox(height: 20),
-
-          // 2. Interactive Map Visualizer
-          const SectionTitle(
-            'Perimeter Map Visualizer',
-            subtitle: 'Real aerial satellite & street layout (Brgy. Concepcion, Baliwag)',
-          ),
-          const SizedBox(height: 10),
-          CarmelitaCard(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Layer Selector and Zoom Level Controls
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    SegmentedButton<MapLayerType>(
-                      segments: const [
-                        ButtonSegment(
-                          value: MapLayerType.satellite,
-                          icon: Icon(Icons.satellite_alt_rounded, size: 16),
-                          label: Text('Satellite', style: TextStyle(fontSize: 12)),
-                        ),
-                        ButtonSegment(
-                          value: MapLayerType.streets,
-                          icon: Icon(Icons.map_rounded, size: 16),
-                          label: Text('Streets', style: TextStyle(fontSize: 12)),
-                        ),
-                        ButtonSegment(
-                          value: MapLayerType.blueprint,
-                          icon: Icon(Icons.grid_on_rounded, size: 16),
-                          label: Text('Blueprint', style: TextStyle(fontSize: 12)),
-                        ),
-                      ],
-                      selected: {_selectedLayer},
-                      onSelectionChanged: (set) {
-                        setState(() => _selectedLayer = set.first);
-                      },
-                      style: const ButtonStyle(
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton.filledTonal(
-                          tooltip: 'Zoom In',
-                          icon: const Icon(Icons.add, size: 18),
-                          onPressed: _zoomLevel < 20.5
-                              ? () => setState(() => _zoomLevel += 0.5)
-                              : null,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        const SizedBox(width: 4),
-                        IconButton.filledTonal(
-                          tooltip: 'Zoom Out',
-                          icon: const Icon(Icons.remove, size: 18),
-                          onPressed: _zoomLevel > 16.5
-                              ? () => setState(() => _zoomLevel -= 0.5)
-                              : null,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        const SizedBox(width: 4),
-                        IconButton.filledTonal(
-                          tooltip: 'Recenter on Property',
-                          icon: const Icon(Icons.my_location_rounded, size: 18),
-                          onPressed: _recenterMap,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // Interactive Map Viewport with Web Mercator Tiles and Vector Overlay
-                SizedBox(
-                  height: 340,
-                  width: double.infinity,
-                  child: ClipRRect(
+          ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isOverridden)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.15),
+                    border:
+                        Border.all(color: Colors.amber.shade700, width: 1.5),
                     borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      color: _selectedLayer == MapLayerType.blueprint
-                          ? (theme.brightness == Brightness.dark
-                              ? const Color(0xFF1E232A)
-                              : const Color(0xFFF1F5F9))
-                          : const Color(0xFF0F172A),
-                      child: GestureDetector(
-                        onPanUpdate: (details) {
-                          setState(() {
-                            _panOffsetX += details.delta.dx;
-                            _panOffsetY += details.delta.dy;
-                          });
-                        },
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final size = Size(
-                                constraints.maxWidth, constraints.maxHeight);
-
-                            return Stack(
-                              clipBehavior: Clip.hardEdge,
-                              children: [
-                                // 1. Real Map Tiles Layer (Satellite or Streets)
-                                if (_selectedLayer != MapLayerType.blueprint)
-                                  ..._buildMapTiles(
-                                    size: size,
-                                    centerLat: avgLat,
-                                    centerLng: avgLng,
-                                    zoom: _zoomLevel.round(),
-                                    panOffset:
-                                        Offset(_panOffsetX, _panOffsetY),
-                                    layer: _selectedLayer,
-                                  ),
-
-                                // 2. Mathematical Vector Polygon Overlay
-                                Positioned.fill(
-                                  child: CustomPaint(
-                                    painter: _WebMercatorPolygonPainter(
-                                      polygon: activePolygon,
-                                      testPoint: (testLat != null &&
-                                              testLng != null)
-                                          ? LatLngPoint(testLat, testLng)
-                                          : null,
-                                      isInside:
-                                          _lastResult?.isInside ?? false,
-                                      centerLat: avgLat,
-                                      centerLng: avgLng,
-                                      zoom: _zoomLevel,
-                                      panOffset:
-                                          Offset(_panOffsetX, _panOffsetY),
-                                      isDark: theme.brightness ==
-                                          Brightness.dark,
-                                      isSatellite: _selectedLayer ==
-                                          MapLayerType.satellite,
-                                      showGrid: _selectedLayer ==
-                                          MapLayerType.blueprint,
-                                    ),
-                                  ),
-                                ),
-
-                                // 3. Touch to Pan Guide Overlay
-                                Positioned(
-                                  bottom: 8,
-                                  left: 8,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.65),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.pan_tool_outlined,
-                                            size: 12, color: Colors.white70),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Drag to pan • Zoom ${_zoomLevel.toStringAsFixed(1)}x',
-                                          style: const TextStyle(
-                                              fontSize: 10,
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w600),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          color: Colors.amber.shade800),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'ACTIVE TEST OVERRIDE: Boundary logic is currently using volatile in-memory parameters.',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 13),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Responsive Legend (Wrap prevents any horizontal overflow)
-                Center(
-                  child: Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [
-                      _legendItem(
-                          Colors.greenAccent.shade400, 'Polygon Perimeter'),
-                      _legendItem(Colors.cyanAccent.shade400, 'Corners (P1–P4)'),
-                      _legendItem(
-                        _lastResult?.isInside == true
-                            ? Colors.greenAccent.shade400
-                            : Colors.redAccent,
-                        'Test Point (${_lastResult?.direction ?? 'None'})',
+                      TextButton(
+                        onPressed: _resetOverride,
+                        child: const Text('Reset'),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
 
-          // 3. Corner Coordinates and Lot Metrics Table
-          const SectionTitle(
-            'Perimeter Corner Coordinates',
-            subtitle: 'On-site measured GPS markers and edge lengths',
-          ),
-          const SizedBox(height: 10),
-          CarmelitaCard(
-            child: Column(
-              children: [
-                for (int i = 0; i < activePolygon.length; i++) ...[
-                  _cornerRow(
-                    index: i + 1,
-                    point: activePolygon[i],
-                    nextPoint: activePolygon[(i + 1) % activePolygon.length],
-                  ),
-                  if (i < activePolygon.length - 1) const Divider(),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // 4. Interactive Test Coordinate Evaluator
-          const SectionTitle(
-            'Coordinate Evaluator',
-            subtitle: 'Simulate resident position and verify boundary calculation',
-          ),
-          const SizedBox(height: 10),
-          CarmelitaCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+              // 1. Status & Mode Overview
+              CarmelitaCard(
+                emphasis: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _latController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: 'Latitude',
-                          isDense: true,
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (_) => _evaluateTestPoint(),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _lngController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: 'Longitude',
-                          isDense: true,
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (_) => _evaluateTestPoint(),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Wrap prevents overflow on narrow screens
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    const Text('Previous direction: ',
-                        style: TextStyle(fontWeight: FontWeight.w600)),
-                    DropdownButton<String>(
-                      value: _previousDirection,
-                      isDense: true,
-                      items: const [
-                        DropdownMenuItem(
-                            value: 'NONE', child: Text('None (First check)')),
-                        DropdownMenuItem(
-                            value: 'IN', child: Text('IN (Test Hysteresis)')),
-                        DropdownMenuItem(
-                            value: 'OUT', child: Text('OUT (Test Hysteresis)')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _previousDirection = val);
-                          _evaluateTestPoint();
-                        }
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // Presets
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ActionChip(
-                      label: const Text('Lot Center (IN)'),
-                      avatar: const Icon(Icons.location_on, size: 16),
-                      onPressed: () =>
-                          _applyPreset(14.949396, 120.884694, 'Lot Center'),
-                    ),
-                    ActionChip(
-                      label: const Text('Corner 1 (NE)'),
-                      avatar: const Icon(Icons.pin_drop, size: 16),
-                      onPressed: () =>
-                          _applyPreset(14.949435, 120.884892, 'Corner 1'),
-                    ),
-                    ActionChip(
-                      label: const Text('East Street (OUT)'),
-                      avatar: const Icon(Icons.directions_walk, size: 16),
-                      onPressed: () =>
-                          _applyPreset(14.949400, 120.885100, 'East Street'),
-                    ),
-                    ActionChip(
-                      label: const Text('Baliwag Center (OUT)'),
-                      avatar: const Icon(Icons.near_me_disabled, size: 16),
-                      onPressed: () =>
-                          _applyPreset(14.954200, 120.900800, 'Baliwag Center'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Evaluation Result Box
-                if (_lastResult != null)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: _lastResult!.isInside
-                          ? Colors.green.withValues(alpha: 0.12)
-                          : Colors.redAccent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: _lastResult!.isInside
-                            ? Colors.green.shade600
-                            : Colors.redAccent,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              _lastResult!.isInside
-                                  ? Icons.check_circle_rounded
-                                  : Icons.cancel_rounded,
-                              color: _lastResult!.isInside
-                                  ? Colors.green.shade700
-                                  : Colors.redAccent.shade700,
-                              size: 22,
+                        Text(
+                          'BOUNDARY STATUS',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                        StatusPill(
+                          GeofenceLocationService.usePolygonBoundary
+                              ? 'Polygon Model (Active)'
+                              : 'Circular Model (Legacy)',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      GeofenceLocationService.usePolygonBoundary
+                          ? 'Ray-casting point-in-polygon verification is active with ±3.0m edge hysteresis.'
+                          : 'Circular radius verification (50.0m) is active for rollback testing.',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Zero-Coordinate Persistence: Lat/Lng coordinates are strictly discarded immediately following on-device computation. Gate logs persist only discrete presence state.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 2. Interactive Map Visualizer
+              const SectionTitle(
+                'Perimeter Map Visualizer',
+                subtitle:
+                    'Real aerial satellite & street layout (Brgy. Concepcion, Baliwag)',
+              ),
+              const SizedBox(height: 10),
+              CarmelitaCard(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Layer Selector and Zoom Level Controls
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        SegmentedButton<MapLayerType>(
+                          segments: const [
+                            ButtonSegment(
+                              value: MapLayerType.satellite,
+                              icon: Icon(Icons.satellite_alt_rounded, size: 16),
+                              label: Text('Satellite',
+                                  style: TextStyle(fontSize: 12)),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'EVALUATION: ${_lastResult!.direction ?? 'UNAVAILABLE'}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 16,
-                                color: _lastResult!.isInside
-                                    ? Colors.green.shade800
-                                    : Colors.redAccent.shade700,
-                              ),
+                            ButtonSegment(
+                              value: MapLayerType.streets,
+                              icon: Icon(Icons.map_rounded, size: 16),
+                              label: Text('Streets',
+                                  style: TextStyle(fontSize: 12)),
+                            ),
+                            ButtonSegment(
+                              value: MapLayerType.blueprint,
+                              icon: Icon(Icons.grid_on_rounded, size: 16),
+                              label: Text('Blueprint',
+                                  style: TextStyle(fontSize: 12)),
+                            ),
+                          ],
+                          selected: {_selectedLayer},
+                          onSelectionChanged: (set) {
+                            setState(() => _selectedLayer = set.first);
+                          },
+                          style: const ButtonStyle(
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton.filledTonal(
+                              tooltip: 'Zoom In',
+                              icon: const Icon(Icons.add, size: 18),
+                              onPressed: _zoomLevel < 20.5
+                                  ? () => setState(() => _zoomLevel += 0.5)
+                                  : null,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton.filledTonal(
+                              tooltip: 'Zoom Out',
+                              icon: const Icon(Icons.remove, size: 18),
+                              onPressed: _zoomLevel > 16.5
+                                  ? () => setState(() => _zoomLevel -= 0.5)
+                                  : null,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton.filledTonal(
+                              tooltip: 'Recenter on Property',
+                              icon: const Icon(Icons.my_location_rounded,
+                                  size: 18),
+                              onPressed: _recenterMap,
+                              visualDensity: VisualDensity.compact,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Distance to property perimeter: ${_lastEdgeDistance?.toStringAsFixed(2)} meters',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        Text(
-                          'Distance to dorm center: ${_lastCenterDistance?.toStringAsFixed(2)} meters',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        if (_lastEdgeDistance != null &&
-                            _lastEdgeDistance! <=
-                                GeofenceLocationService.debounceBufferMeters)
-                          Container(
-                            margin: const EdgeInsets.only(top: 8),
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Note: Point is inside the ±3.0m edge hysteresis band. Previous direction will prevent boundary flapping.',
-                              style: TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w600),
-                            ),
-                          ),
                       ],
                     ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
+                    const SizedBox(height: 10),
 
-          // 5. Volatile In-Memory Test Override Panel
-          CarmelitaCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.science_outlined),
-                  title: const Text(
-                    'In-Memory Test Override Panel',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  subtitle: const Text(
-                    'Modify boundary parameters for local testing. Strictly volatile, never written to DB.',
-                  ),
-                  trailing: IconButton(
-                    icon: Icon(
-                      _showOverridePanel
-                          ? Icons.expand_less_rounded
-                          : Icons.expand_more_rounded,
-                    ),
-                    onPressed: () => setState(
-                        () => _showOverridePanel = !_showOverridePanel),
-                  ),
-                ),
-                if (_showOverridePanel) ...[
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  Text(
-                    'STRICT ISOLATION GUARANTEE: Any values configured below exist only in ephemeral process memory. They will not persist across app restarts and will never modify Supabase configuration.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.orange.shade800,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isNarrow = constraints.maxWidth < 360;
-                      if (isNarrow) {
-                        return Column(
-                          children: [
-                            TextField(
-                              controller: _overrideRadiusController,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                      decimal: true),
-                              decoration: const InputDecoration(
-                                labelText: 'Test Circular Radius (meters)',
-                                isDense: true,
-                                border: OutlineInputBorder(),
-                              ),
+                    // Interactive Map Viewport with Web Mercator Tiles and Vector Overlay
+                    SizedBox(
+                      height: 340,
+                      width: double.infinity,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          color: _selectedLayer == MapLayerType.blueprint
+                              ? (theme.brightness == Brightness.dark
+                                  ? const Color(0xFF1E232A)
+                                  : const Color(0xFFF1F5F9))
+                              : const Color(0xFF0F172A),
+                          child: GestureDetector(
+                            onPanUpdate: (details) {
+                              setState(() {
+                                _panOffsetX += details.delta.dx;
+                                _panOffsetY += details.delta.dy;
+                              });
+                            },
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final size = Size(constraints.maxWidth,
+                                    constraints.maxHeight);
+
+                                return Stack(
+                                  clipBehavior: Clip.hardEdge,
+                                  children: [
+                                    // 1. Real Map Tiles Layer (Satellite or Streets)
+                                    if (_selectedLayer !=
+                                        MapLayerType.blueprint)
+                                      ..._buildMapTiles(
+                                        size: size,
+                                        centerLat: avgLat,
+                                        centerLng: avgLng,
+                                        zoom: _zoomLevel.round(),
+                                        panOffset:
+                                            Offset(_panOffsetX, _panOffsetY),
+                                        layer: _selectedLayer,
+                                      ),
+
+                                    // 2. Mathematical Vector Polygon Overlay
+                                    Positioned.fill(
+                                      child: CustomPaint(
+                                        painter: _WebMercatorPolygonPainter(
+                                          polygon: activePolygon,
+                                          testPoint: (testLat != null &&
+                                                  testLng != null)
+                                              ? LatLngPoint(testLat, testLng)
+                                              : null,
+                                          isInside:
+                                              _lastResult?.isInside ?? false,
+                                          centerLat: avgLat,
+                                          centerLng: avgLng,
+                                          zoom: _zoomLevel,
+                                          panOffset:
+                                              Offset(_panOffsetX, _panOffsetY),
+                                          isDark: theme.brightness ==
+                                              Brightness.dark,
+                                          isSatellite: _selectedLayer ==
+                                              MapLayerType.satellite,
+                                          showGrid: _selectedLayer ==
+                                              MapLayerType.blueprint,
+                                        ),
+                                      ),
+                                    ),
+
+                                    // 3. Touch to Pan Guide Overlay
+                                    Positioned(
+                                      bottom: 8,
+                                      left: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.65),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.pan_tool_outlined,
+                                                size: 12,
+                                                color: Colors.white70),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Drag to pan • Zoom ${_zoomLevel.toStringAsFixed(1)}x',
+                                              style: const TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Responsive Legend (Wrap prevents any horizontal overflow)
+                    Center(
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 12,
+                        runSpacing: 8,
+                        children: [
+                          _legendItem(
+                              Colors.greenAccent.shade400, 'Polygon Perimeter'),
+                          _legendItem(
+                              Colors.cyanAccent.shade400, 'Corners (P1–P4)'),
+                          _legendItem(
+                            _lastResult?.isInside == true
+                                ? Colors.greenAccent.shade400
+                                : Colors.redAccent,
+                            'Test Point (${_lastResult?.direction ?? 'None'})',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 3. Corner Coordinates and Lot Metrics Table
+              const SectionTitle(
+                'Perimeter Corner Coordinates',
+                subtitle: 'On-site measured GPS markers and edge lengths',
+              ),
+              const SizedBox(height: 10),
+              CarmelitaCard(
+                child: Column(
+                  children: [
+                    for (int i = 0; i < activePolygon.length; i++) ...[
+                      _cornerRow(
+                        index: i + 1,
+                        point: activePolygon[i],
+                        nextPoint:
+                            activePolygon[(i + 1) % activePolygon.length],
+                      ),
+                      if (i < activePolygon.length - 1) const Divider(),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 4. Interactive Test Coordinate Evaluator
+              const SectionTitle(
+                'Coordinate Evaluator',
+                subtitle:
+                    'Simulate resident position and verify boundary calculation',
+              ),
+              const SizedBox(height: 10),
+              CarmelitaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _latController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Latitude',
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (_) => _evaluateTestPoint(),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _lngController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Longitude',
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (_) => _evaluateTestPoint(),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Wrap prevents overflow on narrow screens
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        const Text('Previous direction: ',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        DropdownButton<String>(
+                          value: _previousDirection,
+                          isDense: true,
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'NONE',
+                                child: Text('None (First check)')),
+                            DropdownMenuItem(
+                                value: 'IN',
+                                child: Text('IN (Test Hysteresis)')),
+                            DropdownMenuItem(
+                                value: 'OUT',
+                                child: Text('OUT (Test Hysteresis)')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _previousDirection = val);
+                              _evaluateTestPoint();
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Presets
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ActionChip(
+                          label: const Text('Lot Center (IN)'),
+                          avatar: const Icon(Icons.location_on, size: 16),
+                          onPressed: () =>
+                              _applyPreset(14.949396, 120.884694, 'Lot Center'),
+                        ),
+                        ActionChip(
+                          label: const Text('Corner 1 (NE)'),
+                          avatar: const Icon(Icons.pin_drop, size: 16),
+                          onPressed: () =>
+                              _applyPreset(14.949435, 120.884892, 'Corner 1'),
+                        ),
+                        ActionChip(
+                          label: const Text('East Street (OUT)'),
+                          avatar: const Icon(Icons.directions_walk, size: 16),
+                          onPressed: () => _applyPreset(
+                              14.949400, 120.885100, 'East Street'),
+                        ),
+                        ActionChip(
+                          label: const Text('Baliwag Center (OUT)'),
+                          avatar: const Icon(Icons.near_me_disabled, size: 16),
+                          onPressed: () => _applyPreset(
+                              14.954200, 120.900800, 'Baliwag Center'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Evaluation Result Box
+                    if (_lastResult != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: _lastResult!.isInside
+                              ? Colors.green.withValues(alpha: 0.12)
+                              : Colors.redAccent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _lastResult!.isInside
+                                ? Colors.green.shade600
+                                : Colors.redAccent,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  _lastResult!.isInside
+                                      ? Icons.check_circle_rounded
+                                      : Icons.cancel_rounded,
+                                  color: _lastResult!.isInside
+                                      ? Colors.green.shade700
+                                      : Colors.redAccent.shade700,
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'EVALUATION: ${_lastResult!.direction ?? 'UNAVAILABLE'}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16,
+                                    color: _lastResult!.isInside
+                                        ? Colors.green.shade800
+                                        : Colors.redAccent.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Distance to property perimeter: ${_lastEdgeDistance?.toStringAsFixed(2)} meters',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              'Distance to dorm center: ${_lastCenterDistance?.toStringAsFixed(2)} meters',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            if (_lastEdgeDistance != null &&
+                                _lastEdgeDistance! <=
+                                    GeofenceLocationService
+                                        .debounceBufferMeters)
+                              Container(
+                                margin: const EdgeInsets.only(top: 8),
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Note: Point is inside the ±3.0m edge hysteresis band. Previous direction will prevent boundary flapping.',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 5. Volatile In-Memory Test Override Panel
+              CarmelitaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.science_outlined),
+                      title: const Text(
+                        'In-Memory Test Override Panel',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: const Text(
+                        'Modify boundary parameters for local testing. Strictly volatile, never written to DB.',
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(
+                          _showOverridePanel
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
+                        ),
+                        onPressed: () => setState(
+                            () => _showOverridePanel = !_showOverridePanel),
+                      ),
+                    ),
+                    if (_showOverridePanel) ...[
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      Text(
+                        'STRICT ISOLATION GUARANTEE: Any values configured below exist only in ephemeral process memory. They will not persist across app restarts and will never modify Supabase configuration.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.orange.shade800,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isNarrow = constraints.maxWidth < 360;
+                          if (isNarrow) {
+                            return Column(
+                              children: [
+                                TextField(
+                                  controller: _overrideRadiusController,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Test Circular Radius (meters)',
+                                    isDense: true,
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      final r = double.tryParse(
+                                          _overrideRadiusController.text
+                                              .trim());
+                                      if (r != null && r > 0) {
+                                        setState(() {
+                                          GeofenceLocationService
+                                              .setTestRadiusOverride(r);
+                                          GeofenceLocationService
+                                              .usePolygonBoundary = false;
+                                        });
+                                        _evaluateTestPoint();
+                                      }
+                                    },
+                                    child: const Text('Apply Radius'),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _overrideRadiusController,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Test Circular Radius (meters)',
+                                    isDense: true,
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              ElevatedButton(
                                 onPressed: () {
                                   final r = double.tryParse(
                                       _overrideRadiusController.text.trim());
@@ -744,64 +806,28 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
                                 },
                                 child: const Text('Apply Radius'),
                               ),
-                            ),
-                          ],
-                        );
-                      }
-                      return Row(
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
                         children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _overrideRadiusController,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                      decimal: true),
-                              decoration: const InputDecoration(
-                                labelText: 'Test Circular Radius (meters)',
-                                isDense: true,
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          ElevatedButton(
-                            onPressed: () {
-                              final r = double.tryParse(
-                                  _overrideRadiusController.text.trim());
-                              if (r != null && r > 0) {
-                                setState(() {
-                                  GeofenceLocationService
-                                      .setTestRadiusOverride(r);
-                                  GeofenceLocationService
-                                      .usePolygonBoundary = false;
-                                });
-                                _evaluateTestPoint();
-                              }
-                            },
-                            child: const Text('Apply Radius'),
+                          OutlinedButton.icon(
+                            onPressed: _resetOverride,
+                            icon: const Icon(Icons.restart_alt_rounded),
+                            label: const Text('Reset to Production'),
                           ),
                         ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _resetOverride,
-                        icon: const Icon(Icons.restart_alt_rounded),
-                        label: const Text('Reset to Production'),
                       ),
                     ],
-                  ),
-                ],
-              ],
-            ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 30),
+            ],
           ),
-          const SizedBox(height: 30),
-        ],
-      ),
-    );
+        ));
   }
 
   /// Generates the Web Mercator map image tiles covering the active viewport.
@@ -836,18 +862,15 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
         if (ty < 0 || ty > maxTileIndex) continue;
         final wrappedTx = (tx % (1 << zoom) + (1 << zoom)) % (1 << zoom);
 
-        final screenX =
-            (size.width / 2.0) + (tx * 256.0 - centerWorldX);
-        final screenY =
-            (size.height / 2.0) + (ty * 256.0 - centerWorldY);
+        final screenX = (size.width / 2.0) + (tx * 256.0 - centerWorldX);
+        final screenY = (size.height / 2.0) + (ty * 256.0 - centerWorldY);
 
         final String tileUrl;
         if (layer == MapLayerType.satellite) {
           tileUrl =
               'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/$zoom/$ty/$wrappedTx';
         } else {
-          tileUrl =
-              'https://tile.openstreetmap.org/$zoom/$wrappedTx/$ty.png';
+          tileUrl = 'https://tile.openstreetmap.org/$zoom/$wrappedTx/$ty.png';
         }
 
         tileWidgets.add(
@@ -936,8 +959,8 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
               children: [
                 Text(
                   cornerLabels[(index - 1) % cornerLabels.length],
-                  style:
-                      const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 13),
                 ),
                 FittedBox(
                   fit: BoxFit.scaleDown,

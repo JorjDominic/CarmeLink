@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/curfew_service.dart';
+import '../services/confidential_report_service.dart';
 import '../services/gate_service.dart';
 import '../services/payment_service.dart';
 import '../services/room_service.dart';
@@ -15,6 +16,12 @@ class OwnerController extends ChangeNotifier {
   static final OwnerController instance = OwnerController._();
 
   final CurfewService _curfewService = const CurfewService();
+  final ConfidentialReportService _confidentialReportService =
+      const ConfidentialReportService();
+  final List<ConcernReport> _concerns = [];
+  bool _concernsLoading = false;
+  String? _concernsError;
+  bool _concernsLoadedOnce = false;
   final List<CurfewRequest> _curfewRequests = [];
   bool _curfewLoading = false;
   String? _curfewError;
@@ -66,17 +73,14 @@ class OwnerController extends ChangeNotifier {
   String? get maintenanceError => _maintenanceError;
   bool get maintenanceLoadedOnce => _maintenanceLoadedOnce;
 
-  int get highPriorityMaintenance => _staffMaintenanceReports
-      .where((r) => r.isOpen && r.isHighUrgency)
-      .length;
+  int get highPriorityMaintenance =>
+      _staffMaintenanceReports.where((r) => r.isOpen && r.isHighUrgency).length;
 
-  int get inProgressMaintenanceCount => _staffMaintenanceReports
-      .where((r) => r.isInProgress)
-      .length;
+  int get inProgressMaintenanceCount =>
+      _staffMaintenanceReports.where((r) => r.isInProgress).length;
 
-  int get resolvedMaintenanceCount => _staffMaintenanceReports
-      .where((r) => r.isResolved)
-      .length;
+  int get resolvedMaintenanceCount =>
+      _staffMaintenanceReports.where((r) => r.isResolved).length;
 
   List<TenantDirectoryEntry> get tenants => List.unmodifiable(_tenants);
   bool get tenantsLoading => _tenantsLoading;
@@ -137,7 +141,9 @@ class OwnerController extends ChangeNotifier {
   bool get gateLoading => _gateLoading;
   String? get gateError => _gateError;
   List<VisitorRequest> get visitors => List.unmodifiable(MockData.visitors);
-  List<ConcernReport> get concerns => List.unmodifiable(MockData.concerns);
+  List<ConcernReport> get concerns => List.unmodifiable(_concerns);
+  bool get concernsLoading => _concernsLoading;
+  String? get concernsError => _concernsError;
   List<Announcement> get announcements =>
       List.unmodifiable(MockData.announcements);
   List<OwnerConversation> get conversations =>
@@ -149,9 +155,8 @@ class OwnerController extends ChangeNotifier {
   int get totalCapacity =>
       rooms.fold<int>(0, (sum, room) => sum + room.capacity);
 
-  int get pendingPaymentProofs => payments
-      .where((payment) => payment.isPending)
-      .length;
+  int get pendingPaymentProofs =>
+      payments.where((payment) => payment.isPending).length;
 
   int get overduePaymentCount =>
       payments.where((payment) => payment.isOverdue).length;
@@ -179,17 +184,12 @@ class OwnerController extends ChangeNotifier {
   int get pendingVisitors =>
       visitors.where((visitor) => visitor.status == 'Pending').length;
 
-  int get tenantsInsideCount => tenants
-      .where((t) => t.isInside)
-      .length;
+  int get tenantsInsideCount => tenants.where((t) => t.isInside).length;
 
-  int get tenantsOutsideCount => tenants
-      .where((t) => t.isOutside)
-      .length;
+  int get tenantsOutsideCount => tenants.where((t) => t.isOutside).length;
 
-  int get tenantsUnavailableCount => tenants
-      .where((t) => t.isUnavailable)
-      .length;
+  int get tenantsUnavailableCount =>
+      tenants.where((t) => t.isUnavailable).length;
 
   List<Payment> get payments => _payments.isEmpty
       ? List.unmodifiable(MockData.payments)
@@ -304,8 +304,37 @@ class OwnerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateConcernStatus(ConcernReport report, String status) {
-    report.status = status;
+  Future<void> loadConcerns({bool force = false}) async {
+    if (_concernsLoading || (_concernsLoadedOnce && !force)) return;
+    _concernsLoading = true;
+    _concernsError = null;
+    notifyListeners();
+    try {
+      final items = await _confidentialReportService.listForOwner();
+      _concerns
+        ..clear()
+        ..addAll(items);
+      _concernsLoadedOnce = true;
+    } catch (error) {
+      _concernsError = error.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _concernsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> reviewConcern({
+    required ConcernReport report,
+    required String status,
+    required String notes,
+  }) async {
+    final updated = await _confidentialReportService.review(
+      reportId: report.id,
+      status: status,
+      notes: notes,
+    );
+    final index = _concerns.indexWhere((item) => item.id == report.id);
+    if (index >= 0) _concerns[index] = updated;
     notifyListeners();
   }
 
@@ -534,6 +563,10 @@ class OwnerController extends ChangeNotifier {
     _curfewLoading = false;
     _curfewError = null;
     _curfewLoadedOnce = false;
+    _concerns.clear();
+    _concernsLoading = false;
+    _concernsError = null;
+    _concernsLoadedOnce = false;
     _staffMaintenanceReports.clear();
     _maintenanceLoading = false;
     _maintenanceError = null;

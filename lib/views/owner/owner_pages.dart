@@ -4,9 +4,11 @@ import 'package:flutter/services.dart';
 
 import '../../controllers/messaging_controller.dart';
 import '../../controllers/owner_controller.dart';
+import '../../controllers/session_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../../services/payment_service.dart';
 import '../../services/tenant_service.dart';
@@ -147,7 +149,8 @@ class OwnerDashboardPage extends StatelessWidget {
               compact: true,
               icon: Icons.location_on_outlined,
               title: 'Dormitory geofencing active',
-              subtitle: 'GPS perimeter monitoring ${controller.tenants.length} registered residents.',
+              subtitle:
+                  'GPS perimeter monitoring ${controller.tenants.length} registered residents.',
               status: 'Active',
               onTap: () => _ownerPush(
                 context,
@@ -296,7 +299,8 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
                       backgroundColor:
                           const Color(0xFF56886B).withValues(alpha: .10),
                       foregroundColor: const Color(0xFF56886B),
-                      child: Text(tenant.name.isNotEmpty ? tenant.name[0] : '?'),
+                      child:
+                          Text(tenant.name.isNotEmpty ? tenant.name[0] : '?'),
                     ),
                     title: Text(
                       tenant.name,
@@ -304,13 +308,11 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    subtitle:
-                        Text('Room ${tenant.room} • ${tenant.bedSpace}'),
+                    subtitle: Text('Room ${tenant.room} • ${tenant.bedSpace}'),
                     trailing:
                         StatusPill(_residencyLabel(tenant.residencyStatus)),
                     onTap: () async {
-                      await Navigator.of(context)
-                          .push(MaterialPageRoute<void>(
+                      await Navigator.of(context).push(MaterialPageRoute<void>(
                         builder: (_) => TenantDetailsPage(tenant: tenant),
                       ));
                       if (mounted) _fetchTenants(showSpinner: false);
@@ -748,8 +750,7 @@ class _RoomBedSelectorSheetState extends State<RoomBedSelectorSheet> {
                                         color: theme
                                             .colorScheme.surfaceContainerHighest
                                             .withValues(alpha: .35),
-                                        borderRadius:
-                                            BorderRadius.circular(10),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Row(
                                         children: [
@@ -793,8 +794,8 @@ class _RoomBedSelectorSheetState extends State<RoomBedSelectorSheet> {
                                                 Icon(
                                                   Icons.arrow_forward_rounded,
                                                   size: 13,
-                                                  color: theme
-                                                      .colorScheme.primary,
+                                                  color:
+                                                      theme.colorScheme.primary,
                                                 ),
                                               ],
                                             ),
@@ -1168,8 +1169,11 @@ const _operationCategories = [
     Icons.health_and_safety_outlined,
     Color(0xFF627FA8),
     [
-      _OperationItem('Geofence presence', 'Review live tenant presence and boundary',
-          Icons.location_on_outlined, GeofenceMonitoringPage()),
+      _OperationItem(
+          'Geofence presence',
+          'Review live tenant presence and boundary',
+          Icons.location_on_outlined,
+          GeofenceMonitoringPage()),
       _OperationItem('Visitors', 'Manage visitor requests',
           Icons.people_outline, VisitorManagementPage()),
       _OperationItem('Confidential reports', 'Review private reports',
@@ -1552,7 +1556,8 @@ class PaymentVerificationPage extends StatefulWidget {
 }
 
 class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
-  String _filter = 'pending'; // 'pending', 'due', 'overdue', 'verified', 'rejected', 'all'
+  String _filter =
+      'pending'; // 'pending', 'due', 'overdue', 'verified', 'rejected', 'all'
   late final TableRefreshSubscription _subscription;
   String? _processingPaymentId;
   final TextEditingController _searchController = TextEditingController();
@@ -1592,7 +1597,8 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
     );
   }
 
-  Future<void> _handleVerify(Payment payment, bool approve, {String? notes}) async {
+  Future<void> _handleVerify(Payment payment, bool approve,
+      {String? notes}) async {
     setState(() => _processingPaymentId = payment.id);
     try {
       await OwnerController.instance.verifyPayment(
@@ -1608,7 +1614,8 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                 ? 'Payment of ${money(payment.amount)} from ${payment.tenantName ?? "tenant"} verified.'
                 : 'Payment marked as rejected.',
           ),
-          backgroundColor: approve ? const Color(0xFF56886B) : const Color(0xFFB3261E),
+          backgroundColor:
+              approve ? const Color(0xFF56886B) : const Color(0xFFB3261E),
         ),
       );
     } catch (e) {
@@ -1668,7 +1675,8 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openCreateInvoiceDialog(context),
         icon: const Icon(Icons.add_card_rounded),
-        label: const Text('Issue invoice', style: TextStyle(fontWeight: FontWeight.w700)),
+        label: const Text('Issue invoice',
+            style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       onRefresh: () => OwnerController.instance.loadPayments(force: true),
       actions: [
@@ -1698,7 +1706,8 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
           final pendingCount = controller.pendingPaymentProofs;
           final overdueCount = controller.overduePaymentCount;
           final verifiedCount = allPayments.where((p) => p.isVerified).length;
-          final dueCount = allPayments.where((p) => p.isDue && !p.isOverdue).length;
+          final dueCount =
+              allPayments.where((p) => p.isDue && !p.isOverdue).length;
           final rejectedCount = allPayments.where((p) => p.isRejected).length;
 
           final totalCollected = controller.totalCollectedRevenue;
@@ -2627,7 +2636,8 @@ class _PaymentReviewCard extends StatelessWidget {
                 if (payment.reference != null && payment.reference!.isNotEmpty)
                   InkWell(
                     onTap: () {
-                      Clipboard.setData(ClipboardData(text: payment.reference!));
+                      Clipboard.setData(
+                          ClipboardData(text: payment.reference!));
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content:
@@ -2771,8 +2781,8 @@ class _PaymentReviewCard extends StatelessWidget {
               builder: (context, constraints) {
                 final isNarrow = constraints.maxWidth < 280;
                 final statusBanner = Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHighest
                         .withValues(alpha: .3),
@@ -2781,14 +2791,13 @@ class _PaymentReviewCard extends StatelessWidget {
                   child: Row(
                     children: [
                       Icon(Icons.schedule_rounded,
-                          size: 16,
-                          color: theme.colorScheme.onSurfaceVariant),
+                          size: 16, color: theme.colorScheme.onSurfaceVariant),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           'Awaiting tenant proof',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(fontSize: 11),
+                          style:
+                              theme.textTheme.bodySmall?.copyWith(fontSize: 11),
                         ),
                       ),
                     ],
@@ -2833,9 +2842,7 @@ class _PaymentReviewCard extends StatelessWidget {
                 onPressed: onReEvaluate,
                 icon: const Icon(Icons.sync_alt_rounded, size: 16),
                 label: Text(
-                  payment.isVerified
-                      ? 'Mark as rejected'
-                      : 'Re-verify payment',
+                  payment.isVerified ? 'Mark as rejected' : 'Re-verify payment',
                   style: const TextStyle(
                       fontSize: 12, fontWeight: FontWeight.w700),
                 ),
@@ -2904,7 +2911,8 @@ class _ReceiptProofThumbnailState extends State<_ReceiptProofThumbnail> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .25),
+          color:
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: .25),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: theme.dividerColor.withValues(alpha: .3),
@@ -2931,7 +2939,8 @@ class _ReceiptProofThumbnailState extends State<_ReceiptProofThumbnail> {
         width: double.infinity,
         height: 140,
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .3),
+          color:
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: .3),
           borderRadius: BorderRadius.circular(14),
         ),
         alignment: Alignment.center,
@@ -3029,7 +3038,8 @@ class _ReceiptProofThumbnailState extends State<_ReceiptProofThumbnail> {
                 right: 0,
                 bottom: 0,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -3043,7 +3053,8 @@ class _ReceiptProofThumbnailState extends State<_ReceiptProofThumbnail> {
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.zoom_in_rounded, color: Colors.white, size: 16),
+                      Icon(Icons.zoom_in_rounded,
+                          color: Colors.white, size: 16),
                       SizedBox(width: 6),
                       Flexible(
                         child: Text(
@@ -3124,7 +3135,8 @@ class _ReceiptViewerModal extends StatelessWidget {
                           loadingBuilder: (context, child, progress) {
                             if (progress == null) return child;
                             return const Center(
-                              child: CircularProgressIndicator(color: Colors.white),
+                              child: CircularProgressIndicator(
+                                  color: Colors.white),
                             );
                           },
                         ),
@@ -3163,7 +3175,8 @@ class _ReceiptViewerModal extends StatelessWidget {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                      icon: const Icon(Icons.check_circle_outline_rounded,
+                          size: 18),
                       label: const Text(
                         'Confirm',
                         style: TextStyle(fontWeight: FontWeight.w700),
@@ -3256,7 +3269,8 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                     color: const Color(0xFFB3261E).withValues(alpha: .1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.cancel_outlined, color: Color(0xFFB3261E), size: 20),
+                  child: const Icon(Icons.cancel_outlined,
+                      color: Color(0xFFB3261E), size: 20),
                 ),
                 const SizedBox(width: 10),
                 const Expanded(
@@ -3265,7 +3279,8 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                     children: [
                       Text(
                         'Reject Payment Proof',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 17),
                       ),
                       Text(
                         'Tenant will be notified to correct and re-upload.',
@@ -3289,7 +3304,8 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                   onTap: () => setState(() => _selectedReason = reason),
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                     child: Row(
                       children: [
                         Icon(
@@ -3307,7 +3323,9 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                             reason,
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
                             ),
                           ),
                         ),
@@ -3377,7 +3395,6 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
   }
 }
 
-
 class MaintenanceManagementPage extends StatelessWidget {
   const MaintenanceManagementPage({super.key});
 
@@ -3427,6 +3444,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
   @override
   Widget build(BuildContext context) {
     final controller = OwnerController.instance;
+    final isOwner =
+        SessionController.instance.currentUser?.role == UserRole.owner;
 
     return PageFrame(
       title: 'Curfew',
@@ -3463,15 +3482,16 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
             }
           },
           itemBuilder: (_) => [
-            const PopupMenuItem(
-              value: 'dev_dashboard',
-              child: ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.map_outlined),
-                title: Text('Perimeter Visualizer'),
+            if (isOwner)
+              const PopupMenuItem(
+                value: 'dev_dashboard',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.map_outlined),
+                  title: Text('Perimeter Visualizer'),
+                ),
               ),
-            ),
             const PopupMenuItem(
               value: 'staff_log',
               child: ListTile(
@@ -3539,20 +3559,22 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                   if (isCompact) {
                     return Column(
                       children: [
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const GeofenceDevDashboardPage(),
+                        if (isOwner) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const GeofenceDevDashboardPage(),
+                                ),
                               ),
+                              icon: const Icon(Icons.map_outlined, size: 18),
+                              label: const Text('View Perimeter Map & Overlay'),
                             ),
-                            icon: const Icon(Icons.map_outlined, size: 18),
-                            label: const Text('View Perimeter Map & Overlay'),
                           ),
-                        ),
-                        const SizedBox(height: 8),
+                          const SizedBox(height: 8),
+                        ],
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
@@ -3566,19 +3588,21 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                   }
                   return Row(
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  const GeofenceDevDashboardPage(),
+                      if (isOwner) ...[
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const GeofenceDevDashboardPage(),
+                              ),
                             ),
+                            icon: const Icon(Icons.map_outlined, size: 18),
+                            label: const Text('View Perimeter Map & Overlay'),
                           ),
-                          icon: const Icon(Icons.map_outlined, size: 18),
-                          label: const Text('View Perimeter Map & Overlay'),
                         ),
-                      ),
-                      const SizedBox(width: 10),
+                        const SizedBox(width: 10),
+                      ],
                       Expanded(
                         child: FilledButton.icon(
                           onPressed: () => _openManualLogDialog(),
@@ -3619,10 +3643,12 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                     onTap: () => setState(() => _presenceFilter = 'out'),
                   ),
                   _FilterChip(
-                    label: 'Unavailable (${controller.tenantsUnavailableCount})',
+                    label:
+                        'Unavailable (${controller.tenantsUnavailableCount})',
                     selected: _presenceFilter == 'unavailable',
                     badgeColor: const Color(0xFFC77800),
-                    onTap: () => setState(() => _presenceFilter = 'unavailable'),
+                    onTap: () =>
+                        setState(() => _presenceFilter = 'unavailable'),
                   ),
                 ],
               ),
@@ -4027,76 +4053,191 @@ class VisitorManagementPage extends StatelessWidget {
   }
 }
 
-class ConfidentialReportsPage extends StatelessWidget {
+class ConfidentialReportsPage extends StatefulWidget {
   const ConfidentialReportsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final controller = OwnerController.instance;
+  State<ConfidentialReportsPage> createState() =>
+      _ConfidentialReportsPageState();
+}
 
-    return PageFrame(
-      title: 'Confidential reports',
-      subtitle: 'Authorized review only',
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) => Column(
-          children: controller.concerns
-              .map(
-                (report) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: CarmelitaCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                report.category,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                            StatusPill(report.status),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(report.summary),
-                        const SizedBox(height: 8),
-                        Text(
-                          shortDate(report.createdAt),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            OutlinedButton(
-                              onPressed: () => controller.updateConcernStatus(
-                                report,
-                                'Under review',
-                              ),
-                              child: const Text(
-                                'Mark under review',
-                              ),
-                            ),
-                            FilledButton(
-                              onPressed: () => controller.updateConcernStatus(
-                                report,
-                                'Resolved',
-                              ),
-                              child: const Text('Resolve'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
+  final controller = OwnerController.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    controller.loadConcerns();
+  }
+
+  Future<void> _review(ConcernReport report, String status) async {
+    final notes = TextEditingController(text: report.responseNotes);
+    var saving = false;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(status == 'resolved'
+              ? 'Resolve confidential report'
+              : status == 'dismissed'
+                  ? 'Dismiss confidential report'
+                  : 'Begin confidential review'),
+          content: TextField(
+            controller: notes,
+            minLines: 3,
+            maxLines: 6,
+            maxLength: 1000,
+            decoration: const InputDecoration(
+              labelText: 'Private review notes',
+              hintText: 'Record the action taken or reason for this decision.',
+              alignLabelWithHint: true,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (notes.text.trim().length < 5) {
+                        showAppSnackBar(
+                          context,
+                          'Enter at least 5 characters of review notes.',
+                        );
+                        return;
+                      }
+                      setDialogState(() => saving = true);
+                      try {
+                        await controller.reviewConcern(
+                          report: report,
+                          status: status,
+                          notes: notes.text,
+                        );
+                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+                      } catch (error) {
+                        if (context.mounted) {
+                          showAppSnackBar(context, 'Review failed: $error');
+                          setDialogState(() => saving = false);
+                        }
+                      }
+                    },
+              child: Text(saving ? 'Saving…' : 'Confirm'),
+            ),
+          ],
+        ),
+      ),
+    );
+    notes.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RoleGuard(
+      allowedRoles: const {UserRole.owner},
+      child: PageFrame(
+        title: 'Confidential reports',
+        subtitle: 'Owner-authorized review with audit logging',
+        onRefresh: () => controller.loadConcerns(force: true),
+        child: AnimatedBuilder(
+          animation: controller,
+          builder: (context, _) {
+            if (controller.concernsLoading && controller.concerns.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (controller.concernsError != null &&
+                controller.concerns.isEmpty) {
+              return Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.lock_outline, size: 42),
+                  const SizedBox(height: 10),
+                  Text(controller.concernsError!, textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () => controller.loadConcerns(force: true),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Try again'),
                   ),
-                ),
-              )
-              .toList(),
+                ]),
+              );
+            }
+            if (controller.concerns.isEmpty) {
+              return const Center(
+                child: Text('No confidential reports have been submitted.'),
+              );
+            }
+            return Column(
+              children: controller.concerns
+                  .map(
+                    (report) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: CarmelitaCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    report.category,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                StatusPill(report.status),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(report.tenantName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 6),
+                            SelectableText(report.summary),
+                            const SizedBox(height: 8),
+                            Text(
+                              shortDate(report.createdAt),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            if (report.responseNotes.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text('Private notes: ${report.responseNotes}'),
+                            ],
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                OutlinedButton(
+                                  onPressed: report.isResolved
+                                      ? null
+                                      : () => _review(report, 'under_review'),
+                                  child: const Text('Mark under review'),
+                                ),
+                                FilledButton(
+                                  onPressed: report.isResolved
+                                      ? null
+                                      : () => _review(report, 'resolved'),
+                                  child: const Text('Resolve'),
+                                ),
+                                TextButton(
+                                  onPressed: report.isResolved
+                                      ? null
+                                      : () => _review(report, 'dismissed'),
+                                  child: const Text('Dismiss'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            );
+          },
         ),
       ),
     );
@@ -4499,9 +4640,7 @@ class _AnnouncementsManagementPageState
                           size: 22,
                           color: hasActiveFilter
                               ? Colors.white
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         if (hasActiveFilter)
                           Positioned(
@@ -4542,15 +4681,13 @@ class _AnnouncementsManagementPageState
                     visualDensity: VisualDensity.compact,
                     label: Text(_categoryTitle(_selectedCategory)),
                     avatar: Icon(_categoryIcon(_selectedCategory), size: 14),
-                    onDeleted: () =>
-                        setState(() => _selectedCategory = 'all'),
+                    onDeleted: () => setState(() => _selectedCategory = 'all'),
                   ),
                 if (_selectedAudience != 'all')
                   InputChip(
                     visualDensity: VisualDensity.compact,
                     label: Text(_audienceTitle(_selectedAudience)),
-                    onDeleted: () =>
-                        setState(() => _selectedAudience = 'all'),
+                    onDeleted: () => setState(() => _selectedAudience = 'all'),
                   ),
                 TextButton(
                   style: TextButton.styleFrom(
@@ -5112,9 +5249,8 @@ class _AnnouncementComposerSheetState
                   'Pinned notices remain visible at the very top of all feeds',
                 ),
                 value: _isPinned,
-                onChanged: _saving
-                    ? null
-                    : (val) => setState(() => _isPinned = val),
+                onChanged:
+                    _saving ? null : (val) => setState(() => _isPinned = val),
               ),
               const SizedBox(height: 18),
               SizedBox(
@@ -5278,7 +5414,8 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
                     child: ConversationListCard(
                       name: conv.title,
                       role: conv.subtitle,
-                      lastMessageText: conv.lastMessagePreview ?? 'No messages yet',
+                      lastMessageText:
+                          conv.lastMessagePreview ?? 'No messages yet',
                       lastMessageTime: conv.lastMessageAt,
                       unreadCount: conv.unreadCount,
                       onTap: () => _ownerPush(
@@ -5348,8 +5485,11 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
   @override
   Widget build(BuildContext context) {
     final messaging = MessagingController.instance;
-    final title = widget.record?.title ?? widget.conversation?.personName ?? 'Conversation';
-    final subtitle = widget.record?.subtitle ?? widget.conversation?.personRole ?? '';
+    final title = widget.record?.title ??
+        widget.conversation?.personName ??
+        'Conversation';
+    final subtitle =
+        widget.record?.subtitle ?? widget.conversation?.personRole ?? '';
 
     return PageFrame(
       title: title,
@@ -5399,7 +5539,8 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
                                   ? Alignment.centerRight
                                   : Alignment.centerLeft,
                               child: Container(
-                                constraints: const BoxConstraints(maxWidth: 560),
+                                constraints:
+                                    const BoxConstraints(maxWidth: 560),
                                 margin: const EdgeInsets.symmetric(vertical: 6),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -5407,7 +5548,8 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: isStaff
-                                      ? const Color(0xFF627FA8).withValues(alpha: .10)
+                                      ? const Color(0xFF627FA8)
+                                          .withValues(alpha: .10)
                                       : Theme.of(context)
                                           .colorScheme
                                           .surfaceContainerHighest
@@ -5415,8 +5557,10 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
                                   borderRadius: BorderRadius.only(
                                     topLeft: const Radius.circular(15),
                                     topRight: const Radius.circular(15),
-                                    bottomLeft: Radius.circular(isStaff ? 15 : 4),
-                                    bottomRight: Radius.circular(isStaff ? 4 : 15),
+                                    bottomLeft:
+                                        Radius.circular(isStaff ? 15 : 4),
+                                    bottomRight:
+                                        Radius.circular(isStaff ? 4 : 15),
                                   ),
                                 ),
                                 child: Column(
@@ -5439,7 +5583,8 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
                                     const SizedBox(height: 3),
                                     Text(
                                       timeText(item.sentAt),
-                                      style: Theme.of(context).textTheme.bodySmall,
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
                                     ),
                                   ],
                                 ),

@@ -28,6 +28,19 @@ geofencing or advanced analytics.
 
 ## Completed Milestones History
 
+> **Sep 19, 2026 — Owner Confidential Report Review:** Connected the owner-only
+> confidential report register to Supabase with mandatory private decision
+> notes, status workflow, protected RPCs, and an append-only audit trail for
+> register access and status changes. Caretakers and guardians remain blocked.
+
+> **Sep 19, 2026 — Tenant-only Device Binding:** Removed Device Binding from
+> guardian, caretaker, and owner Settings views and added a tenant-only role
+> guard to the page. Other roles cannot expose it through direct navigation.
+
+> **Sep 19, 2026 — Owner-only Geofence Diagnostics:** Removed the Geofence Dev
+> Dashboard from shared Settings and added a direct owner role guard. Shared
+> Settings now contains only user-relevant privacy and permission controls.
+
 > **Sep 19, 2026 — Feedback UI:** Added a shared Settings feedback screen for
 > all roles with a 1–5 star rating, feedback categories, detailed comments,
 > optional account context, validation, and an explicit UI-only disclosure.
@@ -125,7 +138,7 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Gate and Manual Override** — auditable access decisions, 50m perimeter metrics, live presence directory, and staff manual log override.
 - [✓] **Curfew Review** — live request list, guardian input status, staff approval with gate instructions or rejection with reasons, emergency staff override, real-time Supabase sync, and prioritized dashboard attention card.
 - [ ] **Visitor Management** — approve, reject, and audit visitor access.
-- [ ] **Confidential Reports** — owner-authorized access with audit logging.
+- [✓] **Confidential Reports** — owner-only live review with mandatory notes, protected status decisions, and audit logging.
 - [ ] **Announcements** — create, target, publish, and archive notices.
 - [ ] **Messages** — persistent tenant and guardian conversations.
 - [ ] **Contacts** — verified guardian and emergency contact directory.
