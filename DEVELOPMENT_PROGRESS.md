@@ -1,9 +1,21 @@
 # CarmeLink Development Progress
 
-Last updated: September 13, 2026
+Last updated: September 19, 2026
 
 This file tracks development separately from the README. Page ownership is
 divided between two developers to reduce merge conflicts.
+
+## Current completion assessment
+
+**Estimated full-system completion: 71%.** The functional prototype is roughly
+89% complete, while production readiness is approximately 63%. This estimate
+weights live persistence, authorization, validation, testing, and role-complete
+workflows more heavily than screens that exist only as UI.
+
+Major remaining areas are visitors, persisted notifications/preferences,
+contracts, finance/expenses, discipline, analytics, native tenant device
+binding/background location, feedback persistence, MockData removal, and final
+multi-account security/offline testing.
 
 ## Status legend
 
@@ -94,10 +106,10 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Reports Hub** — live maintenance and confidential-report summaries with pull-to-refresh and active issue alerts.
 - [✓] **Maintenance Reports** — live tenant-owned reports with status filters (All, Pending, In Progress, Resolved, Cancelled), interactive details sheet, photo zoom, caretaker notes, and cancellation for pending reports.
 - [✓] **Submit Maintenance** — validated category, urgency guidance, description, assigned room context, and photo attachment with 5MB validation.
-  - *Planned Media Upgrade*: **Cloudinary Integration** — dynamic compression (`f_auto,q_auto`), progressive loading, thumbnail transformations (`c_thumb`), and offloaded media bandwidth.
+  - **Cloudinary Integration** — authenticated uploads, optimized derivatives, RLS-authorized access, and offloaded Supabase media storage.
 - [✓] **Maintenance Floor Plan** — interactive 2D floor plan map location picker integrated directly into report submission.
-- [ ] **Announcements** — show only notices published for the tenant audience.
-- [ ] **Messages and Conversation** — persisted, role-scoped real-time messaging.
+- [✓] **Announcements** — live audience-filtered notices from Supabase.
+- [✓] **Messages and Conversation** — persisted, role-scoped real-time messaging; production multi-account testing remains.
 - [✓] **Gate and Curfew** — verified IN/OUT events, curfew status, on-device geofence check-in, and presence timeline.
 - [✓] **Curfew Exception (Tenant)** — differentiated request types ('Late Return' direct to caretaker vs 'Overnight Leave' with guardian endorsement), departure/return schedule pickers, status pills, cancellation of pending requests, and live Supabase real-time sync.
 - [ ] **Visitor Request** — visitor identity, schedule, status, and audit history.
@@ -112,7 +124,7 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Curfew Requests** — review overnight leave requests with parental remarks, endorse/decline actions, audit timestamps, and real-time Supabase sync.
 - [✓] **Payment Status** — live read-only charges, balances, and verification status for linked tenants.
 - [✓] **Announcements** — guardian-audience notices from Supabase with realtime subscription.
-- [ ] **Messages and Conversation** — persistent communication with authorized staff.
+- [✓] **Messages and Conversation** — persistent real-time communication with authorized management; production multi-account testing remains.
 - [ ] **Emergency and Safety Alerts** — urgent targeted alerts and acknowledgement.
 
 ### Caretaker pages
@@ -158,7 +170,7 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Settings and Theme** — local appearance preference.
 - [ ] **Notification Preferences** — persist preferences per authenticated account.
 - [ ] **Privacy and Permissions** — connect actual device permission state.
-- [ ] **Device Binding** — trusted-device registration, revocation, and audit history.
+- [ ] **Device Binding (Tenant only)** — tenant-only UI and route guard are complete; native registration, revocation, and audit history remain.
 - [ ] **Verification Code** — secure expiring SMS OTP with retry and resend limits.
 - [✓] **Dormitory Information** — static dormitory information and contact guidance.
 - [✓] **Feedback UI** — Settings entry and validated feedback form completed; backend submission and staff review remain pending.
@@ -211,7 +223,7 @@ need to be agreed on before implementation.
 - [ ] Create and view the tenant's own maintenance submissions in `Pending` state.
 - [ ] Create, view, and cancel the tenant's own unreviewed visitor requests.
 - [ ] Create, view, and cancel the tenant's own unreviewed curfew requests.
-- [ ] Submit and view the tenant's own confidential concerns.
+- [✓] Submit and view the tenant's own confidential concerns.
 - [ ] Persist the tenant's own notification preferences.
 
 #### Guardian
@@ -376,9 +388,9 @@ link.
 - [ ] Gate monitoring and manual override — UI implemented, **Mock**
 - [ ] Curfew monitoring and request review — UI implemented, **Mock**
 - [ ] Visitor management — UI implemented, **Mock**
-- [ ] Confidential reports — UI implemented, **Mock**
+- [✓] Confidential reports — owner-only live workflow with protected RPCs and audit logging
 - [ ] Announcements — UI implemented, **Mock**
-- [ ] Messaging and conversations — UI implemented, **Mock**
+- [✓] Messaging and conversations — live Supabase persistence and realtime first iteration
 - [ ] Emergency contacts — UI implemented, **Mock**
 - [ ] Contracts, finance, discipline, and analytics — UI implemented, **Mock**
 - [✓] Guardian-to-tenant linking — owner management UI, **Live**
@@ -415,11 +427,11 @@ Owned folders and files:
 - [ ] Reports hub — UI implemented, **Mock**
 - [ ] Maintenance list, submission, and floor plan — UI implemented, **Mock**
 - [ ] Announcements — UI implemented, **Mock**
-- [ ] Messages and conversation — UI implemented, **Mock**
+- [✓] Messages and conversation — live Supabase persistence and realtime first iteration
 - [ ] Gate and curfew overview — UI implemented, **Mock**
 - [ ] Curfew-exception request — UI implemented, **Mock**
 - [ ] Visitor request — UI implemented, **Mock**
-- [ ] Confidential concern — UI implemented, **Mock**
+- [✓] Confidential concern — live tenant-only persistence and RLS
 - [✓] Rules and policies
 
 ### Guardian pages
@@ -430,7 +442,7 @@ Owned folders and files:
 - [ ] Curfew-request review — UI implemented, **Mock**
 - [✓] Payment status — linked tenant charges and verification state — **Live**
 - [✓] Announcements — guardian-audience notices from Supabase — **Live**
-- [ ] Messages and conversation — UI implemented, **Mock**
+- [✓] Messages and conversation — live Supabase persistence and realtime first iteration
 - [ ] Emergency and safety alerts — UI implemented, **Mock**
 
 ### Shared pages
@@ -450,8 +462,8 @@ Owned folders and files:
 - [ ] Connect tenant data to tables prepared by Developer 1
 - [ ] Connect guardian-to-tenant relationships
 - [ ] Store payment proofs in Supabase Storage
-- [ ] Persist maintenance, visitor, curfew, and confidential reports
-- [ ] Connect announcements and real-time messaging
+- [ ] Persist visitor requests; maintenance, curfew, and confidential reports are live
+- [✓] Connect announcements and real-time messaging
 - [ ] Connect notification preferences
 - [ ] Verify tenants can access only their own records
 - [ ] Verify guardians can access only their linked tenant

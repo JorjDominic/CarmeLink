@@ -4,9 +4,21 @@
 
 CarmeLink is a role-based dormitory management platform for Carmelita's Dormitory. It is designed to centralize tenant records, guardian relationships, room and bed assignments, payments, maintenance, curfew and gate monitoring, visitor requests, announcements, messaging, safety reports, contracts, and administrative reporting in one system.
 
+## Current Completion Snapshot — September 19, 2026
+
+- **Estimated full-system completion:** 71%
+- **Functional prototype completion:** approximately 89%
+- **Production readiness:** approximately 63%
+
+The estimate credits only connected workflows proportionally; UI-only pages do
+not count as complete. Remaining work is concentrated in visitors,
+notifications/preferences, contracts, finance, discipline, analytics, native
+device binding/background location, feedback persistence, MockData removal,
+and final multi-account security/offline validation.
+
 The current project already uses one shared Flutter codebase and one Supabase backend so every role works with the same protected data source rather than separate databases.
 
-> **Implementation note:** The ZIP currently has live Supabase authentication, protected profiles and roles, account management, core rooms/bed spaces/tenant assignments, role-specific detail tables, and guardian-to-tenant links. Many operational pages are already designed but still use mock/demo data while their production backend tables and services are being completed.
+> **Implementation status (September 19, 2026):** The repository has live Supabase authentication and role protection, accounts, rooms/assignments, guardian links, payments, maintenance, curfew/gate records, announcements, real-time messaging, and tenant/owner confidential-report workflows. Visitors, notifications, contracts, finance, discipline, analytics, native device binding, and production hardening remain incomplete.
 
 ---
 
@@ -24,9 +36,9 @@ The current project already uses one shared Flutter codebase and one Supabase ba
 - **Supabase PostgreSQL** — central relational database.
 - **Row Level Security (RLS)** — server-side role and record access restrictions.
 - **Supabase Edge Functions** — protected administrative actions such as account creation and account management.
-- **Supabase Storage** — planned for payment proofs, maintenance photos, incident evidence, and other uploads.
-- **Supabase Realtime** — planned where live messages, notifications, gate events, and status updates are required.
-- **Cloudinary (Planned Media Upgrade)** — planned media CDN and transformation pipeline to optimize photo uploads (maintenance evidence, payment receipts, avatars), providing automatic WebP compression (`f_auto,q_auto`), dynamic thumbnail transformations, and responsive delivery over mobile networks.
+- **Supabase Storage** — retains legacy private payment and maintenance objects during media migration.
+- **Supabase Realtime** — active for messaging and selected operational status workflows.
+- **Cloudinary** — active for new maintenance evidence and payment receipts using authenticated server-side uploads, optimized derivatives, and RLS-authorized expiring delivery links.
 
 ## Current High-Level Architecture
 
@@ -780,11 +792,12 @@ The tenant can use an interactive floor plan to identify the exact room or dormi
 
 ## Media Storage & Optimization Upgrade (Cloudinary)
 
-To optimize storage costs, upload speeds, and mobile bandwidth, an architectural upgrade integrates **Cloudinary** for maintenance photo attachments:
-- **Direct Client Upload**: Mobile clients upload compressed images directly to Cloudinary using an upload preset, offloading heavy binary payload storage from Supabase database servers.
-- **Dynamic Optimization**: Serves photos using automatic format conversion (`f_auto`) and quality compression (`q_auto`) tailored to the resident's network connection.
-- **On-the-Fly Transformations**: Automatically generates thumbnails for report cards (`c_thumb,w_150,h_150`) while retaining full-resolution images for the interactive zoom viewer.
-- **Database Schema Compatibility**: Stores the Cloudinary public ID or secure URL in `maintenance_reports.photo_path`, keeping the existing schema backward-compatible.
+Cloudinary is implemented for maintenance evidence and payment receipts:
+- **Protected Upload**: Flutter sends media to JWT-protected Supabase Edge Functions; Cloudinary secrets never enter the application.
+- **Authenticated Assets**: Sensitive images use Cloudinary's authenticated delivery type rather than public URLs.
+- **Optimization**: Incoming images are limited and quality-optimized, with eager 1200px and 320px derivatives.
+- **Authorized Delivery**: Existing Supabase RLS is checked before a five-minute private-download URL is returned.
+- **Schema Compatibility**: Opaque Cloudinary references share existing path columns, while legacy Supabase Storage paths remain readable.
 
 ---
 
@@ -1809,25 +1822,33 @@ read_at
 
 ```text
 id
-submitted_by
+tenant_id
 category
 summary
-details
 status
+response_notes
+reviewed_by
+reviewed_at
 created_at
 updated_at
 ```
 
-## `confidential_report_updates`
+## `confidential_report_audit`
 
 ```text
 id
 report_id
-author_id
-status
+actor_id
+action
+previous_status
+new_status
 notes
 created_at
 ```
+
+Current authorization: tenants insert and read only their own immutable
+submissions. Owners list and review through protected functions. Each owner
+register access and status change creates an append-only audit entry.
 
 ## `disciplinary_records`
 
@@ -2698,20 +2719,20 @@ Manual/test gate events should be proven first. Camera, facial recognition, and 
 
 - [ ] Create announcement and audience-targeting backend
 - [ ] Connect Owner/Caretaker announcement publishing
-- [ ] Create protected conversation/message contracts
+- [✓] Create protected conversation/message contracts
 - [ ] Create notification records and delivery triggers
-- [ ] Create confidential-report tables with strict staff-only access
+- [✓] Create confidential-report tables with tenant ownership, owner-only review, and audit logging
 - [ ] Create disciplinary-record backend
-- [ ] Add audit logging for sensitive staff access/actions
+- [✓] Add audit logging for confidential-report owner access/actions
 
 ### Developer 2
 
 - [ ] Connect Tenant/Guardian announcements
-- [ ] Connect Tenant/Guardian conversations and message history
+- [✓] Connect Tenant/Guardian conversations and message history
 - [ ] Connect notifications and deep links
 - [ ] Persist Tenant/Guardian notification preferences
-- [ ] Submit Tenant confidential concerns
-- [ ] Show only the submitting Tenant's permitted confidential-report state/history
+- [✓] Submit Tenant confidential concerns
+- [✓] Show only the submitting Tenant's permitted confidential-report state/history
 - [ ] Connect Guardian emergency/safety alerts where the backend audience permits it
 
 ### Integration checkpoint
@@ -2892,20 +2913,20 @@ At each checkpoint, Developer 1 supplies or confirms the backend contract and RL
 - [✓] RLS foundation
 - [✓] Server-side user-management functions
 
-## Developer 1 — UI Exists but Operational Backend Is Mostly Mock
+## Developer 1 — Mixed Live and Pending Operational Work
 
 - [ ] Owner dashboard metrics
 - [ ] Owner/Caretaker tenant operational data
-- [ ] Room monitoring and management data
-- [ ] Interactive floor-plan operational records
-- [ ] Payment verification
-- [ ] Maintenance management
-- [ ] Gate monitoring/manual override
-- [ ] Curfew staff review
+- [✓] Room monitoring and management data
+- [✓] Interactive floor-plan operational records
+- [✓] Payment verification
+- [✓] Maintenance management
+- [✓] Gate monitoring/manual override
+- [✓] Curfew staff review
 - [ ] Visitor approval
-- [ ] Confidential-report management
+- [✓] Confidential-report management
 - [ ] Staff announcements
-- [ ] Staff messaging
+- [✓] Staff messaging
 - [ ] Contract expiry
 - [ ] Income/expenses
 - [ ] Disciplinary records
@@ -2922,24 +2943,24 @@ At each checkpoint, Developer 1 supplies or confirms the backend contract and RL
 - [✓] Rules and policies
 - [✓] Dormitory information
 
-## Developer 2 — UI Exists but Mostly Mock / Local
+## Developer 2 — Mixed Live and Pending Tenant/Guardian Work
 
 - [ ] Tenant dashboard and My Room
-- [ ] Tenant payments/history
-- [ ] Payment-proof upload/OCR flow
-- [ ] Tenant reports hub
-- [ ] Tenant maintenance submission/history/floor plan
-- [ ] Tenant announcements
-- [ ] Tenant messages
-- [ ] Tenant gate/curfew
-- [ ] Tenant curfew exceptions
+- [✓] Tenant payments/history
+- [✓] Payment-proof upload/OCR flow
+- [✓] Tenant reports hub
+- [✓] Tenant maintenance submission/history/floor plan
+- [✓] Tenant announcements
+- [✓] Tenant messages
+- [✓] Tenant gate/curfew
+- [✓] Tenant curfew exceptions
 - [ ] Tenant visitor requests
-- [ ] Tenant confidential concerns
-- [ ] Guardian dashboard
-- [ ] Guardian curfew/gate activity
-- [ ] Guardian curfew review
-- [ ] Guardian payment status
-- [ ] Guardian announcements/messages
+- [✓] Tenant confidential concerns
+- [✓] Guardian dashboard
+- [✓] Guardian curfew/gate activity
+- [✓] Guardian curfew review
+- [✓] Guardian payment status
+- [✓] Guardian announcements/messages
 - [ ] Guardian emergency/safety alerts
 - [ ] Notifications
 - [ ] Notification preferences persistence
