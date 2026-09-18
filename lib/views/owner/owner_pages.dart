@@ -3398,8 +3398,29 @@ class FloorPlanMonitoringPage extends StatelessWidget {
   }
 }
 
-class GeofenceMonitoringPage extends StatelessWidget {
+class GeofenceMonitoringPage extends StatefulWidget {
   const GeofenceMonitoringPage({super.key});
+
+  @override
+  State<GeofenceMonitoringPage> createState() => _GeofenceMonitoringPageState();
+}
+
+class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
+  String _presenceFilter = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    OwnerController.instance.loadGateEvents();
+    OwnerController.instance.loadTenants();
+  }
+
+  void _openManualLogDialog({TenantDirectoryEntry? preselected}) {
+    showDialog(
+      context: context,
+      builder: (_) => _StaffManualLogDialog(preselectedTenant: preselected),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3407,133 +3428,418 @@ class GeofenceMonitoringPage extends StatelessWidget {
 
     return PageFrame(
       title: 'Curfew',
-      subtitle: 'Geofence perimeter and live tenant status',
+      subtitle: 'Geofence perimeter and live resident presence',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh presence & events',
+          icon: controller.gateLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded),
+          onPressed: controller.gateLoading
+              ? null
+              : () {
+                  controller.loadGateEvents(force: true);
+                  controller.loadTenants(force: true);
+                },
+        ),
+        FilledButton.icon(
+          onPressed: () => _openManualLogDialog(),
+          icon: const Icon(Icons.edit_note_rounded, size: 18),
+          label: const Text('Staff Log'),
+          style: FilledButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+          ),
+        ),
+      ],
       child: AnimatedBuilder(
         animation: controller,
-        builder: (context, _) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AdaptiveGrid(
-              children: [
-                const MetricCard(
-                  label: 'Dormitory perimeter',
-                  value: '50m Radius',
-                  detail: 'Carmelita\'s Dormitory',
-                  icon: Icons.location_searching_outlined,
-                ),
-                MetricCard(
-                  label: 'Inside perimeter',
-                  value: '${controller.tenantsInsideCount}',
-                  detail: 'Residents on premises',
-                  icon: Icons.home_outlined,
-                ),
-                MetricCard(
-                  label: 'Outside perimeter',
-                  value: '${controller.tenantsOutsideCount}',
-                  detail: 'Residents away',
-                  icon: Icons.directions_walk_outlined,
-                ),
-              ],
-            ),
-            const SizedBox(height: 22),
-            const SectionTitle(
-              'Resident presence directory',
-              subtitle: 'Current presence verified via background GPS geofencing',
-            ),
-            const SizedBox(height: 10),
-            ...controller.tenants.map(
-              (tenant) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: CarmelitaCard(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
+        builder: (context, _) {
+          final allTenants = controller.tenants;
+          final filteredTenants = allTenants.where((t) {
+            switch (_presenceFilter) {
+              case 'in':
+                return t.isInside;
+              case 'out':
+                return t.isOutside;
+              case 'unavailable':
+                return t.isUnavailable;
+              default:
+                return true;
+            }
+          }).toList();
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AdaptiveGrid(
+                children: [
+                  MetricCard(
+                    label: 'Inside perimeter',
+                    value: '${controller.tenantsInsideCount}',
+                    detail: 'Residents on premises',
+                    icon: Icons.home_outlined,
                   ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: (tenant.gateStatus == 'IN' ||
-                                tenant.gateStatus == 'Inside')
-                            ? const Color(0x1556886B)
-                            : const Color(0x15627FA8),
-                        foregroundColor: (tenant.gateStatus == 'IN' ||
-                                tenant.gateStatus == 'Inside')
+                  MetricCard(
+                    label: 'Outside perimeter',
+                    value: '${controller.tenantsOutsideCount}',
+                    detail: 'Residents away',
+                    icon: Icons.directions_walk_outlined,
+                  ),
+                  MetricCard(
+                    label: 'Unavailable',
+                    value: '${controller.tenantsUnavailableCount}',
+                    detail: 'GPS disabled or no signal',
+                    icon: Icons.location_off_outlined,
+                  ),
+                  const MetricCard(
+                    label: 'Dormitory perimeter',
+                    value: '50m Radius',
+                    detail: 'Brgy. Concepcion, Baliwag',
+                    icon: Icons.location_searching_outlined,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              const SectionTitle(
+                'Resident presence directory',
+                subtitle: 'Current presence verified via on-device geofence',
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _FilterChip(
+                    label: 'All (${allTenants.length})',
+                    selected: _presenceFilter == 'all',
+                    badgeColor: const Color(0xFF627FA8),
+                    onTap: () => setState(() => _presenceFilter = 'all'),
+                  ),
+                  _FilterChip(
+                    label: 'Inside (${controller.tenantsInsideCount})',
+                    selected: _presenceFilter == 'in',
+                    badgeColor: const Color(0xFF56886B),
+                    onTap: () => setState(() => _presenceFilter = 'in'),
+                  ),
+                  _FilterChip(
+                    label: 'Outside (${controller.tenantsOutsideCount})',
+                    selected: _presenceFilter == 'out',
+                    badgeColor: const Color(0xFF627FA8),
+                    onTap: () => setState(() => _presenceFilter = 'out'),
+                  ),
+                  _FilterChip(
+                    label: 'Unavailable (${controller.tenantsUnavailableCount})',
+                    selected: _presenceFilter == 'unavailable',
+                    badgeColor: const Color(0xFFC77800),
+                    onTap: () => setState(() => _presenceFilter = 'unavailable'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (filteredTenants.isEmpty)
+                const EmptyState(
+                  icon: Icons.person_off_outlined,
+                  title: 'No residents match filter',
+                  message: 'No residents found with this presence status.',
+                )
+              else
+                ...filteredTenants.map(
+                  (tenant) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: CarmelitaCard(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: tenant.isInside
+                                ? const Color(0x1556886B)
+                                : (tenant.isOutside
+                                    ? const Color(0x15627FA8)
+                                    : const Color(0x15C77800)),
+                            foregroundColor: tenant.isInside
+                                ? const Color(0xFF56886B)
+                                : (tenant.isOutside
+                                    ? const Color(0xFF627FA8)
+                                    : const Color(0xFFC77800)),
+                            child: Icon(
+                              tenant.isInside
+                                  ? Icons.home_rounded
+                                  : (tenant.isOutside
+                                      ? Icons.directions_walk_rounded
+                                      : Icons.location_off_rounded),
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  tenant.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Room ${tenant.room} • Bed ${tenant.bedSpace}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          StatusPill(
+                            tenant.isInside
+                                ? 'Inside'
+                                : (tenant.isOutside
+                                    ? 'Outside'
+                                    : 'Unavailable'),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            tooltip: 'Log observed entry/exit',
+                            icon: const Icon(Icons.edit_note_rounded, size: 20),
+                            onPressed: () =>
+                                _openManualLogDialog(preselected: tenant),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 22),
+              const SectionTitle(
+                'Recent presence events',
+                subtitle:
+                    'Automated discrete transition logs (data-minimization compliant)',
+              ),
+              const SizedBox(height: 10),
+              if (controller.gateEvents.isEmpty)
+                const EmptyState(
+                  icon: Icons.history_rounded,
+                  title: 'No recent presence events',
+                  message:
+                      'Discrete entry, exit, and manual logs will appear here.',
+                )
+              else
+                ...controller.gateEvents.map(
+                  (event) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: CarmelitaCard(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      child: TimelineTile(
+                        compact: true,
+                        icon: event.direction == 'IN'
+                            ? Icons.login_rounded
+                            : (event.direction == 'OUT'
+                                ? Icons.logout_rounded
+                                : Icons.location_off_rounded),
+                        color: event.direction == 'IN'
                             ? const Color(0xFF56886B)
-                            : const Color(0xFF627FA8),
-                        child: Icon(
-                          (tenant.gateStatus == 'IN' ||
-                                  tenant.gateStatus == 'Inside')
-                              ? Icons.home_rounded
-                              : Icons.directions_walk_rounded,
-                          size: 20,
-                        ),
+                            : (event.direction == 'OUT'
+                                ? const Color(0xFF627FA8)
+                                : const Color(0xFFC77800)),
+                        title:
+                            '${event.person} • ${event.isUnavailable ? 'Presence unavailable' : (event.direction == 'IN' ? 'Entered perimeter' : 'Exited perimeter')}',
+                        subtitle:
+                            '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verificationMethod}${event.notes != null && event.notes!.isNotEmpty ? ' • "${event.notes}"' : ''}',
+                        trailing: StatusPill(event.status),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              tenant.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Room ${tenant.room} • Bed ${tenant.bedSpace}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                      StatusPill(
-                        (tenant.gateStatus == 'IN' ||
-                                tenant.gateStatus == 'Inside')
-                            ? 'Inside'
-                            : 'Outside',
-                      ),
-                    ],
+                    ),
                   ),
                 ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StaffManualLogDialog extends StatefulWidget {
+  const _StaffManualLogDialog({this.preselectedTenant});
+
+  final TenantDirectoryEntry? preselectedTenant;
+
+  @override
+  State<_StaffManualLogDialog> createState() => _StaffManualLogDialogState();
+}
+
+class _StaffManualLogDialogState extends State<_StaffManualLogDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _notesController = TextEditingController();
+
+  TenantDirectoryEntry? _selectedTenant;
+  String _direction = 'IN';
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final tenants = OwnerController.instance.tenants;
+    if (widget.preselectedTenant != null) {
+      _selectedTenant = widget.preselectedTenant;
+    } else if (tenants.isNotEmpty) {
+      _selectedTenant = tenants.first;
+    }
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedTenant == null) return;
+
+    setState(() => _submitting = true);
+
+    try {
+      await OwnerController.instance.recordStaffManualLog(
+        tenantId: _selectedTenant!.id,
+        direction: _direction,
+        notes: _notesController.text.trim(),
+        tenantName: _selectedTenant!.name,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Recorded manual $_direction log for ${_selectedTenant!.name}',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to record staff manual log: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tenants = OwnerController.instance.tenants;
+
+    return AlertDialog(
+      title: const Text('Staff Manual Log'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Log a directly observed resident entry or exit to resolve an unavailable status gap. Mandatory observation notes are required for auditing.',
+                style: TextStyle(fontSize: 13),
               ),
-            ),
-            const SizedBox(height: 22),
-            const SectionTitle(
-              'Recent geofence transitions',
-              subtitle: 'Automated perimeter arrival and departure logs',
-            ),
-            const SizedBox(height: 10),
-            ...controller.geofenceEvents.map(
-              (event) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: CarmelitaCard(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  child: TimelineTile(
-                    compact: true,
-                    icon: event.direction == 'IN'
-                        ? Icons.login_rounded
-                        : Icons.logout_rounded,
-                    color: event.direction == 'IN'
-                        ? const Color(0xFF56886B)
-                        : const Color(0xFF627FA8),
-                    title:
-                        '${event.person} • ${event.direction == 'IN' ? 'Entered' : 'Exited'} perimeter',
-                    subtitle:
-                        '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verification}',
-                    trailing: StatusPill(event.status),
-                  ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<TenantDirectoryEntry>(
+                initialValue: _selectedTenant,
+                decoration: const InputDecoration(
+                  labelText: 'Select Tenant',
+                  border: OutlineInputBorder(),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
+                items: tenants.map((t) {
+                  return DropdownMenuItem(
+                    value: t,
+                    child: Text('${t.name} (Rm ${t.room})'),
+                  );
+                }).toList(),
+                onChanged: (val) => setState(() => _selectedTenant = val),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              const Text(
+                'Observed Direction',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+              const SizedBox(height: 6),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: 'IN',
+                    label: Text('IN (Entry)'),
+                    icon: Icon(Icons.login_rounded),
+                  ),
+                  ButtonSegment(
+                    value: 'OUT',
+                    label: Text('OUT (Exit)'),
+                    icon: Icon(Icons.logout_rounded),
+                  ),
+                ],
+                selected: {_direction},
+                onSelectionChanged: (set) =>
+                    setState(() => _direction = set.first),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _notesController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Observation Notes *',
+                  hintText: 'e.g. Directly observed at gate; phone drained.',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Observation notes are mandatory for staff manual log.';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Submit Log'),
+        ),
+      ],
     );
   }
 }

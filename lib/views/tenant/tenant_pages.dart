@@ -9,6 +9,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/announcement_service.dart';
+import '../../services/geofence_service.dart';
 import '../../services/receipt_ocr_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../widgets/feature_widgets.dart';
@@ -4087,14 +4088,16 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         TenantController.instance.loadCurfewRequests();
+        TenantController.instance.loadGateEvents();
       }
     });
     _subscription = TableRefreshSubscription(
       'tenant-curfew-presence',
-      ['curfew_requests'],
+      ['curfew_requests', 'gate_events', 'tenant_details'],
       () {
         if (mounted) {
           TenantController.instance.loadCurfewRequests(force: true);
+          TenantController.instance.loadGateEvents(force: true);
         }
       },
     );
@@ -4147,18 +4150,18 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
   @override
   Widget build(BuildContext context) {
     final controller = TenantController.instance;
-    final events = controller.geofenceEvents
-        .where((e) => e.person == 'Anna Dela Cruz')
-        .toList();
 
     return PageFrame(
       title: 'Curfew',
       subtitle: 'Geofence tracking and exception requests',
       actions: [
         IconButton(
-          tooltip: 'Refresh requests',
+          tooltip: 'Refresh presence & requests',
           icon: const Icon(Icons.refresh_rounded),
-          onPressed: () => controller.loadCurfewRequests(force: true),
+          onPressed: () {
+            controller.loadCurfewRequests(force: true);
+            controller.loadGateEvents(force: true);
+          },
         ),
       ],
       child: AnimatedBuilder(
@@ -4167,6 +4170,32 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
           final requests = controller.curfewRequests;
           final loading = controller.curfewLoading;
           final error = controller.curfewError;
+
+          final events = controller.gateEvents;
+
+          final isInside = controller.isInside;
+          final isOutside = controller.isOutside;
+          final isUnavailable = controller.isUnavailable;
+
+          final statusLabel = isInside
+              ? 'Inside dormitory'
+              : (isOutside ? 'Outside dormitory' : 'Location unavailable');
+          final statusPillText = isInside
+              ? 'IN'
+              : (isOutside ? 'OUT' : 'UNAVAILABLE');
+          final statusColor = isInside
+              ? const Color(0xFF56886B)
+              : (isOutside ? const Color(0xFFC77800) : const Color(0xFFB03A2E));
+          final statusIcon = isInside
+              ? Icons.location_on_outlined
+              : (isOutside
+                  ? Icons.directions_walk_outlined
+                  : Icons.location_disabled_outlined);
+          final lastEventText = controller.lastGateEventAt != null
+              ? 'Last ${controller.currentGateStatus}: ${timeText(controller.lastGateEventAt!)} • GPS Geofence confirmed'
+              : (isUnavailable
+                  ? 'Location signal or permission unavailable'
+                  : 'Boundary monitoring active');
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4185,79 +4214,210 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                 width: double.infinity,
                 child: CarmelitaCard(
                   padding: const EdgeInsets.all(14),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final compact = constraints.maxWidth < 330;
-                      const copy = Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'CURRENT STATUS',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          SizedBox(height: 3),
-                          Text(
-                            'Inside dormitory',
-                            style: TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          SizedBox(height: 6),
-                          Text('Last IN: 8:14 PM • GPS Geofence confirmed'),
-                        ],
-                      );
-
-                      if (compact) {
-                        return const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: Color(0x1356886B),
-                                  foregroundColor: Color(0xFF56886B),
-                                  child: Icon(Icons.location_on_outlined),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compact = constraints.maxWidth < 330;
+                          final copy = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'CURRENT STATUS',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
                                 ),
-                                SizedBox(width: 12),
-                                StatusPill('IN'),
-                              ],
-                            ),
-                            SizedBox(height: 12),
-                            copy,
-                          ],
-                        );
-                      }
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                statusLabel,
+                                style: const TextStyle(
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(lastEventText),
+                            ],
+                          );
 
-                      return const Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CircleAvatar(
-                            radius: 28,
-                            backgroundColor: Color(0x1356886B),
-                            foregroundColor: Color(0xFF56886B),
-                            child: Icon(Icons.location_on_outlined),
+                          if (compact) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 24,
+                                      backgroundColor:
+                                          statusColor.withValues(alpha: 0.12),
+                                      foregroundColor: statusColor,
+                                      child: Icon(statusIcon),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    StatusPill(statusPillText),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                copy,
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              CircleAvatar(
+                                radius: 28,
+                                backgroundColor:
+                                    statusColor.withValues(alpha: 0.12),
+                                foregroundColor: statusColor,
+                                child: Icon(statusIcon),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(child: copy),
+                              const SizedBox(width: 10),
+                              StatusPill(statusPillText),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: controller.checkingPresence
+                              ? null
+                              : () async {
+                                  try {
+                                    final result =
+                                        await controller.performGeofenceCheckIn();
+                                    if (context.mounted) {
+                                      final msg = switch (result.status) {
+                                        'Verified' => result.errorMessage != null
+                                            ? 'Presence confirmed (${result.direction == "IN" ? "Inside" : "Outside"}), but server sync warning: ${result.errorMessage}'
+                                            : 'Presence confirmed: ${result.direction == "IN" ? "Inside perimeter" : "Outside perimeter"}',
+                                        'Flagged' =>
+                                          'Gate check recorded (Flagged: curfew hours active)',
+                                        _ =>
+                                          'Location check failed: ${result.errorMessage ?? (result.failureReason.name != 'none' ? result.failureReason.name : 'Signal error')}',
+                                      };
+                                      showAppSnackBar(context, msg);
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      showAppSnackBar(
+                                        context,
+                                        'Location check error: $e',
+                                      );
+                                    }
+                                  }
+                                },
+                          icon: controller.checkingPresence
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.my_location_rounded, size: 18),
+                          label: Text(
+                            controller.checkingPresence
+                                ? 'Checking boundary...'
+                                : 'Verify Location / Check-in',
                           ),
-                          SizedBox(width: 16),
-                          Expanded(child: copy),
-                          SizedBox(width: 10),
-                          StatusPill('IN'),
-                        ],
-                      );
-                    },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
+              if (isUnavailable) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB03A2E).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFB03A2E).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: Color(0xFFB03A2E)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Location signal unavailable',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFB03A2E),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Please verify that GPS is turned on and location permissions are granted to automatically log curfew boundary arrival and departure.',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: () =>
+                                      GeofenceService.openAppSettings(),
+                                  style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    foregroundColor: const Color(0xFFB03A2E),
+                                    side: const BorderSide(
+                                      color: Color(0xFFB03A2E),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.settings_outlined,
+                                      size: 14),
+                                  label: const Text('App Permissions',
+                                      style: TextStyle(fontSize: 12)),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: () =>
+                                      GeofenceService.openLocationSettings(),
+                                  style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    foregroundColor: const Color(0xFFB03A2E),
+                                    side: const BorderSide(
+                                      color: Color(0xFFB03A2E),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.gps_fixed, size: 14),
+                                  label: const Text('Turn On GPS',
+                                      style: TextStyle(fontSize: 12)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 18),
-              const MutedDashboardGrid(
+              MutedDashboardGrid(
                 compact: true,
                 items: [
-                  MutedDashboardItem(
+                  const MutedDashboardItem(
                     label: 'Geofence boundary',
                     value: '50m Radius',
                     detail: 'Carmelita\'s Dormitory',
@@ -4266,10 +4426,16 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                   ),
                   MutedDashboardItem(
                     label: 'Detection signal',
-                    value: 'Active',
-                    detail: 'GPS Geofencing',
-                    icon: Icons.gps_fixed_outlined,
-                    color: Color(0xFF627FA8),
+                    value: isUnavailable ? 'Unavailable' : 'Active',
+                    detail: isUnavailable
+                        ? 'Check GPS & permissions'
+                        : 'GPS Geofencing',
+                    icon: isUnavailable
+                        ? Icons.location_disabled_outlined
+                        : Icons.gps_fixed_outlined,
+                    color: isUnavailable
+                        ? const Color(0xFFB03A2E)
+                        : const Color(0xFF627FA8),
                   ),
                 ],
               ),
@@ -4397,30 +4563,44 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
               const SizedBox(height: 22),
               const SectionTitle('Recent presence records'),
               const SizedBox(height: 10),
-              ...events.map(
-                (e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: CarmelitaCard(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    child: TimelineTile(
-                      compact: true,
-                      icon: e.direction == 'IN'
-                          ? Icons.login_rounded
-                          : Icons.logout_rounded,
-                      color: e.direction == 'IN'
-                          ? const Color(0xFF56886B)
-                          : const Color(0xFF627FA8),
-                      title: e.direction == 'IN'
-                          ? 'Entered dormitory perimeter'
-                          : 'Exited dormitory perimeter',
-                      subtitle:
-                          '${shortDate(e.time)} • ${timeText(e.time)} • ${e.verification}',
-                      trailing: StatusPill(e.status),
+              if (events.isEmpty)
+                const CarmelitaCard(
+                  padding: EdgeInsets.all(16),
+                  child: Center(
+                    child: Text('No presence records recorded yet.'),
+                  ),
+                )
+              else
+                ...events.map(
+                  (e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: CarmelitaCard(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      child: TimelineTile(
+                        compact: true,
+                        icon: e.isUnavailable
+                            ? Icons.location_disabled_outlined
+                            : (e.direction == 'IN'
+                                ? Icons.login_rounded
+                                : Icons.logout_rounded),
+                        color: e.isUnavailable
+                            ? const Color(0xFFB03A2E)
+                            : (e.direction == 'IN'
+                                ? const Color(0xFF56886B)
+                                : const Color(0xFF627FA8)),
+                        title: e.isUnavailable
+                            ? 'Location check unavailable'
+                            : (e.direction == 'IN'
+                                ? 'Entered dormitory perimeter'
+                                : 'Exited dormitory perimeter'),
+                        subtitle:
+                            '${shortDate(e.time)} • ${timeText(e.time)} • ${e.verification}${e.notes != null && e.notes!.isNotEmpty ? ' (${e.notes})' : ''}',
+                        trailing: StatusPill(e.status),
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           );
         },

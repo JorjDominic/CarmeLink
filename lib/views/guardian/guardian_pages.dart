@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/announcement_service.dart';
+import '../../services/guardian_alert_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/usage_stats_service.dart';
 
@@ -576,15 +577,17 @@ class _GuardianPresenceMonitoringPageState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         GuardianController.instance.loadCurfewRequests();
+        GuardianController.instance.loadGateEvents();
       }
     });
 
     _subscription = TableRefreshSubscription(
       'guardian-curfew-monitoring',
-      ['curfew_requests'],
+      ['curfew_requests', 'gate_events', 'tenant_details'],
       () {
         if (mounted) {
           GuardianController.instance.loadCurfewRequests(force: true);
+          GuardianController.instance.loadGateEvents(force: true);
         }
       },
     );
@@ -674,9 +677,10 @@ class _GuardianPresenceMonitoringPageState
   @override
   Widget build(BuildContext context) {
     final controller = GuardianController.instance;
-    final events = controller.geofenceEvents
-        .where((event) => event.person == controller.linkedTenantName)
-        .toList();
+    final allEvents = controller.gateEvents;
+    final events = allEvents.any((e) => e.person == controller.linkedTenantName)
+        ? allEvents.where((e) => e.person == controller.linkedTenantName).toList()
+        : allEvents;
 
     return PageFrame(
       title: 'Curfew',
@@ -684,16 +688,19 @@ class _GuardianPresenceMonitoringPageState
       actions: [
         IconButton(
           tooltip: 'Refresh curfew data',
-          icon: controller.curfewLoading
+          icon: (controller.curfewLoading || controller.gateLoading)
               ? const SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.refresh_rounded),
-          onPressed: controller.curfewLoading
+          onPressed: (controller.curfewLoading || controller.gateLoading)
               ? null
-              : () => controller.loadCurfewRequests(force: true),
+              : () {
+                  controller.loadCurfewRequests(force: true);
+                  controller.loadGateEvents(force: true);
+                },
         ),
       ],
       child: AnimatedBuilder(
@@ -856,24 +863,101 @@ class _GuardianPresenceMonitoringPageState
                       ),
                 ),
                 const SizedBox(height: 8),
-                const MutedDashboardGrid(
-                  compact: true,
-                  items: [
-                    MutedDashboardItem(
-                      label: 'Current status',
-                      value: 'Inside',
-                      detail: 'Last IN 8:14 PM',
-                      icon: Icons.location_on_outlined,
-                      color: Color(0xFF56886B),
-                    ),
-                    MutedDashboardItem(
-                      label: 'Geofence zone',
-                      value: '50m Radius',
-                      detail: 'Carmelita\'s Dormitory',
-                      icon: Icons.location_searching_outlined,
-                      color: Color(0xFF627FA8),
-                    ),
-                  ],
+                () {
+                  final presence = controller.linkedTenantPresence;
+                  final isInside = presence == 'Inside' || presence == 'IN';
+                  final isOutside = presence == 'Outside' || presence == 'OUT';
+                  final isUnavailable =
+                      presence == 'Unavailable' || presence == 'UNAVAILABLE';
+
+                  final statusColor = isInside
+                      ? const Color(0xFF56886B)
+                      : (isOutside
+                          ? const Color(0xFFC77800)
+                          : const Color(0xFFB03A2E));
+                  final statusIcon = isInside
+                      ? Icons.location_on_outlined
+                      : (isOutside
+                          ? Icons.directions_walk_outlined
+                          : Icons.location_disabled_outlined);
+                  final latestEvent = events.firstOrNull;
+                  final presenceDetail = latestEvent != null
+                      ? '${latestEvent.direction != null ? "Last ${latestEvent.direction}: " : ""}${timeText(latestEvent.time)} • ${latestEvent.verification}'
+                      : (isUnavailable
+                          ? 'Signal unavailable'
+                          : 'Boundary monitoring active');
+
+                  return MutedDashboardGrid(
+                    compact: true,
+                    items: [
+                      MutedDashboardItem(
+                        label: 'Current status',
+                        value: presence,
+                        detail: presenceDetail,
+                        icon: statusIcon,
+                        color: statusColor,
+                      ),
+                      const MutedDashboardItem(
+                        label: 'Geofence zone',
+                        value: '50m Radius',
+                        detail: "Carmelita's Dormitory",
+                        icon: Icons.location_searching_outlined,
+                        color: Color(0xFF627FA8),
+                      ),
+                    ],
+                  );
+                }(),
+                const SizedBox(height: 14),
+                CarmelitaCard(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF627FA8).withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.notifications_active_outlined,
+                          color: Color(0xFF627FA8),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Guardian Alert Preference',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 14),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Alert me if resident is outside past ${GuardianAlertService.preferredAlertTime.format(context)}',
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.black54),
+                            ),
+                          ],
+                        ),
+                      ),
+                      OutlinedButton(
+                        onPressed: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: GuardianAlertService.preferredAlertTime,
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              GuardianAlertService.setPreferredAlertTime(picked);
+                            });
+                          }
+                        },
+                        child: const Text('Set time'),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 20),
                 MutedActionGrid(
@@ -927,17 +1011,23 @@ class _GuardianPresenceMonitoringPageState
                         ),
                         child: TimelineTile(
                           compact: true,
-                          icon: event.direction == 'IN'
-                              ? Icons.login_rounded
-                              : Icons.logout_rounded,
-                          color: event.direction == 'IN'
-                              ? const Color(0xFF56886B)
-                              : const Color(0xFF627FA8),
-                          title: event.direction == 'IN'
-                              ? 'Entered dormitory perimeter'
-                              : 'Exited dormitory perimeter',
+                          icon: event.isUnavailable
+                              ? Icons.location_disabled_outlined
+                              : (event.direction == 'IN'
+                                  ? Icons.login_rounded
+                                  : Icons.logout_rounded),
+                          color: event.isUnavailable
+                              ? const Color(0xFFB03A2E)
+                              : (event.direction == 'IN'
+                                  ? const Color(0xFF56886B)
+                                  : const Color(0xFF627FA8)),
+                          title: event.isUnavailable
+                              ? 'Location check unavailable'
+                              : (event.direction == 'IN'
+                                  ? 'Entered dormitory perimeter'
+                                  : 'Exited dormitory perimeter'),
                           subtitle:
-                              '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verification}',
+                              '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verification}${event.notes != null && event.notes!.isNotEmpty ? ' (${event.notes})' : ''}',
                           trailing: StatusPill(event.status),
                         ),
                       ),
@@ -1878,18 +1968,44 @@ class _GuardianPresenceRecords extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tenantName = GuardianController.instance.linkedTenantName;
-    final events = GuardianController.instance.geofenceEvents
-        .where((e) => e.person == tenantName || e.person == 'Anna Dela Cruz')
-        .toList();
+    final allEvents = GuardianController.instance.gateEvents;
+    final events = allEvents.any((e) => e.person == tenantName)
+        ? allEvents.where((e) => e.person == tenantName).toList()
+        : allEvents;
+
+    if (events.isEmpty) {
+      return const CarmelitaCard(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: Text('No presence records recorded yet.')),
+        ),
+      );
+    }
+
     return CarmelitaCard(
-        child: Column(
-            children: events
-                .map((e) => TimelineTile(
-                    icon: e.direction == 'IN' ? Icons.login : Icons.logout,
-                    title: '${e.direction} • ${e.verification}',
-                    subtitle: '${shortDate(e.time)} • ${timeText(e.time)}',
-                    trailing: StatusPill(e.status)))
-                .toList()));
+      child: Column(
+        children: events
+            .map(
+              (e) => TimelineTile(
+                icon: e.isUnavailable
+                    ? Icons.location_disabled_outlined
+                    : (e.direction == 'IN' ? Icons.login : Icons.logout),
+                color: e.isUnavailable
+                    ? const Color(0xFFB03A2E)
+                    : (e.direction == 'IN'
+                        ? const Color(0xFF56886B)
+                        : const Color(0xFF627FA8)),
+                title: e.isUnavailable
+                    ? 'Unavailable • ${e.verification}'
+                    : '${e.direction} • ${e.verification}',
+                subtitle:
+                    '${shortDate(e.time)} • ${timeText(e.time)}${e.notes != null && e.notes!.isNotEmpty ? ' (${e.notes})' : ''}',
+                trailing: StatusPill(e.status),
+              ),
+            )
+            .toList(),
+      ),
+    );
   }
 }
 

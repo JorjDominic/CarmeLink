@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/config/supabase_config.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/curfew_service.dart';
+import '../services/gate_service.dart';
+import '../services/geofence_service.dart';
 import '../services/maintenance_service.dart';
 import '../services/payment_service.dart';
 import '../services/room_service.dart';
@@ -16,11 +19,23 @@ class TenantController extends ChangeNotifier {
   final MaintenanceService _maintenanceService = const MaintenanceService();
   final PaymentService _paymentService = const PaymentService();
   final RoomService _roomService = const RoomService();
+  final GateService _gateService = const GateService();
+  final GeofenceLocationService _geofenceService =
+      const GeofenceLocationService();
 
   final List<MaintenanceReport> _maintenance = [];
   final List<Payment> _payments = [];
   final List<CurfewRequest> _curfewRequests = [];
+  List<GateEvent> _gateEvents = [];
   Room? _room;
+
+  bool _gateLoading = false;
+  String? _gateError;
+  bool _gateLoadedOnce = false;
+
+  String _currentGateStatus = 'IN';
+  DateTime? _lastGateEventAt;
+  bool _checkingPresence = false;
 
   bool _maintenanceLoading = false;
   String? _maintenanceError;
@@ -41,6 +56,7 @@ class TenantController extends ChangeNotifier {
   Room? get room => _room;
   bool get roomLoading => _roomLoading;
   String? get roomError => _roomError;
+  bool get roomLoadedOnce => _roomLoadedOnce;
   bool get isRoomAssigned => _room != null;
 
   List<Payment> get payments => _payments.isEmpty
@@ -86,10 +102,24 @@ class TenantController extends ChangeNotifier {
     return active.isNotEmpty ? active.first : null;
   }
 
-  List<GeofenceEvent> get geofenceEvents =>
-      List.unmodifiable(MockData.gateEvents);
+  List<GateEvent> get gateEvents => List.unmodifiable(_gateEvents);
 
-  List<GeofenceEvent> get gateEvents => geofenceEvents;
+  List<GateEvent> get geofenceEvents => gateEvents;
+  bool get gateLoading => _gateLoading;
+  String? get gateError => _gateError;
+  bool get gateLoadedOnce => _gateLoadedOnce;
+
+  String get currentGateStatus => _currentGateStatus;
+  DateTime? get lastGateEventAt => _lastGateEventAt;
+  bool get checkingPresence => _checkingPresence;
+
+  bool get isInside =>
+      _currentGateStatus == 'IN' || _currentGateStatus == 'Inside';
+  bool get isOutside =>
+      _currentGateStatus == 'OUT' || _currentGateStatus == 'Outside';
+  bool get isUnavailable =>
+      _currentGateStatus == 'UNAVAILABLE' ||
+      _currentGateStatus == 'Unavailable';
 
   List<Announcement> get announcements => List.unmodifiable(
         MockData.announcements,
@@ -153,12 +183,20 @@ class TenantController extends ChangeNotifier {
   }
 
   Future<void> cancelCurfewRequest(String requestId) async {
-    final updated = await _curfewService.cancelRequest(requestId);
-    final index = _curfewRequests.indexWhere((r) => r.id == requestId);
-    if (index != -1) {
-      _curfewRequests[index] = updated;
+    try {
+      final updated = await _curfewService.cancelRequest(requestId);
+      final index = _curfewRequests.indexWhere((r) => r.id == requestId);
+      if (index != -1) {
+        _curfewRequests[index] = updated;
+      }
+      notifyListeners();
+    } catch (_) {
+      final index = _curfewRequests.indexWhere((r) => r.id == requestId);
+      if (index != -1) {
+        _curfewRequests[index].status = 'cancelled';
+        notifyListeners();
+      }
     }
-    notifyListeners();
   }
 
   Future<void> loadMaintenance({bool force = false}) async {
@@ -205,6 +243,13 @@ class TenantController extends ChangeNotifier {
     _curfewLoading = false;
     _curfewError = null;
     _curfewLoadedOnce = false;
+    _gateEvents.clear();
+    _gateLoading = false;
+    _gateError = null;
+    _gateLoadedOnce = false;
+    _currentGateStatus = 'IN';
+    _lastGateEventAt = null;
+    _checkingPresence = false;
     notifyListeners();
   }
 
@@ -489,5 +534,149 @@ class TenantController extends ChangeNotifier {
           '',
         )
         .replaceAll(')', '');
+  }
+
+  Future<void> loadGateEvents({bool force = false}) async {
+    if (_gateLoading && !force) return;
+    if (_gateLoadedOnce && !force) return;
+
+    _gateLoading = true;
+    _gateError = null;
+    notifyListeners();
+
+    try {
+      final client = SupabaseConfig.clientSafe;
+      final uid = client?.auth.currentUser?.id;
+      if (client == null || uid == null) {
+        _gateEvents = [];
+        _gateLoadedOnce = true;
+        return;
+      }
+      final events = await _gateService.loadGateEvents(
+        tenantId: uid,
+        forceRefresh: force,
+      );
+      _gateEvents = events;
+      _gateLoadedOnce = true;
+      if (events.isNotEmpty) {
+        final latest = events.first;
+        _currentGateStatus =
+            latest.isUnavailable ? 'UNAVAILABLE' : (latest.direction ?? 'IN');
+        _lastGateEventAt = latest.checkedAt;
+      } else {
+        try {
+          final row = await client
+              .from('tenant_details')
+              .select('current_gate_status, last_gate_event_at')
+              .eq('profile_id', uid)
+              .maybeSingle();
+          if (row != null) {
+            if (row['current_gate_status'] != null) {
+              _currentGateStatus = row['current_gate_status'] as String;
+            }
+            if (row['last_gate_event_at'] != null) {
+              _lastGateEventAt =
+                  DateTime.parse(row['last_gate_event_at'] as String);
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (e) {
+      _gateError = _message(e);
+    } finally {
+      _gateLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// On-demand or scheduled GPS geofence check-in.
+  ///
+  /// Zero coordinates are persisted; evaluates on-device and passes only
+  /// the resulting status/direction to the secure RPC.
+  Future<GeofenceCheckResult> performGeofenceCheckIn({
+    String checkpointType = 'on_demand',
+  }) async {
+    _checkingPresence = true;
+    notifyListeners();
+
+    try {
+      final previous =
+          _currentGateStatus == 'UNAVAILABLE' ? null : _currentGateStatus;
+      final result = await _geofenceService.checkCurrentPresence(
+        previousDirection: previous,
+      );
+
+      _currentGateStatus =
+          result.isUnavailable ? 'UNAVAILABLE' : (result.direction ?? 'IN');
+      _lastGateEventAt = DateTime.now();
+
+      final client = SupabaseConfig.clientSafe;
+      final uid = client?.auth.currentUser?.id;
+
+      try {
+        await _gateService.recordGeofenceCheckIn(
+          direction: result.direction,
+          status: result.status,
+          checkpointType: checkpointType,
+        );
+      } catch (dbError) {
+        _gateError = _message(dbError);
+        final localEvent = GateEvent(
+          id: 'ge_${DateTime.now().millisecondsSinceEpoch}',
+          person: 'Me',
+          tenantId: uid,
+          direction: result.direction,
+          time: _lastGateEventAt ?? DateTime.now(),
+          verification: 'GPS Geofence',
+          status: result.status,
+          checkpointType: checkpointType,
+        );
+        _gateEvents.insert(0, localEvent);
+        return GeofenceCheckResult(
+          direction: result.direction,
+          status: result.status,
+          failureReason: result.failureReason,
+          errorMessage: result.errorMessage ??
+              'Database sync error: ${_message(dbError)}',
+        );
+      }
+
+      await loadGateEvents(force: true);
+      return result;
+    } catch (e) {
+      _gateError = _message(e);
+      return GeofenceCheckResult(
+        direction: null,
+        status: 'UNAVAILABLE',
+        failureReason: GeofenceFailureReason.timeoutOrSignalError,
+        errorMessage: _message(e),
+      );
+    } finally {
+      _checkingPresence = false;
+      notifyListeners();
+    }
+  }
+
+  @visibleForTesting
+  void setGateEventsForTesting(List<GateEvent> events) {
+    _gateEvents
+      ..clear()
+      ..addAll(events);
+    _gateLoadedOnce = true;
+    _gateLoading = false;
+    _gateError = null;
+    if (events.isNotEmpty) {
+      final latest = events.first;
+      _currentGateStatus =
+          latest.isUnavailable ? 'UNAVAILABLE' : (latest.direction ?? 'IN');
+      _lastGateEventAt = latest.checkedAt;
+    }
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void setCurrentGateStatusForTesting(String status) {
+    _currentGateStatus = status;
+    notifyListeners();
   }
 }

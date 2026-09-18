@@ -38,6 +38,8 @@ geofencing or advanced analytics.
 | Sep 17, 2026 | **Tenant Payments & Upload Proof** | Tenant | Account summary, filter chips (All, Due, Pending, Verified), overdue indicators, receipt zoom inspection, GCash/Maya/Bank instructions, and 5MB proof submission with OCR auto-fill. 71/71 tests passing. |
 | Sep 17, 2026 | **Owner & Caretaker Payment Verification & Invoicing** | Caretaker, Owner | Full staff payment suite: financial dashboard grid (Pending, Collected, Outstanding, Overdue), live search (tenant/room/title/ref), status chips, issue invoice modal dialog with category & due date, zoomable receipt inspection (`InteractiveViewer`), approve/reject with mandatory reasons, and cash payment recording. 86/86 tests passing. |
 | Sep 17, 2026 | **Payments Overflow Audit & Layout Hardening** | Tenant, Guardian, Caretaker, Owner | Comprehensive overflow fixes across all payment pages: responsive `LayoutBuilder` for review card details & action buttons, `_RejectReasonSheet` scrollable maxHeight constraints with keyboard insets support, `_CreateInvoiceDialog` `isExpanded` dropdowns and responsive due date picker, `_TenantPaymentCard` full-width & stacked action buttons, and `_showReceiptDialog` constrained scrollable dialog. Verified with 7 dedicated narrow viewport (320px) and 1.35x font scale tests. 93/93 tests passing. |
+| Sep 18, 2026 | **GPS Geofencing & Gate Monitoring** | Tenant, Guardian, Caretaker, Owner | Full geofencing & gate monitoring suite: on-device 50m geofence evaluation with ±3.0m hysteresis buffer, strict zero-coordinate persistence (data minimization), null direction on UNAVAILABLE, server-side curfew auto-flagging via RPC, intelligent curfew sleep battery optimization, staff manual log dialog with mandatory notes validation, and role-specific views across Owner, Caretaker, Tenant, and Guardian. 113/113 tests passing. |
+| Sep 18, 2026 | **Full Application Permissions & System Settings Suite** | Tenant, Guardian, Caretaker, Owner | Configured complete manifest and plist permissions: Android (`INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `CAMERA`, `READ_EXTERNAL_STORAGE`, `READ_MEDIA_IMAGES`, `VIBRATE`), iOS (`NSLocationWhenInUseUsageDescription`, `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`, `NSPhotoLibraryAddUsageDescription`), and macOS client network entitlements. Wired native system settings triggers in `PrivacyPermissionsPage` and tenant location warning cards (`GeofenceService.openAppSettings()`, `GeofenceService.openLocationSettings()`). 115/115 tests passing. |
 
 ## Core requirements by page
 
@@ -65,7 +67,7 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Maintenance Floor Plan** — interactive 2D floor plan map location picker integrated directly into report submission.
 - [ ] **Announcements** — show only notices published for the tenant audience.
 - [ ] **Messages and Conversation** — persisted, role-scoped real-time messaging.
-- [ ] **Gate and Curfew** — verified IN/OUT events, curfew status, and exceptions.
+- [✓] **Gate and Curfew** — verified IN/OUT events, curfew status, on-device geofence check-in, and presence timeline.
 - [✓] **Curfew Exception (Tenant)** — differentiated request types ('Late Return' direct to caretaker vs 'Overnight Leave' with guardian endorsement), departure/return schedule pickers, status pills, cancellation of pending requests, and live Supabase real-time sync.
 - [ ] **Visitor Request** — visitor identity, schedule, status, and audit history.
 - [ ] **Confidential Concern** — encrypted/restricted submission visible only to authorized staff.
@@ -75,7 +77,7 @@ page exists but its important backend workflow is unfinished.
 
 - [✓] **Home** — live linked-tenant, payment, and notice summary with real-time refresh.
 - [✓] **Curfew Overview** — linked tenant's current status, overnight leave endorsements, and approved exceptions with live real-time sync.
-- [ ] **Gate Activity** — verified activity for linked tenants only.
+- [✓] **Gate Activity** — verified presence and discrete gate activity for linked tenants only with isolated alert preferences.
 - [✓] **Curfew Requests** — review overnight leave requests with parental remarks, endorse/decline actions, audit timestamps, and real-time Supabase sync.
 - [✓] **Payment Status** — live read-only charges, balances, and verification status for linked tenants.
 - [✓] **Announcements** — guardian-audience notices from Supabase with realtime subscription.
@@ -88,7 +90,7 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Rooms** — live room/bed CRUD, vacancies, bed occupant details (name, contact), bed reassignment/transfers across rooms, and unassignment.
 - [✓] **Maintenance** — triage, assign staff, start work, update status, record resolution notes, inspect photos with tap-to-zoom (InteractiveViewer), floor plan overview integration, and audit trail.
 - [✓] **Payment Verification & Invoicing** — staff payment review: financial dashboard metrics, proof verification, invoice generation, status filters, and cash payment recording.
-- [ ] **Gate** — review events and record authorized manual overrides.
+- [✓] **Gate** — review live resident presence directory, discrete transition logs, and record authorized manual overrides.
 - [✓] **Curfew & Exceptions** — review live late return and overnight leave requests, approve with gate instructions or reject with reason, real-time sync via Supabase table subscriptions.
 - [✓] **Accounts** — CRUD limited to tenant and guardian accounts.
 - [✓] **Profile** — authenticated caretaker identity and access level.
@@ -102,7 +104,7 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Floor Plan (Integrated)** — merged as an interactive 2D map view inside Room Monitoring (`RoomMonitoringPage`) with live Supabase occupancy and bed details, rather than an isolated standalone page.
 - [✓] **Payments (Payment Verification & Invoicing)** — financial metrics (Pending, Collected, Outstanding, Overdue), tenant search & filter chips, invoice issuance modal with billing categories, receipt proof zoom, approve/reject actions with audit notes, and mark-as-paid for cash payments.
 - [✓] **Maintenance** — live request triage, metric summary cards (Open, High Priority, In Progress, Resolved), search & status filtering, assign staff, record resolution details with mandatory notes validation, floor plan overview, photo zoom inspection, and audit history.
-- [ ] **Gate and Manual Override** — auditable access decisions and system health.
+- [✓] **Gate and Manual Override** — auditable access decisions, 50m perimeter metrics, live presence directory, and staff manual log override.
 - [✓] **Curfew Review** — live request list, guardian input status, staff approval with gate instructions or rejection with reasons, emergency staff override, real-time Supabase sync, and prioritized dashboard attention card.
 - [ ] **Visitor Management** — approve, reject, and audit visitor access.
 - [ ] **Confidential Reports** — owner-authorized access with audit logging.

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/curfew_service.dart';
+import '../services/gate_service.dart';
 import '../services/guardian_service.dart';
 import '../services/table_refresh_subscription.dart';
 
@@ -13,12 +14,19 @@ class GuardianController extends ChangeNotifier {
 
   final GuardianService _guardianService = const GuardianService();
   final CurfewService _curfewService = const CurfewService();
+  final GateService _gateService = const GateService();
 
   final List<LinkedTenant> _linkedTenants = [];
   LinkedTenant? _selectedTenant;
   Room? _room;
   final List<Payment> _payments = [];
   final List<CurfewRequest> _curfewRequests = [];
+  final List<GateEvent> _gateEvents = [];
+
+  bool _gateLoading = false;
+  String? _gateError;
+  bool _gateLoadedOnce = false;
+  String _linkedTenantPresence = 'Inside';
 
   bool _loading = false;
   String? _error;
@@ -66,14 +74,15 @@ class GuardianController extends ChangeNotifier {
       .where((payment) => !payment.isVerified)
       .fold<double>(0, (sum, payment) => sum + payment.amount);
 
-  List<GeofenceEvent> get geofenceEvents =>
-      List.unmodifiable(MockData.gateEvents);
-  List<GeofenceEvent> get gateEvents => geofenceEvents;
+  List<GateEvent> get gateEvents => List.unmodifiable(_gateEvents);
+  List<GateEvent> get geofenceEvents => gateEvents;
+  bool get gateLoading => _gateLoading;
+  String? get gateError => _gateError;
 
   List<ChatMessage> get messages =>
       List.unmodifiable(MockData.guardianMessages);
 
-  String get linkedTenantPresence => 'Inside';
+  String get linkedTenantPresence => _linkedTenantPresence;
 
   /// Loads linked tenants, room assignment, and payment records.
   Future<void> loadData({bool force = false}) async {
@@ -116,12 +125,16 @@ class GuardianController extends ChangeNotifier {
           ..clear()
           ..addAll(results[1] as List<Payment>);
 
-        await loadCurfewRequests(force: force);
+        await Future.wait([
+          loadCurfewRequests(force: force),
+          loadGateEvents(force: force),
+        ]);
       } else {
         _selectedTenant = null;
         _room = null;
         _payments.clear();
         _curfewRequests.clear();
+        _gateEvents.clear();
       }
 
       _initRealtimeSubscription();
@@ -219,12 +232,79 @@ class GuardianController extends ChangeNotifier {
         'tenant_assignments',
         'payments',
         'curfew_requests',
+        'gate_events',
       ],
       () {
         loadData(force: true);
         loadCurfewRequests(force: true);
+        loadGateEvents(force: true);
       },
     );
+  }
+
+  Future<void> loadGateEvents({bool force = false}) async {
+    final tenantId = _selectedTenant?.tenantId;
+    if (tenantId == null) return;
+    if (_gateLoading && !force) return;
+    if (_gateLoadedOnce && !force) return;
+
+    _gateLoading = true;
+    _gateError = null;
+    notifyListeners();
+
+    try {
+      final events = await _gateService.loadGateEvents(
+        tenantId: tenantId,
+        forceRefresh: force,
+      );
+      _gateEvents
+        ..clear()
+        ..addAll(events);
+      _gateLoadedOnce = true;
+
+      if (events.isNotEmpty) {
+        final latest = events.first;
+        if (latest.isUnavailable) {
+          _linkedTenantPresence = 'Unavailable';
+        } else if (latest.direction == 'IN') {
+          _linkedTenantPresence = 'Inside';
+        } else if (latest.direction == 'OUT') {
+          _linkedTenantPresence = 'Outside';
+        }
+      }
+    } catch (e) {
+      _gateError = e.toString();
+    } finally {
+      _gateLoading = false;
+      notifyListeners();
+    }
+  }
+
+  @visibleForTesting
+  void setGateEventsForTesting(List<GateEvent> events) {
+    _gateEvents
+      ..clear()
+      ..addAll(events);
+    _gateLoadedOnce = true;
+    _gateLoading = false;
+    _gateError = null;
+    if (events.isNotEmpty) {
+      final latest = events.first;
+      if (latest.isUnavailable) {
+        _linkedTenantPresence = 'Unavailable';
+      } else if (latest.direction == 'IN') {
+        _linkedTenantPresence = 'Inside';
+      } else if (latest.direction == 'OUT') {
+        _linkedTenantPresence = 'Outside';
+      }
+    }
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void setLinkedTenantPresenceForTesting(String status) {
+    _linkedTenantPresence = status;
+    notifyListeners();
   }
 
   /// Resets state on sign-out.
@@ -236,12 +316,17 @@ class GuardianController extends ChangeNotifier {
     _room = null;
     _payments.clear();
     _curfewRequests.clear();
+    _gateEvents.clear();
     _loading = false;
     _error = null;
     _loadedOnce = false;
     _curfewLoading = false;
     _curfewError = null;
     _curfewLoadedOnce = false;
+    _gateLoading = false;
+    _gateError = null;
+    _gateLoadedOnce = false;
+    _linkedTenantPresence = 'Inside';
     GuardianService.invalidateCache();
     notifyListeners();
   }

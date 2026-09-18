@@ -373,25 +373,70 @@ class MaintenanceReport {
   int get hashCode => id.hashCode;
 }
 
-class GeofenceEvent {
-  const GeofenceEvent({
+class GateEvent {
+  const GateEvent({
     required this.id,
     required this.person,
-    required this.direction,
+    this.tenantId,
+    this.direction,
     required this.time,
     required this.verification,
     required this.status,
+    this.checkpointType = 'on_demand',
+    this.notes,
+    this.createdByName,
   });
 
+  factory GateEvent.fromRow(Map<String, dynamic> row) {
+    final profile = (row['profiles'] ?? row['user_profiles'])
+        as Map<String, dynamic>?;
+    final creator = row['creator'] as Map<String, dynamic>?;
+    final checkedAtStr =
+        row['checked_at'] as String? ?? row['created_at'] as String?;
+    final time =
+        checkedAtStr != null ? DateTime.parse(checkedAtStr) : DateTime.now();
+    final direction = row['direction'] as String?;
+    final status = row['status'] as String? ?? 'Verified';
+    final verificationMethod =
+        row['verification_method'] as String? ?? 'GPS Geofence';
+
+    return GateEvent(
+      id: row['id'] as String,
+      tenantId: row['tenant_id'] as String?,
+      person: profile?['full_name'] as String? ?? 'Tenant',
+      direction: direction,
+      time: time,
+      verification: verificationMethod,
+      status: status,
+      checkpointType: row['checkpoint_type'] as String? ?? 'on_demand',
+      notes: row['notes'] as String?,
+      createdByName: creator?['full_name'] as String?,
+    );
+  }
+
   final String id;
+  final String? tenantId;
   final String person;
-  final String direction;
+  final String? direction;
   final DateTime time;
   final String verification;
   final String status;
+  final String checkpointType;
+  final String? notes;
+  final String? createdByName;
+
+  DateTime get checkedAt => time;
+  String get verificationMethod => verification;
+
+  bool get isInside => direction == 'IN';
+  bool get isOutside => direction == 'OUT';
+  bool get isUnavailable => status == 'UNAVAILABLE';
+  bool get isFlagged => status == 'Flagged';
+  bool get isVerified => status == 'Verified';
+  bool get isManualLog => verification == 'Staff Manual Log';
 }
 
-typedef GateEvent = GeofenceEvent;
+typedef GeofenceEvent = GateEvent;
 
 class VisitorRequest {
   VisitorRequest({
@@ -504,6 +549,7 @@ class TenantDirectoryEntry {
     this.assignmentId,
     this.contractStartsOn,
     this.contractEndsOn,
+    this.lastGateEventAt,
   });
 
   final String id;
@@ -519,6 +565,12 @@ class TenantDirectoryEntry {
   final String? assignmentId;
   final DateTime? contractStartsOn;
   final DateTime? contractEndsOn;
+  final DateTime? lastGateEventAt;
+
+  bool get isInside => gateStatus == 'IN' || gateStatus == 'Inside';
+  bool get isOutside => gateStatus == 'OUT' || gateStatus == 'Outside';
+  bool get isUnavailable =>
+      gateStatus == 'UNAVAILABLE' || gateStatus == 'Unavailable';
 }
 
 class OwnerConversation {

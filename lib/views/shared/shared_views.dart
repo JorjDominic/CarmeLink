@@ -7,6 +7,8 @@ import '../../core/widgets/common_widgets.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../services/auth_service.dart';
+import '../../services/geofence_service.dart';
+import '../../services/guardian_alert_service.dart';
 import '../../services/profile_service.dart';
 
 class NotificationsPage extends StatelessWidget {
@@ -800,19 +802,108 @@ class _NotificationPreferencesPageState
     return PageFrame(
       title: 'Notification preferences',
       subtitle: 'Choose which updates you receive',
-      child: CarmelitaCard(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Column(
-          children: enabled.entries.map((entry) {
-            return SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              secondary: Icon(icons[entry.key]),
-              title: Text(entry.key),
-              value: entry.value,
-              onChanged: (value) => setState(() => enabled[entry.key] = value),
-            );
-          }).toList(),
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CarmelitaCard(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Column(
+              children: enabled.entries.map((entry) {
+                return SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: Icon(icons[entry.key]),
+                  title: Text(entry.key),
+                  value: entry.value,
+                  onChanged: (value) =>
+                      setState(() => enabled[entry.key] = value),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          CarmelitaCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF627FA8).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.alarm_outlined,
+                        color: Color(0xFF627FA8),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Guardian Curfew Alert Time',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Informational alert if your linked resident is outside past this time.',
+                            style: TextStyle(fontSize: 12, color: Colors.black54),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Preferred alert cutoff:',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: GuardianAlertService.preferredAlertTime,
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            GuardianAlertService.setPreferredAlertTime(picked);
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.schedule, size: 16),
+                      label: Text(
+                        GuardianAlertService.preferredAlertTime.format(context),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Note: This alert is strictly guardian-facing for peace of mind. It does not record official dormitory curfew violations or disciplinary infractions.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.black45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -828,10 +919,28 @@ class PrivacyPermissionsPage extends StatefulWidget {
 class _PrivacyPermissionsPageState extends State<PrivacyPermissionsPage> {
   final permissions = <String, bool>{
     'Camera': true,
-    'Location': true,
+    'Location': false,
     'Photos and storage': true,
     'Notifications': true,
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSystemPermissions();
+  }
+
+  Future<void> _checkSystemPermissions() async {
+    try {
+      final perm = await GeofenceService.checkPermission();
+      if (mounted) {
+        setState(() {
+          permissions['Location'] = (perm == LocationPermission.always ||
+              perm == LocationPermission.whileInUse);
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -857,8 +966,23 @@ class _PrivacyPermissionsPageState extends State<PrivacyPermissionsPage> {
                   secondary: Icon(icons[entry.key]),
                   title: Text(entry.key),
                   value: entry.value,
-                  onChanged: (value) =>
-                      setState(() => permissions[entry.key] = value),
+                  onChanged: (value) async {
+                    setState(() => permissions[entry.key] = value);
+                    if (entry.key == 'Location') {
+                      if (value) {
+                        final perm = await GeofenceService.requestPermission();
+                        if (mounted) {
+                          setState(() {
+                            permissions['Location'] =
+                                (perm == LocationPermission.always ||
+                                    perm == LocationPermission.whileInUse);
+                          });
+                        }
+                      } else {
+                        await GeofenceService.openAppSettings();
+                      }
+                    }
+                  },
                 );
               }).toList(),
             ),
@@ -886,9 +1010,18 @@ class _PrivacyPermissionsPageState extends State<PrivacyPermissionsPage> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: () => GeofenceService.openAppSettings(),
+              icon: const Icon(Icons.settings_outlined, size: 18),
+              label: const Text('Open System App Settings'),
+            ),
+          ),
+          const SizedBox(height: 8),
           Text(
-            'System permission prompts will be connected when native services are enabled.',
+            'To adjust OS-level hardware permissions (Location, Camera, Storage), tap "Open System App Settings" above.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

@@ -46,7 +46,7 @@ class TenantService {
               'tenant_id, profiles!guardian_tenant_links_guardian_id_fkey(full_name, phone)')
           .eq('is_primary', true),
       client.from('tenant_details').select(
-          'profile_id, residency_status, contract_starts_on, contract_ends_on'),
+          'profile_id, residency_status, contract_starts_on, contract_ends_on, current_gate_status, last_gate_event_at'),
     ]);
     final assignments = <String, Map<String, String>>{};
     for (final row in results[0]) {
@@ -86,6 +86,8 @@ class TenantService {
         residencyStatus: detail?['residency_status'] as String? ?? 'active',
         contractStartsOn: _date(detail?['contract_starts_on']),
         contractEndsOn: _date(detail?['contract_ends_on']),
+        gateStatus: detail?['current_gate_status'] as String? ?? 'Unavailable',
+        lastGateEventAt: _date(detail?['last_gate_event_at']),
       );
     }).toList();
     _cachedTenants = entries;
