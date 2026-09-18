@@ -753,6 +753,29 @@ class SettingsPage extends StatelessWidget {
             ),
             const SizedBox(height: 22),
             const SectionTitle(
+              'Support',
+              subtitle: 'Help improve CarmeLink',
+            ),
+            const SizedBox(height: 10),
+            CarmelitaCard(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.rate_review_outlined),
+                title: const Text(
+                  'Send feedback',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: const Text(
+                  'Share an idea, report an app issue, or rate your experience.',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const FeedbackPage()),
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            const SectionTitle(
               'Perimeter & Geofence',
               subtitle: 'Diagnostic boundary visualization',
             ),
@@ -790,6 +813,204 @@ class SettingsPage extends StatelessWidget {
                 },
                 icon: const Icon(Icons.logout_rounded),
                 label: const Text('Sign out'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class FeedbackPage extends StatefulWidget {
+  const FeedbackPage({super.key});
+
+  @override
+  State<FeedbackPage> createState() => _FeedbackPageState();
+}
+
+class _FeedbackPageState extends State<FeedbackPage> {
+  final message = TextEditingController();
+  String category = 'Suggestion';
+  int rating = 0;
+  bool includeAccountDetails = true;
+  bool submitted = false;
+
+  @override
+  void dispose() {
+    message.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final clean = message.text.trim();
+    if (rating == 0) {
+      showAppSnackBar(context, 'Choose a rating before submitting.');
+      return;
+    }
+    if (clean.length < 10) {
+      showAppSnackBar(context, 'Enter at least 10 characters of feedback.');
+      return;
+    }
+
+    setState(() => submitted = true);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.check_circle_outline),
+        title: const Text('Feedback UI complete'),
+        content: const Text(
+          'Thank you. This preview validates the feedback form, but it is not '
+          'sent or stored until the backend feedback service is connected.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PageFrame(
+      title: 'Send feedback',
+      subtitle: 'Help us improve your experience',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const ElegantHeader(
+              eyebrow: 'Your voice matters',
+              title: 'How is CarmeLink working for you?',
+              subtitle:
+                  'Tell us what works well, what feels difficult, or what you would like added.',
+            ),
+            const SizedBox(height: 20),
+            CarmelitaCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'RATE YOUR EXPERIENCE',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.1,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 4,
+                    children: List.generate(5, (index) {
+                      final value = index + 1;
+                      return IconButton(
+                        tooltip: '$value star${value == 1 ? '' : 's'}',
+                        onPressed: () => setState(() {
+                          rating = value;
+                          submitted = false;
+                        }),
+                        icon: Icon(
+                          value <= rating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: const Color(0xFFD19A45),
+                          size: 32,
+                        ),
+                      );
+                    }),
+                  ),
+                  Text(
+                    rating == 0
+                        ? 'No rating selected'
+                        : '$rating out of 5 stars',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 18),
+                  DropdownButtonFormField<String>(
+                    initialValue: category,
+                    decoration: const InputDecoration(
+                      labelText: 'Feedback type',
+                      prefixIcon: Icon(Icons.category_outlined),
+                    ),
+                    items: const [
+                      'Suggestion',
+                      'App issue',
+                      'Compliment',
+                      'Accessibility',
+                      'Other',
+                    ]
+                        .map((item) => DropdownMenuItem(
+                              value: item,
+                              child: Text(item),
+                            ))
+                        .toList(),
+                    onChanged: (value) => setState(() {
+                      category = value ?? category;
+                      submitted = false;
+                    }),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: message,
+                    minLines: 5,
+                    maxLines: 8,
+                    maxLength: 1500,
+                    onChanged: (_) {
+                      if (submitted) setState(() => submitted = false);
+                    },
+                    decoration: const InputDecoration(
+                      labelText: 'Feedback',
+                      alignLabelWithHint: true,
+                      hintText:
+                          'Describe your experience, suggestion, or the issue you encountered.',
+                    ),
+                  ),
+                  Material(
+                    type: MaterialType.transparency,
+                    child: SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Include my account details'),
+                      subtitle: const Text(
+                        'Helps support identify your role and follow up later.',
+                      ),
+                      value: includeAccountDetails,
+                      onChanged: (value) =>
+                          setState(() => includeAccountDetails = value),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            CarmelitaCard(
+              padding: const EdgeInsets.all(12),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'This form is currently a UI preview. Feedback is not '
+                      'transmitted or stored until backend support is added.',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _submit,
+                icon: Icon(submitted
+                    ? Icons.check_circle_outline
+                    : Icons.send_outlined),
+                label:
+                    Text(submitted ? 'Preview validated' : 'Submit feedback'),
               ),
             ),
           ],
@@ -880,7 +1101,8 @@ class _NotificationPreferencesPageState
                           SizedBox(height: 2),
                           Text(
                             'Informational alert if your linked resident is outside past this time.',
-                            style: TextStyle(fontSize: 12, color: Colors.black54),
+                            style:
+                                TextStyle(fontSize: 12, color: Colors.black54),
                           ),
                         ],
                       ),

@@ -28,6 +28,17 @@ geofencing or advanced analytics.
 
 ## Completed Milestones History
 
+> **Sep 19, 2026 — Feedback UI:** Added a shared Settings feedback screen for
+> all roles with a 1–5 star rating, feedback categories, detailed comments,
+> optional account context, validation, and an explicit UI-only disclosure.
+> Backend persistence and staff review are intentionally deferred.
+
+> **Sep 19, 2026 — Tenant Confidential Reports (Phase 1):** Tenants can submit
+> validated confidential safety, rule, roommate, or other concerns and view
+> only their own immutable submission history. Supabase RLS denies access to
+> unrelated accounts. Owner/caretaker review is intentionally deferred until
+> the next approved role phase.
+
 > **Sep 19, 2026 — Secure Cloudinary Media Integration:** Maintenance evidence
 > and payment receipts now use server-side authenticated Cloudinary uploads.
 > Secrets remain in Supabase Edge Functions, database RLS authorizes each view,
@@ -77,7 +88,7 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Gate and Curfew** — verified IN/OUT events, curfew status, on-device geofence check-in, and presence timeline.
 - [✓] **Curfew Exception (Tenant)** — differentiated request types ('Late Return' direct to caretaker vs 'Overnight Leave' with guardian endorsement), departure/return schedule pickers, status pills, cancellation of pending requests, and live Supabase real-time sync.
 - [ ] **Visitor Request** — visitor identity, schedule, status, and audit history.
-- [ ] **Confidential Concern** — encrypted/restricted submission visible only to authorized staff.
+- [✓] **Confidential Concern (Tenant Phase)** — restricted live submission and tenant-only history protected by RLS; staff review is deferred.
 - [✓] **Rules and Policies** — maintained dormitory rules and safety guidance.
 
 ### Guardian pages
@@ -137,6 +148,7 @@ page exists but its important backend workflow is unfinished.
 - [ ] **Device Binding** — trusted-device registration, revocation, and audit history.
 - [ ] **Verification Code** — secure expiring SMS OTP with retry and resend limits.
 - [✓] **Dormitory Information** — static dormitory information and contact guidance.
+- [✓] **Feedback UI** — Settings entry and validated feedback form completed; backend submission and staff review remain pending.
 
 ### Requirements applying to every live page
 

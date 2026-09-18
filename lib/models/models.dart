@@ -328,6 +328,7 @@ class MaintenanceReport {
     final s = status.trim().toLowerCase();
     return s == 'in progress' || s == 'in_progress';
   }
+
   bool get isResolved => status.trim().toLowerCase() == 'resolved';
   bool get isCancelled => status.trim().toLowerCase() == 'cancelled';
 
@@ -388,8 +389,8 @@ class GateEvent {
   });
 
   factory GateEvent.fromRow(Map<String, dynamic> row) {
-    final profile = (row['profiles'] ?? row['user_profiles'])
-        as Map<String, dynamic>?;
+    final profile =
+        (row['profiles'] ?? row['user_profiles']) as Map<String, dynamic>?;
     final creator = row['creator'] as Map<String, dynamic>?;
     final checkedAtStr =
         row['checked_at'] as String? ?? row['created_at'] as String?;
@@ -477,6 +478,10 @@ class ConcernReport {
     required this.summary,
     required this.status,
     required this.createdAt,
+    this.tenantId = '',
+    this.tenantName = 'Confidential tenant',
+    this.responseNotes = '',
+    this.reviewedAt,
   });
 
   final String id;
@@ -484,6 +489,43 @@ class ConcernReport {
   final String summary;
   String status;
   final DateTime createdAt;
+  final String tenantId;
+  final String tenantName;
+  final String responseNotes;
+  final DateTime? reviewedAt;
+
+  bool get isSubmitted => status.toLowerCase() == 'submitted';
+  bool get isResolved => status.toLowerCase() == 'resolved';
+
+  factory ConcernReport.fromRow(Map<String, dynamic> row) {
+    final rawCategory = row['category'] as String? ?? 'other';
+    final category = rawCategory
+        .split('_')
+        .map((part) => part.isEmpty
+            ? part
+            : '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+    final rawStatus = row['status'] as String? ?? 'submitted';
+    final status = rawStatus
+        .split('_')
+        .map((part) => part.isEmpty
+            ? part
+            : '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+    return ConcernReport(
+      id: row['id'] as String,
+      tenantId: row['tenant_id'] as String? ?? '',
+      tenantName: row['tenant_name'] as String? ?? 'Confidential tenant',
+      category: category,
+      summary: row['summary'] as String? ?? '',
+      status: status,
+      responseNotes: row['response_notes'] as String? ?? '',
+      createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+      reviewedAt: row['reviewed_at'] == null
+          ? null
+          : DateTime.tryParse(row['reviewed_at'] as String)?.toLocal(),
+    );
+  }
 }
 
 class AppNotification {
@@ -583,7 +625,8 @@ class ConversationRecord {
   });
 
   final String id;
-  final String type; // 'tenant_management', 'guardian_management', 'internal_staff'
+  final String
+      type; // 'tenant_management', 'guardian_management', 'internal_staff'
   final String? tenantId;
   final String? guardianId;
   final String title;
@@ -645,7 +688,8 @@ class ConversationRecord {
         roomNumber = assignment['room_number'] as String?;
         bedSpace = assignment['bed_space'] as String?;
         if (roomNumber != null) {
-          subtitle = 'Room $roomNumber${bedSpace != null ? ' ($bedSpace)' : ''}';
+          subtitle =
+              'Room $roomNumber${bedSpace != null ? ' ($bedSpace)' : ''}';
         }
       }
     }
@@ -834,7 +878,8 @@ class CurfewRequest {
       tenantName: tenantObj?['full_name'] as String?,
       guardianId: json['guardian_id'] as String?,
       guardianDecision: json['guardian_decision'] as String?,
-      guardianRemarks: (json['guardian_remarks'] ?? json['guardian_notes']) as String?,
+      guardianRemarks:
+          (json['guardian_remarks'] ?? json['guardian_notes']) as String?,
       guardianDecidedAt: json['guardian_decided_at'] != null
           ? DateTime.tryParse(json['guardian_decided_at'].toString())
           : null,

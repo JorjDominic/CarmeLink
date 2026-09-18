@@ -4,6 +4,7 @@ import '../core/config/supabase_config.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/curfew_service.dart';
+import '../services/confidential_report_service.dart';
 import '../services/gate_service.dart';
 import '../services/geofence_service.dart';
 import '../services/maintenance_service.dart';
@@ -16,6 +17,8 @@ class TenantController extends ChangeNotifier {
   static final TenantController instance = TenantController._();
 
   final CurfewService _curfewService = const CurfewService();
+  final ConfidentialReportService _confidentialReportService =
+      const ConfidentialReportService();
   final MaintenanceService _maintenanceService = const MaintenanceService();
   final PaymentService _paymentService = const PaymentService();
   final RoomService _roomService = const RoomService();
@@ -26,6 +29,7 @@ class TenantController extends ChangeNotifier {
   final List<MaintenanceReport> _maintenance = [];
   final List<Payment> _payments = [];
   final List<CurfewRequest> _curfewRequests = [];
+  final List<ConcernReport> _concerns = [];
   List<GateEvent> _gateEvents = [];
   Room? _room;
 
@@ -48,6 +52,10 @@ class TenantController extends ChangeNotifier {
   bool _curfewLoading = false;
   String? _curfewError;
   bool _curfewLoadedOnce = false;
+
+  bool _concernsLoading = false;
+  String? _concernsError;
+  bool _concernsLoadedOnce = false;
 
   bool _roomLoading = false;
   String? _roomError;
@@ -90,8 +98,7 @@ class TenantController extends ChangeNotifier {
 
   List<MaintenanceReport> get maintenance => List.unmodifiable(_maintenance);
 
-  List<CurfewRequest> get curfewRequests =>
-      List.unmodifiable(_curfewRequests);
+  List<CurfewRequest> get curfewRequests => List.unmodifiable(_curfewRequests);
   bool get curfewLoading => _curfewLoading;
   String? get curfewError => _curfewError;
   bool get curfewLoadedOnce => _curfewLoadedOnce;
@@ -127,7 +134,10 @@ class TenantController extends ChangeNotifier {
 
   List<VisitorRequest> get visitors => List.unmodifiable(MockData.visitors);
 
-  List<ConcernReport> get concerns => List.unmodifiable(MockData.concerns);
+  List<ConcernReport> get concerns => List.unmodifiable(_concerns);
+  bool get concernsLoading => _concernsLoading;
+  String? get concernsError => _concernsError;
+  bool get concernsLoadedOnce => _concernsLoadedOnce;
 
   List<ChatMessage> get messages => List.unmodifiable(
         MockData.tenantMessages,
@@ -138,6 +148,25 @@ class TenantController extends ChangeNotifier {
   String? get maintenanceError => _maintenanceError;
 
   bool get maintenanceLoadedOnce => _maintenanceLoadedOnce;
+
+  Future<void> loadConcerns({bool force = false}) async {
+    if (_concernsLoading || (_concernsLoadedOnce && !force)) return;
+    _concernsLoading = true;
+    _concernsError = null;
+    notifyListeners();
+    try {
+      final reports = await _confidentialReportService.listOwnReports();
+      _concerns
+        ..clear()
+        ..addAll(reports);
+      _concernsLoadedOnce = true;
+    } catch (error) {
+      _concernsError = _message(error);
+    } finally {
+      _concernsLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> loadCurfewRequests({bool force = false}) async {
     if (_curfewLoading && !force) return;
@@ -243,6 +272,10 @@ class TenantController extends ChangeNotifier {
     _curfewLoading = false;
     _curfewError = null;
     _curfewLoadedOnce = false;
+    _concerns.clear();
+    _concernsLoading = false;
+    _concernsError = null;
+    _concernsLoadedOnce = false;
     _gateEvents.clear();
     _gateLoading = false;
     _gateError = null;
@@ -480,22 +513,19 @@ class TenantController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void submitConcern({
+  Future<ConcernReport> submitConcern({
     required String category,
     required String summary,
-  }) {
-    MockData.concerns.insert(
-      0,
-      ConcernReport(
-        id: 'r${DateTime.now().millisecondsSinceEpoch}',
-        category: category,
-        summary: summary,
-        status: 'Submitted',
-        createdAt: DateTime.now(),
-      ),
+  }) async {
+    final report = await _confidentialReportService.submit(
+      category: category,
+      summary: summary,
     );
-
+    _concerns.insert(0, report);
+    _concernsLoadedOnce = true;
+    _concernsError = null;
     notifyListeners();
+    return report;
   }
 
   void sendMessage(String body) {

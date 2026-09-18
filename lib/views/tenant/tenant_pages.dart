@@ -21,6 +21,11 @@ class TenantDashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = TenantController.instance;
+    if (!controller.concernsLoadedOnce && !controller.concernsLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.loadConcerns();
+      });
+    }
 
     return PageFrame(
       title: 'Home',
@@ -34,7 +39,9 @@ class TenantDashboardPage extends StatelessWidget {
               session.currentUser?.name.trim().split(' ').first ?? 'Resident';
 
           final nextDue = controller.nextDuePayment ??
-              (controller.payments.isNotEmpty ? controller.payments.first : null);
+              (controller.payments.isNotEmpty
+                  ? controller.payments.first
+                  : null);
           final outstanding = controller.outstandingBalance;
           final maintenance = controller.maintenance.isEmpty
               ? null
@@ -125,7 +132,9 @@ class TenantDashboardPage extends StatelessWidget {
                     value: nextDue != null ? money(nextDue.amount) : '₱0.00',
                     detail: nextDue != null
                         ? '${nextDue.label} • Due ${shortDate(nextDue.dueDate)}'
-                        : (outstanding > 0 ? '₱${outstanding.toStringAsFixed(2)} balance' : 'All bills settled'),
+                        : (outstanding > 0
+                            ? '₱${outstanding.toStringAsFixed(2)} balance'
+                            : 'All bills settled'),
                     icon: Icons.account_balance_wallet_outlined,
                     color: (nextDue != null || outstanding > 0)
                         ? const Color(0xFFAA8A45)
@@ -688,9 +697,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                     value:
                         nextDue != null ? shortDate(nextDue.dueDate) : 'None',
                     detail: nextDue != null
-                        ? (nextDue.isOverdue
-                            ? 'Overdue bill!'
-                            : nextDue.label)
+                        ? (nextDue.isOverdue ? 'Overdue bill!' : nextDue.label)
                         : 'No pending bills',
                     icon: Icons.event_outlined,
                     color: nextDue?.isOverdue == true
@@ -792,7 +799,8 @@ class _TenantPaymentCard extends StatelessWidget {
       builder: (dialogCtx) {
         final maxHeight = MediaQuery.sizeOf(dialogCtx).height * 0.85;
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxHeight),
             child: SingleChildScrollView(
@@ -803,98 +811,101 @@ class _TenantPaymentCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                  const Icon(Icons.receipt_outlined, color: Color(0xFF627FA8)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${payment.label} Receipt',
+                      const Icon(Icons.receipt_outlined,
+                          color: Color(0xFF627FA8)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${payment.label} Receipt',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(dialogCtx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (payment.reference != null &&
+                      payment.reference!.isNotEmpty)
+                    Text(
+                      'Reference: ${payment.reference}',
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  if (payment.paymentMethod != null)
+                    Text('Method: ${payment.paymentMethod}'),
+                  if (payment.paidAt != null)
+                    Text('Submitted: ${shortDate(payment.paidAt!)}'),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: SizedBox(
+                      height: 280,
+                      width: double.infinity,
+                      child: FutureBuilder<String?>(
+                        future: TenantController.instance
+                            .paymentReceiptUrl(payment.receiptPath),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            );
+                          }
+                          final url = snapshot.data;
+                          if (url == null || url.isEmpty) {
+                            return Container(
+                              color: Colors.grey.shade200,
+                              child: const Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.broken_image_outlined,
+                                      size: 40,
+                                      color: Colors.grey,
+                                    ),
+                                    SizedBox(height: 6),
+                                    Text('Receipt photo unavailable'),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                          return InteractiveViewer(
+                            panEnabled: true,
+                            minScale: 0.8,
+                            maxScale: 3.5,
+                            child: Image.network(
+                              url,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: Colors.grey.shade200,
+                                child: const Center(
+                                  child: Text('Could not load receipt photo'),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(dialogCtx),
-                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              if (payment.reference != null && payment.reference!.isNotEmpty)
-                Text(
-                  'Reference: ${payment.reference}',
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              if (payment.paymentMethod != null)
-                Text('Method: ${payment.paymentMethod}'),
-              if (payment.paidAt != null)
-                Text('Submitted: ${shortDate(payment.paidAt!)}'),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(
-                  height: 280,
-                  width: double.infinity,
-                  child: FutureBuilder<String?>(
-                    future: TenantController.instance
-                        .paymentReceiptUrl(payment.receiptPath),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        );
-                      }
-                      final url = snapshot.data;
-                      if (url == null || url.isEmpty) {
-                        return Container(
-                          color: Colors.grey.shade200,
-                          child: const Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.broken_image_outlined,
-                                  size: 40,
-                                  color: Colors.grey,
-                                ),
-                                SizedBox(height: 6),
-                                Text('Receipt photo unavailable'),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-                      return InteractiveViewer(
-                        panEnabled: true,
-                        minScale: 0.8,
-                        maxScale: 3.5,
-                        child: Image.network(
-                          url,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: Colors.grey.shade200,
-                            child: const Center(
-                              child: Text('Could not load receipt photo'),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
-  },
-);
-}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1521,8 +1532,8 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
                                   Container(
                                     padding: const EdgeInsets.all(2),
                                     decoration: BoxDecoration(
-                                      color: Colors.black
-                                          .withValues(alpha: 0.6),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.6),
                                       borderRadius: const BorderRadius.only(
                                         bottomRight: Radius.circular(8),
                                         topLeft: Radius.circular(4),
@@ -1775,11 +1786,20 @@ class TenantReportsHubPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = TenantController.instance;
+    if (!controller.concernsLoadedOnce && !controller.concernsLoading) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => controller.loadConcerns());
+    }
 
     return PageFrame(
       title: 'Reports',
       subtitle: 'Maintenance and confidential concerns',
-      onRefresh: () => controller.loadMaintenance(force: true),
+      onRefresh: () async {
+        await Future.wait([
+          controller.loadMaintenance(force: true),
+          controller.loadConcerns(force: true),
+        ]);
+      },
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute(
@@ -2693,7 +2713,8 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
                         ),
                         const SizedBox(height: 8),
                         TextButton(
-                          onPressed: () => setState(() => _selectedFilter = 'All'),
+                          onPressed: () =>
+                              setState(() => _selectedFilter = 'All'),
                           child: const Text('Show all reports'),
                         ),
                       ],
@@ -2849,8 +2870,7 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
     super.initState();
     final report = widget.report;
     final room = TenantController.instance.room;
-    final defaultLocation =
-        room != null ? 'Room ${room.number}' : 'Room 204';
+    final defaultLocation = room != null ? 'Room ${room.number}' : 'Room 204';
 
     description = TextEditingController(text: report?.description ?? '');
     category = categories.contains(report?.category)
@@ -3004,7 +3024,8 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
                     location = pickedRoom;
                   });
                   Navigator.pop(sheetContext);
-                  showAppSnackBar(context, 'Selected $pickedRoom from floor plan.');
+                  showAppSnackBar(
+                      context, 'Selected $pickedRoom from floor plan.');
                 },
               ),
             ],
@@ -3017,7 +3038,8 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
   Future<void> _save() async {
     final cleanDescription = description.text.trim();
     if (cleanDescription.length < 5) {
-      showAppSnackBar(context, 'Please enter a description (at least 5 characters).');
+      showAppSnackBar(
+          context, 'Please enter a description (at least 5 characters).');
       return;
     }
 
@@ -3051,7 +3073,9 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
       if (!mounted) return;
       showAppSnackBar(
         context,
-        editing ? 'Maintenance report updated.' : 'Maintenance report submitted.',
+        editing
+            ? 'Maintenance report updated.'
+            : 'Maintenance report submitted.',
       );
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -3949,7 +3973,8 @@ class _TenantMessagesPageState extends State<TenantMessagesPage> {
             role: 'Owner & Caretaker',
             lastMessage: lastMsg,
             lastMessageText: previewText,
-            lastMessageTime: lastMsg?.sentAt ?? messaging.activeConversation?.lastMessageAt,
+            lastMessageTime:
+                lastMsg?.sentAt ?? messaging.activeConversation?.lastMessageAt,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => const TenantConversationPage(),
@@ -4041,7 +4066,8 @@ class _TenantConversationPageState extends State<TenantConversationPage> {
                                   ? Alignment.centerRight
                                   : Alignment.centerLeft,
                               child: Container(
-                                constraints: const BoxConstraints(maxWidth: 560),
+                                constraints:
+                                    const BoxConstraints(maxWidth: 560),
                                 margin: const EdgeInsets.symmetric(vertical: 6),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -4049,7 +4075,8 @@ class _TenantConversationPageState extends State<TenantConversationPage> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: isMe
-                                      ? const Color(0xFF627FA8).withValues(alpha: .10)
+                                      ? const Color(0xFF627FA8)
+                                          .withValues(alpha: .10)
                                       : Theme.of(context)
                                           .colorScheme
                                           .surfaceContainerHighest
@@ -4081,7 +4108,8 @@ class _TenantConversationPageState extends State<TenantConversationPage> {
                                     const SizedBox(height: 3),
                                     Text(
                                       timeText(item.sentAt),
-                                      style: Theme.of(context).textTheme.bodySmall,
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
                                     ),
                                   ],
                                 ),
@@ -4230,9 +4258,8 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
           final statusLabel = isInside
               ? 'Inside dormitory'
               : (isOutside ? 'Outside dormitory' : 'Location unavailable');
-          final statusPillText = isInside
-              ? 'IN'
-              : (isOutside ? 'OUT' : 'UNAVAILABLE');
+          final statusPillText =
+              isInside ? 'IN' : (isOutside ? 'OUT' : 'UNAVAILABLE');
           final statusColor = isInside
               ? const Color(0xFF56886B)
               : (isOutside ? const Color(0xFFC77800) : const Color(0xFFB03A2E));
@@ -4343,11 +4370,12 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                               ? null
                               : () async {
                                   try {
-                                    final result =
-                                        await controller.performGeofenceCheckIn();
+                                    final result = await controller
+                                        .performGeofenceCheckIn();
                                     if (context.mounted) {
                                       final msg = switch (result.status) {
-                                        'Verified' => result.errorMessage != null
+                                        'Verified' => result.errorMessage !=
+                                                null
                                             ? 'Presence confirmed (${result.direction == "IN" ? "Inside" : "Outside"}), but server sync warning: ${result.errorMessage}'
                                             : 'Presence confirmed: ${result.direction == "IN" ? "Inside perimeter" : "Outside perimeter"}',
                                         'Flagged' =>
@@ -4780,8 +4808,8 @@ class _CurfewRequestCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Guardian note: ${request.guardianNotes!}',
-                style: const TextStyle(
-                    fontSize: 12, fontStyle: FontStyle.italic),
+                style:
+                    const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
               ),
             ],
             if (request.staffNotes != null &&
@@ -4789,8 +4817,8 @@ class _CurfewRequestCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 'Staff note: ${request.staffNotes!}',
-                style: const TextStyle(
-                    fontSize: 12, fontStyle: FontStyle.italic),
+                style:
+                    const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
               ),
             ],
             if (request.canCancel) ...[
@@ -5025,7 +5053,8 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: InkWell(
-                    onTap: () => setState(() => _requestType = 'overnight_leave'),
+                    onTap: () =>
+                        setState(() => _requestType = 'overnight_leave'),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.all(12),
@@ -5105,9 +5134,7 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      isLate
-                          ? Icons.bolt_outlined
-                          : Icons.shield_outlined,
+                      isLate ? Icons.bolt_outlined : Icons.shield_outlined,
                       color: isLate
                           ? const Color(0xFF56886B)
                           : Theme.of(context).colorScheme.primary,
@@ -5419,6 +5446,13 @@ class ConfidentialConcernPage extends StatefulWidget {
 class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
   String category = 'Safety concern';
   final details = TextEditingController();
+  bool saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    TenantController.instance.loadConcerns();
+  }
 
   @override
   void dispose() {
@@ -5467,8 +5501,8 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                 ),
                 subtitle: const Text(
-                  'Only authorized owner/caretaker accounts should review '
-                  'these reports after backend role policies are applied.',
+                  'Your report is stored in a restricted record. In this '
+                  'phase, only you can view your submitted history.',
                   style: TextStyle(fontSize: 11),
                 ),
               ),
@@ -5491,8 +5525,9 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                     ),
                   )
                   .toList(),
-              onChanged: (value) =>
-                  setState(() => category = value ?? category),
+              onChanged: saving
+                  ? null
+                  : (value) => setState(() => category = value ?? category),
             ),
             const SizedBox(height: 14),
             LabeledField(
@@ -5505,26 +5540,43 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () {
-                  if (details.text.trim().isEmpty) {
-                    showAppSnackBar(
-                      context,
-                      'Enter the concern details before submitting.',
-                    );
-                    return;
-                  }
-
-                  TenantController.instance.submitConcern(
-                    category: category,
-                    summary: details.text.trim(),
-                  );
-                  showAppSnackBar(
-                    context,
-                    'Confidential report submitted.',
-                  );
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Submit confidential report'),
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final summary = details.text.trim();
+                        if (summary.length < 10) {
+                          showAppSnackBar(
+                            context,
+                            'Enter at least 10 characters describing the concern.',
+                          );
+                          return;
+                        }
+                        setState(() => saving = true);
+                        try {
+                          await TenantController.instance.submitConcern(
+                            category: category,
+                            summary: summary,
+                          );
+                          if (!context.mounted) return;
+                          showAppSnackBar(
+                              context, 'Confidential report submitted.');
+                          Navigator.of(context).pop();
+                        } catch (error) {
+                          if (!context.mounted) return;
+                          showAppSnackBar(
+                            context,
+                            'Unable to submit confidential report: $error',
+                          );
+                          setState(() => saving = false);
+                        }
+                      },
+                child: saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Submit confidential report'),
               ),
             ),
             if (TenantController.instance.concerns.isNotEmpty) ...[
