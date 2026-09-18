@@ -2620,16 +2620,17 @@ class _GuardianMessagesPageState extends State<GuardianMessagesPage> {
         builder: (context, _) {
           final lastMsg = messaging.activeMessages.isNotEmpty
               ? messaging.activeMessages.last
-              : (GuardianController.instance.messages.isNotEmpty
-                  ? GuardianController.instance.messages.last
-                  : null);
+              : null;
+          final previewText = lastMsg?.body ??
+              messaging.activeConversation?.lastMessagePreview ??
+              'Tap to chat with Dormitory Management';
 
           return ConversationListCard(
             name: 'Caretaker / Management',
             role: 'Owner & Caretaker',
             lastMessage: lastMsg,
-            lastMessageText: lastMsg?.body ?? 'Tap to chat with Dormitory Management',
-            lastMessageTime: lastMsg?.sentAt,
+            lastMessageText: previewText,
+            lastMessageTime: lastMsg?.sentAt ?? messaging.activeConversation?.lastMessageAt,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => const GuardianConversationPage(),
@@ -2686,9 +2687,7 @@ class _GuardianConversationPageState extends State<GuardianConversationPage> {
         child: AnimatedBuilder(
           animation: messaging,
           builder: (context, _) {
-            final messagesList = messaging.activeMessages.isNotEmpty
-                ? messaging.activeMessages
-                : GuardianController.instance.messages;
+            final messagesList = messaging.activeMessages;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,

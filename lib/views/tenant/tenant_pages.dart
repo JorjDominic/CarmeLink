@@ -3939,16 +3939,17 @@ class _TenantMessagesPageState extends State<TenantMessagesPage> {
         builder: (context, _) {
           final lastMsg = messaging.activeMessages.isNotEmpty
               ? messaging.activeMessages.last
-              : (TenantController.instance.messages.isNotEmpty
-                  ? TenantController.instance.messages.last
-                  : null);
+              : null;
+          final previewText = lastMsg?.body ??
+              messaging.activeConversation?.lastMessagePreview ??
+              'Tap to chat with Dormitory Management';
 
           return ConversationListCard(
             name: 'Caretaker / Management',
             role: 'Owner & Caretaker',
             lastMessage: lastMsg,
-            lastMessageText: lastMsg?.body ?? 'Tap to chat with Dormitory Management',
-            lastMessageTime: lastMsg?.sentAt,
+            lastMessageText: previewText,
+            lastMessageTime: lastMsg?.sentAt ?? messaging.activeConversation?.lastMessageAt,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => const TenantConversationPage(),
@@ -4004,9 +4005,7 @@ class _TenantConversationPageState extends State<TenantConversationPage> {
         child: AnimatedBuilder(
           animation: messaging,
           builder: (context, _) {
-            final messagesList = messaging.activeMessages.isNotEmpty
-                ? messaging.activeMessages
-                : TenantController.instance.messages;
+            final messagesList = messaging.activeMessages;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,

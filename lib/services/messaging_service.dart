@@ -24,13 +24,18 @@ class MessagingService {
     final client = SupabaseConfig.clientSafe;
     if (client == null) return null;
 
+    final effectiveTenantId = tenantId.isNotEmpty
+        ? tenantId
+        : (client.auth.currentUser?.id ?? '');
+    if (effectiveTenantId.isEmpty) return null;
+
     try {
       // 1. Try to find existing thread
       final existing = await client
           .from('conversations')
           .select(_conversationColumns)
           .eq('type', 'tenant_management')
-          .eq('tenant_id', tenantId)
+          .eq('tenant_id', effectiveTenantId)
           .maybeSingle();
 
       if (existing != null) {
@@ -42,7 +47,7 @@ class MessagingService {
           .from('conversations')
           .insert({
             'type': 'tenant_management',
-            'tenant_id': tenantId,
+            'tenant_id': effectiveTenantId,
             'last_message_preview': 'Conversation started.',
           })
           .select(_conversationColumns)
@@ -52,6 +57,47 @@ class MessagingService {
     } catch (e) {
       debugPrint('Error in getOrCreateTenantConversation: $e');
       return null;
+    }
+  }
+
+  /// Ensures initial conversation threads exist for active tenants and internal staff.
+  Future<void> ensureInitialConversations() async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null) return;
+
+    try {
+      // 1. Ensure staff room exists
+      await getOrCreateStaffConversation();
+
+      // 2. Query tenants from profiles and ensure each has an official thread
+      final tenantProfiles = await client
+          .from('profiles')
+          .select('id')
+          .eq('role', 'tenant')
+          .limit(20);
+
+      for (final t in tenantProfiles) {
+        final tid = t['id'] as String?;
+        if (tid != null && tid.isNotEmpty) {
+          await getOrCreateTenantConversation(tenantId: tid);
+        }
+      }
+
+      // 3. Query guardians from profiles and ensure each has an official thread
+      final guardianProfiles = await client
+          .from('profiles')
+          .select('id')
+          .eq('role', 'guardian')
+          .limit(20);
+
+      for (final g in guardianProfiles) {
+        final gid = g['id'] as String?;
+        if (gid != null && gid.isNotEmpty) {
+          await getOrCreateGuardianConversation(guardianId: gid);
+        }
+      }
+    } catch (e) {
+      debugPrint('ensureInitialConversations info: $e');
     }
   }
 
@@ -148,7 +194,13 @@ class MessagingService {
         query = query.eq('type', filterType);
       }
 
-      final rows = await query.order('last_message_at', ascending: false);
+      var rows = await query.order('last_message_at', ascending: false);
+
+      if ((rows as List).isEmpty &&
+          (currentRole == 'owner' || currentRole == 'caretaker')) {
+        await ensureInitialConversations();
+        rows = await query.order('last_message_at', ascending: false);
+      }
 
       return (rows as List<dynamic>)
           .map<ConversationRecord>((row) => ConversationRecord.fromRow(
@@ -202,11 +254,19 @@ class MessagingService {
       throw Exception('Database client unavailable');
     }
 
+    final effectiveSenderId = senderId.isNotEmpty
+        ? senderId
+        : (client.auth.currentUser?.id ?? '');
+
+    if (effectiveSenderId.isEmpty) {
+      throw Exception('Authenticated user ID required to send message');
+    }
+
     final inserted = await client
         .from('messages')
         .insert({
           'conversation_id': conversationId,
-          'sender_id': senderId,
+          'sender_id': effectiveSenderId,
           'sender_role': senderRole,
           'body': trimmed,
           'is_read': false,

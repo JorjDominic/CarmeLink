@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/config/supabase_config.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/messaging_service.dart';
@@ -95,12 +96,23 @@ class MessagingController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final conv = await _service.getOrCreateTenantConversation(tenantId: tenantId);
+      final effectiveUid = tenantId.isNotEmpty
+          ? tenantId
+          : (SupabaseConfig.clientSafe?.auth.currentUser?.id ??
+              SessionController.instance.currentUser?.id ??
+              '');
+
+      if (effectiveUid.isEmpty) {
+        _useMockTenantMessages();
+        return;
+      }
+
+      final conv =
+          await _service.getOrCreateTenantConversation(tenantId: effectiveUid);
       if (conv != null) {
         _activeConversation = conv;
         await _fetchMessagesForActiveConversation();
       } else {
-        // Fallback to mock data if database table not yet provisioned
         _useMockTenantMessages();
       }
     } catch (e) {
@@ -122,8 +134,19 @@ class MessagingController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final effectiveGid = guardianId.isNotEmpty
+          ? guardianId
+          : (SupabaseConfig.clientSafe?.auth.currentUser?.id ??
+              SessionController.instance.currentUser?.id ??
+              '');
+
+      if (effectiveGid.isEmpty) {
+        _useMockGuardianMessages();
+        return;
+      }
+
       final conv = await _service.getOrCreateGuardianConversation(
-        guardianId: guardianId,
+        guardianId: effectiveGid,
         tenantId: tenantId,
       );
       if (conv != null) {
@@ -176,8 +199,11 @@ class MessagingController extends ChangeNotifier {
       if (list.isNotEmpty) {
         _conversations = list;
         _conversationsLoadedOnce = true;
+      } else if (SupabaseConfig.clientSafe != null &&
+          SupabaseConfig.clientSafe!.auth.currentUser != null) {
+        _conversations = list;
+        _conversationsLoadedOnce = true;
       } else {
-        // Use initial mock conversations if database is empty/fresh
         _useMockConversations();
       }
 
@@ -185,7 +211,9 @@ class MessagingController extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error loading conversations: $e');
       _conversationsError = 'Unable to fetch conversations';
-      _useMockConversations();
+      if (_conversations.isEmpty) {
+        _useMockConversations();
+      }
     } finally {
       _loadingConversations = false;
       notifyListeners();
@@ -200,8 +228,12 @@ class MessagingController extends ChangeNotifier {
     _sendingMessage = true;
     notifyListeners();
 
+    final client = SupabaseConfig.clientSafe;
+    final authUid = client?.auth.currentUser?.id;
     final user = SessionController.instance.currentUser;
-    final senderId = user?.id ?? 'current-user';
+    final senderId = (authUid != null && authUid.isNotEmpty)
+        ? authUid
+        : (user?.id ?? '');
     final senderName = user?.name ?? 'Me';
     final senderRole = user?.role.name ?? 'tenant';
     final conv = _activeConversation;
@@ -210,6 +242,20 @@ class MessagingController extends ChangeNotifier {
       _sendingMessage = false;
       notifyListeners();
       return false;
+    }
+
+    // Offline / Mock conversation fallback
+    if (conv.id.startsWith('mock-') || conv.id.startsWith('oc')) {
+      _appendLocalMessage(
+        text,
+        senderId.isNotEmpty ? senderId : 'mock-user',
+        senderName,
+        senderRole,
+        conv.id,
+      );
+      _sendingMessage = false;
+      notifyListeners();
+      return true;
     }
 
     try {
@@ -225,20 +271,16 @@ class MessagingController extends ChangeNotifier {
         if (!_activeMessages.any((m) => m.id == newMsg.id)) {
           _activeMessages.add(newMsg);
         }
-      } else {
-        // Local append fallback
-        _appendLocalMessage(text, senderId, senderName, senderRole, conv.id);
       }
-
       _sendingMessage = false;
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('Send message database error, fallback to local: $e');
-      _appendLocalMessage(text, senderId, senderName, senderRole, conv.id);
+      debugPrint('Send message database error: $e');
+      _messagesError = 'Failed to send message: $e';
       _sendingMessage = false;
       notifyListeners();
-      return true;
+      return false;
     }
   }
 
@@ -272,24 +314,25 @@ class MessagingController extends ChangeNotifier {
     final conv = _activeConversation;
     if (conv == null) return;
 
-    // 1. Fetch remote messages
-    final messages = await _service.fetchMessages(conv.id);
-    if (messages.isNotEmpty) {
-      _activeMessages = messages;
-    } else {
-      // If none yet, check if mock has relevant items
-      if (conv.isTenantManagement && MockData.tenantMessages.isNotEmpty) {
+    if (conv.id.startsWith('mock-')) {
+      if (conv.isTenantManagement) {
         _activeMessages = List.from(MockData.tenantMessages);
-      } else if (conv.isGuardianManagement && MockData.guardianMessages.isNotEmpty) {
+      } else if (conv.isGuardianManagement) {
         _activeMessages = List.from(MockData.guardianMessages);
       } else {
         _activeMessages = [];
       }
+      return;
     }
 
+    // 1. Fetch remote messages
+    final messages = await _service.fetchMessages(conv.id);
+    _activeMessages = messages;
+
     // 2. Mark unread as read
-    final currentUid = SessionController.instance.currentUser?.id;
-    if (currentUid != null) {
+    final currentUid = SupabaseConfig.clientSafe?.auth.currentUser?.id ??
+        SessionController.instance.currentUser?.id;
+    if (currentUid != null && currentUid.isNotEmpty) {
       _service.markConversationAsRead(
         conversationId: conv.id,
         currentUserId: currentUid,
