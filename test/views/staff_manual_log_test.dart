@@ -96,7 +96,8 @@ void main() {
       expect(find.text('Inside'), findsWidgets);
       expect(find.text('Outside'), findsWidgets);
       expect(find.text('Unavailable'), findsWidgets);
-      expect(find.text('50m Radius'), findsOneWidget);
+      // Polygon model replaced '50m Radius' with 'Polygon Lot'
+      expect(find.text('Polygon Lot'), findsOneWidget);
 
       // Verify filter chips
       expect(find.text('All (3)'), findsOneWidget);
@@ -161,8 +162,9 @@ void main() {
       await tester.tap(quickLogButtons.first);
       await tester.pumpAndSettle();
 
-      // Verify dialog is visible with title
-      expect(find.text('Staff Manual Log'), findsOneWidget);
+      // Verify dialog is visible with title (findsWidgets because popup menu
+      // item 'Staff Manual Log' may also be in the widget tree simultaneously)
+      expect(find.text('Staff Manual Log'), findsWidgets);
       expect(find.text('Observation Notes *'), findsOneWidget);
       expect(find.text('Submit Log'), findsOneWidget);
     });
@@ -183,13 +185,15 @@ void main() {
       await tester.pumpWidget(buildTestable(const GeofenceMonitoringPage()));
       await tester.pumpAndSettle();
 
-      // Tap 'Staff Log' action button to open dialog
-      final staffLogBtn = find.text('Staff Log');
-      expect(staffLogBtn, findsOneWidget);
-      await tester.tap(staffLogBtn);
+      // Open the Staff Manual Log dialog via the per-row tooltip icon.
+      // (The popup-menu path opens the same dialog but is unreliable in
+      // headless widget tests due to overlay hit-testing constraints.)
+      final quickLogButtons = find.byTooltip('Log observed entry/exit');
+      expect(quickLogButtons, findsWidgets);
+      await tester.tap(quickLogButtons.first);
       await tester.pumpAndSettle();
 
-      expect(find.text('Staff Manual Log'), findsOneWidget);
+      expect(find.text('Staff Manual Log'), findsWidgets);
 
       // Try submitting without filling observation notes
       final submitButton = find.text('Submit Log');

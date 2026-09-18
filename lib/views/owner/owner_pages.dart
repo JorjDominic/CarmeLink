@@ -17,6 +17,7 @@ import 'floor_plan_page.dart';
 import 'guardian_link_management_page.dart';
 import 'staff_maintenance_page.dart';
 import 'room_monitoring_page.dart';
+import 'geofence_dev_dashboard_page.dart';
 
 void _ownerPush(BuildContext context, Widget page) {
   Navigator.of(context).push(
@@ -3446,14 +3447,40 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                   controller.loadTenants(force: true);
                 },
         ),
-        FilledButton.icon(
-          onPressed: () => _openManualLogDialog(),
-          icon: const Icon(Icons.edit_note_rounded, size: 18),
-          label: const Text('Staff Log'),
-          style: FilledButton.styleFrom(
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-          ),
+        PopupMenuButton<String>(
+          tooltip: 'Perimeter & logging options',
+          icon: const Icon(Icons.more_vert_rounded),
+          onSelected: (value) {
+            if (value == 'dev_dashboard') {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const GeofenceDevDashboardPage(),
+                ),
+              );
+            } else if (value == 'staff_log') {
+              _openManualLogDialog();
+            }
+          },
+          itemBuilder: (_) => [
+            const PopupMenuItem(
+              value: 'dev_dashboard',
+              child: ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.map_outlined),
+                title: Text('Perimeter Visualizer'),
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'staff_log',
+              child: ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.edit_note_rounded),
+                title: Text('Staff Manual Log'),
+              ),
+            ),
+          ],
         ),
       ],
       child: AnimatedBuilder(
@@ -3498,11 +3525,69 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                   ),
                   const MetricCard(
                     label: 'Dormitory perimeter',
-                    value: '50m Radius',
-                    detail: 'Brgy. Concepcion, Baliwag',
-                    icon: Icons.location_searching_outlined,
+                    value: 'Polygon Lot',
+                    detail: '4 Measured Corners (Baliwag)',
+                    icon: Icons.polyline_outlined,
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 420;
+                  if (isCompact) {
+                    return Column(
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const GeofenceDevDashboardPage(),
+                              ),
+                            ),
+                            icon: const Icon(Icons.map_outlined, size: 18),
+                            label: const Text('View Perimeter Map & Overlay'),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: () => _openManualLogDialog(),
+                            icon: const Icon(Icons.edit_note_rounded, size: 18),
+                            label: const Text('Staff Manual Log'),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const GeofenceDevDashboardPage(),
+                            ),
+                          ),
+                          icon: const Icon(Icons.map_outlined, size: 18),
+                          label: const Text('View Perimeter Map & Overlay'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () => _openManualLogDialog(),
+                          icon: const Icon(Icons.edit_note_rounded, size: 18),
+                          label: const Text('Staff Manual Log'),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 22),
               const SectionTitle(

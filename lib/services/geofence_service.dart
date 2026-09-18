@@ -1,7 +1,43 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:geolocator/geolocator.dart';
 
 export 'package:geolocator/geolocator.dart' show LocationPermission;
+
+/// Immutable geographic coordinate representing a point on the earth's surface.
+class LatLngPoint {
+  const LatLngPoint(this.latitude, this.longitude);
+
+  final double latitude;
+  final double longitude;
+
+  double get lat => latitude;
+  double get lng => longitude;
+
+  Map<String, double> toJson() => {
+        'lat': latitude,
+        'lng': longitude,
+      };
+
+  factory LatLngPoint.fromJson(Map<String, dynamic> json) => LatLngPoint(
+        (json['lat'] as num).toDouble(),
+        (json['lng'] as num).toDouble(),
+      );
+
+  @override
+  String toString() => 'LatLngPoint($latitude, $longitude)';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LatLngPoint &&
+          runtimeType == other.runtimeType &&
+          latitude == other.latitude &&
+          longitude == other.longitude;
+
+  @override
+  int get hashCode => Object.hash(latitude, longitude);
+}
 
 enum GeofenceFailureReason {
   none,
@@ -61,6 +97,48 @@ class GeofenceLocationService {
   static const double outerBoundaryMeters =
       geofenceRadiusMeters + debounceBufferMeters; // 53.0m
 
+  /// Production 4-point polygon boundary captured from on-site measurements
+  /// at Carmelita Dormitory (Brgy. Concepcion, Baliwag, Bulacan).
+  static const List<LatLngPoint> productionDormitoryPolygon = [
+    LatLngPoint(14.949435124962447, 120.88489213696135), // Point 1 (East / NE)
+    LatLngPoint(14.949251893796628, 120.88482211758398), // Point 2 (South / SE)
+    LatLngPoint(14.949350151678374, 120.88452020740704), // Point 3 (West / SW)
+    LatLngPoint(14.949547385390431, 120.88454200910613), // Point 4 (North / NW)
+  ];
+
+  /// Boundary evaluation mode: true for polygon (default), false for circular fallback.
+  static bool usePolygonBoundary = true;
+
+  // In-memory test override fields (strictly volatile, never written to DB or storage)
+  static List<LatLngPoint>? _testPolygonOverride;
+  static double? _testRadiusOverride;
+  static bool _useTestOverride = false;
+
+  static bool get hasActiveTestOverride => _useTestOverride;
+  static List<LatLngPoint>? get testPolygonOverride => _testPolygonOverride;
+  static double? get testRadiusOverride => _testRadiusOverride;
+
+  static void setTestPolygonOverride(List<LatLngPoint> points) {
+    _testPolygonOverride = List.unmodifiable(points);
+    _useTestOverride = true;
+  }
+
+  static void setTestRadiusOverride(double radiusMeters) {
+    _testRadiusOverride = radiusMeters;
+    _useTestOverride = true;
+  }
+
+  static void resetTestOverride() {
+    _testPolygonOverride = null;
+    _testRadiusOverride = null;
+    _useTestOverride = false;
+  }
+
+  static List<LatLngPoint> get activePolygon =>
+      (_useTestOverride && _testPolygonOverride != null)
+          ? _testPolygonOverride!
+          : productionDormitoryPolygon;
+
   // Mock hooks for headless unit and widget testing
   static Position? mockPosition;
   static bool? mockLocationServiceEnabled;
@@ -72,36 +150,152 @@ class GeofenceLocationService {
     mockLocationServiceEnabled = null;
     mockPermission = null;
     mockShouldTimeout = false;
+    usePolygonBoundary = true;
+    resetTestOverride();
   }
 
-  /// Evaluates whether a coordinate is within the 50m dormitory boundary
-  /// using hysteresis/debounce logic.
+  /// Point-in-polygon ray casting algorithm (even-odd rule).
   ///
-  /// Evaluates distance entirely in function scope and discards the raw
-  /// distance immediately upon return to uphold data minimization.
+  /// Casts a horizontal ray along positive longitude from ([lat], [lng]) and counts
+  /// intersections with polygon segments. An odd count means the point is inside.
+  static bool isPointInPolygon(
+    double lat,
+    double lng,
+    List<LatLngPoint> polygon,
+  ) {
+    if (polygon.length < 3) return false;
+    bool inside = false;
+    int j = polygon.length - 1;
+    for (int i = 0; i < polygon.length; i++) {
+      final pi = polygon[i];
+      final pj = polygon[j];
+      final yi = pi.latitude;
+      final xi = pi.longitude;
+      final yj = pj.latitude;
+      final xj = pj.longitude;
+
+      if (((yi > lat) != (yj > lat)) &&
+          (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+      j = i;
+    }
+    return inside;
+  }
+
+  /// Calculates the shortest distance in meters from ([lat], [lng]) to the perimeter
+  /// of the specified [polygon].
+  static double distanceToPolygonEdgeMeters(
+    double lat,
+    double lng,
+    List<LatLngPoint> polygon,
+  ) {
+    if (polygon.isEmpty) return double.infinity;
+    if (polygon.length == 1) {
+      return Geolocator.distanceBetween(
+        lat,
+        lng,
+        polygon.first.latitude,
+        polygon.first.longitude,
+      );
+    }
+
+    double minDistance = double.infinity;
+    final latRad = lat * math.pi / 180.0;
+    final cosLat = math.cos(latRad);
+
+    for (int i = 0; i < polygon.length; i++) {
+      final a = polygon[i];
+      final b = polygon[(i + 1) % polygon.length];
+
+      // Convert lat/lng to approximate locally scaled coordinates relative to 'a'
+      final dx = (b.longitude - a.longitude) * cosLat;
+      final dy = b.latitude - a.latitude;
+      final px = (lng - a.longitude) * cosLat;
+      final py = lat - a.latitude;
+
+      final lenSq = dx * dx + dy * dy;
+      final double t =
+          lenSq == 0 ? 0.0 : ((px * dx + py * dy) / lenSq).clamp(0.0, 1.0);
+
+      final closestLat = a.latitude + t * (b.latitude - a.latitude);
+      final closestLng = a.longitude + t * (b.longitude - a.longitude);
+
+      final dist = Geolocator.distanceBetween(lat, lng, closestLat, closestLng);
+      if (dist < minDistance) {
+        minDistance = dist;
+      }
+    }
+
+    return minDistance;
+  }
+
+  /// Isolated boundary check supporting both polygon and circular models,
+  /// with edge buffer hysteresis to eliminate boundary flapping.
+  ///
+  /// Clean signature:
+  /// `bool isWithinDormBoundary(double lat, double lng)`
+  /// Optional parameters allow supplying [previousDirection], a [customPolygon],
+  /// or a custom [edgeBufferMeters] (defaults to [debounceBufferMeters] = 3.0m).
+  static bool isWithinDormBoundary(
+    double lat,
+    double lng, {
+    String? previousDirection,
+    List<LatLngPoint>? customPolygon,
+    double edgeBufferMeters = debounceBufferMeters,
+  }) {
+    if (usePolygonBoundary) {
+      final poly = customPolygon ?? activePolygon;
+      final inside = isPointInPolygon(lat, lng, poly);
+      final distToEdge = distanceToPolygonEdgeMeters(lat, lng, poly);
+
+      if (edgeBufferMeters > 0 && distToEdge <= edgeBufferMeters) {
+        if (previousDirection == 'IN') {
+          return true;
+        } else if (previousDirection == 'OUT') {
+          return false;
+        }
+      }
+      return inside;
+    } else {
+      // Legacy circular boundary check with hysteresis
+      final radius = (_useTestOverride && _testRadiusOverride != null)
+          ? _testRadiusOverride!
+          : geofenceRadiusMeters;
+      final distance = Geolocator.distanceBetween(
+        lat,
+        lng,
+        carmelitaLatitude,
+        carmelitaLongitude,
+      );
+
+      if (previousDirection == 'IN') {
+        return distance <= (radius + edgeBufferMeters);
+      } else if (previousDirection == 'OUT') {
+        return distance <= (radius - edgeBufferMeters);
+      } else {
+        return distance <= radius;
+      }
+    }
+  }
+
+  /// Evaluates whether a coordinate is within the dormitory boundary.
+  ///
+  /// Evaluates presence entirely in function scope and discards the raw
+  /// coordinates immediately upon return to uphold zero-coordinate persistence.
   static GeofenceCheckResult evaluateCoordinates({
     required double latitude,
     required double longitude,
     String? previousDirection,
   }) {
-    final distance = Geolocator.distanceBetween(
+    final isInside = isWithinDormBoundary(
       latitude,
       longitude,
-      carmelitaLatitude,
-      carmelitaLongitude,
+      previousDirection: previousDirection,
     );
 
-    String resolvedDirection;
-    if (previousDirection == 'IN') {
-      resolvedDirection = distance > outerBoundaryMeters ? 'OUT' : 'IN';
-    } else if (previousDirection == 'OUT') {
-      resolvedDirection = distance <= innerBoundaryMeters ? 'IN' : 'OUT';
-    } else {
-      resolvedDirection = distance <= geofenceRadiusMeters ? 'IN' : 'OUT';
-    }
-
     return GeofenceCheckResult(
-      direction: resolvedDirection,
+      direction: isInside ? 'IN' : 'OUT',
       status: 'Verified',
     );
   }

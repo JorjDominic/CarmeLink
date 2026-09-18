@@ -82,6 +82,7 @@ void main() {
     });
 
     test('respects hysteresis buffer to prevent boundary jitter', () {
+      GeofenceService.usePolygonBoundary = false;
       // 1 degree latitude ~ 111,000 meters.
       // 50m ~ 0.0004505 degrees latitude.
       // 51m ~ 0.0004595 degrees latitude (inside 47m-53m buffer).

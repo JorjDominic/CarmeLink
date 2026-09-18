@@ -10,6 +10,7 @@ import '../../services/auth_service.dart';
 import '../../services/geofence_service.dart';
 import '../../services/guardian_alert_service.dart';
 import '../../services/profile_service.dart';
+import '../owner/geofence_dev_dashboard_page.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
@@ -748,6 +749,31 @@ class SettingsPage extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 22),
+            const SectionTitle(
+              'Perimeter & Geofence',
+              subtitle: 'Diagnostic boundary visualization',
+            ),
+            const SizedBox(height: 10),
+            CarmelitaCard(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.map_outlined),
+                title: const Text(
+                  'Geofence Dev Dashboard',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: const Text(
+                  'Polygon boundary visualizer, point evaluator, and in-memory test overrides.',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const GeofenceDevDashboardPage(),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 18),
