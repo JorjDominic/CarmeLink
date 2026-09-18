@@ -5,12 +5,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/supabase_config.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
+import 'secure_media_service.dart';
 
 class PaymentService {
   const PaymentService();
 
   static const String _receiptBucket = 'payment-proofs';
   static const int _maximumPhotoBytes = 5 * 1024 * 1024; // 5 MB
+  static const SecureMediaService _media = SecureMediaService();
 
   SupabaseClient get _client => SupabaseConfig.client;
 
@@ -99,7 +101,6 @@ class PaymentService {
     String? uploadedPath;
     if (receiptBytes != null && receiptBytes.isNotEmpty) {
       uploadedPath = await _uploadReceipt(
-        tenantId: tenantId,
         paymentId: paymentId,
         bytes: receiptBytes,
         fileName: fileName,
@@ -327,6 +328,10 @@ class PaymentService {
       return receiptPath;
     }
 
+    if (SecureMediaService.isCloudinaryReference(receiptPath)) {
+      return _media.createAuthorizedUrl(receiptPath);
+    }
+
     try {
       final client = SupabaseConfig.clientSafe;
       if (client == null) return null;
@@ -340,7 +345,6 @@ class PaymentService {
   }
 
   Future<String> _uploadReceipt({
-    required String tenantId,
     required String paymentId,
     required Uint8List bytes,
     String? fileName,
@@ -355,24 +359,20 @@ class PaymentService {
     }
 
     final normalizedMime = _normalizedMimeType(mimeType, fileName);
-    final extension = _extensionFor(normalizedMime);
-    final path =
-        '$tenantId/$paymentId/${DateTime.now().microsecondsSinceEpoch}.$extension';
-
-    await _client.storage.from(_receiptBucket).uploadBinary(
-          path,
-          bytes,
-          fileOptions: FileOptions(
-            contentType: normalizedMime,
-            upsert: false,
-          ),
-        );
-
-    return path;
+    return _media.uploadImage(
+      kind: 'payment',
+      recordId: paymentId,
+      bytes: bytes,
+      mimeType: normalizedMime,
+    );
   }
 
   Future<void> _safeRemoveReceipt(String path) async {
     try {
+      if (SecureMediaService.isCloudinaryReference(path)) {
+        await _media.deleteImage(path);
+        return;
+      }
       await _client.storage.from(_receiptBucket).remove([path]);
     } catch (_) {
       // Non-critical storage cleanup failure
@@ -394,10 +394,4 @@ class PaymentService {
 
     throw Exception('Please upload a JPG, PNG, or WEBP receipt image.');
   }
-
-  String _extensionFor(String mimeType) => switch (mimeType) {
-        'image/png' => 'png',
-        'image/webp' => 'webp',
-        _ => 'jpg',
-      };
 }

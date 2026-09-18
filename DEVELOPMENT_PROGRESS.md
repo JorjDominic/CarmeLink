@@ -28,6 +28,12 @@ geofencing or advanced analytics.
 
 ## Completed Milestones History
 
+> **Sep 19, 2026 — Secure Cloudinary Media Integration:** Maintenance evidence
+> and payment receipts now use server-side authenticated Cloudinary uploads.
+> Secrets remain in Supabase Edge Functions, database RLS authorizes each view,
+> links expire after five minutes, uploads are optimized, and legacy Supabase
+> Storage paths remain readable.
+
 | Date | Module / Feature | Roles Covered | Summary & Verification |
 |---|---|---|---|
 | Sep 13, 2026 | **Auth & Role Routing** | All | Supabase session restore, `RoleGuard`, server-role routing, profile and password management. |
@@ -144,12 +150,21 @@ page exists but its important backend workflow is unfinished.
 
 ### Media Pipeline & Upgrades
 
-- [ ] **Cloudinary Media Storage & CDN Integration** *(Planned Upgrade)*:
-  - Migrate binary photo storage (maintenance evidence, payment proof receipts, user avatars) from direct Supabase storage buckets to **Cloudinary**.
-  - **Dynamic optimization**: Automatic format delivery (`f_auto` to WebP/AVIF) and network-aware compression (`q_auto`).
-  - **Dynamic transformations**: Responsive thumbnail cropping for cards and lists (`c_thumb,w_150,h_150`) alongside high-resolution deliveries for full-screen inspection.
-  - **Egress & bandwidth savings**: Offloads binary file uploads directly from mobile devices, preserving database bandwidth and accelerating load times.
-  - **Backward-compatible schema**: Store Cloudinary public IDs or secure URLs in `maintenance_reports.photo_path` without requiring breaking schema redesigns.
+**Implemented Sep 19, 2026:** Secure Cloudinary media storage is connected for
+maintenance evidence and payment receipts. Assets use Cloudinary's
+`authenticated` delivery type. Upload, URL, and delete operations run through
+JWT-protected Supabase Edge Functions; existing database RLS authorizes every
+view before a five-minute private-download URL is returned. JPG, PNG, and WEBP
+uploads retain the 5 MB limit and receive incoming optimization plus eager
+1200px and 320px derivatives. Legacy Supabase Storage paths remain supported.
+User avatars are not yet part of the current upload workflow.
+
+- [✓] **Cloudinary Media Storage & CDN Integration** *(implemented for maintenance evidence and payment receipts)*:
+  - **Authenticated storage**: Maintenance evidence and payment receipts are private Cloudinary assets; avatars are not yet part of the upload workflow.
+  - **Optimization**: Incoming images are limited to 2400px with automatic quality selection; 1200px and 320px eager derivatives are prepared.
+  - **Protected delivery**: RLS-authorized Edge Functions return expiring private-download URLs instead of public asset URLs.
+  - **Egress savings**: New binary uploads no longer consume Supabase Storage capacity or object-delivery bandwidth.
+  - **Backward compatibility**: Existing private Supabase Storage paths remain readable while new rows store opaque Cloudinary references.
 
 ## Development handoff
 

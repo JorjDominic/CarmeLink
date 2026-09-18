@@ -4,12 +4,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
+import 'secure_media_service.dart';
 
 class MaintenanceService {
   const MaintenanceService();
 
   static const String _photoBucket = 'maintenance-photos';
   static const int _maximumPhotoBytes = 5 * 1024 * 1024;
+  static const SecureMediaService _media = SecureMediaService();
 
   SupabaseClient get _client => SupabaseConfig.client;
 
@@ -77,7 +79,6 @@ class MaintenanceService {
 
     try {
       uploadedPath = await _uploadPhoto(
-        tenantId: tenantId,
         reportId: report.id,
         bytes: photoBytes,
         fileName: photoFileName,
@@ -143,7 +144,6 @@ class MaintenanceService {
 
     if (photoBytes != null) {
       uploadedPath = await _uploadPhoto(
-        tenantId: tenantId,
         reportId: id,
         bytes: photoBytes,
         fileName: photoFileName,
@@ -224,6 +224,10 @@ class MaintenanceService {
       return null;
     }
 
+    if (SecureMediaService.isCloudinaryReference(photoPath)) {
+      return _media.createAuthorizedUrl(photoPath);
+    }
+
     return _client.storage.from(_photoBucket).createSignedUrl(
           photoPath,
           3600,
@@ -231,7 +235,6 @@ class MaintenanceService {
   }
 
   Future<String> _uploadPhoto({
-    required String tenantId,
     required String reportId,
     required Uint8List bytes,
     String? fileName,
@@ -254,21 +257,12 @@ class MaintenanceService {
       fileName,
     );
 
-    final extension = _extensionFor(normalizedMimeType);
-
-    final path = '$tenantId/$reportId/'
-        '${DateTime.now().microsecondsSinceEpoch}.$extension';
-
-    await _client.storage.from(_photoBucket).uploadBinary(
-          path,
-          bytes,
-          fileOptions: FileOptions(
-            contentType: normalizedMimeType,
-            upsert: false,
-          ),
-        );
-
-    return path;
+    return _media.uploadImage(
+      kind: 'maintenance',
+      recordId: reportId,
+      bytes: bytes,
+      mimeType: normalizedMimeType,
+    );
   }
 
   String _normalizedMimeType(
@@ -300,19 +294,14 @@ class MaintenanceService {
     );
   }
 
-  String _extensionFor(
-    String mimeType,
-  ) =>
-      switch (mimeType) {
-        'image/png' => 'png',
-        'image/webp' => 'webp',
-        _ => 'jpg',
-      };
-
   Future<void> _safeRemovePhoto(
     String path,
   ) async {
     try {
+      if (SecureMediaService.isCloudinaryReference(path)) {
+        await _media.deleteImage(path);
+        return;
+      }
       await _client.storage.from(_photoBucket).remove([path]);
     } catch (_) {
       // Missing cleanup objects must not break
