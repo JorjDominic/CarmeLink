@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
-import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
@@ -104,8 +103,12 @@ class MutedDashboardGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       LayoutBuilder(builder: (context, constraints) {
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        final scaledText = textScale > 1.15;
         final columns = denseFourColumn
-            ? items.length.clamp(1, 4)
+            ? constraints.maxWidth < 400
+                ? items.length.clamp(1, 2)
+                : items.length.clamp(1, 4)
             : constraints.maxWidth < 600
                 ? (constraints.maxWidth < 320 ? 1 : 2)
                 : items.length.clamp(2, 4);
@@ -118,12 +121,14 @@ class MutedDashboardGrid extends StatelessWidget {
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
             childAspectRatio: compact
-                ? (constraints.maxWidth < 500 ? 1.45 : 1.7)
+                ? (constraints.maxWidth < 500
+                    ? (scaledText ? 1.18 : 1.45)
+                    : (scaledText ? 1.4 : 1.7))
                 : denseFourColumn && constraints.maxWidth < 500
-                    ? .65
+                    ? (scaledText ? .54 : .65)
                     : constraints.maxWidth < 500
-                        ? 1.05
-                        : 1.15,
+                        ? (scaledText ? .86 : 1.05)
+                        : (scaledText ? .96 : 1.15),
           ),
           itemBuilder: (context, index) {
             final item = items[index];
@@ -204,6 +209,7 @@ class MutedActionGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       LayoutBuilder(builder: (context, constraints) {
+        final scaledText = MediaQuery.textScalerOf(context).scale(1) > 1.15;
         final columns = constraints.maxWidth >= 900 ? 3 : 2;
         return GridView.builder(
           shrinkWrap: true,
@@ -213,7 +219,9 @@ class MutedActionGrid extends StatelessWidget {
               crossAxisCount: columns,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
-              childAspectRatio: constraints.maxWidth < 520 ? 2.15 : 2.8),
+              childAspectRatio: constraints.maxWidth < 520
+                  ? (scaledText ? 1.8 : 2.15)
+                  : (scaledText ? 2.35 : 2.8)),
           itemBuilder: (context, index) {
             final item = items[index];
             return CarmelitaCard(
@@ -518,17 +526,20 @@ class _PageEntranceState extends State<_PageEntrance>
 class _GlobalNotificationsPage extends StatelessWidget {
   const _GlobalNotificationsPage();
 
-  int _urgency(String type) =>
-      (type == 'Gate' || type == 'Geofence' || type == 'Presence')
-          ? 3
-          : type == 'Payment'
-              ? 2
-              : 1;
-
   @override
   Widget build(BuildContext context) {
-    final ranked = [...MockData.notifications]
-      ..sort((a, b) => _urgency(b.type).compareTo(_urgency(a.type)));
+    final ranked = <AppNotification>[];
+    if (ranked.isEmpty) {
+      return const PageFrame(
+        title: 'Notifications',
+        subtitle: 'Persistent notifications are not connected yet',
+        child: EmptyState(
+          icon: Icons.notifications_none_rounded,
+          title: 'No notification service',
+          message: 'Updates remain available in their source modules.',
+        ),
+      );
+    }
     return PageFrame(
       title: 'Notifications',
       subtitle: 'Updates ranked by urgency',
@@ -1417,7 +1428,8 @@ class InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 370;
+    final compact = MediaQuery.sizeOf(context).width < 370 ||
+        MediaQuery.textScalerOf(context).scale(1) > 1.15;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: compact
@@ -1434,11 +1446,13 @@ class InfoRow extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                     ],
-                    Text(
-                      label,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
                     ),
                   ],
                 ),

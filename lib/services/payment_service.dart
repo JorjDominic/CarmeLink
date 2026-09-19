@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
-import '../data/mock_data.dart';
 import '../models/models.dart';
 import 'secure_media_service.dart';
 
@@ -43,48 +42,28 @@ class PaymentService {
 
   /// Fetches all payment records for the currently authenticated tenant.
   Future<List<Payment>> listOwnPayments() async {
-    final tenantId = currentUserId;
-    if (tenantId == null) {
-      // Return mock data for demo / offline sessions
-      return List.unmodifiable(MockData.payments);
-    }
-
-    try {
-      final rows = await _client
-          .from('payments')
-          .select(_columns)
-          .eq('tenant_id', tenantId)
-          .order('due_date', ascending: false);
-
-      if (rows.isEmpty) {
-        return List.unmodifiable(MockData.payments);
-      }
-
-      return rows
-          .map<Payment>((row) => Payment.fromJson(row))
-          .toList(growable: false);
-    } catch (_) {
-      // Fallback to mock data on connection failure
-      return List.unmodifiable(MockData.payments);
-    }
+    final tenantId = _requireAuthId();
+    final rows = await _client
+        .from('payments')
+        .select(_columns)
+        .eq('tenant_id', tenantId)
+        .order('due_date', ascending: false);
+    return rows
+        .map<Payment>((row) => Payment.fromJson(row))
+        .toList(growable: false);
   }
 
   /// Fetches all payment records for a specific tenant ID.
   /// Allowed for guardians (if linked to the tenant) or staff members by RLS.
   Future<List<Payment>> listPaymentsForTenant(String tenantId) async {
-    try {
-      final rows = await _client
-          .from('payments')
-          .select(_columns)
-          .eq('tenant_id', tenantId)
-          .order('due_date', ascending: false);
-
-      return rows
-          .map<Payment>((row) => Payment.fromJson(row))
-          .toList(growable: false);
-    } catch (_) {
-      return const [];
-    }
+    final rows = await _client
+        .from('payments')
+        .select(_columns)
+        .eq('tenant_id', tenantId)
+        .order('due_date', ascending: false);
+    return rows
+        .map<Payment>((row) => Payment.fromJson(row))
+        .toList(growable: false);
   }
 
   /// Submits proof of payment (GCash/bank reference + optional receipt photo).
@@ -138,23 +117,14 @@ class PaymentService {
 
   /// Fetches payment records for a linked tenant (ward).
   Future<List<Payment>> listGuardianTenantPayments(String tenantId) async {
-    try {
-      final rows = await _client
-          .from('payments')
-          .select(_columns)
-          .eq('tenant_id', tenantId)
-          .order('due_date', ascending: false);
-
-      if (rows.isEmpty) {
-        return List.unmodifiable(MockData.payments);
-      }
-
-      return rows
-          .map<Payment>((row) => Payment.fromJson(row))
-          .toList(growable: false);
-    } catch (_) {
-      return List.unmodifiable(MockData.payments);
-    }
+    final rows = await _client
+        .from('payments')
+        .select(_columns)
+        .eq('tenant_id', tenantId)
+        .order('due_date', ascending: false);
+    return rows
+        .map<Payment>((row) => Payment.fromJson(row))
+        .toList(growable: false);
   }
 
   // ===========================================================================
@@ -163,62 +133,34 @@ class PaymentService {
 
   /// Lists all pending payment verifications for staff review.
   Future<List<Payment>> listPendingVerifications() async {
-    try {
-      final rows = await _client
-          .from('payments')
-          .select(_columnsWithTenant)
-          .eq('status', 'pending_verification')
-          .order('created_at', ascending: false);
-
-      if (rows.isEmpty) {
-        final mockPending = MockData.payments
-            .where((p) =>
-                p.status == 'Pending verification' ||
-                p.status == 'Pending review')
-            .toList();
-        return mockPending;
-      }
-
-      return rows.map<Payment>((row) {
-        final tenantMap = row['tenant'] as Map<String, dynamic>?;
-        final tenantName =
-            tenantMap?['full_name'] as String? ?? 'Anna Dela Cruz';
-        return Payment.fromJson(row, tenantName: tenantName);
-      }).toList(growable: false);
-    } catch (_) {
-      return MockData.payments
-          .where((p) =>
-              p.status == 'Pending verification' ||
-              p.status == 'Pending review')
-          .toList();
-    }
+    final rows = await _client
+        .from('payments')
+        .select(_columnsWithTenant)
+        .eq('status', 'pending_verification')
+        .order('created_at', ascending: false);
+    return rows.map<Payment>((row) {
+      final tenantMap = row['tenant'] as Map<String, dynamic>?;
+      final tenantName = tenantMap?['full_name'] as String? ?? 'Tenant';
+      return Payment.fromJson(row, tenantName: tenantName);
+    }).toList(growable: false);
   }
 
   /// Lists all payments across all tenants with optional status and search filters.
   Future<List<Payment>> listAllPayments({String? statusFilter}) async {
-    try {
-      var query = _client.from('payments').select(_columnsWithTenant);
+    var query = _client.from('payments').select(_columnsWithTenant);
 
-      if (statusFilter != null &&
-          statusFilter.isNotEmpty &&
-          statusFilter != 'all') {
-        query = query.eq('status', Payment.toDbStatus(statusFilter));
-      }
-
-      final rows = await query.order('due_date', ascending: false);
-
-      if (rows.isEmpty) {
-        return List.unmodifiable(MockData.payments);
-      }
-
-      return rows.map<Payment>((row) {
-        final tenantMap = row['tenant'] as Map<String, dynamic>?;
-        final tenantName = tenantMap?['full_name'] as String?;
-        return Payment.fromJson(row, tenantName: tenantName);
-      }).toList(growable: false);
-    } catch (_) {
-      return List.unmodifiable(MockData.payments);
+    if (statusFilter != null &&
+        statusFilter.isNotEmpty &&
+        statusFilter != 'all') {
+      query = query.eq('status', Payment.toDbStatus(statusFilter));
     }
+
+    final rows = await query.order('due_date', ascending: false);
+    return rows.map<Payment>((row) {
+      final tenantMap = row['tenant'] as Map<String, dynamic>?;
+      final tenantName = tenantMap?['full_name'] as String?;
+      return Payment.fromJson(row, tenantName: tenantName);
+    }).toList(growable: false);
   }
 
   /// Confirms (verified) or Rejects a payment submission.
@@ -229,31 +171,21 @@ class PaymentService {
   }) async {
     final staffId = _requireAuthId();
 
-    try {
-      final updatedRow = await _client
-          .from('payments')
-          .update({
-            'status': approve ? 'verified' : 'rejected',
-            'reviewed_by': staffId,
-            'reviewed_at': DateTime.now().toUtc().toIso8601String(),
-            if (reviewNotes != null) 'review_notes': reviewNotes.trim(),
-          })
-          .eq('id', paymentId)
-          .select(_columnsWithTenant)
-          .single();
+    final updatedRow = await _client
+        .from('payments')
+        .update({
+          'status': approve ? 'verified' : 'rejected',
+          'reviewed_by': staffId,
+          'reviewed_at': DateTime.now().toUtc().toIso8601String(),
+          if (reviewNotes != null) 'review_notes': reviewNotes.trim(),
+        })
+        .eq('id', paymentId)
+        .select(_columnsWithTenant)
+        .single();
 
-      final tenantMap = updatedRow['tenant'] as Map<String, dynamic>?;
-      final tenantName = tenantMap?['full_name'] as String?;
-      return Payment.fromJson(updatedRow, tenantName: tenantName);
-    } catch (_) {
-      // Mock fallback: update in-memory mock record if running without backend
-      final mock = MockData.payments.firstWhere(
-        (p) => p.id == paymentId,
-        orElse: () => MockData.payments.first,
-      );
-      mock.status = approve ? 'Verified' : 'Rejected';
-      return mock;
-    }
+    final tenantMap = updatedRow['tenant'] as Map<String, dynamic>?;
+    final tenantName = tenantMap?['full_name'] as String?;
+    return Payment.fromJson(updatedRow, tenantName: tenantName);
   }
 
   /// Creates a new invoice / billing charge for a tenant.
@@ -264,52 +196,23 @@ class PaymentService {
     required double amount,
     required DateTime dueDate,
   }) async {
-    try {
-      final row = await _client
-          .from('payments')
-          .insert({
-            'tenant_id': tenantId,
-            'title': title.trim(),
-            'category': category.trim().toLowerCase(),
-            'amount': amount,
-            'due_date':
-                '${dueDate.year.toString().padLeft(4, '0')}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}',
-            'status': 'due',
-          })
-          .select(_columnsWithTenant)
-          .single();
+    final row = await _client
+        .from('payments')
+        .insert({
+          'tenant_id': tenantId,
+          'title': title.trim(),
+          'category': category.trim().toLowerCase(),
+          'amount': amount,
+          'due_date':
+              '${dueDate.year.toString().padLeft(4, '0')}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}',
+          'status': 'due',
+        })
+        .select(_columnsWithTenant)
+        .single();
 
-      final tenantMap = row['tenant'] as Map<String, dynamic>?;
-      final tenantName = tenantMap?['full_name'] as String?;
-      return Payment.fromJson(row, tenantName: tenantName);
-    } catch (_) {
-      // Mock fallback: create mock record when database is unavailable or in mock test mode
-      TenantDirectoryEntry? matchedTenant;
-      for (final t in MockData.tenantDirectory) {
-        if (t.id == tenantId) {
-          matchedTenant = t;
-          break;
-        }
-      }
-      final tenantName = matchedTenant?.name ?? 'Tenant $tenantId';
-      final tenantRoom = matchedTenant != null
-          ? '${matchedTenant.room} • ${matchedTenant.bedSpace}'
-          : 'Room 204';
-
-      final mock = Payment(
-        id: 'p_${DateTime.now().millisecondsSinceEpoch}',
-        tenantId: tenantId,
-        tenantName: tenantName,
-        tenantRoom: tenantRoom,
-        label: title.trim(),
-        category: category.trim().toLowerCase(),
-        amount: amount,
-        dueDate: dueDate,
-        status: 'Due',
-      );
-      MockData.payments.insert(0, mock);
-      return mock;
-    }
+    final tenantMap = row['tenant'] as Map<String, dynamic>?;
+    final tenantName = tenantMap?['full_name'] as String?;
+    return Payment.fromJson(row, tenantName: tenantName);
   }
 
   // ===========================================================================

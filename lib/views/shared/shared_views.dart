@@ -5,7 +5,6 @@ import '../../controllers/theme_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/role_guard.dart';
-import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../services/auth_service.dart';
 import '../../services/geofence_service.dart';
@@ -16,8 +15,18 @@ class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
   @override
   Widget build(BuildContext context) {
-    final ranked = [...MockData.notifications]
-      ..sort((a, b) => _urgency(b.type).compareTo(_urgency(a.type)));
+    final ranked = <AppNotification>[];
+    if (ranked.isEmpty) {
+      return const PageFrame(
+        title: 'Notifications',
+        subtitle: 'Persistent notifications are not connected yet',
+        child: EmptyState(
+          icon: Icons.notifications_none_rounded,
+          title: 'No notification service',
+          message: 'Updates remain available in their source modules.',
+        ),
+      );
+    }
     return PageFrame(
       title: 'Notifications',
       subtitle: 'Updates ranked by urgency',
@@ -38,11 +47,6 @@ class NotificationsPage extends StatelessWidget {
     );
   }
 
-  int _urgency(String type) => type == 'Presence' || type == 'Geofence'
-      ? 3
-      : type == 'Payment'
-          ? 2
-          : 1;
 }
 
 class ProfilePage extends StatelessWidget {

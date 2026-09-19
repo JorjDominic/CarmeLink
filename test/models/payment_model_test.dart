@@ -109,7 +109,8 @@ void main() {
       final paidPastBill = overdueBill.copyWith(status: 'Verified');
       expect(paidPastBill.isOverdue, isFalse);
 
-      final pendingPastBill = overdueBill.copyWith(status: 'Pending verification');
+      final pendingPastBill =
+          overdueBill.copyWith(status: 'Pending verification');
       expect(pendingPastBill.isOverdue, isFalse);
     });
 
@@ -161,7 +162,8 @@ void main() {
       expect(serialized['receipt_path'], 'proofs/pay-db-1.png');
     });
 
-    test('copyWith updates specified fields and preserves untouched fields', () {
+    test('copyWith updates specified fields and preserves untouched fields',
+        () {
       final original = Payment(
         id: 'p-orig',
         label: 'Aircon Surcharge',
@@ -228,8 +230,7 @@ void main() {
       expect(controller.paymentsLoading, isFalse);
       expect(controller.paymentsError, isNull);
       expect(controller.paymentsLoadedOnce, isFalse);
-      // Fallback mock payments exist when cleared/empty
-      expect(controller.payments, isNotEmpty);
+      expect(controller.payments, isEmpty);
     });
 
     test('setPaymentsForTesting updates lists and metrics properly', () {
@@ -272,7 +273,9 @@ void main() {
       expect(controller.nextDuePayment?.id, 't-1');
     });
 
-    test('submitPaymentProof falls back gracefully in offline/test mode', () async {
+    test(
+        'submitPaymentProof does not fabricate success when backend is unavailable',
+        () async {
       final initialPayment = Payment(
         id: 't-submit',
         label: 'Rent October',
@@ -283,22 +286,18 @@ void main() {
 
       controller.setPaymentsForTesting([initialPayment]);
 
-      final result = await controller.submitPaymentProof(
-        paymentId: 't-submit',
-        amount: 3500.0,
-        method: 'GCash',
-        reference: 'GCASH-123456',
+      await expectLater(
+        controller.submitPaymentProof(
+          paymentId: 't-submit',
+          amount: 3500.0,
+          method: 'GCash',
+          reference: 'GCASH-123456',
+        ),
+        throwsA(anything),
       );
 
-      expect(result.id, 't-submit');
-      expect(result.status, 'Pending verification');
-      expect(result.reference, 'GCASH-123456');
-      expect(result.paymentMethod, 'GCash');
-
-      // The controller payment list was updated with the pending verification
-      final updated = controller.payments.firstWhere((p) => p.id == 't-submit');
-      expect(updated.status, 'Pending verification');
+      expect(controller.payments.single.status, 'Due');
+      expect(controller.paymentsError, isNotNull);
     });
   });
 }
-

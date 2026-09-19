@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/config/supabase_config.dart';
-import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/curfew_service.dart';
 import '../services/confidential_report_service.dart';
@@ -74,9 +73,7 @@ class TenantController extends ChangeNotifier {
   bool get roomLoadedOnce => _roomLoadedOnce;
   bool get isRoomAssigned => _room != null;
 
-  List<Payment> get payments => _payments.isEmpty
-      ? List.unmodifiable(MockData.payments)
-      : List.unmodifiable(_payments);
+  List<Payment> get payments => List.unmodifiable(_payments);
 
   bool get paymentsLoading => _paymentsLoading;
   String? get paymentsError => _paymentsError;
@@ -135,9 +132,7 @@ class TenantController extends ChangeNotifier {
       _currentGateStatus == 'UNAVAILABLE' ||
       _currentGateStatus == 'Unavailable';
 
-  List<Announcement> get announcements => List.unmodifiable(
-        MockData.announcements,
-      );
+  List<Announcement> get announcements => const [];
 
   List<VisitorRequest> get visitors => List.unmodifiable(_visitors);
   bool get visitorsLoading => _visitorsLoading;
@@ -149,9 +144,7 @@ class TenantController extends ChangeNotifier {
   String? get concernsError => _concernsError;
   bool get concernsLoadedOnce => _concernsLoadedOnce;
 
-  List<ChatMessage> get messages => List.unmodifiable(
-        MockData.tenantMessages,
-      );
+  List<ChatMessage> get messages => const [];
 
   bool get maintenanceLoading => _maintenanceLoading;
 
@@ -387,30 +380,10 @@ class TenantController extends ChangeNotifier {
       }
       notifyListeners();
       return updated;
-    } catch (_) {
-      final mock = Payment(
-        id: targetId,
-        label: '$method payment submission',
-        amount: amount,
-        dueDate: DateTime.now(),
-        status: 'Pending verification',
-        reference: reference.trim().isEmpty ? null : reference.trim(),
-        paymentMethod: method,
-      );
-      final localIndex = _payments.indexWhere((p) => p.id == targetId);
-      if (localIndex != -1) {
-        _payments[localIndex] = mock;
-      } else {
-        _payments.insert(0, mock);
-      }
-      final index = MockData.payments.indexWhere((p) => p.id == targetId);
-      if (index != -1) {
-        MockData.payments[index] = mock;
-      } else {
-        MockData.payments.insert(0, mock);
-      }
+    } catch (error) {
+      _paymentsError = _message(error);
       notifyListeners();
-      return mock;
+      rethrow;
     }
   }
 
@@ -618,26 +591,6 @@ class TenantController extends ChangeNotifier {
     _concernsError = null;
     notifyListeners();
     return report;
-  }
-
-  void sendMessage(String body) {
-    final clean = body.trim();
-
-    if (clean.isEmpty) {
-      return;
-    }
-
-    MockData.tenantMessages.add(
-      ChatMessage(
-        id: 'tm${DateTime.now().millisecondsSinceEpoch}',
-        senderName: 'Anna Dela Cruz',
-        senderRole: 'tenant',
-        body: clean,
-        sentAt: DateTime.now(),
-      ),
-    );
-
-    notifyListeners();
   }
 
   String _message(Object error) {

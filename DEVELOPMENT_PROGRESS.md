@@ -7,7 +7,7 @@ divided between two developers to reduce merge conflicts.
 
 ## Current production-readiness assessment
 
-**Production readiness: approximately 65%.** This is the primary completion
+**Production readiness: approximately 68%.** This is the primary completion
 metric for the project. It weights live persistence, authorization, validation,
 testing, deployment readiness, and role-complete workflows more heavily than
 screens that exist only as UI.
@@ -18,8 +18,8 @@ percentage.
 
 Major remaining areas are persisted notifications/preferences, contracts,
 finance/expenses, discipline, analytics, native tenant device
-binding/background location, feedback persistence, MockData removal, and final
-multi-account security/offline testing.
+binding/background location, feedback persistence, and final multi-account
+security/offline testing outside the visitor workflow.
 
 The planned contracts module must synchronize through separate contract,
 billing-charge, and payment-transaction records. Verified payment amounts and
@@ -49,6 +49,19 @@ geofencing or advanced analytics.
 8. **Safety and privacy** — confidential reports, audit logs, retention, and permissions.
 
 ## Completed Milestones History
+
+> **Sep 19, 2026 — Visitor Production Verification:** Added and ran a remote
+> multi-account smoke test across tenant, guardian, owner, and caretaker
+> identities. It verifies tenant submission and visibility, guardian isolation,
+> blocked tenant approval, owner approval, caretaker arrival/departure, final
+> completion, and three append-only audit events under deployed RLS policies.
+
+> **Sep 19, 2026 — Production Data & Responsive Hardening:** Removed runtime
+> `MockData` fallbacks from operational controllers, payment services,
+> messaging, and shared notification views. Backend failures now remain visible
+> instead of fabricating successful records. Added a 30-case responsive matrix
+> spanning representative tenant, guardian, caretaker, and owner pages across
+> narrow phone, landscape, tablet, desktop, and enlarged text; all cases pass.
 
 > **Sep 19, 2026 — Visitor Workflow Database Hardening (Phase 1):** Added a
 > controlled visitor lifecycle (`pending` → `approved`/`rejected`/`cancelled`
@@ -180,7 +193,8 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Maintenance** — live request triage, metric summary cards (Open, High Priority, In Progress, Resolved), search & status filtering, assign staff, record resolution details with mandatory notes validation, floor plan overview, photo zoom inspection, and audit history.
 - [✓] **Gate and Manual Override** — auditable access decisions, 50m perimeter metrics, live presence directory, and staff manual log override.
 - [✓] **Curfew Review** — live request list, guardian input status, staff approval with gate instructions or rejection with reasons, emergency staff override, real-time Supabase sync, and prioritized dashboard attention card.
-- [ ] **Visitor Management** — approve, reject, and audit visitor access.
+- [✓] **Visitor Management** — live approve/reject, arrival/departure recording,
+  role-scoped history, and append-only audit events.
 - [✓] **Confidential Reports** — owner-only live review with mandatory notes, protected status decisions, and audit logging.
 - [ ] **Announcements** — create, target, publish, and archive notices.
 - [ ] **Messages** — persistent tenant and guardian conversations.
@@ -212,9 +226,9 @@ page exists but its important backend workflow is unfinished.
 - [ ] Server-side authorization for every read and mutation.
 - [ ] Input validation on both Flutter and Supabase.
 - [ ] Audit fields for sensitive creation, updates, approvals, and deletion.
-- [ ] Responsive phone, tablet, and wide-screen testing.
+- [✓] Responsive phone, tablet, and wide-screen matrix for representative critical pages.
 - [ ] Unit, widget, integration, and role-access tests.
-- [ ] No production page may depend on `MockData`.
+- [✓] No production page depends on `MockData`; test data is injected explicitly.
 
 ### Media Pipeline & Upgrades
 
@@ -418,7 +432,7 @@ link.
 - [ ] Maintenance management and floor monitoring — UI implemented, **Mock**
 - [ ] Gate monitoring and manual override — UI implemented, **Mock**
 - [ ] Curfew monitoring and request review — UI implemented, **Mock**
-- [ ] Visitor management — UI implemented, **Mock**
+- [✓] Visitor management — **Live**, RLS-tested multi-account workflow
 - [✓] Confidential reports — owner-only live workflow with protected RPCs and audit logging
 - [ ] Announcements — UI implemented, **Mock**
 - [✓] Messaging and conversations — live Supabase persistence and realtime first iteration
@@ -461,7 +475,7 @@ Owned folders and files:
 - [✓] Messages and conversation — live Supabase persistence and realtime first iteration
 - [ ] Gate and curfew overview — UI implemented, **Mock**
 - [ ] Curfew-exception request — UI implemented, **Mock**
-- [ ] Visitor request — UI implemented, **Mock**
+- [✓] Visitor request — **Live**, same-day-only and audit-safe
 - [✓] Confidential concern — live tenant-only persistence and RLS
 - [✓] Rules and policies
 

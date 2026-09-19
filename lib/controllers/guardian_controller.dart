@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/curfew_service.dart';
 import '../services/gate_service.dart';
@@ -60,7 +59,9 @@ class GuardianController extends ChangeNotifier {
     if (_room != null) {
       return 'Room ${_room!.number} • ${_room!.bedSpace} • Floor ${_room!.floor}';
     }
-    return _loading ? 'Checking room assignment...' : 'No active room assignment';
+    return _loading
+        ? 'Checking room assignment...'
+        : 'No active room assignment';
   }
 
   Room? get room => _room;
@@ -79,8 +80,7 @@ class GuardianController extends ChangeNotifier {
   bool get gateLoading => _gateLoading;
   String? get gateError => _gateError;
 
-  List<ChatMessage> get messages =>
-      List.unmodifiable(MockData.guardianMessages);
+  List<ChatMessage> get messages => const [];
 
   String get linkedTenantPresence => _linkedTenantPresence;
 
@@ -328,22 +328,6 @@ class GuardianController extends ChangeNotifier {
     _gateLoadedOnce = false;
     _linkedTenantPresence = 'Inside';
     GuardianService.invalidateCache();
-    notifyListeners();
-  }
-
-  void sendMessage(String body) {
-    final clean = body.trim();
-    if (clean.isEmpty) return;
-
-    MockData.guardianMessages.add(
-      ChatMessage(
-        id: 'gm${DateTime.now().millisecondsSinceEpoch}',
-        senderName: 'Guardian',
-        senderRole: 'guardian',
-        body: clean,
-        sentAt: DateTime.now(),
-      ),
-    );
     notifyListeners();
   }
 }

@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
-import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/messaging_service.dart';
 import 'session_controller.dart';
@@ -38,7 +37,8 @@ class MessagingController extends ChangeNotifier {
   bool get sendingMessage => _sendingMessage;
   String? get messagesError => _messagesError;
 
-  List<ConversationRecord> get conversations => List.unmodifiable(_conversations);
+  List<ConversationRecord> get conversations =>
+      List.unmodifiable(_conversations);
   bool get loadingConversations => _loadingConversations;
   String? get conversationsError => _conversationsError;
   String get selectedFilter => _selectedFilter;
@@ -103,8 +103,7 @@ class MessagingController extends ChangeNotifier {
               '');
 
       if (effectiveUid.isEmpty) {
-        _useMockTenantMessages();
-        return;
+        throw StateError('Authentication is required to load messages');
       }
 
       final conv =
@@ -113,11 +112,15 @@ class MessagingController extends ChangeNotifier {
         _activeConversation = conv;
         await _fetchMessagesForActiveConversation();
       } else {
-        _useMockTenantMessages();
+        _activeConversation = null;
+        _activeMessages = [];
+        _messagesError = 'No tenant conversation is available';
       }
     } catch (e) {
       debugPrint('Error loading tenant conversation: $e');
-      _useMockTenantMessages();
+      _activeConversation = null;
+      _activeMessages = [];
+      _messagesError = 'Unable to load tenant messages';
     } finally {
       _loadingMessages = false;
       notifyListeners();
@@ -141,8 +144,7 @@ class MessagingController extends ChangeNotifier {
               '');
 
       if (effectiveGid.isEmpty) {
-        _useMockGuardianMessages();
-        return;
+        throw StateError('Authentication is required to load messages');
       }
 
       final conv = await _service.getOrCreateGuardianConversation(
@@ -153,11 +155,15 @@ class MessagingController extends ChangeNotifier {
         _activeConversation = conv;
         await _fetchMessagesForActiveConversation();
       } else {
-        _useMockGuardianMessages();
+        _activeConversation = null;
+        _activeMessages = [];
+        _messagesError = 'No guardian conversation is available';
       }
     } catch (e) {
       debugPrint('Error loading guardian conversation: $e');
-      _useMockGuardianMessages();
+      _activeConversation = null;
+      _activeMessages = [];
+      _messagesError = 'Unable to load guardian messages';
     } finally {
       _loadingMessages = false;
       notifyListeners();
@@ -196,24 +202,14 @@ class MessagingController extends ChangeNotifier {
           SessionController.instance.currentUser?.role.name ?? 'owner';
       final list = await _service.fetchConversations(currentRole: currentRole);
 
-      if (list.isNotEmpty) {
-        _conversations = list;
-        _conversationsLoadedOnce = true;
-      } else if (SupabaseConfig.clientSafe != null &&
-          SupabaseConfig.clientSafe!.auth.currentUser != null) {
-        _conversations = list;
-        _conversationsLoadedOnce = true;
-      } else {
-        _useMockConversations();
-      }
+      _conversations = list;
+      _conversationsLoadedOnce = true;
 
       _subscribeToInboxChanges();
     } catch (e) {
       debugPrint('Error loading conversations: $e');
       _conversationsError = 'Unable to fetch conversations';
-      if (_conversations.isEmpty) {
-        _useMockConversations();
-      }
+      _conversations = [];
     } finally {
       _loadingConversations = false;
       notifyListeners();
@@ -231,10 +227,8 @@ class MessagingController extends ChangeNotifier {
     final client = SupabaseConfig.clientSafe;
     final authUid = client?.auth.currentUser?.id;
     final user = SessionController.instance.currentUser;
-    final senderId = (authUid != null && authUid.isNotEmpty)
-        ? authUid
-        : (user?.id ?? '');
-    final senderName = user?.name ?? 'Me';
+    final senderId =
+        (authUid != null && authUid.isNotEmpty) ? authUid : (user?.id ?? '');
     final senderRole = user?.role.name ?? 'tenant';
     final conv = _activeConversation;
 
@@ -244,18 +238,11 @@ class MessagingController extends ChangeNotifier {
       return false;
     }
 
-    // Offline / Mock conversation fallback
-    if (conv.id.startsWith('mock-') || conv.id.startsWith('oc')) {
-      _appendLocalMessage(
-        text,
-        senderId.isNotEmpty ? senderId : 'mock-user',
-        senderName,
-        senderRole,
-        conv.id,
-      );
+    if (senderId.isEmpty) {
+      _messagesError = 'Authentication is required to send messages';
       _sendingMessage = false;
       notifyListeners();
-      return true;
+      return false;
     }
 
     try {
@@ -284,46 +271,9 @@ class MessagingController extends ChangeNotifier {
     }
   }
 
-  void _appendLocalMessage(
-    String body,
-    String senderId,
-    String senderName,
-    String senderRole,
-    String conversationId,
-  ) {
-    final localMsg = ChatMessage(
-      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
-      conversationId: conversationId,
-      senderId: senderId,
-      senderName: senderName,
-      senderRole: senderRole,
-      body: body,
-      sentAt: DateTime.now(),
-    );
-    _activeMessages.add(localMsg);
-
-    // Keep mock data synchronized for mock views
-    if (senderRole == 'tenant') {
-      MockData.tenantMessages.add(localMsg);
-    } else if (senderRole == 'guardian') {
-      MockData.guardianMessages.add(localMsg);
-    }
-  }
-
   Future<void> _fetchMessagesForActiveConversation() async {
     final conv = _activeConversation;
     if (conv == null) return;
-
-    if (conv.id.startsWith('mock-')) {
-      if (conv.isTenantManagement) {
-        _activeMessages = List.from(MockData.tenantMessages);
-      } else if (conv.isGuardianManagement) {
-        _activeMessages = List.from(MockData.guardianMessages);
-      } else {
-        _activeMessages = [];
-      }
-      return;
-    }
 
     // 1. Fetch remote messages
     final messages = await _service.fetchMessages(conv.id);
@@ -364,48 +314,23 @@ class MessagingController extends ChangeNotifier {
     );
   }
 
-  void _useMockTenantMessages() {
-    _activeConversation = ConversationRecord(
-      id: 'mock-tenant-conv',
-      type: 'tenant_management',
-      title: 'Dormitory Management',
-      subtitle: 'Owner & Caretaker',
-      createdAt: DateTime(2026, 8, 8),
-      updatedAt: DateTime.now(),
-    );
-    _activeMessages = List.from(MockData.tenantMessages);
+  @visibleForTesting
+  void setConversationForTesting(
+    ConversationRecord conversation, {
+    List<ChatMessage> messages = const [],
+  }) {
+    _activeConversation = conversation;
+    _activeMessages = List.of(messages);
+    _messagesError = null;
+    notifyListeners();
   }
 
-  void _useMockGuardianMessages() {
-    _activeConversation = ConversationRecord(
-      id: 'mock-guardian-conv',
-      type: 'guardian_management',
-      title: 'Dormitory Management',
-      subtitle: 'Regarding Anna Dela Cruz',
-      createdAt: DateTime(2026, 8, 8),
-      updatedAt: DateTime.now(),
-    );
-    _activeMessages = List.from(MockData.guardianMessages);
-  }
-
-  void _useMockConversations() {
-    _conversations = MockData.ownerConversations.map((oc) {
-      return ConversationRecord(
-        id: oc.id,
-        type: oc.personRole.toLowerCase() == 'guardian'
-            ? 'guardian_management'
-            : 'tenant_management',
-        title: oc.personName,
-        subtitle: oc.personRole,
-        participantName: oc.personName,
-        participantRole: oc.personRole,
-        lastMessagePreview: oc.messages.isNotEmpty ? oc.messages.last.body : '',
-        lastMessageAt: oc.messages.isNotEmpty ? oc.messages.last.sentAt : null,
-        unreadCount: 0,
-        createdAt: DateTime(2026, 8, 8),
-        updatedAt: DateTime.now(),
-      );
-    }).toList();
+  @visibleForTesting
+  void setConversationsForTesting(List<ConversationRecord> conversations) {
+    _conversations = List.of(conversations);
+    _conversationsLoadedOnce = true;
+    _conversationsError = null;
+    notifyListeners();
   }
 
   void _disposeActiveChannel() {
@@ -437,4 +362,3 @@ class MessagingController extends ChangeNotifier {
     notifyListeners();
   }
 }
-

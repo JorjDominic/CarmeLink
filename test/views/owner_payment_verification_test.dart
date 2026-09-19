@@ -173,7 +173,7 @@ void main() {
       expect(find.text('Pedro Penduko'), findsNothing);
     });
 
-    testWidgets('approving pending payment updates status to Verified',
+    testWidgets('failed approval preserves pending payment and reports error',
         (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
       tester.view.devicePixelRatio = 1.0;
@@ -195,10 +195,11 @@ void main() {
       await tester.tap(confirmBtn);
       await tester.pumpAndSettle();
 
-      expect(payments[1].isVerified, isTrue);
+      expect(payments[1].isPending, isTrue);
+      expect(find.textContaining('Failed to update payment:'), findsOneWidget);
     });
 
-    testWidgets('rejecting pending payment opens reject sheet and updates status',
+    testWidgets('failed rejection preserves pending payment and reports error',
         (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
       tester.view.devicePixelRatio = 1.0;
@@ -227,10 +228,12 @@ void main() {
       await tester.tap(find.text('Confirm Rejection'));
       await tester.pumpAndSettle();
 
-      expect(payments[1].isRejected, isTrue);
+      expect(payments[1].isPending, isTrue);
+      expect(find.textContaining('Failed to update payment:'), findsOneWidget);
     });
 
-    testWidgets('due payment card allows marking as paid directly',
+    testWidgets(
+        'failed mark-paid action preserves due status and reports error',
         (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
       tester.view.devicePixelRatio = 1.0;
@@ -259,7 +262,8 @@ void main() {
       await tester.tap(markPaidBtn);
       await tester.pumpAndSettle();
 
-      expect(payments[0].isVerified, isTrue);
+      expect(payments[0].isDue, isTrue);
+      expect(find.textContaining('Failed to update payment:'), findsOneWidget);
     });
 
     testWidgets('tapping Issue invoice button opens create invoice dialog',
@@ -322,7 +326,7 @@ void main() {
       expect(find.text('Maria Santos'), findsNothing);
     });
 
-    testWidgets('filling and submitting invoice dialog creates invoice',
+    testWidgets('failed backend submission does not fabricate an invoice',
         (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
       tester.view.devicePixelRatio = 1.0;
@@ -350,10 +354,8 @@ void main() {
       await tester.tap(submitBtn);
       await tester.pumpAndSettle();
 
-      // New invoice should be in controller
-      expect(OwnerController.instance.payments.first.amount, equals(5000.0));
-      expect(find.text('Invoice for Monthly Dorm Rent issued successfully.'),
-          findsOneWidget);
+      expect(OwnerController.instance.payments.first.amount, equals(4000.0));
+      expect(find.textContaining('Failed to issue invoice:'), findsOneWidget);
     });
   });
 }

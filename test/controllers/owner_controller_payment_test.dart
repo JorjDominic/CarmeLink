@@ -88,7 +88,8 @@ void main() {
       expect(controller.overduePaymentCount, equals(1));
     });
 
-    test('createInvoice prepends new payment invoice and notifies listeners',
+    test(
+        'createInvoice does not fabricate an invoice when backend is unavailable',
         () async {
       final controller = OwnerController.instance;
       controller.setPaymentsForTesting(testPayments);
@@ -96,43 +97,46 @@ void main() {
       int notifyCount = 0;
       controller.addListener(() => notifyCount++);
 
-      final newInvoice = await controller.createInvoice(
-        tenantId: 't-1',
-        title: 'October Dorm Rent',
-        category: 'rent',
-        amount: 4200.0,
-        dueDate: DateTime.now().add(const Duration(days: 14)),
+      await expectLater(
+        controller.createInvoice(
+          tenantId: 't-1',
+          title: 'October Dorm Rent',
+          category: 'rent',
+          amount: 4200.0,
+          dueDate: DateTime.now().add(const Duration(days: 14)),
+        ),
+        throwsA(anything),
       );
 
-      expect(newInvoice.label, equals('October Dorm Rent'));
-      expect(newInvoice.amount, equals(4200.0));
-      expect(newInvoice.status.toLowerCase(), equals('due'));
-      expect(controller.payments.first.id, equals(newInvoice.id));
-      expect(notifyCount, greaterThan(0));
+      expect(controller.payments, hasLength(testPayments.length));
+      expect(controller.payments.first.id, testPayments.first.id);
+      expect(notifyCount, 0);
     });
 
-    test('verifyPayment approves and updates payment in place', () async {
+    test('verifyPayment does not approve locally when backend is unavailable',
+        () async {
       final controller = OwnerController.instance;
       controller.setPaymentsForTesting(testPayments);
 
       final target = testPayments[1]; // Pending verification
       expect(target.isPending, isTrue);
 
-      await controller.verifyPayment(target, true);
-
-      expect(target.isVerified, isTrue);
-      expect(target.status, equals('Verified'));
+      await expectLater(
+          controller.verifyPayment(target, true), throwsA(anything));
+      expect(target.isPending, isTrue);
     });
 
-    test('verifyPayment rejects and updates payment with notes', () async {
+    test('verifyPayment does not reject locally when backend is unavailable',
+        () async {
       final controller = OwnerController.instance;
       controller.setPaymentsForTesting(testPayments);
 
       final target = testPayments[1]; // Pending verification
-      await controller.verifyPayment(target, false, notes: 'Invalid proof');
-
-      expect(target.isRejected, isTrue);
-      expect(target.status, equals('Rejected'));
+      await expectLater(
+        controller.verifyPayment(target, false, notes: 'Invalid proof'),
+        throwsA(anything),
+      );
+      expect(target.isPending, isTrue);
     });
 
     test('clear resets payments and paymentsLoadedOnce', () {
@@ -145,8 +149,7 @@ void main() {
       controller.clear();
 
       expect(controller.paymentsLoadedOnce, isFalse);
-      // When empty, controller.payments falls back to MockData.payments
+      expect(controller.payments, isEmpty);
     });
   });
 }
-

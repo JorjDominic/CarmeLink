@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:carmelitas_dormitory_system/controllers/messaging_controller.dart';
+import 'package:carmelitas_dormitory_system/models/models.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -19,36 +20,47 @@ void main() {
       expect(controller.searchQuery, '');
     });
 
-    test('mock tenant messages load properly', () async {
-      await controller.loadTenantConversation('non-existent-tenant-id');
-
-      expect(controller.activeConversation, isNotNull);
-      expect(controller.activeConversation?.title, 'Dormitory Management');
-      expect(controller.activeMessages, isNotEmpty);
-    });
-
-    test('sendMessage appends new message and updates state', () async {
-      await controller.loadTenantConversation('non-existent-tenant-id');
-      final initialCount = controller.activeMessages.length;
-
-      final success = await controller.sendMessage('Hello this is a test message');
-      expect(success, isTrue);
-      expect(controller.activeMessages.length, initialCount + 1);
-      expect(controller.activeMessages.last.body, 'Hello this is a test message');
+    test('unauthenticated tenant load exposes an error without demo data',
+        () async {
+      await controller.loadTenantConversation('');
+      expect(controller.activeConversation, isNull);
+      expect(controller.activeMessages, isEmpty);
+      expect(controller.messagesError, isNotNull);
     });
 
     test('filter and search works on conversation list', () async {
-      await controller.loadConversations(force: true);
+      controller.setConversationsForTesting([
+        ConversationRecord(
+          id: 'tenant-conversation',
+          type: 'tenant_management',
+          title: 'Anna Tenant',
+          subtitle: 'Tenant',
+          createdAt: DateTime(2026, 9, 1),
+          updatedAt: DateTime(2026, 9, 1),
+        ),
+        ConversationRecord(
+          id: 'guardian-conversation',
+          type: 'guardian_management',
+          title: 'Maria Guardian',
+          subtitle: 'Guardian',
+          createdAt: DateTime(2026, 9, 1),
+          updatedAt: DateTime(2026, 9, 1),
+        ),
+      ]);
 
       expect(controller.conversations, isNotEmpty);
 
       // Filter by tenant
       controller.setFilter('tenant');
-      expect(controller.filteredConversations.every((c) => c.isTenantManagement), isTrue);
+      expect(
+          controller.filteredConversations.every((c) => c.isTenantManagement),
+          isTrue);
 
       // Filter by guardian
       controller.setFilter('guardian');
-      expect(controller.filteredConversations.every((c) => c.isGuardianManagement), isTrue);
+      expect(
+          controller.filteredConversations.every((c) => c.isGuardianManagement),
+          isTrue);
 
       // Search by name
       controller.setFilter('all');
@@ -62,7 +74,16 @@ void main() {
     });
 
     test('closeActiveConversation resets active thread', () async {
-      await controller.loadTenantConversation('test-tenant');
+      controller.setConversationForTesting(
+        ConversationRecord(
+          id: 'conversation',
+          type: 'tenant_management',
+          title: 'Management',
+          subtitle: 'Staff',
+          createdAt: DateTime(2026, 9, 1),
+          updatedAt: DateTime(2026, 9, 1),
+        ),
+      );
       expect(controller.activeConversation, isNotNull);
 
       controller.closeActiveConversation();
@@ -71,4 +92,3 @@ void main() {
     });
   });
 }
-

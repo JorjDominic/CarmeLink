@@ -5647,8 +5647,6 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
 
     if (widget.record != null) {
       await MessagingController.instance.sendMessage(text);
-    } else if (widget.conversation != null) {
-      OwnerController.instance.sendOwnerMessage(widget.conversation!, text);
     }
   }
 
