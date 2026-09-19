@@ -7,6 +7,7 @@ class ContractService {
   static const _selection =
       'id, tenant_id, contract_number, starts_on, ends_on, monthly_rent, '
       'security_deposit, status, notes, created_at, updated_at, '
+      'signature_status, '
       'profiles!tenant_contracts_tenant_id_fkey(full_name)';
 
   Future<List<TenantContract>> listContracts() async {

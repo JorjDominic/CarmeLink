@@ -896,6 +896,7 @@ class TenantContract {
     required this.createdAt,
     required this.updatedAt,
     this.notes,
+    this.signatureStatus = 'not_generated',
   });
 
   factory TenantContract.fromRow(Map<String, dynamic> row) {
@@ -911,6 +912,7 @@ class TenantContract {
       securityDeposit: (row['security_deposit'] as num).toDouble(),
       status: row['status'] as String,
       notes: row['notes'] as String?,
+      signatureStatus: row['signature_status'] as String? ?? 'not_generated',
       createdAt: DateTime.parse(row['created_at'] as String),
       updatedAt: DateTime.parse(row['updated_at'] as String),
     );
@@ -926,6 +928,7 @@ class TenantContract {
   final double securityDeposit;
   final String status;
   final String? notes;
+  final String signatureStatus;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -942,6 +945,7 @@ class TenantContract {
     double? securityDeposit,
     String? status,
     String? notes,
+    String? signatureStatus,
   }) =>
       TenantContract(
         id: id,
@@ -954,9 +958,65 @@ class TenantContract {
         securityDeposit: securityDeposit ?? this.securityDeposit,
         status: status ?? this.status,
         notes: notes ?? this.notes,
+        signatureStatus: signatureStatus ?? this.signatureStatus,
         createdAt: createdAt,
         updatedAt: updatedAt,
       );
+}
+
+class ContractDocument {
+  const ContractDocument({
+    required this.id,
+    required this.contractId,
+    required this.version,
+    required this.documentType,
+    required this.storagePath,
+    required this.originalFilename,
+    required this.mimeType,
+    required this.sizeBytes,
+    required this.sha256,
+    required this.reviewStatus,
+    required this.uploadedAt,
+    this.reviewedAt,
+    this.reviewNotes,
+  });
+
+  factory ContractDocument.fromRow(Map<String, dynamic> row) =>
+      ContractDocument(
+        id: row['id'] as String,
+        contractId: row['contract_id'] as String,
+        version: row['version'] as int,
+        documentType: row['document_type'] as String,
+        storagePath: row['storage_path'] as String,
+        originalFilename: row['original_filename'] as String,
+        mimeType: row['mime_type'] as String,
+        sizeBytes: (row['size_bytes'] as num).toInt(),
+        sha256: row['sha256'] as String,
+        reviewStatus: row['review_status'] as String,
+        uploadedAt: DateTime.parse(row['uploaded_at'] as String),
+        reviewedAt: row['reviewed_at'] == null
+            ? null
+            : DateTime.parse(row['reviewed_at'] as String),
+        reviewNotes: row['review_notes'] as String?,
+      );
+
+  final String id;
+  final String contractId;
+  final int version;
+  final String documentType;
+  final String storagePath;
+  final String originalFilename;
+  final String mimeType;
+  final int sizeBytes;
+  final String sha256;
+  final String reviewStatus;
+  final DateTime uploadedAt;
+  final DateTime? reviewedAt;
+  final String? reviewNotes;
+
+  bool get isGenerated => documentType == 'generated';
+  bool get isSigned => documentType == 'signed';
+  bool get isPending => reviewStatus == 'pending';
 }
 
 class OwnerConversation {

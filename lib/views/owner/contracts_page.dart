@@ -1,8 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:printing/printing.dart';
 
 import '../../controllers/owner_controller.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
+import '../../services/contract_document_service.dart';
 
 Future<bool?> showContractEditor(
   BuildContext context, {
@@ -140,12 +145,13 @@ class _ContractsPageState extends State<ContractsPage> {
                         crossAxisCount: columns,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
-                        mainAxisExtent: enlargedText ? 430 : 350,
+                        mainAxisExtent: enlargedText ? 530 : 410,
                       ),
                       itemBuilder: (_, index) => _ContractCard(
                         contract: items[index],
                         onEdit: () => _openEditor(items[index]),
                         onDelete: () => _delete(items[index]),
+                        onDocuments: () => _openDocuments(items[index]),
                       ),
                     );
                   }),
@@ -186,16 +192,28 @@ class _ContractsPageState extends State<ContractsPage> {
     }
   }
 
+  Future<void> _openDocuments(TenantContract contract) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _ContractDocumentsDialog(contract: contract),
+    );
+    await OwnerController.instance.loadContracts(force: true);
+  }
+
   String _title(String value) =>
       value == 'all' ? 'All' : '${value[0].toUpperCase()}${value.substring(1)}';
 }
 
 class _ContractCard extends StatelessWidget {
   const _ContractCard(
-      {required this.contract, required this.onEdit, required this.onDelete});
+      {required this.contract,
+      required this.onEdit,
+      required this.onDelete,
+      required this.onDocuments});
   final TenantContract contract;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onDocuments;
 
   @override
   Widget build(BuildContext context) {
@@ -223,8 +241,23 @@ class _ContractCard extends StatelessWidget {
             value: '${date(contract.startsOn)} – ${date(contract.endsOn)}'),
         InfoRow(label: 'Monthly rent', value: money(contract.monthlyRent)),
         InfoRow(label: 'Deposit', value: money(contract.securityDeposit)),
+        const SizedBox(height: 6),
+        Row(children: [
+          const Icon(Icons.verified_user_outlined, size: 17),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              _signatureLabel(contract.signatureStatus),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        ]),
         const Spacer(),
-        Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+        Wrap(alignment: WrapAlignment.end, spacing: 2, children: [
+          TextButton.icon(
+              onPressed: onDocuments,
+              icon: const Icon(Icons.description_outlined),
+              label: const Text('Documents')),
           IconButton(
               tooltip: 'Edit contract',
               onPressed: onEdit,
@@ -237,6 +270,433 @@ class _ContractCard extends StatelessWidget {
       ]),
     );
   }
+
+  String _signatureLabel(String status) => switch (status) {
+        'awaiting_signature' => 'Awaiting signed copy',
+        'pending_verification' => 'Signature review pending',
+        'verified' => 'Signed document verified',
+        'rejected' => 'Signed document rejected',
+        _ => 'PDF not generated',
+      };
+}
+
+class _ContractDocumentsDialog extends StatefulWidget {
+  const _ContractDocumentsDialog({required this.contract});
+  final TenantContract contract;
+
+  @override
+  State<_ContractDocumentsDialog> createState() =>
+      _ContractDocumentsDialogState();
+}
+
+class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
+  final _service = const ContractDocumentService();
+  late Future<List<ContractDocument>> _documents =
+      _service.listDocuments(widget.contract.id);
+  bool _working = false;
+
+  void _reload() =>
+      setState(() => _documents = _service.listDocuments(widget.contract.id));
+
+  Future<void> _generate() async {
+    setState(() => _working = true);
+    try {
+      final generated = await _service.generateContract(widget.contract);
+      await Printing.sharePdf(
+        bytes: generated.bytes,
+        filename: generated.document.originalFilename,
+      );
+      if (mounted) {
+        showAppSnackBar(context,
+            'Contract version ${generated.document.version} generated.');
+        _reload();
+      }
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Could not generate PDF: $error');
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _uploadSigned(int version) async {
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+    );
+    if (file == null || !mounted) return;
+    final bytes = await file.readAsBytes();
+    final extension = file.extension?.toLowerCase();
+    final mimeType = switch (extension) {
+      'pdf' => 'application/pdf',
+      'png' => 'image/png',
+      _ => 'image/jpeg',
+    };
+    setState(() => _working = true);
+    try {
+      await _service.uploadSigned(
+        contract: widget.contract,
+        version: version,
+        filename: file.name,
+        mimeType: mimeType,
+        bytes: bytes,
+      );
+      if (mounted) {
+        showAppSnackBar(context, 'Signed contract uploaded for review.');
+        _reload();
+      }
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Upload failed: $error');
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _open(ContractDocument document) async {
+    await Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _ContractDocumentViewer(
+          document: document,
+          service: _service,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _review(ContractDocument document, bool approve) async {
+    final notes = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+            approve ? 'Verify signed contract?' : 'Reject signed contract?'),
+        content: TextField(
+          controller: notes,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 4,
+          decoration: InputDecoration(
+            labelText: 'Review notes',
+            hintText: approve
+                ? 'Confirm signatures and document completeness'
+                : 'Explain what must be corrected',
+            alignLabelWithHint: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(approve ? 'Verify document' : 'Reject document')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      notes.dispose();
+      return;
+    }
+    if (notes.text.trim().length < 3) {
+      showAppSnackBar(context, 'Enter review notes of at least 3 characters.');
+      notes.dispose();
+      return;
+    }
+    setState(() => _working = true);
+    try {
+      await _service.reviewSignedDocument(
+        documentId: document.id,
+        approve: approve,
+        notes: notes.text,
+      );
+      if (mounted) {
+        showAppSnackBar(context,
+            approve ? 'Signed contract verified.' : 'Document rejected.');
+        _reload();
+      }
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Review failed: $error');
+    } finally {
+      notes.dispose();
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 600;
+    final content = FutureBuilder<List<ContractDocument>>(
+      future: _documents,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return EmptyState(
+            icon: Icons.cloud_off_outlined,
+            title: 'Documents could not be loaded',
+            message: snapshot.error.toString(),
+            action:
+                FilledButton(onPressed: _reload, child: const Text('Retry')),
+          );
+        }
+        final documents = snapshot.data ?? const [];
+        final generated = documents.where((item) => item.isGenerated).toList();
+        final latestVersion = generated.isEmpty
+            ? null
+            : generated.map((e) => e.version).reduce((a, b) => a > b ? a : b);
+        return ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(children: [
+                Icon(Icons.description_outlined,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.contract.contractNumber,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(widget.contract.tenantName),
+                    ],
+                  ),
+                ),
+                StatusPill(_signatureLabel(widget.contract.signatureStatus)),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _working ? null : _generate,
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              label: Text(generated.isEmpty
+                  ? 'Generate printable PDF'
+                  : 'Generate new version'),
+            ),
+            if (latestVersion != null) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _working ? null : () => _uploadSigned(latestVersion),
+                icon: const Icon(Icons.upload_file_outlined),
+                label: Text('Upload signed copy for version $latestVersion'),
+              ),
+            ],
+            const SizedBox(height: 24),
+            Text('Document history',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            if (documents.isEmpty)
+              const EmptyState(
+                icon: Icons.folder_open_outlined,
+                title: 'No contract documents',
+                message: 'Generate the first printable version to begin.',
+              )
+            else
+              ...documents.map((document) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: CarmelitaCard(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            Icon(document.isGenerated
+                                ? Icons.picture_as_pdf_outlined
+                                : Icons.draw_outlined),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                document.isGenerated
+                                    ? 'Printable contract • Version ${document.version}'
+                                    : 'Signed copy • Version ${document.version}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            StatusPill(_reviewLabel(document.reviewStatus)),
+                          ]),
+                          const SizedBox(height: 6),
+                          Text(document.originalFilename,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall),
+                          const SizedBox(height: 8),
+                          Wrap(spacing: 8, runSpacing: 6, children: [
+                            TextButton.icon(
+                              onPressed: () => _open(document),
+                              icon: const Icon(Icons.visibility_outlined,
+                                  size: 18),
+                              label: const Text('View'),
+                            ),
+                            if (document.isPending)
+                              TextButton.icon(
+                                onPressed: _working
+                                    ? null
+                                    : () => _review(document, true),
+                                icon: const Icon(Icons.verified_outlined,
+                                    size: 18),
+                                label: const Text('Verify'),
+                              ),
+                            if (document.isPending)
+                              TextButton.icon(
+                                onPressed: _working
+                                    ? null
+                                    : () => _review(document, false),
+                                icon:
+                                    const Icon(Icons.cancel_outlined, size: 18),
+                                label: const Text('Reject'),
+                              ),
+                          ]),
+                        ],
+                      ),
+                    ),
+                  )),
+          ],
+        );
+      },
+    );
+
+    if (compact) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close)),
+            title: const Text('Contract documents'),
+          ),
+          body: content,
+        ),
+      );
+    }
+    return Dialog(
+      child: SizedBox(
+        width: 720,
+        height: 760,
+        child: Column(children: [
+          ListTile(
+            title: const Text('Contract documents'),
+            subtitle: const Text('Generate, upload, and verify signed copies'),
+            trailing: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close)),
+          ),
+          const Divider(height: 1),
+          Expanded(child: content),
+        ]),
+      ),
+    );
+  }
+
+  String _signatureLabel(String value) => switch (value) {
+        'awaiting_signature' => 'Awaiting signature',
+        'pending_verification' => 'Pending review',
+        'verified' => 'Verified',
+        'rejected' => 'Rejected',
+        _ => 'Not generated',
+      };
+
+  String _reviewLabel(String value) => switch (value) {
+        'pending' => 'Pending',
+        'verified' => 'Verified',
+        'rejected' => 'Rejected',
+        _ => 'Original',
+      };
+}
+
+class _ContractDocumentViewer extends StatefulWidget {
+  const _ContractDocumentViewer({
+    required this.document,
+    required this.service,
+  });
+
+  final ContractDocument document;
+  final ContractDocumentService service;
+
+  @override
+  State<_ContractDocumentViewer> createState() =>
+      _ContractDocumentViewerState();
+}
+
+class _ContractDocumentViewerState extends State<_ContractDocumentViewer> {
+  late Future<Uint8List> _bytes =
+      widget.service.downloadDocument(widget.document.storagePath);
+
+  void _retry() => setState(() {
+        _bytes = widget.service.downloadDocument(widget.document.storagePath);
+      });
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.document.originalFilename,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        body: FutureBuilder<Uint8List>(
+          future: _bytes,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError || !snapshot.hasData) {
+              return EmptyState(
+                icon: Icons.cloud_off_outlined,
+                title: 'Document could not be opened',
+                message: snapshot.error?.toString() ?? 'No file data received.',
+                action: FilledButton.icon(
+                  onPressed: _retry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                ),
+              );
+            }
+            final bytes = snapshot.data!;
+            if (widget.document.mimeType == 'application/pdf') {
+              return PdfPreview(
+                build: (_) async => bytes,
+                pdfFileName: widget.document.originalFilename,
+                canChangeOrientation: false,
+                canChangePageFormat: false,
+                canDebug: false,
+                allowPrinting: true,
+                allowSharing: true,
+                loadingWidget: const Center(child: CircularProgressIndicator()),
+              );
+            }
+            return ColoredBox(
+              color: Colors.black,
+              child: Center(
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 5,
+                  child: Image.memory(
+                    bytes,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, error, __) => EmptyState(
+                      icon: Icons.broken_image_outlined,
+                      title: 'Image could not be displayed',
+                      message: error.toString(),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
 }
 
 class _ContractEditor extends StatefulWidget {

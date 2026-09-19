@@ -46,9 +46,10 @@ visible in the directory and the incomplete onboarding state can be resumed.
 The contract may be saved as Draft while account verification is pending. The
 workflow then generates a versioned printable PDF, records that signatures are
 awaited, accepts a private upload of the scanned signed paper, and requires
-owner verification before activation. Contract activation requires verified
-email, verified mobile number, and a verified signed document. Afterward, the
-guided workflow continues to room/bed assignment and guardian linking.
+owner verification before activation. Contract activation currently requires
+verified email and a verified signed document. Mobile verification remains on
+hold until an SMS provider is selected. Afterward, the guided workflow
+continues to room/bed assignment and guardian linking.
 
 Implementation follow-up:
 
@@ -57,9 +58,9 @@ Implementation follow-up:
 - [✓] Expose Pending/Verified email state and independent On hold mobile state.
 - [✓] Add `Create contract now` and `Do this later` success actions for owners.
 - [✓] Open the contract editor with the tenant preselected and locked.
-- [ ] Generate an immutable, versioned printable contract PDF.
-- [ ] Upload the signed paper privately and record uploader/time/file metadata.
-- [ ] Add owner signed-document verification before contract activation.
+- [✓] Generate an immutable, versioned printable contract PDF.
+- [✓] Upload the signed paper privately and record uploader/time/file metadata.
+- [✓] Add owner signed-document verification before contract activation.
 - [ ] Display an onboarding-incomplete indicator for tenants without contracts.
 - [ ] Continue from contract save to room/bed assignment and guardian linking.
 
@@ -85,6 +86,14 @@ geofencing or advanced analytics.
 8. **Safety and privacy** — confidential reports, audit logs, retention, and permissions.
 
 ## Completed Milestones History
+
+> **Sep 19, 2026 — Signed Contract Document Workflow:** Added owner-side
+> generation and sharing of versioned contract PDFs, immutable private storage
+> for generated and signed copies, SHA-256 file metadata, signed-copy review,
+> and activation guards requiring both verified tenant email and an
+> owner-verified signed document. Migration `202609190010` is deployed. The
+> complete Flutter suite passes at 186/186 tests, static analysis reports no
+> issues, and the Android debug APK builds successfully.
 
 > **Sep 19, 2026 — Contract Production Verification:** Added and ran a remote
 > multi-role smoke test against the deployed Supabase project. It verifies
