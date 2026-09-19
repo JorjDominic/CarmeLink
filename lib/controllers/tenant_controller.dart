@@ -531,19 +531,45 @@ class TenantController extends ChangeNotifier {
     required String visitorName,
     required String relationship,
     required String purpose,
+    required String contactNumber,
     required DateTime schedule,
+    required DateTime expectedDepartureAt,
   }) async {
     final request = await _visitorService.submit(
       visitorName: visitorName,
       relationship: relationship,
       purpose: purpose,
+      contactNumber: contactNumber,
       schedule: schedule,
+      expectedDepartureAt: expectedDepartureAt,
     );
     _visitors.insert(0, request);
     _visitorsLoadedOnce = true;
     _visitorsError = null;
     notifyListeners();
     return request;
+  }
+
+  Future<VisitorRequest> updateVisitor({
+    required VisitorRequest request,
+    required String visitorName,
+    required String relationship,
+    required String purpose,
+    required String contactNumber,
+    required DateTime schedule,
+    required DateTime expectedDepartureAt,
+  }) async {
+    final updated = await _visitorService.updatePending(
+      requestId: request.id,
+      visitorName: visitorName,
+      relationship: relationship,
+      purpose: purpose,
+      contactNumber: contactNumber,
+      schedule: schedule,
+      expectedDepartureAt: expectedDepartureAt,
+    );
+    _replaceVisitor(updated);
+    return updated;
   }
 
   Future<void> cancelVisitor(VisitorRequest request) async {

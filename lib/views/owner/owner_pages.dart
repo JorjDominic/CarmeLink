@@ -4141,11 +4141,22 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
                               value: visitor.tenantName,
                             ),
                           InfoRow(label: 'Purpose', value: visitor.purpose),
+                          if (visitor.contactNumber.isNotEmpty)
+                            InfoRow(
+                              label: 'Visitor contact',
+                              value: visitor.contactNumber,
+                            ),
                           InfoRow(
-                            label: 'Schedule',
+                            label: 'Expected arrival',
                             value: '${shortDate(visitor.schedule)} • '
                                 '${timeText(visitor.schedule)}',
                           ),
+                          if (visitor.expectedDepartureAt != null)
+                            InfoRow(
+                              label: 'Expected departure',
+                              value:
+                                  '${shortDate(visitor.expectedDepartureAt!)} • ${timeText(visitor.expectedDepartureAt!)}',
+                            ),
                           if (visitor.reviewNote?.isNotEmpty == true)
                             InfoRow(
                               label: 'Review note',

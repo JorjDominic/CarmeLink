@@ -449,6 +449,8 @@ class VisitorRequest {
     this.tenantId = '',
     this.tenantName = '',
     this.purpose = '',
+    this.contactNumber = '',
+    this.expectedDepartureAt,
     this.reviewNote,
     this.decidedBy,
     this.decidedAt,
@@ -463,7 +465,9 @@ class VisitorRequest {
   final String visitorName;
   final String relationship;
   final String purpose;
+  final String contactNumber;
   final DateTime schedule;
+  final DateTime? expectedDepartureAt;
   final String status;
   final String? reviewNote;
   final String? decidedBy;
@@ -498,7 +502,9 @@ class VisitorRequest {
       visitorName: row['visitor_name'] as String? ?? '',
       relationship: row['relationship'] as String? ?? '',
       purpose: row['purpose'] as String? ?? '',
+      contactNumber: row['contact_number'] as String? ?? '',
       schedule: DateTime.parse(row['schedule'] as String).toLocal(),
+      expectedDepartureAt: _optionalLocalDate(row['expected_departure_at']),
       status: row['status'] as String? ?? 'pending',
       reviewNote: row['review_note'] as String?,
       decidedBy: row['decided_by'] as String?,

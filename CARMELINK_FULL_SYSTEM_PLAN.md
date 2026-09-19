@@ -728,6 +728,66 @@ Approved / Rejected
 
 OCR is currently represented as a simulated workflow in the ZIP and should not be considered a live production integration yet.
 
+## Contract, Billing, and Payment Synchronization
+
+Contracts define the financial terms but must not directly store mutable
+payment history. The production relationship is:
+
+```text
+Rental Contract
+      ↓
+Billing Charges
+      ↓
+Payment Transactions
+```
+
+### Rental contract records
+
+- Tenant and assigned room/bed
+- Contract start and end dates
+- Agreed rent, deposit, and other recurring charges
+- Billing frequency and due day
+- Contract status and effective terms
+
+### Billing charge records
+
+- Contract ID and tenant ID
+- Billing period and charge category
+- Original amount due and due date
+- Remaining balance and calculated payment status
+- Snapshot of the contract terms used when the charge was generated
+
+### Payment transaction records
+
+- Related charge and contract IDs
+- Exact amount paid
+- Date and time the payment was received or submitted
+- Payment method and external reference number
+- Receipt/proof metadata
+- Verification status, verifier, verification date/time, and decision notes
+
+### Synchronization rules
+
+- Active contract terms generate billing charges; payments never rewrite the
+  contract itself.
+- Only verified transactions reduce a charge's outstanding balance.
+- A charge becomes `paid` only when verified transactions cover its full
+  amount; lower totals produce `partially_paid`.
+- Rejected or pending-verification transactions do not reduce balances.
+- One charge may have multiple transactions to support partial payments.
+- Deposits, utilities, penalties, discounts, and rent must remain separately
+  identifiable billing categories.
+- Payment amount and transaction timestamps are append-only financial facts.
+  Corrections use reversal or adjustment records rather than overwriting
+  history.
+- Contract amendments affect future charges only. Existing charges retain the
+  terms and amounts used when they were generated.
+- Contract summaries calculate totals from charges minus verified payments,
+  using server-side database logic as the source of truth.
+
+This separation preserves accurate payment dates, times, and amounts while
+allowing contracts to change without corrupting historical financial records.
+
 ---
 
 # 12. Tenant Reports Hub
@@ -916,8 +976,8 @@ Recommended visitor fields:
 - Relationship
 - Tenant visited
 - Visit date
-- Expected time in
-- Expected time out
+- Expected arrival time
+- Expected same-day departure time; overnight visitor stays are prohibited
 - Purpose
 - Approval status
 - Actual arrival and departure times when staff presence logging is available

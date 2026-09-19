@@ -5,7 +5,8 @@ class VisitorService {
   const VisitorService();
 
   static const _columns =
-      'id, tenant_id, visitor_name, relationship, purpose, schedule, status, '
+      'id, tenant_id, visitor_name, relationship, purpose, contact_number, '
+      'schedule, expected_departure_at, status, '
       'review_note, decided_by, decided_at, arrived_at, departed_at, created_at, updated_at';
   static const _staffColumns =
       '$_columns, tenant:profiles!visitor_requests_tenant_id_fkey(full_name)';
@@ -45,7 +46,9 @@ class VisitorService {
     required String visitorName,
     required String relationship,
     required String purpose,
+    required String contactNumber,
     required DateTime schedule,
+    required DateTime expectedDepartureAt,
   }) async {
     final client = SupabaseConfig.clientSafe;
     final tenantId = client?.auth.currentUser?.id;
@@ -60,7 +63,10 @@ class VisitorService {
           'visitor_name': visitorName.trim(),
           'relationship': relationship.trim(),
           'purpose': purpose.trim(),
+          'contact_number': contactNumber.trim(),
           'schedule': schedule.toUtc().toIso8601String(),
+          'expected_departure_at':
+              expectedDepartureAt.toUtc().toIso8601String(),
           'status': 'pending',
         })
         .select(_columns)
@@ -73,7 +79,9 @@ class VisitorService {
     required String visitorName,
     required String relationship,
     required String purpose,
+    required String contactNumber,
     required DateTime schedule,
+    required DateTime expectedDepartureAt,
   }) async {
     final client = SupabaseConfig.clientSafe;
     if (client == null) throw Exception('Database client not available');
@@ -83,7 +91,10 @@ class VisitorService {
           'visitor_name': visitorName.trim(),
           'relationship': relationship.trim(),
           'purpose': purpose.trim(),
+          'contact_number': contactNumber.trim(),
           'schedule': schedule.toUtc().toIso8601String(),
+          'expected_departure_at':
+              expectedDepartureAt.toUtc().toIso8601String(),
         })
         .eq('id', requestId)
         .eq('status', 'pending')

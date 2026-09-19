@@ -5330,9 +5330,74 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
   final name = TextEditingController();
   final relation = TextEditingController();
   final purpose = TextEditingController();
+  final contact = TextEditingController();
   late DateTime schedule;
+  late DateTime expectedDepartureAt;
   late final TableRefreshSubscription _subscription;
   bool saving = false;
+  VisitorRequest? editingRequest;
+
+  Future<void> _pickArrival() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: schedule,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(schedule),
+    );
+    if (time == null) return;
+    final arrival =
+        DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    setState(() {
+      schedule = arrival;
+      expectedDepartureAt = arrival.add(const Duration(hours: 2));
+      if (expectedDepartureAt.day != arrival.day) {
+        expectedDepartureAt =
+            DateTime(arrival.year, arrival.month, arrival.day, 23, 59);
+      }
+    });
+  }
+
+  Future<void> _pickDeparture() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(expectedDepartureAt),
+    );
+    if (time == null) return;
+    setState(() {
+      expectedDepartureAt = DateTime(
+          schedule.year, schedule.month, schedule.day, time.hour, time.minute);
+    });
+  }
+
+  void _edit(VisitorRequest request) {
+    setState(() {
+      editingRequest = request;
+      name.text = request.visitorName;
+      relation.text = request.relationship;
+      purpose.text = request.purpose;
+      contact.text = request.contactNumber;
+      schedule = request.schedule;
+      expectedDepartureAt = request.expectedDepartureAt ??
+          request.schedule.add(const Duration(hours: 2));
+    });
+  }
+
+  void _resetForm() {
+    setState(() {
+      editingRequest = null;
+      name.clear();
+      relation.clear();
+      purpose.clear();
+      contact.clear();
+      schedule = DateTime.now().add(const Duration(days: 1));
+      expectedDepartureAt = schedule.add(const Duration(hours: 2));
+    });
+  }
 
   Future<void> _showHistory(VisitorRequest request) => showDialog<void>(
         context: context,
@@ -5379,6 +5444,7 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
   void initState() {
     super.initState();
     schedule = DateTime.now().add(const Duration(days: 1));
+    expectedDepartureAt = schedule.add(const Duration(hours: 2));
     TenantController.instance.loadVisitors();
     _subscription = TableRefreshSubscription(
       'tenant-visitors',
@@ -5392,6 +5458,7 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
     name.dispose();
     relation.dispose();
     purpose.dispose();
+    contact.dispose();
     _subscription.dispose();
     super.dispose();
   }
@@ -5436,36 +5503,46 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
               maxLines: 3,
             ),
             const SizedBox(height: 14),
+            LabeledField(
+              label: 'Visitor contact number',
+              controller: contact,
+              hint: 'e.g. 0917 123 4567',
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 14),
             CarmelitaCard(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Column(
                 children: [
                   InfoRow(
-                    label: 'Schedule',
+                    label: 'Expected arrival',
                     value: '${shortDate(schedule)} • ${timeText(schedule)}',
                     icon: Icons.event_outlined,
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton(
-                        onPressed: () => setState(
-                          () =>
-                              schedule = schedule.add(const Duration(days: 1)),
-                        ),
-                        child: const Text('+1 day'),
-                      ),
-                      OutlinedButton(
-                        onPressed: () => setState(
-                          () => schedule =
-                              schedule.add(const Duration(minutes: 30)),
-                        ),
-                        child: const Text('+30 min'),
-                      ),
-                    ],
+                  InfoRow(
+                    label: 'Expected departure',
+                    value:
+                        '${shortDate(expectedDepartureAt)} • ${timeText(expectedDepartureAt)}',
+                    icon: Icons.schedule_outlined,
                   ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Dormitory policy requires visitors to depart on the same day. Overnight stays are not permitted.',
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    OutlinedButton.icon(
+                      onPressed: _pickArrival,
+                      icon: const Icon(Icons.event_outlined),
+                      label: const Text('Choose arrival'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _pickDeparture,
+                      icon: const Icon(Icons.schedule_outlined),
+                      label: const Text('Choose departure'),
+                    ),
+                  ]),
                 ],
               ),
             ),
@@ -5478,10 +5555,11 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                     : () async {
                         if (name.text.trim().isEmpty ||
                             relation.text.trim().isEmpty ||
-                            purpose.text.trim().isEmpty) {
+                            purpose.text.trim().isEmpty ||
+                            contact.text.trim().length < 7) {
                           showAppSnackBar(
                             context,
-                            'Complete the visitor name, relationship, and purpose.',
+                            'Complete all visitor details with a valid contact number.',
                           );
                           return;
                         }
@@ -5490,20 +5568,47 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                               context, 'Choose a future visit schedule.');
                           return;
                         }
+                        if (!expectedDepartureAt.isAfter(schedule) ||
+                            expectedDepartureAt.year != schedule.year ||
+                            expectedDepartureAt.month != schedule.month ||
+                            expectedDepartureAt.day != schedule.day) {
+                          showAppSnackBar(
+                            context,
+                            'Departure must be after arrival on the same day. Overnight stays are not permitted.',
+                          );
+                          return;
+                        }
                         setState(() => saving = true);
                         try {
-                          await TenantController.instance.submitVisitor(
-                            visitorName: name.text.trim(),
-                            relationship: relation.text.trim(),
-                            purpose: purpose.text.trim(),
-                            schedule: schedule,
-                          );
+                          final editing = editingRequest;
+                          if (editing == null) {
+                            await TenantController.instance.submitVisitor(
+                              visitorName: name.text.trim(),
+                              relationship: relation.text.trim(),
+                              purpose: purpose.text.trim(),
+                              contactNumber: contact.text.trim(),
+                              schedule: schedule,
+                              expectedDepartureAt: expectedDepartureAt,
+                            );
+                          } else {
+                            await TenantController.instance.updateVisitor(
+                              request: editing,
+                              visitorName: name.text.trim(),
+                              relationship: relation.text.trim(),
+                              purpose: purpose.text.trim(),
+                              contactNumber: contact.text.trim(),
+                              schedule: schedule,
+                              expectedDepartureAt: expectedDepartureAt,
+                            );
+                          }
                           if (context.mounted) {
                             showAppSnackBar(
-                                context, 'Visitor request submitted.');
-                            name.clear();
-                            relation.clear();
-                            purpose.clear();
+                              context,
+                              editing == null
+                                  ? 'Visitor request submitted.'
+                                  : 'Visitor request updated.',
+                            );
+                            _resetForm();
                           }
                         } catch (error) {
                           if (context.mounted) {
@@ -5516,9 +5621,25 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                           if (mounted) setState(() => saving = false);
                         }
                       },
-                child: Text(saving ? 'Submitting…' : 'Submit visitor request'),
+                child: Text(
+                  saving
+                      ? 'Saving…'
+                      : editingRequest == null
+                          ? 'Submit visitor request'
+                          : 'Save changes',
+                ),
               ),
             ),
+            if (editingRequest != null) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: saving ? null : _resetForm,
+                  child: const Text('Discard changes'),
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             const SectionTitle(
               'Request history',
@@ -5571,8 +5692,14 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                                   const SizedBox(height: 6),
                                   Text(request.purpose),
                                   Text(
-                                    '${shortDate(request.schedule)} • ${timeText(request.schedule)}',
+                                    'Arrival: ${shortDate(request.schedule)} • ${timeText(request.schedule)}',
                                   ),
+                                  if (request.expectedDepartureAt != null)
+                                    Text(
+                                      'Departure: ${timeText(request.expectedDepartureAt!)}',
+                                    ),
+                                  if (request.contactNumber.isNotEmpty)
+                                    Text('Contact: ${request.contactNumber}'),
                                   if (request.reviewNote?.isNotEmpty == true)
                                     Text('Staff note: ${request.reviewNote}'),
                                   TextButton.icon(
@@ -5582,21 +5709,30 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                                   ),
                                   if (request.isPending) ...[
                                     const SizedBox(height: 8),
-                                    OutlinedButton(
-                                      onPressed: () async {
-                                        try {
-                                          await controller
-                                              .cancelVisitor(request);
-                                        } catch (error) {
-                                          if (context.mounted) {
-                                            showAppSnackBar(
-                                              context,
-                                              'Cancellation failed: $error',
-                                            );
-                                          }
-                                        }
-                                      },
-                                      child: const Text('Cancel request'),
+                                    Wrap(
+                                      spacing: 8,
+                                      children: [
+                                        OutlinedButton(
+                                          onPressed: () => _edit(request),
+                                          child: const Text('Edit'),
+                                        ),
+                                        OutlinedButton(
+                                          onPressed: () async {
+                                            try {
+                                              await controller
+                                                  .cancelVisitor(request);
+                                            } catch (error) {
+                                              if (context.mounted) {
+                                                showAppSnackBar(
+                                                  context,
+                                                  'Cancellation failed: $error',
+                                                );
+                                              }
+                                            }
+                                          },
+                                          child: const Text('Cancel request'),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ],

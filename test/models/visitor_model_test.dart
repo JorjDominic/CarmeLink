@@ -13,7 +13,9 @@ void main() {
         'visitor_name': 'Maria Dela Cruz',
         'relationship': 'Mother',
         'purpose': 'Family visit',
+        'contact_number': '0917 123 4567',
         'schedule': '2026-09-20T06:00:00Z',
+        'expected_departure_at': '2026-09-20T10:00:00Z',
         'status': 'approved',
         'review_note': 'Approved for the afternoon.',
         'decided_by': 'staff-1',
@@ -26,6 +28,8 @@ void main() {
       expect(request.tenantName, 'Anna Dela Cruz');
       expect(request.visitorName, 'Maria Dela Cruz');
       expect(request.purpose, 'Family visit');
+      expect(request.contactNumber, '0917 123 4567');
+      expect(request.expectedDepartureAt, isNotNull);
       expect(request.isApproved, isTrue);
       expect(request.statusLabel, 'Approved');
       expect(request.decidedAt, isNotNull);

@@ -21,6 +21,12 @@ finance/expenses, discipline, analytics, native tenant device
 binding/background location, feedback persistence, MockData removal, and final
 multi-account security/offline testing.
 
+The planned contracts module must synchronize through separate contract,
+billing-charge, and payment-transaction records. Verified payment amounts and
+exact transaction timestamps reduce charge balances; contract changes must not
+overwrite historical charges or payment facts. See the full system plan's
+**Contract, Billing, and Payment Synchronization** section.
+
 ## Status legend
 
 - [✓] Completed and connected, or fully complete as a static feature
@@ -56,6 +62,12 @@ geofencing or advanced analytics.
 > cancellation, approval/rejection, arrival/departure recording, role-visible
 > history, loading/error states, and real-time refresh. Added visitor model and
 > controller coverage; 150/150 tests pass.
+
+> **Sep 19, 2026 — Visitor Scheduling & Contact Rules:** Added pending-request
+> editing, visitor contact numbers, arrival/departure pickers, and an explicit
+> no-overnight policy. PostgreSQL validates that departure follows arrival on
+> the same Asia/Manila calendar date, while the app provides immediate matching
+> validation and clearly communicates the dormitory rule.
 
 > **Sep 19, 2026 — Owner Confidential Report Review:** Connected the owner-only
 > confidential report register to Supabase with mandatory private decision
@@ -130,7 +142,8 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Gate and Curfew** — verified IN/OUT events, curfew status, on-device geofence check-in, and presence timeline.
 - [✓] **Curfew Exception (Tenant)** — differentiated request types ('Late Return' direct to caretaker vs 'Overnight Leave' with guardian endorsement), departure/return schedule pickers, status pills, cancellation of pending requests, and live Supabase real-time sync.
 - [✓] **Visitor Request** — live visitor identity, purpose, schedule, review,
-  cancellation, arrival/departure status, and audit-safe real-time history.
+  contact details, pending edits, same-day-only arrival/departure scheduling,
+  cancellation, visit status, and audit-safe real-time history.
 - [✓] **Confidential Concern (Tenant Phase)** — restricted live submission and tenant-only history protected by RLS; staff review is deferred.
 - [✓] **Rules and Policies** — maintained dormitory rules and safety guidance.
 
