@@ -18,8 +18,9 @@ percentage.
 
 Major remaining areas are persisted notifications/preferences, contract-to-billing
 synchronization, finance/expenses, discipline, analytics, native tenant device
-binding/background location, feedback persistence, and final multi-account
-security/offline testing outside the visitor workflow.
+binding/background location, feedback persistence, real-device geofencing
+testing, geofence check-timer testing, and final multi-account security/offline
+testing outside the visitor workflow.
 
 The planned contracts module must synchronize through separate contract,
 billing-charge, and payment-transaction records. Verified payment amounts and
@@ -28,6 +29,22 @@ overwrite historical charges or payment facts. See the full system plan's
 **Contract, Billing, and Payment Synchronization** section.
 
 ## Workflow improvements
+
+### Geofencing production validation
+
+The boundary evaluator and adaptive interval calculations have automated test
+coverage, but this does not prove that scheduled checks execute reliably on a
+physical device. Production readiness also requires validating the timer and
+operating-system background restrictions across supported platforms.
+
+- [✓] Unit-test polygon/radius boundaries, hysteresis, permissions, failures, and adaptive interval calculations.
+- [ ] Implement the actual recurring geofence check scheduler; interval recommendations alone are not a running timer.
+- [ ] Test timer rescheduling at daytime, pre-curfew, active-curfew, and curfew-sleep transitions.
+- [ ] Verify that only one timer is active and that logout, account changes, and disposal cancel it.
+- [ ] Test foreground, background, app-resume, device-restart, and battery-optimization behavior on physical Android devices.
+- [ ] Test denied permission, permanently denied permission, disabled GPS, timeouts, poor signal, and restored-location recovery.
+- [ ] Confirm duplicate checks do not create duplicate IN/OUT events and that retry/backoff behavior is bounded.
+- [ ] Run an on-site inside/outside boundary walk test and compare recorded transitions with the configured dormitory polygon.
 
 ### Account creation → contract
 
@@ -61,8 +78,8 @@ Implementation follow-up:
 - [✓] Generate an immutable, versioned printable contract PDF.
 - [✓] Upload the signed paper privately and record uploader/time/file metadata.
 - [✓] Add owner signed-document verification before contract activation.
-- [ ] Display an onboarding-incomplete indicator for tenants without contracts.
-- [ ] Continue from contract save to room/bed assignment and guardian linking.
+- [✓] Display an onboarding-incomplete indicator for tenants without contracts.
+- [✓] Continue from signed-document verification to room/bed assignment and guardian linking.
 
 ## Status legend
 

@@ -37,21 +37,32 @@ class ContractDocumentService {
 
   Future<GeneratedContractFile> generateContract(
       TenantContract contract) async {
+    final existing = await listDocuments(contract.id);
+    if (existing.any((item) => item.isGenerated)) {
+      throw Exception(
+          'A printable contract already exists. Delete it before generating another.');
+    }
     final version = await _nextVersion(contract.id);
     final bytes = await _buildPdf(contract, version);
     final filename = '${contract.contractNumber}-v$version.pdf';
     final path = '${contract.id}/v$version/generated-'
         '${DateTime.now().toUtc().microsecondsSinceEpoch}.pdf';
     await _upload(path, bytes, 'application/pdf');
-    final document = await _register(
-      contractId: contract.id,
-      version: version,
-      documentType: 'generated',
-      path: path,
-      filename: filename,
-      mimeType: 'application/pdf',
-      bytes: bytes,
-    );
+    late final ContractDocument document;
+    try {
+      document = await _register(
+        contractId: contract.id,
+        version: version,
+        documentType: 'generated',
+        path: path,
+        filename: filename,
+        mimeType: 'application/pdf',
+        bytes: bytes,
+      );
+    } catch (_) {
+      await _client.storage.from(_bucket).remove([path]);
+      rethrow;
+    }
     return GeneratedContractFile(document: document, bytes: bytes);
   }
 
@@ -62,6 +73,11 @@ class ContractDocumentService {
     required String mimeType,
     required Uint8List bytes,
   }) async {
+    final existing = await listDocuments(contract.id);
+    if (existing.any((item) => item.isSigned)) {
+      throw Exception(
+          'A signed copy already exists. Delete it before uploading another.');
+    }
     if (bytes.isEmpty || bytes.length > 10 * 1024 * 1024) {
       throw Exception('Signed document must be 10 MB or smaller.');
     }
@@ -77,15 +93,20 @@ class ContractDocumentService {
     final path = '${contract.id}/v$version/signed-'
         '${DateTime.now().toUtc().microsecondsSinceEpoch}.$extension';
     await _upload(path, bytes, mimeType);
-    return _register(
-      contractId: contract.id,
-      version: version,
-      documentType: 'signed',
-      path: path,
-      filename: filename,
-      mimeType: mimeType,
-      bytes: bytes,
-    );
+    try {
+      return await _register(
+        contractId: contract.id,
+        version: version,
+        documentType: 'signed',
+        path: path,
+        filename: filename,
+        mimeType: mimeType,
+        bytes: bytes,
+      );
+    } catch (_) {
+      await _client.storage.from(_bucket).remove([path]);
+      rethrow;
+    }
   }
 
   Future<ContractDocument> reviewSignedDocument({
@@ -103,6 +124,25 @@ class ContractDocumentService {
 
   Future<Uint8List> downloadDocument(String storagePath) async =>
       _client.storage.from(_bucket).download(storagePath);
+
+  Future<void> deleteVersion({
+    required String contractId,
+    required int version,
+    required List<String> storagePaths,
+  }) async {
+    final deleted = await _client
+        .from('contract_documents')
+        .delete()
+        .eq('contract_id', contractId)
+        .eq('version', version)
+        .select('id');
+    if (deleted.isEmpty) {
+      throw Exception('Document version could not be deleted.');
+    }
+    if (storagePaths.isNotEmpty) {
+      await _client.storage.from(_bucket).remove(storagePaths);
+    }
+  }
 
   Future<int> _nextVersion(String contractId) async {
     final rows = await _client

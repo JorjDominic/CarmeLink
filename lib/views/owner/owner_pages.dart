@@ -194,7 +194,8 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
         'guardian_tenant_links',
         'tenant_assignments',
         'bed_spaces',
-        'rooms'
+        'rooms',
+        'tenant_contracts',
       ],
       () => _fetchTenants(showSpinner: false),
     );
@@ -211,7 +212,11 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
       setState(() => _loading = true);
     }
     try {
-      final latest = await _service.loadTenants(forceRefresh: true);
+      final latest = await _service.loadTenants(
+        forceRefresh: true,
+        includeContractStatus:
+            SessionController.instance.currentUser?.role == UserRole.owner,
+      );
       if (mounted) {
         setState(() {
           _tenants = latest;
@@ -303,11 +308,19 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
                       child:
                           Text(tenant.name.isNotEmpty ? tenant.name[0] : '?'),
                     ),
-                    title: Text(
-                      tenant.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                      ),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            tenant.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (tenant.hasContract == false)
+                          const _OnboardingIncompleteBadge(),
+                      ],
                     ),
                     subtitle: Text('Room ${tenant.room} • ${tenant.bedSpace}'),
                     trailing:
@@ -394,12 +407,106 @@ class TenantDetailsPage extends StatelessWidget {
               ],
             ),
           ),
+          if (tenant.hasContract == false) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.pending_actions_outlined,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Onboarding incomplete',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onErrorContainer,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'This tenant does not have a contract yet. Create a draft to continue onboarding.',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () async {
+                      final saved = await showContractEditor(
+                        context,
+                        initialTenantId: tenant.id,
+                        initialTenantName: tenant.name,
+                        lockTenant: true,
+                      );
+                      if (saved == true && context.mounted) {
+                        Navigator.pop(context);
+                      }
+                    },
+                    icon: const Icon(Icons.description_outlined),
+                    label: const Text('Create contract'),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           _TenantAssignmentManager(tenant: tenant),
         ],
       ),
     );
   }
+}
+
+class _OnboardingIncompleteBadge extends StatelessWidget {
+  const _OnboardingIncompleteBadge();
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: 'No contract has been created for this tenant',
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.priority_high_rounded,
+                size: 14,
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                'Incomplete',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 String _residencyLabel(String value) => switch (value) {

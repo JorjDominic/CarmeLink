@@ -15,7 +15,7 @@ class TenantService {
   }
 
   Future<List<TenantDirectoryEntry>> loadTenants(
-      {bool forceRefresh = false}) async {
+      {bool forceRefresh = false, bool includeContractStatus = false}) async {
     if (!forceRefresh &&
         _cachedTenants != null &&
         _lastTenantFetch != null &&
@@ -69,6 +69,14 @@ class TenantService {
     final details = <String, Map<String, dynamic>>{
       for (final row in results[2]) row['profile_id'] as String: row,
     };
+    final contractTenantIds = <String>{};
+    if (includeContractStatus) {
+      final contracts =
+          await client.from('tenant_contracts').select('tenant_id');
+      contractTenantIds.addAll(
+        contracts.map((row) => row['tenant_id'] as String),
+      );
+    }
     final entries = profiles.map((profile) {
       final id = profile['id'] as String;
       final assignment = assignments[id];
@@ -88,6 +96,8 @@ class TenantService {
         contractEndsOn: _date(detail?['contract_ends_on']),
         gateStatus: detail?['current_gate_status'] as String? ?? 'Unavailable',
         lastGateEventAt: _date(detail?['last_gate_event_at']),
+        hasContract:
+            includeContractStatus ? contractTenantIds.contains(id) : null,
       );
     }).toList();
     _cachedTenants = entries;

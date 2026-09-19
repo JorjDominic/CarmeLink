@@ -8,6 +8,9 @@ import '../../controllers/owner_controller.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/contract_document_service.dart';
+import '../../services/guardian_link_service.dart';
+import '../../services/tenant_service.dart';
+import 'tenant_onboarding_flow.dart';
 
 Future<bool?> showContractEditor(
   BuildContext context, {
@@ -15,16 +18,19 @@ Future<bool?> showContractEditor(
   String? initialTenantId,
   String? initialTenantName,
   bool lockTenant = false,
-}) =>
-    showDialog<bool>(
-      context: context,
-      builder: (_) => _ContractEditor(
-        contract: contract,
-        initialTenantId: initialTenantId,
-        initialTenantName: initialTenantName,
-        lockTenant: lockTenant,
-      ),
-    );
+}) async {
+  final saved = await showDialog<TenantContract>(
+    context: context,
+    builder: (_) => _ContractEditor(
+      contract: contract,
+      initialTenantId: initialTenantId,
+      initialTenantName: initialTenantName,
+      lockTenant: lockTenant,
+    ),
+  );
+  if (saved == null) return null;
+  return true;
+}
 
 class ContractsPage extends StatefulWidget {
   const ContractsPage({super.key});
@@ -293,10 +299,39 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
   final _service = const ContractDocumentService();
   late Future<List<ContractDocument>> _documents =
       _service.listDocuments(widget.contract.id);
+  late Future<_OnboardingNeeds> _onboardingNeeds = _loadOnboardingNeeds();
   bool _working = false;
 
-  void _reload() =>
-      setState(() => _documents = _service.listDocuments(widget.contract.id));
+  Future<_OnboardingNeeds> _loadOnboardingNeeds() async {
+    final results = await Future.wait<dynamic>([
+      const TenantService().loadTenants(forceRefresh: true),
+      const GuardianLinkService().listLinks(),
+    ]);
+    final tenants = results[0] as List<TenantDirectoryEntry>;
+    final links = results[1] as List<Map<String, dynamic>>;
+    final tenant = tenants
+        .where((item) => item.id == widget.contract.tenantId)
+        .firstOrNull;
+    return _OnboardingNeeds(
+      needsBed: tenant?.assignmentId == null,
+      needsGuardian:
+          !links.any((link) => link['tenant_id'] == widget.contract.tenantId),
+    );
+  }
+
+  void _reloadOnboardingNeeds() {
+    if (!mounted) return;
+    setState(() {
+      _onboardingNeeds = _loadOnboardingNeeds();
+    });
+  }
+
+  void _reload() {
+    if (!mounted) return;
+    setState(() {
+      _documents = _service.listDocuments(widget.contract.id);
+    });
+  }
 
   Future<void> _generate() async {
     setState(() => _working = true);
@@ -351,6 +386,64 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
     }
   }
 
+  Future<void> _deleteVersion(
+    int version,
+    List<ContractDocument> documents,
+  ) async {
+    if (widget.contract.status == 'active') {
+      showAppSnackBar(
+        context,
+        'Active contract documents cannot be deleted. Terminate the contract first.',
+      );
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete contract documents?'),
+        content: Text(
+          'Delete the generated and signed files for version $version? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _working = true);
+    try {
+      await _service.deleteVersion(
+        contractId: widget.contract.id,
+        version: version,
+        storagePaths: documents.map((item) => item.storagePath).toList(),
+      );
+      if (mounted) {
+        showAppSnackBar(context, 'Contract document version deleted.');
+        _reload();
+      }
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Delete failed: $error');
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _continueOnboarding() async {
+    await continueTenantOnboarding(
+      context,
+      tenantId: widget.contract.tenantId,
+      tenantName: widget.contract.tenantName,
+    );
+    _reloadOnboardingNeeds();
+  }
+
   Future<void> _open(ContractDocument document) async {
     await Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute<void>(
@@ -363,60 +456,34 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
   }
 
   Future<void> _review(ContractDocument document, bool approve) async {
-    final notes = TextEditingController();
-    final confirmed = await showDialog<bool>(
+    final notes = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(
-            approve ? 'Verify signed contract?' : 'Reject signed contract?'),
-        content: TextField(
-          controller: notes,
-          autofocus: true,
-          minLines: 2,
-          maxLines: 4,
-          decoration: InputDecoration(
-            labelText: 'Review notes',
-            hintText: approve
-                ? 'Confirm signatures and document completeness'
-                : 'Explain what must be corrected',
-            alignLabelWithHint: true,
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel')),
-          FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(approve ? 'Verify document' : 'Reject document')),
-        ],
-      ),
+      builder: (_) => _ContractReviewDialog(approve: approve),
     );
-    if (confirmed != true || !mounted) {
-      notes.dispose();
-      return;
-    }
-    if (notes.text.trim().length < 3) {
-      showAppSnackBar(context, 'Enter review notes of at least 3 characters.');
-      notes.dispose();
-      return;
-    }
+    if (notes == null || !mounted) return;
     setState(() => _working = true);
     try {
       await _service.reviewSignedDocument(
         documentId: document.id,
         approve: approve,
-        notes: notes.text,
+        notes: notes,
       );
       if (mounted) {
         showAppSnackBar(context,
             approve ? 'Signed contract verified.' : 'Document rejected.');
         _reload();
+        if (approve) {
+          await continueTenantOnboarding(
+            context,
+            tenantId: widget.contract.tenantId,
+            tenantName: widget.contract.tenantName,
+          );
+          _reloadOnboardingNeeds();
+        }
       }
     } catch (error) {
       if (mounted) showAppSnackBar(context, 'Review failed: $error');
     } finally {
-      notes.dispose();
       if (mounted) setState(() => _working = false);
     }
   }
@@ -441,9 +508,26 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
         }
         final documents = snapshot.data ?? const [];
         final generated = documents.where((item) => item.isGenerated).toList();
+        final signed = documents.where((item) => item.isSigned).toList();
         final latestVersion = generated.isEmpty
             ? null
             : generated.map((e) => e.version).reduce((a, b) => a > b ? a : b);
+        final latestSigned = latestVersion == null
+            ? null
+            : documents
+                .where((item) => item.isSigned && item.version == latestVersion)
+                .firstOrNull;
+        final currentSignatureStatus = latestVersion == null
+            ? 'not_generated'
+            : latestSigned == null
+                ? 'awaiting_signature'
+                : latestSigned.reviewStatus == 'verified'
+                    ? 'verified'
+                    : latestSigned.reviewStatus == 'rejected'
+                        ? 'rejected'
+                        : 'pending_verification';
+        final versions = documents.map((item) => item.version).toSet().toList()
+          ..sort((a, b) => b.compareTo(a));
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
@@ -470,23 +554,48 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
                     ],
                   ),
                 ),
-                StatusPill(_signatureLabel(widget.contract.signatureStatus)),
+                StatusPill(_signatureLabel(currentSignatureStatus)),
               ]),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: _working ? null : _generate,
+              onPressed: _working || generated.isNotEmpty ? null : _generate,
               icon: const Icon(Icons.picture_as_pdf_outlined),
               label: Text(generated.isEmpty
                   ? 'Generate printable PDF'
-                  : 'Generate new version'),
+                  : 'Printable contract already generated'),
             ),
-            if (latestVersion != null) ...[
+            if (latestVersion != null && signed.isEmpty) ...[
               const SizedBox(height: 10),
               OutlinedButton.icon(
                 onPressed: _working ? null : () => _uploadSigned(latestVersion),
                 icon: const Icon(Icons.upload_file_outlined),
                 label: Text('Upload signed copy for version $latestVersion'),
+              ),
+            ],
+            if (latestSigned?.reviewStatus == 'verified') ...[
+              const SizedBox(height: 10),
+              FutureBuilder<_OnboardingNeeds>(
+                future: _onboardingNeeds,
+                builder: (context, onboardingSnapshot) {
+                  final needs = onboardingSnapshot.data;
+                  if (needs != null && !needs.hasRemainingSteps) {
+                    return const SizedBox.shrink();
+                  }
+                  final label = needs == null
+                      ? 'Checking onboarding status...'
+                      : needs.needsBed && needs.needsGuardian
+                          ? 'Continue tenant onboarding'
+                          : needs.needsBed
+                              ? 'Continue room assignment'
+                              : 'Continue guardian linking';
+                  return FilledButton.tonalIcon(
+                    onPressed:
+                        _working || needs == null ? null : _continueOnboarding,
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                    label: Text(label),
+                  );
+                },
               ),
             ],
             const SizedBox(height: 24),
@@ -503,65 +612,18 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
                 message: 'Generate the first printable version to begin.',
               )
             else
-              ...documents.map((document) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: CarmelitaCard(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            Icon(document.isGenerated
-                                ? Icons.picture_as_pdf_outlined
-                                : Icons.draw_outlined),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                document.isGenerated
-                                    ? 'Printable contract • Version ${document.version}'
-                                    : 'Signed copy • Version ${document.version}',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            StatusPill(_reviewLabel(document.reviewStatus)),
-                          ]),
-                          const SizedBox(height: 6),
-                          Text(document.originalFilename,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall),
-                          const SizedBox(height: 8),
-                          Wrap(spacing: 8, runSpacing: 6, children: [
-                            TextButton.icon(
-                              onPressed: () => _open(document),
-                              icon: const Icon(Icons.visibility_outlined,
-                                  size: 18),
-                              label: const Text('View'),
-                            ),
-                            if (document.isPending)
-                              TextButton.icon(
-                                onPressed: _working
-                                    ? null
-                                    : () => _review(document, true),
-                                icon: const Icon(Icons.verified_outlined,
-                                    size: 18),
-                                label: const Text('Verify'),
-                              ),
-                            if (document.isPending)
-                              TextButton.icon(
-                                onPressed: _working
-                                    ? null
-                                    : () => _review(document, false),
-                                icon:
-                                    const Icon(Icons.cancel_outlined, size: 18),
-                                label: const Text('Reject'),
-                              ),
-                          ]),
-                        ],
-                      ),
-                    ),
-                  )),
+              ...versions.map((version) {
+                final versionDocuments =
+                    documents.where((item) => item.version == version).toList();
+                return _DocumentVersionCard(
+                  version: version,
+                  documents: versionDocuments,
+                  working: _working,
+                  onOpen: _open,
+                  onReview: _review,
+                  onDelete: () => _deleteVersion(version, versionDocuments),
+                );
+              }),
           ],
         );
       },
@@ -606,13 +668,227 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
         'rejected' => 'Rejected',
         _ => 'Not generated',
       };
+}
 
-  String _reviewLabel(String value) => switch (value) {
+class _OnboardingNeeds {
+  const _OnboardingNeeds({
+    required this.needsBed,
+    required this.needsGuardian,
+  });
+
+  final bool needsBed;
+  final bool needsGuardian;
+  bool get hasRemainingSteps => needsBed || needsGuardian;
+}
+
+class _DocumentVersionCard extends StatelessWidget {
+  const _DocumentVersionCard({
+    required this.version,
+    required this.documents,
+    required this.working,
+    required this.onOpen,
+    required this.onReview,
+    required this.onDelete,
+  });
+
+  final int version;
+  final List<ContractDocument> documents;
+  final bool working;
+  final ValueChanged<ContractDocument> onOpen;
+  final void Function(ContractDocument document, bool approve) onReview;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final generated = documents.where((item) => item.isGenerated).firstOrNull;
+    final signed = documents.where((item) => item.isSigned).firstOrNull;
+    final status = signed?.reviewStatus ?? 'not_required';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: CarmelitaCard(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              const Icon(Icons.description_outlined),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Contract document • Version $version',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              StatusPill(_reviewLabel(status)),
+            ]),
+            if (generated != null) ...[
+              const SizedBox(height: 10),
+              _DocumentFileRow(
+                label: 'Original PDF',
+                document: generated,
+                dateLabel: 'Created',
+                onOpen: () => onOpen(generated),
+              ),
+            ],
+            if (signed != null) ...[
+              const SizedBox(height: 10),
+              _DocumentFileRow(
+                label: 'Signed copy',
+                document: signed,
+                dateLabel: 'Signed/uploaded',
+                onOpen: () => onOpen(signed),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 6, children: [
+              if (signed?.isPending == true)
+                TextButton.icon(
+                  onPressed: working ? null : () => onReview(signed!, true),
+                  icon: const Icon(Icons.verified_outlined, size: 18),
+                  label: const Text('Verify'),
+                ),
+              if (signed?.isPending == true)
+                TextButton.icon(
+                  onPressed: working ? null : () => onReview(signed!, false),
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: const Text('Reject'),
+                ),
+              TextButton.icon(
+                onPressed: working ? null : onDelete,
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Delete version'),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _reviewLabel(String value) => switch (value) {
         'pending' => 'Pending',
         'verified' => 'Verified',
         'rejected' => 'Rejected',
         _ => 'Original',
       };
+}
+
+class _DocumentFileRow extends StatelessWidget {
+  const _DocumentFileRow({
+    required this.label,
+    required this.document,
+    required this.dateLabel,
+    required this.onOpen,
+  });
+
+  final String label;
+  final ContractDocument document;
+  final String dateLabel;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(document.isGenerated
+                  ? Icons.picture_as_pdf_outlined
+                  : Icons.draw_outlined),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(label,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+              ),
+              TextButton.icon(
+                onPressed: onOpen,
+                icon: const Icon(Icons.visibility_outlined, size: 18),
+                label: const Text('View'),
+              ),
+            ]),
+            Text(
+              document.originalFilename,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              '$dateLabel ${shortDate(document.uploadedAt)} • ${timeText(document.uploadedAt)}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      );
+}
+
+class _ContractReviewDialog extends StatefulWidget {
+  const _ContractReviewDialog({required this.approve});
+
+  final bool approve;
+
+  @override
+  State<_ContractReviewDialog> createState() => _ContractReviewDialogState();
+}
+
+class _ContractReviewDialogState extends State<_ContractReviewDialog> {
+  final _notes = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _notes.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _notes.text.trim();
+    if (value.length < 3) {
+      setState(() => _error = 'Enter review notes of at least 3 characters.');
+      return;
+    }
+    Navigator.pop(context, value);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text(widget.approve
+            ? 'Verify signed contract?'
+            : 'Reject signed contract?'),
+        content: TextField(
+          controller: _notes,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 4,
+          onChanged: (_) {
+            if (_error != null) setState(() => _error = null);
+          },
+          onSubmitted: (_) => _submit(),
+          decoration: InputDecoration(
+            labelText: 'Review notes',
+            hintText: widget.approve
+                ? 'Confirm signatures and document completeness'
+                : 'Explain what must be corrected',
+            errorText: _error,
+            alignLabelWithHint: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _submit,
+            child: Text(widget.approve ? 'Verify document' : 'Reject document'),
+          ),
+        ],
+      );
 }
 
 class _ContractDocumentViewer extends StatefulWidget {
@@ -992,8 +1268,9 @@ class _ContractEditorState extends State<_ContractEditor> {
     try {
       final controller = OwnerController.instance;
       final existing = widget.contract;
+      late final TenantContract saved;
       if (existing == null) {
-        await controller.createContract(
+        saved = await controller.createContract(
           tenantId: _tenantId!,
           contractNumber: _number.text,
           startsOn: _start,
@@ -1011,7 +1288,7 @@ class _ContractEditorState extends State<_ContractEditor> {
             break;
           }
         }
-        await controller.updateContract(existing.copyWith(
+        saved = await controller.updateContract(existing.copyWith(
           tenantId: _tenantId!,
           tenantName: tenant?.name ?? existing.tenantName,
           contractNumber: _number.text,
@@ -1023,7 +1300,7 @@ class _ContractEditorState extends State<_ContractEditor> {
           notes: _notes.text,
         ));
       }
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) Navigator.pop(context, saved);
     } catch (error) {
       if (mounted) showAppSnackBar(context, 'Failed to save contract: $error');
     } finally {

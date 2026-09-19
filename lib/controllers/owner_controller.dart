@@ -570,7 +570,7 @@ class OwnerController extends ChangeNotifier {
     }
   }
 
-  Future<void> createContract({
+  Future<TenantContract> createContract({
     required String tenantId,
     required String contractNumber,
     required DateTime startsOn,
@@ -592,13 +592,15 @@ class OwnerController extends ChangeNotifier {
     );
     _contracts.insert(0, item);
     notifyListeners();
+    return item;
   }
 
-  Future<void> updateContract(TenantContract contract) async {
+  Future<TenantContract> updateContract(TenantContract contract) async {
     final item = await _contractService.updateContract(contract);
     final index = _contracts.indexWhere((value) => value.id == item.id);
     if (index >= 0) _contracts[index] = item;
     notifyListeners();
+    return item;
   }
 
   Future<void> deleteContract(String id) async {

@@ -859,6 +859,7 @@ class TenantDirectoryEntry {
     this.contractStartsOn,
     this.contractEndsOn,
     this.lastGateEventAt,
+    this.hasContract,
   });
 
   final String id;
@@ -875,6 +876,7 @@ class TenantDirectoryEntry {
   final DateTime? contractStartsOn;
   final DateTime? contractEndsOn;
   final DateTime? lastGateEventAt;
+  final bool? hasContract;
 
   bool get isInside => gateStatus == 'IN' || gateStatus == 'Inside';
   bool get isOutside => gateStatus == 'OUT' || gateStatus == 'Outside';
