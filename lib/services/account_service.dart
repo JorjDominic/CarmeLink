@@ -10,7 +10,7 @@ class AccountService {
     return List<Map<String, dynamic>>.from(data['accounts'] as List);
   }
 
-  Future<void> createAccount({
+  Future<CreatedAccount> createAccount({
     required String fullName,
     required String email,
     required String phone,
@@ -31,6 +31,12 @@ class AccountService {
       if (response.status < 200 || response.status >= 300) {
         throw AccountCreationException(_messageFrom(response.data));
       }
+      if (response.data is! Map) {
+        throw const AccountCreationException(
+            'The account was created, but its profile ID was not returned.');
+      }
+      return CreatedAccount.fromData(
+          Map<String, dynamic>.from(response.data as Map));
     } on FunctionException catch (error) {
       throw AccountCreationException(_messageFrom(error.details));
     }
@@ -63,6 +69,10 @@ class AccountService {
     await _invokeManage({'action': 'reset_password', 'id': id});
   }
 
+  Future<void> resendEmailVerification(String id) async {
+    await _invokeManage({'action': 'resend_verification', 'id': id});
+  }
+
   Future<void> deleteAccount(String id) async {
     await _invokeManage({'action': 'delete', 'id': id});
   }
@@ -81,6 +91,35 @@ class AccountService {
       throw AccountCreationException(_messageFrom(error.details));
     }
   }
+}
+
+class CreatedAccount {
+  const CreatedAccount({
+    required this.id,
+    required this.email,
+    required this.role,
+    required this.fullName,
+  });
+
+  factory CreatedAccount.fromData(Map<String, dynamic> data,
+      {String fullName = ''}) {
+    final id = data['id'] as String?;
+    final email = data['email'] as String?;
+    final role = data['role'] as String?;
+    if (id == null || id.isEmpty || email == null || role == null) {
+      throw const AccountCreationException(
+          'The account was created, but its profile details were incomplete.');
+    }
+    return CreatedAccount(id: id, email: email, role: role, fullName: fullName);
+  }
+
+  final String id;
+  final String email;
+  final String role;
+  final String fullName;
+
+  CreatedAccount withFullName(String value) =>
+      CreatedAccount(id: id, email: email, role: role, fullName: value.trim());
 }
 
 class AccountCreationException implements Exception {

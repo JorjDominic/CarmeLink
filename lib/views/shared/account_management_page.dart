@@ -6,6 +6,7 @@ import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../../services/account_service.dart';
 import '../../services/table_refresh_subscription.dart';
+import '../owner/contracts_page.dart';
 
 class AccountManagementPage extends StatefulWidget {
   const AccountManagementPage({super.key});
@@ -64,16 +65,22 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
           ],
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () async {
-              final created = await showModalBottomSheet<bool>(
+              final created = await showModalBottomSheet<CreatedAccount>(
                 context: context,
                 isScrollControlled: true,
                 useSafeArea: true,
                 showDragHandle: true,
                 builder: (_) => const _CreateAccountSheet(),
               );
-              if (created == true && context.mounted) {
+              if (created != null && context.mounted) {
                 reload();
-                showAppSnackBar(context, 'Account created successfully.');
+                if (created.role == 'tenant' &&
+                    SessionController.instance.currentUser?.role ==
+                        UserRole.owner) {
+                  await _offerContractDraft(created);
+                } else if (context.mounted) {
+                  showAppSnackBar(context, 'Account created successfully.');
+                }
               }
             },
             icon: const Icon(Icons.person_add_outlined),
@@ -112,6 +119,8 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
                                 (row['phone'] as String?)?.isNotEmpty == true
                                     ? row['phone'] as String
                                     : 'No phone number',
+                                'Email: ${row['email_verification_status'] == 'verified' ? 'Verified' : 'Pending verification'}',
+                                'Mobile: ${row['phone_verification_status'] == 'verified' ? 'Verified' : 'On hold'}',
                               ].join('\n')),
                               trailing: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -130,6 +139,41 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
           ),
         ),
       );
+
+  Future<void> _offerContractDraft(CreatedAccount account) async {
+    final createNow = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Tenant account created'),
+        content: Text(
+          '${account.fullName} can now be added to a draft contract. '
+          'You can also complete this step later from Contracts.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Do this later'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Create contract now'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (createNow != true) {
+      showAppSnackBar(context, 'Tenant account created successfully.');
+      return;
+    }
+    await showContractEditor(
+      context,
+      initialTenantId: account.id,
+      initialTenantName: account.fullName,
+      lockTenant: true,
+    );
+  }
 
   String _roleLabel(String role) => switch (role) {
         'owner' => 'Owner',
@@ -191,6 +235,14 @@ class _EditAccountSheetState extends State<_EditAccountSheet> {
   Future<void> resetPassword() async {
     await run(() => service.sendPasswordReset(widget.account['id'] as String),
         close: false, success: 'Password recovery email sent.');
+  }
+
+  Future<void> resendVerification() async {
+    await run(
+      () => service.resendEmailVerification(widget.account['id'] as String),
+      close: false,
+      success: 'Verification email sent.',
+    );
   }
 
   Future<void> delete() async {
@@ -273,6 +325,37 @@ class _EditAccountSheetState extends State<_EditAccountSheet> {
                 _InlineError(message: errorMessage!),
               ],
               const SizedBox(height: 18),
+              Row(children: [
+                Expanded(
+                  child: InfoRow(
+                    label: 'Email verification',
+                    value: widget.account['email_verification_status'] ==
+                            'verified'
+                        ? 'Verified'
+                        : 'Pending',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: InfoRow(
+                    label: 'Mobile verification',
+                    value: 'On hold',
+                  ),
+                ),
+              ]),
+              if (widget.account['email_verification_status'] !=
+                  'verified') ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: loading ? null : resendVerification,
+                    icon: const Icon(Icons.mark_email_unread_outlined),
+                    label: const Text('Resend verification email'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
               SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -348,7 +431,7 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
     }
     setState(() => loading = true);
     try {
-      await service.createAccount(
+      final created = await service.createAccount(
         fullName: fullName.text,
         email: email.text,
         phone: phone.text,
@@ -356,7 +439,7 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
         temporaryPassword: password.text,
       );
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(created.withFullName(fullName.text));
     } catch (error) {
       if (mounted) setState(() => errorMessage = error.toString());
     } finally {

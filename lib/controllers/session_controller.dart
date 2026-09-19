@@ -69,6 +69,7 @@ class SessionController extends ChangeNotifier {
     notifyListeners();
     try {
       _currentUser = await _authService.signIn(email, password);
+      await _syncEmailVerification();
       _justSignedOut = false;
       return true;
     } catch (e) {
@@ -77,6 +78,14 @@ class SessionController extends ChangeNotifier {
     } finally {
       _loading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _syncEmailVerification() async {
+    try {
+      await SupabaseConfig.client.rpc('sync_current_email_verification');
+    } catch (error) {
+      debugPrint('Could not sync email verification timestamp: $error');
     }
   }
 

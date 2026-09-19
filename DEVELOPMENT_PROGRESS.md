@@ -52,11 +52,11 @@ guided workflow continues to room/bed assignment and guardian linking.
 
 Implementation follow-up:
 
-- [ ] Return the created tenant profile ID from the account-management flow.
-- [ ] Send and track email verification plus an expiring, rate-limited SMS OTP.
-- [ ] Expose Pending/Verified states for email and mobile independently.
-- [ ] Add `Create contract now` and `Do this later` success actions.
-- [ ] Open the contract editor with the tenant preselected and locked.
+- [✓] Return the created tenant profile ID from the account-management flow.
+- [✓] Send and track expiring email verification through Resend; SMS OTP is on hold pending provider selection.
+- [✓] Expose Pending/Verified email state and independent On hold mobile state.
+- [✓] Add `Create contract now` and `Do this later` success actions for owners.
+- [✓] Open the contract editor with the tenant preselected and locked.
 - [ ] Generate an immutable, versioned printable contract PDF.
 - [ ] Upload the signed paper privately and record uploader/time/file metadata.
 - [ ] Add owner signed-document verification before contract activation.
@@ -85,6 +85,13 @@ geofencing or advanced analytics.
 8. **Safety and privacy** — confidential reports, audit logs, retention, and permissions.
 
 ## Completed Milestones History
+
+> **Sep 19, 2026 — Contract Production Verification:** Added and ran a remote
+> multi-role smoke test against the deployed Supabase project. It verifies
+> owner create/read/update/delete, tenant/guardian/caretaker isolation across
+> read/write/delete operations, invalid-date rejection, tenant-only contract
+> association, and cleanup of the temporary record. The complete Flutter suite
+> passes at 183/183 tests and static analysis reports no issues.
 
 > **Sep 19, 2026 — Live Contract CRUD:** Added an owner-only Supabase contract
 > register with create, read, update, and delete operations; tenant association,
@@ -437,14 +444,14 @@ Owned folders and files:
 - [✓] Add full account CRUD: create, list, edit, recovery, and delete
 - [✓] Verify account CRUD against Supabase with temporary-record cleanup
 - [✓] Add owner-only guardian-to-tenant link management and RLS
-- [ ] Send every new user a secure email invitation
+- [✓] Send every new user a secure email invitation through Resend (deployment awaits the production API secret)
 - [ ] Open onboarding from the invitation link and require a permanent password
 - [ ] Require owners and caretakers to verify SMS during onboarding
 - [ ] Require guardians to verify SMS before approving sensitive requests
 - [ ] Require tenants to verify SMS before gate, visitor, and recovery actions
-- [ ] Add OTP expiration, retry limits, resend cooldown, and attempt limits
-- [ ] Store email and phone verification timestamps for security auditing
-- [ ] Enforce verification requirements in RLS or protected server functions
+- [ ] Add SMS OTP expiration, retry limits, resend cooldown, and attempt limits (on hold)
+- [✓] Store independent email and phone verification timestamps for security auditing
+- [✓] Enforce verified email before contract activation; SMS enforcement is on hold
 - [ ] Add recovery handling when a user cannot access their email or phone
 - [ ] Add table-specific RLS as backend features are connected
 - [ ] Complete production access-control testing

@@ -81,4 +81,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('onboarding editor locks the newly created tenant',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(builder: (context) {
+        return FilledButton(
+          onPressed: () => showContractEditor(
+            context,
+            initialTenantId: 'new-tenant-id',
+            initialTenantName: 'New Tenant',
+            lockTenant: true,
+          ),
+          child: const Text('Open'),
+        );
+      }),
+    ));
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('New Tenant'), findsOneWidget);
+    final dropdown = tester.widget<DropdownButtonFormField<String>>(
+        find.byType(DropdownButtonFormField<String>).first);
+    expect(dropdown.onChanged, isNull);
+    expect(find.text('DRAFT'), findsOneWidget);
+  });
 }

@@ -4,6 +4,23 @@ import '../../controllers/owner_controller.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 
+Future<bool?> showContractEditor(
+  BuildContext context, {
+  TenantContract? contract,
+  String? initialTenantId,
+  String? initialTenantName,
+  bool lockTenant = false,
+}) =>
+    showDialog<bool>(
+      context: context,
+      builder: (_) => _ContractEditor(
+        contract: contract,
+        initialTenantId: initialTenantId,
+        initialTenantName: initialTenantName,
+        lockTenant: lockTenant,
+      ),
+    );
+
 class ContractsPage extends StatefulWidget {
   const ContractsPage({super.key});
 
@@ -139,10 +156,7 @@ class _ContractsPageState extends State<ContractsPage> {
       );
 
   Future<void> _openEditor([TenantContract? contract]) async {
-    await showDialog<void>(
-      context: context,
-      builder: (_) => _ContractEditor(contract: contract),
-    );
+    await showContractEditor(context, contract: contract);
   }
 
   Future<void> _delete(TenantContract contract) async {
@@ -226,8 +240,16 @@ class _ContractCard extends StatelessWidget {
 }
 
 class _ContractEditor extends StatefulWidget {
-  const _ContractEditor({this.contract});
+  const _ContractEditor({
+    this.contract,
+    this.initialTenantId,
+    this.initialTenantName,
+    this.lockTenant = false,
+  });
   final TenantContract? contract;
+  final String? initialTenantId;
+  final String? initialTenantName;
+  final bool lockTenant;
   @override
   State<_ContractEditor> createState() => _ContractEditorState();
 }
@@ -254,7 +276,7 @@ class _ContractEditorState extends State<_ContractEditor> {
     _deposit = TextEditingController(
         text: value?.securityDeposit.toStringAsFixed(2) ?? '0');
     _notes = TextEditingController(text: value?.notes ?? '');
-    _tenantId = value?.tenantId;
+    _tenantId = value?.tenantId ?? widget.initialTenantId;
     _status = value?.status ?? 'draft';
     _start = value?.startsOn ?? DateTime.now();
     _end = value?.endsOn ?? DateTime.now().add(const Duration(days: 365));
@@ -271,7 +293,18 @@ class _ContractEditorState extends State<_ContractEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final tenants = OwnerController.instance.tenants;
+    final tenants = [...OwnerController.instance.tenants];
+    if (_tenantId != null && !tenants.any((tenant) => tenant.id == _tenantId)) {
+      tenants.add(TenantDirectoryEntry(
+        id: _tenantId!,
+        name: widget.initialTenantName ?? 'New tenant',
+        room: 'Unassigned',
+        bedSpace: 'Unassigned',
+        phone: '',
+        guardianName: '',
+        guardianPhone: '',
+      ));
+    }
     return AlertDialog(
       title: Text(widget.contract == null ? 'New contract' : 'Edit contract'),
       content: SizedBox(
@@ -288,7 +321,9 @@ class _ContractEditorState extends State<_ContractEditor> {
                     .map((t) =>
                         DropdownMenuItem(value: t.id, child: Text(t.name)))
                     .toList(),
-                onChanged: (value) => setState(() => _tenantId = value),
+                onChanged: widget.lockTenant
+                    ? null
+                    : (value) => setState(() => _tenantId = value),
                 validator: (value) => value == null ? 'Select a tenant' : null,
               ),
               const SizedBox(height: 12),
@@ -412,7 +447,7 @@ class _ContractEditorState extends State<_ContractEditor> {
           notes: _notes.text,
         ));
       }
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) showAppSnackBar(context, 'Failed to save contract: $error');
     } finally {
