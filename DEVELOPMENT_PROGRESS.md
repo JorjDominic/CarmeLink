@@ -27,6 +27,42 @@ exact transaction timestamps reduce charge balances; contract changes must not
 overwrite historical charges or payment facts. See the full system plan's
 **Contract, Billing, and Payment Synchronization** section.
 
+## Workflow improvements
+
+### Account creation → contract
+
+After an authorized owner or caretaker creates a **tenant** account, the
+system sends an email verification link and SMS OTP. The success screen should
+then offer **Create contract now** and **Do this later**.
+All new account roles require email and mobile verification, while only tenant
+accounts continue into contract onboarding.
+Choosing the first action opens the live contract editor with the new tenant ID
+prefilled and locked for the initial contract. Guardian, caretaker, and owner
+accounts skip this step.
+
+Account and contract creation remain separate transactions. A valid account is
+not rolled back when contract entry is deferred or fails; the tenant remains
+visible in the directory and the incomplete onboarding state can be resumed.
+The contract may be saved as Draft while account verification is pending. The
+workflow then generates a versioned printable PDF, records that signatures are
+awaited, accepts a private upload of the scanned signed paper, and requires
+owner verification before activation. Contract activation requires verified
+email, verified mobile number, and a verified signed document. Afterward, the
+guided workflow continues to room/bed assignment and guardian linking.
+
+Implementation follow-up:
+
+- [ ] Return the created tenant profile ID from the account-management flow.
+- [ ] Send and track email verification plus an expiring, rate-limited SMS OTP.
+- [ ] Expose Pending/Verified states for email and mobile independently.
+- [ ] Add `Create contract now` and `Do this later` success actions.
+- [ ] Open the contract editor with the tenant preselected and locked.
+- [ ] Generate an immutable, versioned printable contract PDF.
+- [ ] Upload the signed paper privately and record uploader/time/file metadata.
+- [ ] Add owner signed-document verification before contract activation.
+- [ ] Display an onboarding-incomplete indicator for tenants without contracts.
+- [ ] Continue from contract save to room/bed assignment and guardian linking.
+
 ## Status legend
 
 - [✓] Completed and connected, or fully complete as a static feature

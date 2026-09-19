@@ -233,7 +233,7 @@ Is the compact staff control center. Instead of presenting every tool in one lon
 
 - **Property** — rooms, the interactive floor plan, and maintenance
 - **Tenants & Safety** — curfew, visitors, confidential reports, and disciplinary records; the tenant directory remains a primary navigation destination
-- **Finance & Contracts** — payment review, income and expenses, contract expiry, and analytics
+- **Finance & Contracts** — payment review, live contract CRUD, income and expenses, and analytics
 - **Communication** — announcements, messages, and important contacts
 
 Selecting an area opens a focused page containing its related pages. Each management card includes a short description, its connected-page count, and a live pending-work count when applicable. Searches match both category names and the tools within them. Admins can use the visible `+` button beside **Quick access** to add or remove any Operations tool. Urgent Dashboard shortcuts still open their corresponding tools directly.
@@ -271,9 +271,12 @@ Provides a sample two-dimensional layout for the ground and second floors. Staff
 
 The floor plan currently uses demonstration room positions. Occupancy and maintenance status come from the same owner data used by room monitoring and maintenance management, keeping the administrative views consistent. Persistent property records still require backend integration.
 
-#### Contract expiry alerts
+#### Contract management
 
-Highlights contracts ending soon for renewal or move-out planning. Live contract data still requires backend integration.
+Provides live owner-only contract creation, viewing, editing, deletion, search,
+status filtering, and expiry monitoring. Contracts store the tenant, contract
+number, term, rent, deposit, lifecycle status, and notes. Supabase constraints
+allow only tenant accounts and only one active contract per tenant.
 
 #### Disciplinary records
 
@@ -456,6 +459,60 @@ protect linked room, guardian, tenant, and staff records. Owners manage every
 role; caretakers manage tenant and guardian accounts only. Users cannot delete
 their own currently signed-in account.
 
+### Workflow improvement: account creation → contract
+
+For a newly created tenant, the recommended administrative flow is:
+
+```text
+Create tenant account
+        →
+Confirm profile creation
+        →
+Send email verification link and SMS OTP
+        →
+Verify email address and mobile number
+        →
+Offer “Create contract now”
+        →
+Open a prefilled contract form for that tenant
+        →
+Save Draft and generate printable contract PDF
+        →
+Print and collect required signatures
+        →
+Upload and verify the signed paper
+        →
+Activate contract
+        →
+Continue to room/bed assignment and guardian linking
+```
+
+Account creation and contract creation must remain separate database
+operations. The account should still succeed if the contract is postponed or
+fails validation. After account creation, the UI should present **Create
+contract now** and **Do this later** choices rather than creating a contract
+silently. Only tenant accounts should receive this next step; guardian and
+staff accounts do not require rental contracts.
+
+The contract form should receive the new tenant ID directly, preselect and lock
+that tenant for the initial save, and retain an explicit Draft option. Contract
+activation should remain separate from future billing generation so payment
+history is never embedded in or overwritten by account provisioning.
+
+Email verification confirms control of the login address. SMS OTP verification
+separately confirms the mobile number. OTPs must expire, be single-use, store no
+plain-text code, and enforce resend and attempt limits. Staff may prepare a
+Draft contract while either verification is pending, but the account should
+remain marked **Pending verification**, and the contract must not become Active
+until the required channels and uploaded signed document are verified.
+Email and mobile verification apply to every new account role; only tenant
+accounts continue into the rental-contract workflow.
+
+Generated PDFs are immutable contract-version snapshots. After printing and
+signing, the scanned PDF or clear page images are uploaded to private storage,
+then verified by the owner. Editing terms after PDF generation creates a new
+version so the signed paper always corresponds to preserved system terms.
+
 The Supabase secret/service-role key must only exist in a trusted server environment such as an Edge Function. It must never be included in the Flutter source, app assets, or client configuration.
 
 Implemented permissions:
@@ -481,10 +538,11 @@ For implementation details, see the official [Supabase user invitation guide](ht
 
 - Authentication uses Supabase Auth. Role routing is based on a protected
   profile record rather than email text or client metadata.
-- Operational records primarily come from `lib/data/mock_data.dart` and in-memory controllers.
-- Supabase is included as a dependency and configuration scaffold, but the documented demo workflows should not be assumed to persist remotely.
+- Core operational records now primarily use Supabase; remaining placeholder
+  pages identify their incomplete backend state explicitly.
 - OCR, geofencing, biometrics, and device binding are simulated product workflows pending production integrations.
 - Photo and receipt attachments currently use Supabase Storage buckets, with a planned upgrade path to Cloudinary for media CDN delivery, dynamic WebP compression (`f_auto,q_auto`), and on-the-fly thumbnail generation.
-- Some finance, contract, discipline, and analytics pages explicitly mark where backend data is required.
+- Finance, discipline, and analytics still contain incomplete backend areas;
+  contract CRUD is live.
 
 Before release, connect secured backend services, enforce server-side role permissions, add persistent uploads and messaging, test device permissions, and replace demo records with validated live data.

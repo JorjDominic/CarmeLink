@@ -6,18 +6,18 @@ CarmeLink is a role-based dormitory management platform for Carmelita's Dormitor
 
 ## Current Production-Readiness Snapshot — September 19, 2026
 
-- **Primary tracked completion metric — production readiness:** approximately 65%
+- **Primary tracked completion metric — production readiness:** approximately 70%
 - **Secondary implementation reference — functional prototype:** approximately 89%
 
 The primary estimate credits only connected workflows proportionally; UI-only pages do
 not count as complete. Remaining work is concentrated in
-notifications/preferences, contracts, finance, discipline, analytics, native
-device binding/background location, feedback persistence, MockData removal,
+notifications/preferences, contract-to-billing synchronization, finance,
+discipline, analytics, native device binding/background location, feedback persistence,
 and final multi-account security/offline validation.
 
 The current project already uses one shared Flutter codebase and one Supabase backend so every role works with the same protected data source rather than separate databases.
 
-> **Implementation status (September 19, 2026):** The repository has live Supabase authentication and role protection, accounts, rooms/assignments, guardian links, payments, maintenance, curfew/presence records, visitor requests and arrival/departure history, announcements, real-time messaging, and tenant/owner confidential-report workflows. Notifications, contracts, finance, discipline, analytics, native device binding, and production hardening remain incomplete.
+> **Implementation status (September 19, 2026):** The repository has live Supabase authentication and role protection, accounts, rooms/assignments, guardian links, payments, maintenance, curfew/presence records, visitor requests and arrival/departure history, announcements, real-time messaging, confidential-report workflows, and owner contract CRUD. Notifications, contract-to-billing synchronization, finance, discipline, analytics, native device binding, and production hardening remain incomplete.
 
 ---
 
@@ -2291,11 +2291,17 @@ Purpose:
 ```text
 Staff Creates Account
       ↓
-Tenant Receives Access
+Email Verification Link and SMS OTP Sent
       ↓
-Tenant Completes Verification
+Tenant Verifies Email and Mobile Number
       ↓
 Tenant Details Created
+      ↓
+Draft Contract Created and PDF Generated
+      ↓
+Contract Printed and Signed
+      ↓
+Signed Copy Uploaded and Owner Verified
       ↓
 Room / Bed Assigned
       ↓
@@ -2305,6 +2311,37 @@ Contract Activated
       ↓
 Tenant Dashboard Becomes Fully Active
 ```
+
+### Account creation → contract improvement
+
+Immediately after a tenant account and profile are created successfully, the
+account workflow should offer **Create contract now** and **Do this later**.
+Email and SMS verification are initiated immediately after profile creation.
+The first contract option passes the new tenant profile ID into the editor,
+where the tenant is preselected and locked for the initial save. The operator
+may save a Draft or activate the contract, then continue to room/bed assignment
+and guardian linking. Guardian and staff account creation skips this step.
+
+This is a guided handoff, not one combined database transaction. Account
+creation is never rolled back because contract entry is deferred or fails
+validation. The tenant remains visible as incomplete onboarding so staff can
+resume later. Keeping the records separate also prevents authentication changes
+from rewriting contract, billing, or payment history.
+
+Email and mobile verification are tracked independently. Email uses a secure
+verification link; mobile verification uses a short-lived, single-use SMS OTP
+with hashed storage, resend cooldowns, attempt limits, and audit timestamps.
+Draft contract preparation may continue while verification is pending, but an
+account remains Pending verification and a contract cannot become Active until
+both required channels are verified.
+
+The contract signing lifecycle is Draft → Ready for signature → Awaiting signed
+copy → Pending document verification → Active. PDF generation creates an
+immutable version snapshot. The signed paper is uploaded to private storage and
+records uploader, upload time, original filename, media type, size, and file
+hash. An owner verifies the document before activation. Any material edit after
+generation creates a new version rather than changing the terms represented by
+an existing printed or signed document.
 
 ## B. Monthly Billing
 
