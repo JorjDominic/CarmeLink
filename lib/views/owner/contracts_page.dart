@@ -305,101 +305,217 @@ class _ContractEditorState extends State<_ContractEditor> {
         guardianPhone: '',
       ));
     }
-    return AlertDialog(
-      title: Text(widget.contract == null ? 'New contract' : 'Edit contract'),
-      content: SizedBox(
-        width: 560,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              DropdownButtonFormField<String>(
-                initialValue: _tenantId,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Tenant'),
-                items: tenants
-                    .map((t) =>
-                        DropdownMenuItem(value: t.id, child: Text(t.name)))
-                    .toList(),
-                onChanged: widget.lockTenant
-                    ? null
-                    : (value) => setState(() => _tenantId = value),
-                validator: (value) => value == null ? 'Select a tenant' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                  controller: _number,
-                  decoration:
-                      const InputDecoration(labelText: 'Contract number'),
-                  validator: (value) => (value?.trim().length ?? 0) < 3
-                      ? 'Enter at least 3 characters'
-                      : null),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                    child: TextFormField(
-                        controller: _rent,
-                        keyboardType: TextInputType.number,
-                        decoration:
-                            const InputDecoration(labelText: 'Monthly rent'),
-                        validator: _moneyValidator)),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: TextFormField(
-                        controller: _deposit,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                            labelText: 'Security deposit'),
-                        validator: _moneyValidator)),
-              ]),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                    child: _DateField(
-                        label: 'Starts',
-                        value: _start,
-                        onChanged: (v) => setState(() => _start = v))),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: _DateField(
-                        label: 'Ends',
-                        value: _end,
-                        onChanged: (v) => setState(() => _end = v))),
-              ]),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _status,
-                decoration: const InputDecoration(labelText: 'Status'),
-                items: ['draft', 'active', 'expired', 'terminated']
-                    .map((v) => DropdownMenuItem(
-                        value: v, child: Text(v.toUpperCase())))
-                    .toList(),
-                onChanged: (value) => setState(() => _status = value!),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                  controller: _notes,
-                  maxLines: 3,
-                  decoration:
-                      const InputDecoration(labelText: 'Notes (optional)')),
-            ]),
+    final compact = MediaQuery.sizeOf(context).width < 600;
+    final title = widget.contract == null ? 'Create contract' : 'Edit contract';
+    final form = _buildForm(tenants, compact);
+
+    if (compact) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+              tooltip: 'Close',
+              onPressed: _saving ? null : () => Navigator.pop(context),
+              icon: const Icon(Icons.close),
+            ),
+            title: Text(title),
+            centerTitle: false,
+          ),
+          body: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+              child: form,
+            ),
+          ),
+          bottomNavigationBar: _EditorActions(
+            saving: _saving,
+            onCancel: () => Navigator.pop(context),
+            onSave: _save,
           ),
         ),
+      );
+    }
+
+    return Dialog(
+      insetPadding: const EdgeInsets.all(32),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 820),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(28, 24, 20, 16),
+            child: Row(children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: Theme.of(context).textTheme.headlineSmall),
+                    const SizedBox(height: 4),
+                    Text('Complete the agreement details below.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Close',
+                onPressed: _saving ? null : () => Navigator.pop(context),
+                icon: const Icon(Icons.close),
+              ),
+            ]),
+          ),
+          const Divider(height: 1),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(28),
+              child: form,
+            ),
+          ),
+          _EditorActions(
+            saving: _saving,
+            onCancel: () => Navigator.pop(context),
+            onSave: _save,
+          ),
+        ]),
       ),
-      actions: [
-        TextButton(
-            onPressed: _saving ? null : () => Navigator.pop(context),
-            child: const Text('Cancel')),
-        FilledButton(
-            onPressed: _saving ? null : _save,
-            child: _saving
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Save')),
-      ],
     );
   }
+
+  Widget _buildForm(List<TenantDirectoryEntry> tenants, bool compact) => Form(
+        key: _formKey,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const _FormSectionHeading(
+            icon: Icons.person_outline,
+            title: 'Tenant and agreement',
+            subtitle: 'Choose the resident and identify this contract.',
+          ),
+          const SizedBox(height: 14),
+          if (widget.lockTenant)
+            _LockedTenantField(
+              name: tenants.firstWhere((tenant) => tenant.id == _tenantId).name,
+            )
+          else
+            DropdownButtonFormField<String>(
+              initialValue: _tenantId,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Tenant',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+              items: tenants
+                  .map((tenant) => DropdownMenuItem(
+                      value: tenant.id, child: Text(tenant.name)))
+                  .toList(),
+              onChanged: (value) => setState(() => _tenantId = value),
+              validator: (value) => value == null ? 'Select a tenant' : null,
+            ),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _number,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(
+              labelText: 'Contract number',
+              hintText: 'e.g. CTR-2026-001',
+              prefixIcon: Icon(Icons.tag_outlined),
+            ),
+            validator: (value) => (value?.trim().length ?? 0) < 3
+                ? 'Enter at least 3 characters'
+                : null,
+          ),
+          const SizedBox(height: 28),
+          const _FormSectionHeading(
+            icon: Icons.payments_outlined,
+            title: 'Financial terms',
+            subtitle: 'Enter amounts in Philippine pesos.',
+          ),
+          const SizedBox(height: 14),
+          _ResponsivePair(
+            stacked: compact,
+            first: TextFormField(
+              controller: _rent,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Monthly rent',
+                prefixText: '₱ ',
+              ),
+              validator: _moneyValidator,
+            ),
+            second: TextFormField(
+              controller: _deposit,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Security deposit',
+                prefixText: '₱ ',
+              ),
+              validator: _moneyValidator,
+            ),
+          ),
+          const SizedBox(height: 28),
+          const _FormSectionHeading(
+            icon: Icons.calendar_month_outlined,
+            title: 'Contract period',
+            subtitle: 'Set the inclusive start and end dates.',
+          ),
+          const SizedBox(height: 14),
+          _ResponsivePair(
+            stacked: compact,
+            first: _DateField(
+              label: 'Start date',
+              value: _start,
+              onChanged: (value) => setState(() => _start = value),
+            ),
+            second: _DateField(
+              label: 'End date',
+              value: _end,
+              onChanged: (value) => setState(() => _end = value),
+            ),
+          ),
+          const SizedBox(height: 28),
+          const _FormSectionHeading(
+            icon: Icons.fact_check_outlined,
+            title: 'Status and notes',
+            subtitle: 'New agreements should normally remain Draft.',
+          ),
+          const SizedBox(height: 14),
+          Text('Contract status',
+              style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: ['draft', 'active', 'expired', 'terminated']
+                .map((status) => ChoiceChip(
+                      selected: _status == status,
+                      label: Text(_titleCase(status)),
+                      onSelected: (_) => setState(() => _status = status),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _notes,
+            minLines: 3,
+            maxLines: 5,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              labelText: 'Notes',
+              hintText: 'Optional internal notes about this agreement',
+              alignLabelWithHint: true,
+            ),
+          ),
+        ]),
+      );
+
+  String _titleCase(String value) =>
+      '${value[0].toUpperCase()}${value.substring(1)}';
 
   String? _moneyValidator(String? value) {
     final amount = double.tryParse(value?.trim() ?? '');
@@ -456,6 +572,154 @@ class _ContractEditorState extends State<_ContractEditor> {
   }
 }
 
+class _FormSectionHeading extends StatelessWidget {
+  const _FormSectionHeading({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon,
+                size: 21,
+                color: Theme.of(context).colorScheme.onPrimaryContainer),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ],
+      );
+}
+
+class _LockedTenantField extends StatelessWidget {
+  const _LockedTenantField({required this.name});
+  final String name;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border:
+              Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+        child: Row(children: [
+          const Icon(Icons.person_outline),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Tenant', style: Theme.of(context).textTheme.labelSmall),
+                const SizedBox(height: 2),
+                Text(name,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyLarge
+                        ?.copyWith(fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+          Icon(Icons.lock_outline,
+              size: 19, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ]),
+      );
+}
+
+class _ResponsivePair extends StatelessWidget {
+  const _ResponsivePair({
+    required this.stacked,
+    required this.first,
+    required this.second,
+  });
+  final bool stacked;
+  final Widget first;
+  final Widget second;
+
+  @override
+  Widget build(BuildContext context) {
+    if (stacked) {
+      return Column(children: [first, const SizedBox(height: 14), second]);
+    }
+    return Row(children: [
+      Expanded(child: first),
+      const SizedBox(width: 14),
+      Expanded(child: second),
+    ]);
+  }
+}
+
+class _EditorActions extends StatelessWidget {
+  const _EditorActions({
+    required this.saving,
+    required this.onCancel,
+    required this.onSave,
+  });
+  final bool saving;
+  final VoidCallback onCancel;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Theme.of(context).colorScheme.surface,
+        elevation: 8,
+        child: SafeArea(
+          top: false,
+          minimum: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: saving ? null : onCancel,
+                child: const Text('Cancel'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: FilledButton.icon(
+                onPressed: saving ? null : onSave,
+                icon: saving
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.save_outlined),
+                label: Text(saving ? 'Saving…' : 'Save contract'),
+              ),
+            ),
+          ]),
+        ),
+      );
+}
+
 class _DateField extends StatelessWidget {
   const _DateField(
       {required this.label, required this.value, required this.onChanged});
@@ -463,19 +727,32 @@ class _DateField extends StatelessWidget {
   final DateTime value;
   final ValueChanged<DateTime> onChanged;
   @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: () async {
-          final picked = await showDatePicker(
-              context: context,
-              initialDate: value,
-              firstDate: DateTime(2020),
-              lastDate: DateTime(2100));
-          if (picked != null) onChanged(picked);
-        },
-        child: InputDecorator(
-            decoration: InputDecoration(labelText: label),
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label:
+            '$label, ${_months[value.month - 1]} ${value.day}, ${value.year}',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () async {
+            final picked = await showDatePicker(
+                context: context,
+                initialDate: value,
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2100));
+            if (picked != null) onChanged(picked);
+          },
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: label,
+              prefixIcon: const Icon(Icons.calendar_today_outlined),
+              suffixIcon: const Icon(Icons.arrow_drop_down),
+            ),
             child: Text(
-                '${_months[value.month - 1]} ${value.day}, ${value.year}')),
+              '${_months[value.month - 1]} ${value.day}, ${value.year}',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ),
+        ),
       );
 }
 
