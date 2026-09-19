@@ -1,0 +1,460 @@
+import 'package:flutter/material.dart';
+
+import '../../controllers/owner_controller.dart';
+import '../../core/widgets/common_widgets.dart';
+import '../../models/models.dart';
+
+class ContractsPage extends StatefulWidget {
+  const ContractsPage({super.key});
+
+  @override
+  State<ContractsPage> createState() => _ContractsPageState();
+}
+
+class _ContractsPageState extends State<ContractsPage> {
+  final _search = TextEditingController();
+  String _status = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    OwnerController.instance.loadContracts();
+    OwnerController.instance.loadTenants();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: OwnerController.instance,
+        builder: (context, _) {
+          final controller = OwnerController.instance;
+          final query = _search.text.trim().toLowerCase();
+          final items = controller.contracts.where((contract) {
+            final matchesStatus =
+                _status == 'all' || contract.status == _status;
+            final matchesQuery = query.isEmpty ||
+                contract.tenantName.toLowerCase().contains(query) ||
+                contract.contractNumber.toLowerCase().contains(query);
+            return matchesStatus && matchesQuery;
+          }).toList();
+
+          return PageFrame(
+            title: 'Contracts',
+            subtitle: 'Create and maintain tenant contract records',
+            onRefresh: () => controller.loadContracts(force: true),
+            floatingActionButton: FloatingActionButton.extended(
+              onPressed: () => _openEditor(),
+              icon: const Icon(Icons.add),
+              label: const Text('New contract'),
+            ),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _search,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    labelText: 'Search tenant or contract number',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children:
+                        ['all', 'draft', 'active', 'expired', 'terminated']
+                            .map((value) => Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: ChoiceChip(
+                                    selected: _status == value,
+                                    label: Text(_title(value)),
+                                    onSelected: (_) =>
+                                        setState(() => _status = value),
+                                  ),
+                                ))
+                            .toList(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (controller.contractsLoading &&
+                    !controller.contractsLoadedOnce)
+                  const Padding(
+                    padding: EdgeInsets.all(40),
+                    child: CircularProgressIndicator(),
+                  )
+                else if (controller.contractsError != null &&
+                    !controller.contractsLoadedOnce)
+                  EmptyState(
+                    icon: Icons.cloud_off_outlined,
+                    title: 'Contracts could not be loaded',
+                    message: controller.contractsError!,
+                    action: FilledButton(
+                      onPressed: () => controller.loadContracts(force: true),
+                      child: const Text('Retry'),
+                    ),
+                  )
+                else if (items.isEmpty)
+                  EmptyState(
+                    icon: Icons.description_outlined,
+                    title: 'No contracts found',
+                    message: query.isEmpty && _status == 'all'
+                        ? 'Create the first tenant contract.'
+                        : 'Try a different search or status filter.',
+                  )
+                else
+                  LayoutBuilder(builder: (context, constraints) {
+                    final enlargedText =
+                        MediaQuery.textScalerOf(context).scale(1) > 1.15;
+                    final columns = constraints.maxWidth >= 1000
+                        ? 3
+                        : constraints.maxWidth >= 650
+                            ? 2
+                            : 1;
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: items.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        mainAxisExtent: enlargedText ? 430 : 350,
+                      ),
+                      itemBuilder: (_, index) => _ContractCard(
+                        contract: items[index],
+                        onEdit: () => _openEditor(items[index]),
+                        onDelete: () => _delete(items[index]),
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          );
+        },
+      );
+
+  Future<void> _openEditor([TenantContract? contract]) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _ContractEditor(contract: contract),
+    );
+  }
+
+  Future<void> _delete(TenantContract contract) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete contract?'),
+        content: Text(
+            'Delete ${contract.contractNumber} for ${contract.tenantName}?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await OwnerController.instance.deleteContract(contract.id);
+      if (mounted) showAppSnackBar(context, 'Contract deleted.');
+    } catch (error) {
+      if (mounted)
+        showAppSnackBar(context, 'Failed to delete contract: $error');
+    }
+  }
+
+  String _title(String value) =>
+      value == 'all' ? 'All' : '${value[0].toUpperCase()}${value.substring(1)}';
+}
+
+class _ContractCard extends StatelessWidget {
+  const _ContractCard(
+      {required this.contract, required this.onEdit, required this.onDelete});
+  final TenantContract contract;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    String date(DateTime value) =>
+        '${_months[value.month - 1]} ${value.day}, ${value.year}';
+    String money(double value) => '₱${value.toStringAsFixed(2)}';
+    return CarmelitaCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(
+              child: Text(contract.tenantName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w800))),
+          StatusPill(contract.status),
+        ]),
+        Text(contract.contractNumber,
+            style: Theme.of(context).textTheme.bodySmall),
+        const Divider(height: 22),
+        InfoRow(
+            label: 'Term',
+            value: '${date(contract.startsOn)} – ${date(contract.endsOn)}'),
+        InfoRow(label: 'Monthly rent', value: money(contract.monthlyRent)),
+        InfoRow(label: 'Deposit', value: money(contract.securityDeposit)),
+        const Spacer(),
+        Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+          IconButton(
+              tooltip: 'Edit contract',
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined)),
+          IconButton(
+              tooltip: 'Delete contract',
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline)),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _ContractEditor extends StatefulWidget {
+  const _ContractEditor({this.contract});
+  final TenantContract? contract;
+  @override
+  State<_ContractEditor> createState() => _ContractEditorState();
+}
+
+class _ContractEditorState extends State<_ContractEditor> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _number;
+  late final TextEditingController _rent;
+  late final TextEditingController _deposit;
+  late final TextEditingController _notes;
+  late String? _tenantId;
+  late String _status;
+  late DateTime _start;
+  late DateTime _end;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final value = widget.contract;
+    _number = TextEditingController(text: value?.contractNumber ?? '');
+    _rent = TextEditingController(
+        text: value?.monthlyRent.toStringAsFixed(2) ?? '');
+    _deposit = TextEditingController(
+        text: value?.securityDeposit.toStringAsFixed(2) ?? '0');
+    _notes = TextEditingController(text: value?.notes ?? '');
+    _tenantId = value?.tenantId;
+    _status = value?.status ?? 'draft';
+    _start = value?.startsOn ?? DateTime.now();
+    _end = value?.endsOn ?? DateTime.now().add(const Duration(days: 365));
+  }
+
+  @override
+  void dispose() {
+    _number.dispose();
+    _rent.dispose();
+    _deposit.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tenants = OwnerController.instance.tenants;
+    return AlertDialog(
+      title: Text(widget.contract == null ? 'New contract' : 'Edit contract'),
+      content: SizedBox(
+        width: 560,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              DropdownButtonFormField<String>(
+                initialValue: _tenantId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Tenant'),
+                items: tenants
+                    .map((t) =>
+                        DropdownMenuItem(value: t.id, child: Text(t.name)))
+                    .toList(),
+                onChanged: (value) => setState(() => _tenantId = value),
+                validator: (value) => value == null ? 'Select a tenant' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                  controller: _number,
+                  decoration:
+                      const InputDecoration(labelText: 'Contract number'),
+                  validator: (value) => (value?.trim().length ?? 0) < 3
+                      ? 'Enter at least 3 characters'
+                      : null),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                    child: TextFormField(
+                        controller: _rent,
+                        keyboardType: TextInputType.number,
+                        decoration:
+                            const InputDecoration(labelText: 'Monthly rent'),
+                        validator: _moneyValidator)),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: TextFormField(
+                        controller: _deposit,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                            labelText: 'Security deposit'),
+                        validator: _moneyValidator)),
+              ]),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                    child: _DateField(
+                        label: 'Starts',
+                        value: _start,
+                        onChanged: (v) => setState(() => _start = v))),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: _DateField(
+                        label: 'Ends',
+                        value: _end,
+                        onChanged: (v) => setState(() => _end = v))),
+              ]),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _status,
+                decoration: const InputDecoration(labelText: 'Status'),
+                items: ['draft', 'active', 'expired', 'terminated']
+                    .map((v) => DropdownMenuItem(
+                        value: v, child: Text(v.toUpperCase())))
+                    .toList(),
+                onChanged: (value) => setState(() => _status = value!),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                  controller: _notes,
+                  maxLines: 3,
+                  decoration:
+                      const InputDecoration(labelText: 'Notes (optional)')),
+            ]),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: _saving ? null : () => Navigator.pop(context),
+            child: const Text('Cancel')),
+        FilledButton(
+            onPressed: _saving ? null : _save,
+            child: _saving
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Save')),
+      ],
+    );
+  }
+
+  String? _moneyValidator(String? value) {
+    final amount = double.tryParse(value?.trim() ?? '');
+    return amount == null || amount < 0 ? 'Enter a valid amount' : null;
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_end.isBefore(_start)) {
+      showAppSnackBar(context, 'End date must be on or after the start date.');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final controller = OwnerController.instance;
+      final existing = widget.contract;
+      if (existing == null) {
+        await controller.createContract(
+          tenantId: _tenantId!,
+          contractNumber: _number.text,
+          startsOn: _start,
+          endsOn: _end,
+          monthlyRent: double.parse(_rent.text),
+          securityDeposit: double.parse(_deposit.text),
+          status: _status,
+          notes: _notes.text,
+        );
+      } else {
+        TenantDirectoryEntry? tenant;
+        for (final value in controller.tenants) {
+          if (value.id == _tenantId) {
+            tenant = value;
+            break;
+          }
+        }
+        await controller.updateContract(existing.copyWith(
+          tenantId: _tenantId!,
+          tenantName: tenant?.name ?? existing.tenantName,
+          contractNumber: _number.text,
+          startsOn: _start,
+          endsOn: _end,
+          monthlyRent: double.parse(_rent.text),
+          securityDeposit: double.parse(_deposit.text),
+          status: _status,
+          notes: _notes.text,
+        ));
+      }
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Failed to save contract: $error');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+}
+
+class _DateField extends StatelessWidget {
+  const _DateField(
+      {required this.label, required this.value, required this.onChanged});
+  final String label;
+  final DateTime value;
+  final ValueChanged<DateTime> onChanged;
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: () async {
+          final picked = await showDatePicker(
+              context: context,
+              initialDate: value,
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2100));
+          if (picked != null) onChanged(picked);
+        },
+        child: InputDecorator(
+            decoration: InputDecoration(labelText: label),
+            child: Text(
+                '${_months[value.month - 1]} ${value.day}, ${value.year}')),
+      );
+}
+
+const _months = <String>[
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];

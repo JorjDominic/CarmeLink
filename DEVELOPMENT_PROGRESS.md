@@ -7,7 +7,7 @@ divided between two developers to reduce merge conflicts.
 
 ## Current production-readiness assessment
 
-**Production readiness: approximately 68%.** This is the primary completion
+**Production readiness: approximately 70%.** This is the primary completion
 metric for the project. It weights live persistence, authorization, validation,
 testing, deployment readiness, and role-complete workflows more heavily than
 screens that exist only as UI.
@@ -16,8 +16,8 @@ The functional prototype is roughly 89% complete, but that figure is retained
 only as a secondary implementation reference and is not the tracked completion
 percentage.
 
-Major remaining areas are persisted notifications/preferences, contracts,
-finance/expenses, discipline, analytics, native tenant device
+Major remaining areas are persisted notifications/preferences, contract-to-billing
+synchronization, finance/expenses, discipline, analytics, native tenant device
 binding/background location, feedback persistence, and final multi-account
 security/offline testing outside the visitor workflow.
 
@@ -49,6 +49,15 @@ geofencing or advanced analytics.
 8. **Safety and privacy** — confidential reports, audit logs, retention, and permissions.
 
 ## Completed Milestones History
+
+> **Sep 19, 2026 — Live Contract CRUD:** Added an owner-only Supabase contract
+> register with create, read, update, and delete operations; tenant association,
+> contract number, term, rent, deposit, lifecycle status, notes, search, and
+> filters. Database constraints enforce valid dates, non-negative amounts,
+> unique contract numbers, and one active contract per tenant. Migration
+> `202609190007` and date-summary sync migration `202609190008` are deployed.
+> Billing synchronization remains
+> a separate follow-up so contract edits never rewrite payment history.
 
 > **Sep 19, 2026 — Visitor Production Verification:** Added and ran a remote
 > multi-account smoke test across tenant, guardian, owner, and caretaker
@@ -199,7 +208,8 @@ page exists but its important backend workflow is unfinished.
 - [ ] **Announcements** — create, target, publish, and archive notices.
 - [ ] **Messages** — persistent tenant and guardian conversations.
 - [ ] **Contacts** — verified guardian and emergency contact directory.
-- [ ] **Contracts** — dates, renewal state, expiry alerts, and history.
+- [✓] **Contracts** — live owner CRUD with tenant, dates, amounts, lifecycle,
+  search/filtering, owner-only RLS, and historical records.
 - [ ] **Income and Expenses** — validated financial records and owner-only RLS.
 - [ ] **Disciplinary Records** — verified incidents, notices, and restricted history.
 - [ ] **Reports and Analytics** — owner-only metrics generated from live records.
@@ -437,7 +447,8 @@ link.
 - [ ] Announcements — UI implemented, **Mock**
 - [✓] Messaging and conversations — live Supabase persistence and realtime first iteration
 - [ ] Emergency contacts — UI implemented, **Mock**
-- [ ] Contracts, finance, discipline, and analytics — UI implemented, **Mock**
+- [✓] Contracts — owner CRUD and lifecycle register, **Live**
+- [ ] Finance, discipline, and analytics — UI implemented, **Mock**
 - [✓] Guardian-to-tenant linking — owner management UI, **Live**
 
 ### Developer 1 next tasks

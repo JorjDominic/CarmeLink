@@ -21,6 +21,7 @@ import 'guardian_link_management_page.dart';
 import 'staff_maintenance_page.dart';
 import 'room_monitoring_page.dart';
 import 'geofence_dev_dashboard_page.dart';
+import 'contracts_page.dart';
 
 void _ownerPush(BuildContext context, Widget page) {
   Navigator.of(context).push(
@@ -125,11 +126,11 @@ class OwnerDashboardPage extends StatelessWidget {
             AttentionCard(
               compact: true,
               icon: Icons.event_busy_outlined,
-              title: '1 contract expires within 30 days',
+              title:
+                  '${controller.contractsExpiringWithin30Days} contract(s) expire within 30 days',
               subtitle: 'Review renewal or move-out arrangements.',
               status: 'Soon',
-              onTap: () =>
-                  _ownerPush(context, const ContractExpiryAlertsPage()),
+              onTap: () => _ownerPush(context, const ContractsPage()),
             ),
             const SizedBox(height: 8),
             AttentionCard(
@@ -1192,8 +1193,8 @@ const _operationCategories = [
           Icons.payments_outlined, PaymentVerificationPage()),
       _OperationItem('Income & expenses', 'Monitor property finances',
           Icons.insights_outlined, ExpenseIncomeSummaryPage()),
-      _OperationItem('Contract expiry', 'Track renewals and move-outs',
-          Icons.event_busy_outlined, ContractExpiryAlertsPage()),
+      _OperationItem('Contracts', 'Create contracts and track renewals',
+          Icons.event_busy_outlined, ContractsPage()),
       _OperationItem('Reports & analytics', 'View detailed reports',
           Icons.analytics_outlined, ReportsAnalyticsPage()),
     ],
@@ -5846,26 +5847,7 @@ class EmergencyContactsPage extends StatelessWidget {
 class ContractExpiryAlertsPage extends StatelessWidget {
   const ContractExpiryAlertsPage({super.key});
   @override
-  Widget build(BuildContext context) => const PageFrame(
-        title: 'Contract expiry alerts',
-        subtitle: 'Tenants with contracts ending soon',
-        child: Column(children: [
-          CarmelitaCard(
-              child: TimelineTile(
-                  icon: Icons.event_busy_outlined,
-                  title: 'Ella Garcia • Room 105',
-                  subtitle: 'Expires September 5, 2026 • 16 days remaining',
-                  trailing: StatusPill('Soon'))),
-          SizedBox(height: 12),
-          CarmelitaCard(
-              child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.cloud_off_outlined),
-                  title: Text('Backend data required'),
-                  subtitle: Text(
-                      'Contract dates are sample values until tenant contracts are stored in the backend.'))),
-        ]),
-      );
+  Widget build(BuildContext context) => const ContractsPage();
 }
 
 class ExpenseIncomeSummaryPage extends StatelessWidget {

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../services/curfew_service.dart';
 import '../services/confidential_report_service.dart';
+import '../services/contract_service.dart';
 import '../services/gate_service.dart';
 import '../services/payment_service.dart';
 import '../services/room_service.dart';
@@ -16,6 +17,11 @@ class OwnerController extends ChangeNotifier {
   static final OwnerController instance = OwnerController._();
 
   final CurfewService _curfewService = const CurfewService();
+  final ContractService _contractService = const ContractService();
+  final List<TenantContract> _contracts = [];
+  bool _contractsLoading = false;
+  String? _contractsError;
+  bool _contractsLoadedOnce = false;
   final ConfidentialReportService _confidentialReportService =
       const ConfidentialReportService();
   final List<ConcernReport> _concerns = [];
@@ -64,6 +70,21 @@ class OwnerController extends ChangeNotifier {
   String? _tenantsError;
 
   List<CurfewRequest> get curfewRequests => List.unmodifiable(_curfewRequests);
+  List<TenantContract> get contracts => List.unmodifiable(_contracts);
+  bool get contractsLoading => _contractsLoading;
+  String? get contractsError => _contractsError;
+  bool get contractsLoadedOnce => _contractsLoadedOnce;
+  int get contractsExpiringWithin30Days {
+    final today = DateTime.now();
+    final limit = today.add(const Duration(days: 30));
+    return _contracts
+        .where((item) =>
+            item.status == 'active' &&
+            !item.endsOn.isBefore(today) &&
+            !item.endsOn.isAfter(limit))
+        .length;
+  }
+
   bool get curfewLoading => _curfewLoading;
   String? get curfewError => _curfewError;
   bool get curfewLoadedOnce => _curfewLoadedOnce;
@@ -530,6 +551,73 @@ class OwnerController extends ChangeNotifier {
     }
   }
 
+  Future<void> loadContracts({bool force = false}) async {
+    if (_contractsLoading && !force) return;
+    if (_contractsLoadedOnce && !force) return;
+    _contractsLoading = true;
+    _contractsError = null;
+    notifyListeners();
+    try {
+      _contracts
+        ..clear()
+        ..addAll(await _contractService.listContracts());
+      _contractsLoadedOnce = true;
+    } catch (error) {
+      _contractsError = error.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _contractsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> createContract({
+    required String tenantId,
+    required String contractNumber,
+    required DateTime startsOn,
+    required DateTime endsOn,
+    required double monthlyRent,
+    required double securityDeposit,
+    required String status,
+    String? notes,
+  }) async {
+    final item = await _contractService.createContract(
+      tenantId: tenantId,
+      contractNumber: contractNumber,
+      startsOn: startsOn,
+      endsOn: endsOn,
+      monthlyRent: monthlyRent,
+      securityDeposit: securityDeposit,
+      status: status,
+      notes: notes,
+    );
+    _contracts.insert(0, item);
+    notifyListeners();
+  }
+
+  Future<void> updateContract(TenantContract contract) async {
+    final item = await _contractService.updateContract(contract);
+    final index = _contracts.indexWhere((value) => value.id == item.id);
+    if (index >= 0) _contracts[index] = item;
+    notifyListeners();
+  }
+
+  Future<void> deleteContract(String id) async {
+    await _contractService.deleteContract(id);
+    _contracts.removeWhere((value) => value.id == id);
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void setContractsForTesting(List<TenantContract> items) {
+    _contracts
+      ..clear()
+      ..addAll(items);
+    _contractsLoadedOnce = true;
+    _contractsLoading = false;
+    _contractsError = null;
+    notifyListeners();
+  }
+
   Future<void> recordStaffManualLog({
     required String tenantId,
     required String direction,
@@ -599,6 +687,10 @@ class OwnerController extends ChangeNotifier {
     _tenantsLoading = false;
     _tenantsLoadedOnce = false;
     _tenantsError = null;
+    _contracts.clear();
+    _contractsLoading = false;
+    _contractsError = null;
+    _contractsLoadedOnce = false;
     notifyListeners();
   }
 }

@@ -882,6 +882,83 @@ class TenantDirectoryEntry {
       gateStatus == 'UNAVAILABLE' || gateStatus == 'Unavailable';
 }
 
+class TenantContract {
+  const TenantContract({
+    required this.id,
+    required this.tenantId,
+    required this.tenantName,
+    required this.contractNumber,
+    required this.startsOn,
+    required this.endsOn,
+    required this.monthlyRent,
+    required this.securityDeposit,
+    required this.status,
+    required this.createdAt,
+    required this.updatedAt,
+    this.notes,
+  });
+
+  factory TenantContract.fromRow(Map<String, dynamic> row) {
+    final profile = row['profiles'] as Map<String, dynamic>?;
+    return TenantContract(
+      id: row['id'] as String,
+      tenantId: row['tenant_id'] as String,
+      tenantName: profile?['full_name'] as String? ?? 'Unknown tenant',
+      contractNumber: row['contract_number'] as String,
+      startsOn: DateTime.parse(row['starts_on'] as String),
+      endsOn: DateTime.parse(row['ends_on'] as String),
+      monthlyRent: (row['monthly_rent'] as num).toDouble(),
+      securityDeposit: (row['security_deposit'] as num).toDouble(),
+      status: row['status'] as String,
+      notes: row['notes'] as String?,
+      createdAt: DateTime.parse(row['created_at'] as String),
+      updatedAt: DateTime.parse(row['updated_at'] as String),
+    );
+  }
+
+  final String id;
+  final String tenantId;
+  final String tenantName;
+  final String contractNumber;
+  final DateTime startsOn;
+  final DateTime endsOn;
+  final double monthlyRent;
+  final double securityDeposit;
+  final String status;
+  final String? notes;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  bool get isActive => status == 'active';
+  bool get isExpired => status == 'expired' || endsOn.isBefore(DateTime.now());
+
+  TenantContract copyWith({
+    String? tenantId,
+    String? tenantName,
+    String? contractNumber,
+    DateTime? startsOn,
+    DateTime? endsOn,
+    double? monthlyRent,
+    double? securityDeposit,
+    String? status,
+    String? notes,
+  }) =>
+      TenantContract(
+        id: id,
+        tenantId: tenantId ?? this.tenantId,
+        tenantName: tenantName ?? this.tenantName,
+        contractNumber: contractNumber ?? this.contractNumber,
+        startsOn: startsOn ?? this.startsOn,
+        endsOn: endsOn ?? this.endsOn,
+        monthlyRent: monthlyRent ?? this.monthlyRent,
+        securityDeposit: securityDeposit ?? this.securityDeposit,
+        status: status ?? this.status,
+        notes: notes ?? this.notes,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+      );
+}
+
 class OwnerConversation {
   OwnerConversation({
     required this.id,
