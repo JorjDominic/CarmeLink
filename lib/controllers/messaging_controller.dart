@@ -90,7 +90,10 @@ class MessagingController extends ChangeNotifier {
   }
 
   /// Opens or loads the official conversation for the authenticated Tenant.
-  Future<void> loadTenantConversation(String tenantId) async {
+  Future<void> loadTenantConversation(
+    String tenantId, {
+    bool openThread = false,
+  }) async {
     _loadingMessages = true;
     _messagesError = null;
     notifyListeners();
@@ -110,7 +113,10 @@ class MessagingController extends ChangeNotifier {
           await _service.getOrCreateTenantConversation(tenantId: effectiveUid);
       if (conv != null) {
         _activeConversation = conv;
-        await _fetchMessagesForActiveConversation();
+        await _fetchMessagesForActiveConversation(
+          markAsRead: openThread,
+          subscribe: openThread,
+        );
       } else {
         _activeConversation = null;
         _activeMessages = [];
@@ -131,6 +137,7 @@ class MessagingController extends ChangeNotifier {
   Future<void> loadGuardianConversation({
     required String guardianId,
     String? tenantId,
+    bool openThread = false,
   }) async {
     _loadingMessages = true;
     _messagesError = null;
@@ -153,7 +160,10 @@ class MessagingController extends ChangeNotifier {
       );
       if (conv != null) {
         _activeConversation = conv;
-        await _fetchMessagesForActiveConversation();
+        await _fetchMessagesForActiveConversation(
+          markAsRead: openThread,
+          subscribe: openThread,
+        );
       } else {
         _activeConversation = null;
         _activeMessages = [];
@@ -271,7 +281,10 @@ class MessagingController extends ChangeNotifier {
     }
   }
 
-  Future<void> _fetchMessagesForActiveConversation() async {
+  Future<void> _fetchMessagesForActiveConversation({
+    bool markAsRead = true,
+    bool subscribe = true,
+  }) async {
     final conv = _activeConversation;
     if (conv == null) return;
 
@@ -282,15 +295,21 @@ class MessagingController extends ChangeNotifier {
     // 2. Mark unread as read
     final currentUid = SupabaseConfig.clientSafe?.auth.currentUser?.id ??
         SessionController.instance.currentUser?.id;
-    if (currentUid != null && currentUid.isNotEmpty) {
-      _service.markConversationAsRead(
+    if (markAsRead && currentUid != null && currentUid.isNotEmpty) {
+      final readAt = await _service.markConversationAsRead(
         conversationId: conv.id,
-        currentUserId: currentUid,
       );
+      if (readAt != null) {
+        _activeMessages = _activeMessages
+            .map((message) => message.senderId != currentUid && !message.isRead
+                ? message.copyWith(isRead: true, readAt: readAt)
+                : message)
+            .toList();
+      }
     }
 
     // 3. Subscribe to live incoming messages
-    _subscribeToActiveConversation(conv.id);
+    if (subscribe) _subscribeToActiveConversation(conv.id);
   }
 
   void _subscribeToActiveConversation(String conversationId) {
@@ -302,8 +321,40 @@ class MessagingController extends ChangeNotifier {
           _activeMessages.add(incoming);
           notifyListeners();
         }
+        final currentUid = SupabaseConfig.clientSafe?.auth.currentUser?.id ??
+            SessionController.instance.currentUser?.id;
+        if (currentUid != null &&
+            currentUid.isNotEmpty &&
+            incoming.senderId != currentUid) {
+          _markActiveConversationRead(conversationId, currentUid);
+        }
+      },
+      onMessageUpdated: (updated) {
+        final index =
+            _activeMessages.indexWhere((item) => item.id == updated.id);
+        if (index < 0) return;
+        final existing = _activeMessages[index];
+        _activeMessages[index] = existing.copyWith(
+          isRead: updated.isRead,
+          readAt: updated.readAt,
+        );
+        notifyListeners();
       },
     );
+  }
+
+  Future<void> _markActiveConversationRead(
+      String conversationId, String currentUid) async {
+    final readAt = await _service.markConversationAsRead(
+      conversationId: conversationId,
+    );
+    if (readAt == null || _activeConversation?.id != conversationId) return;
+    _activeMessages = _activeMessages
+        .map((message) => message.senderId != currentUid && !message.isRead
+            ? message.copyWith(isRead: true, readAt: readAt)
+            : message)
+        .toList();
+    notifyListeners();
   }
 
   void _subscribeToInboxChanges() {

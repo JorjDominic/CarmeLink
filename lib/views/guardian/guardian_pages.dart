@@ -51,8 +51,7 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
         animation: controller,
         builder: (context, _) {
           final tenant = controller.selectedTenant;
-          final firstName =
-              tenant?.name.trim().split(' ').first ?? 'Resident';
+          final firstName = tenant?.name.trim().split(' ').first ?? 'Resident';
 
           final headerTitle = controller.hasLinkedTenant
               ? '$firstName is inside the dormitory perimeter.'
@@ -63,273 +62,268 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-                  ElegantHeader(
-                    eyebrow: 'Guardian view',
-                    title: headerTitle,
-                    subtitle: controller.hasLinkedTenant
-                        ? 'Real-time GPS geofencing confirms safe arrival and departure.'
-                        : 'Manage linked resident information, room, and payments.',
-                    trailing: const StatusPill(
-                      'IN',
-                      icon: Icons.location_on_rounded,
-                    ),
-                  ),
-                  if (controller.linkedTenants.length > 1) ...[
-                    const SizedBox(height: 16),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: controller.linkedTenants.map((t) {
-                          final isSelected =
-                              t.tenantId == controller.selectedTenant?.tenantId;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(t.name),
-                              selected: isSelected,
-                              onSelected: (_) => controller.selectTenant(t),
-                              avatar: CircleAvatar(
-                                radius: 10,
-                                backgroundColor: isSelected
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context)
-                                        .colorScheme
-                                        .surfaceContainerHighest,
-                                child: Text(
-                                  t.name.isNotEmpty ? t.name[0] : '?',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : Theme.of(context)
-                                            .colorScheme
-                                            .onSurface,
-                                  ),
-                                ),
+              ElegantHeader(
+                eyebrow: 'Guardian view',
+                title: headerTitle,
+                subtitle: controller.hasLinkedTenant
+                    ? 'Real-time GPS geofencing confirms safe arrival and departure.'
+                    : 'Manage linked resident information, room, and payments.',
+                trailing: const StatusPill(
+                  'IN',
+                  icon: Icons.location_on_rounded,
+                ),
+              ),
+              if (controller.linkedTenants.length > 1) ...[
+                const SizedBox(height: 16),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: controller.linkedTenants.map((t) {
+                      final isSelected =
+                          t.tenantId == controller.selectedTenant?.tenantId;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(t.name),
+                          selected: isSelected,
+                          onSelected: (_) => controller.selectTenant(t),
+                          avatar: CircleAvatar(
+                            radius: 10,
+                            backgroundColor: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHighest,
+                            child: Text(
+                              t.name.isNotEmpty ? t.name[0] : '?',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isSelected
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  if (controller.hasLinkedTenant)
-                    CarmelitaCard(
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundColor: const Color(0x1556886B),
-                            foregroundColor: const Color(0xFF56886B),
-                            child: const Icon(Icons.person, size: 22),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              if (controller.hasLinkedTenant)
+                CarmelitaCard(
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: const Color(0x1556886B),
+                        foregroundColor: const Color(0xFF56886B),
+                        child: const Icon(Icons.person, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      controller.linkedTenantName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0x1556886B),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Text(
-                                        'Active Resident',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFF56886B),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
                                 Text(
-                                  controller.linkedTenantRoomSubtitle,
-                                  style: const TextStyle(fontSize: 12),
+                                  controller.linkedTenantName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0x1556886B),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Active Resident',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF56886B),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
-                      ),
-                    )
-                  else if (!controller.loading)
-                    const CarmelitaCard(
-                      child: ListTile(
-                        leading: Icon(Icons.info_outline,
-                            color: Color(0xFFB47A52)),
-                        title: Text(
-                          'No linked resident',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        subtitle: Text(
-                          'Your account is not linked to an active resident. Please contact dormitory management.',
-                        ),
-                      ),
-                    ),
-                  if (controller.pendingGuardianCurfewCount > 0) ...[
-                    const SizedBox(height: 16),
-                    AttentionCard(
-                      compact: true,
-                      icon: Icons.pending_actions_outlined,
-                      title:
-                          '${controller.pendingGuardianCurfewCount} overnight leave request(s) waiting',
-                      subtitle:
-                          'Your parental endorsement is needed for ${controller.linkedTenantName}.',
-                      status: 'Action needed',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const GuardianPresenceMonitoringPage(
-                            initialSegment: 0,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  const SectionTitle(
-                    'At a glance',
-                    subtitle: 'Presence, payment, and dormitory status',
-                  ),
-                  const SizedBox(height: 10),
-                  MutedDashboardGrid(
-                    items: [
-                      MutedDashboardItem(
-                        label: 'Curfew',
-                        value: 'Inside',
-                        detail: controller.pendingGuardianCurfewCount > 0
-                            ? '${controller.pendingGuardianCurfewCount} waiting your review'
-                            : 'GPS Geofence • 8:14 PM',
-                        icon: Icons.schedule_outlined,
-                        color: const Color(0xFF56886B),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                const GuardianPresenceMonitoringPage(initialSegment: 0),
-                          ),
-                        ),
-                      ),
-                      MutedDashboardItem(
-                        label: 'Outstanding',
-                        value: money(controller.outstandingTotal),
-                        detail: controller.payments.isEmpty
-                            ? 'No pending dues'
-                            : '${controller.payments.where((p) => !p.isVerified).length} unverified/due',
-                        icon: Icons.payments_outlined,
-                        color: const Color(0xFFAA8A45),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const GuardianPaymentStatusPage(),
-                          ),
+                            const SizedBox(height: 2),
+                            Text(
+                              controller.linkedTenantRoomSubtitle,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                  const SectionTitle(
-                    'Safety & presence status',
-                    subtitle:
-                        'Automated geofence tracking for resident safety',
+                )
+              else if (!controller.loading)
+                const CarmelitaCard(
+                  child: ListTile(
+                    leading: Icon(Icons.info_outline, color: Color(0xFFB47A52)),
+                    title: Text(
+                      'No linked resident',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Text(
+                      'Your account is not linked to an active resident. Please contact dormitory management.',
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  CarmelitaCard(
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.verified_user_outlined,
-                          color: Color(0xFF56886B)),
-                      title: const Text(
-                        'Perimeter status: Safe & Inside',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      subtitle: Text(
-                        controller.hasLinkedTenant
-                            ? '${controller.linkedTenantName} is currently within Carmelita\'s Dormitory perimeter. No issues reported.'
-                            : 'Resident monitoring is active when a resident is linked.',
-                      ),
-                      trailing: TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                const GuardianPresenceMonitoringPage(),
-                          ),
-                        ),
-                        child: const Text('View history'),
+                ),
+              if (controller.pendingGuardianCurfewCount > 0) ...[
+                const SizedBox(height: 16),
+                AttentionCard(
+                  compact: true,
+                  icon: Icons.pending_actions_outlined,
+                  title:
+                      '${controller.pendingGuardianCurfewCount} overnight leave request(s) waiting',
+                  subtitle:
+                      'Your parental endorsement is needed for ${controller.linkedTenantName}.',
+                  status: 'Action needed',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const GuardianPresenceMonitoringPage(
+                        initialSegment: 0,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  const SectionTitle(
-                    'Quick access',
-                    subtitle: 'Common information without searching',
+                ),
+              ],
+              const SizedBox(height: 24),
+              const SectionTitle(
+                'At a glance',
+                subtitle: 'Presence, payment, and dormitory status',
+              ),
+              const SizedBox(height: 10),
+              MutedDashboardGrid(
+                items: [
+                  MutedDashboardItem(
+                    label: 'Curfew',
+                    value: 'Inside',
+                    detail: controller.pendingGuardianCurfewCount > 0
+                        ? '${controller.pendingGuardianCurfewCount} waiting your review'
+                        : 'GPS Geofence • 8:14 PM',
+                    icon: Icons.schedule_outlined,
+                    color: const Color(0xFF56886B),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const GuardianPresenceMonitoringPage(
+                            initialSegment: 0),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  MutedActionGrid(
-                    items: [
-                      MutedActionItem(
-                        label: 'Tenant info',
-                        detail: 'View linked resident',
-                        icon: Icons.person_outline,
-                        color: const Color(0xFF56886B),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const GuardianTenantInfoPage(),
-                          ),
-                        ),
+                  MutedDashboardItem(
+                    label: 'Outstanding',
+                    value: money(controller.outstandingTotal),
+                    detail: controller.payments.isEmpty
+                        ? 'No pending dues'
+                        : '${controller.payments.where((p) => !p.isVerified).length} unverified/due',
+                    icon: Icons.payments_outlined,
+                    color: const Color(0xFFAA8A45),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const GuardianPaymentStatusPage(),
                       ),
-                      MutedActionItem(
-                        label: 'Payments',
-                        detail: 'Check balances',
-                        icon: Icons.receipt_long_outlined,
-                        color: const Color(0xFFAA8A45),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const GuardianPaymentStatusPage(),
-                          ),
-                        ),
-                      ),
-                      MutedActionItem(
-                        label: 'Announcements',
-                        detail: 'Read dormitory news',
-                        icon: Icons.campaign_outlined,
-                        color: const Color(0xFF7D70A0),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const GuardianAnnouncementsPage(),
-                          ),
-                        ),
-                      ),
-                      MutedActionItem(
-                        label: 'Contact info',
-                        detail: 'Office and emergency',
-                        icon: Icons.emergency_outlined,
-                        color: const Color(0xFFAA6870),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const EmergencySafetyAlertsPage(),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
-              );
+              ),
+              const SizedBox(height: 24),
+              const SectionTitle(
+                'Safety & presence status',
+                subtitle: 'Automated geofence tracking for resident safety',
+              ),
+              const SizedBox(height: 10),
+              CarmelitaCard(
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.verified_user_outlined,
+                      color: Color(0xFF56886B)),
+                  title: const Text(
+                    'Perimeter status: Safe & Inside',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: Text(
+                    controller.hasLinkedTenant
+                        ? '${controller.linkedTenantName} is currently within Carmelita\'s Dormitory perimeter. No issues reported.'
+                        : 'Resident monitoring is active when a resident is linked.',
+                  ),
+                  trailing: TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const GuardianPresenceMonitoringPage(),
+                      ),
+                    ),
+                    child: const Text('View history'),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const SectionTitle(
+                'Quick access',
+                subtitle: 'Common information without searching',
+              ),
+              const SizedBox(height: 10),
+              MutedActionGrid(
+                items: [
+                  MutedActionItem(
+                    label: 'Tenant info',
+                    detail: 'View linked resident',
+                    icon: Icons.person_outline,
+                    color: const Color(0xFF56886B),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const GuardianTenantInfoPage(),
+                      ),
+                    ),
+                  ),
+                  MutedActionItem(
+                    label: 'Payments',
+                    detail: 'Check balances',
+                    icon: Icons.receipt_long_outlined,
+                    color: const Color(0xFFAA8A45),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const GuardianPaymentStatusPage(),
+                      ),
+                    ),
+                  ),
+                  MutedActionItem(
+                    label: 'Announcements',
+                    detail: 'Read dormitory news',
+                    icon: Icons.campaign_outlined,
+                    color: const Color(0xFF7D70A0),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const GuardianAnnouncementsPage(),
+                      ),
+                    ),
+                  ),
+                  MutedActionItem(
+                    label: 'Contact info',
+                    detail: 'Office and emergency',
+                    icon: Icons.emergency_outlined,
+                    color: const Color(0xFFAA6870),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const EmergencySafetyAlertsPage(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
         },
       ),
     );
@@ -371,180 +365,179 @@ class GuardianTenantInfoPage extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-                  CarmelitaCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'RESIDENT PROFILE',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.1,
-                            fontSize: 12,
-                            color: Color(0xFF56886B),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        InfoRow(
-                          label: 'Resident name',
-                          value: tenant.name,
-                          icon: Icons.person_outline,
-                        ),
-                        InfoRow(
-                          label: 'Relationship',
-                          value:
-                              '${tenant.relationship}${tenant.isPrimary ? ' (Primary)' : ''}',
-                          icon: Icons.family_restroom_outlined,
-                        ),
-                        if (tenant.phone.isNotEmpty)
-                          InfoRow(
-                            label: 'Contact phone',
-                            value: tenant.phone,
-                            icon: Icons.phone_outlined,
-                          ),
-                        InfoRow(
-                          label: 'Residency status',
-                          value: tenant.residencyStatus.toUpperCase(),
-                          icon: Icons.verified_outlined,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  CarmelitaCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'ROOM ASSIGNMENT',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.1,
-                            fontSize: 12,
-                            color: Color(0xFF627FA8),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        if (room != null) ...[
-                          InfoRow(
-                            label: 'Room',
-                            value: 'Room ${room.number} • Floor ${room.floor}',
-                            icon: Icons.meeting_room_outlined,
-                          ),
-                          InfoRow(
-                            label: 'Bed space',
-                            value: room.bedSpace,
-                            icon: Icons.bed_outlined,
-                          ),
-                          InfoRow(
-                            label: 'Capacity & Occupancy',
-                            value: '${room.occupied} / ${room.capacity} occupied',
-                            icon: Icons.people_outline,
-                          ),
-                          if (room.utilitySummary.isNotEmpty)
-                            InfoRow(
-                              label: 'Utilities',
-                              value: room.utilitySummary,
-                              icon: Icons.bolt_outlined,
-                            ),
-                          if (room.roommateDetails.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            const Divider(height: 1),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Roommates',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            ...room.roommateDetails.map(
-                              (rm) => Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 3),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.person,
-                                        size: 16, color: Color(0xFF7D70A0)),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      rm.name,
-                                      style: TextStyle(
-                                        fontWeight: rm.isSelf
-                                            ? FontWeight.w800
-                                            : FontWeight.normal,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Text(
-                                      rm.bed,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ] else
-                          InfoRow(
-                            label: 'Room',
-                            value: controller.loading
-                                ? 'Loading room details...'
-                                : 'No active room assignment',
-                            icon: Icons.meeting_room_outlined,
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (tenant.schoolName.isNotEmpty ||
-                      tenant.courseOrProgram.isNotEmpty ||
-                      tenant.emergencyContactName.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    CarmelitaCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'EDUCATION & EMERGENCY',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.1,
-                              fontSize: 12,
-                              color: Color(0xFF7D70A0),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          if (tenant.schoolName.isNotEmpty)
-                            InfoRow(
-                              label: 'School / Institution',
-                              value: tenant.schoolName,
-                              icon: Icons.school_outlined,
-                            ),
-                          if (tenant.courseOrProgram.isNotEmpty)
-                            InfoRow(
-                              label: 'Program',
-                              value: tenant.yearLevel != null
-                                  ? '${tenant.courseOrProgram} (Year ${tenant.yearLevel})'
-                                  : tenant.courseOrProgram,
-                              icon: Icons.menu_book_outlined,
-                            ),
-                          if (tenant.emergencyContactName.isNotEmpty)
-                            InfoRow(
-                              label: 'Emergency contact',
-                              value:
-                                  '${tenant.emergencyContactName} (${tenant.emergencyContactPhone})',
-                              icon: Icons.emergency_outlined,
-                            ),
-                        ],
+              CarmelitaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'RESIDENT PROFILE',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.1,
+                        fontSize: 12,
+                        color: Color(0xFF56886B),
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    InfoRow(
+                      label: 'Resident name',
+                      value: tenant.name,
+                      icon: Icons.person_outline,
+                    ),
+                    InfoRow(
+                      label: 'Relationship',
+                      value:
+                          '${tenant.relationship}${tenant.isPrimary ? ' (Primary)' : ''}',
+                      icon: Icons.family_restroom_outlined,
+                    ),
+                    if (tenant.phone.isNotEmpty)
+                      InfoRow(
+                        label: 'Contact phone',
+                        value: tenant.phone,
+                        icon: Icons.phone_outlined,
+                      ),
+                    InfoRow(
+                      label: 'Residency status',
+                      value: tenant.residencyStatus.toUpperCase(),
+                      icon: Icons.verified_outlined,
+                    ),
                   ],
-                ],
-              );
+                ),
+              ),
+              const SizedBox(height: 16),
+              CarmelitaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'ROOM ASSIGNMENT',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.1,
+                        fontSize: 12,
+                        color: Color(0xFF627FA8),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (room != null) ...[
+                      InfoRow(
+                        label: 'Room',
+                        value: 'Room ${room.number} • Floor ${room.floor}',
+                        icon: Icons.meeting_room_outlined,
+                      ),
+                      InfoRow(
+                        label: 'Bed space',
+                        value: room.bedSpace,
+                        icon: Icons.bed_outlined,
+                      ),
+                      InfoRow(
+                        label: 'Capacity & Occupancy',
+                        value: '${room.occupied} / ${room.capacity} occupied',
+                        icon: Icons.people_outline,
+                      ),
+                      if (room.utilitySummary.isNotEmpty)
+                        InfoRow(
+                          label: 'Utilities',
+                          value: room.utilitySummary,
+                          icon: Icons.bolt_outlined,
+                        ),
+                      if (room.roommateDetails.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        const Divider(height: 1),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Roommates',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        ...room.roommateDetails.map(
+                          (rm) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.person,
+                                    size: 16, color: Color(0xFF7D70A0)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  rm.name,
+                                  style: TextStyle(
+                                    fontWeight: rm.isSelf
+                                        ? FontWeight.w800
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  rm.bed,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ] else
+                      InfoRow(
+                        label: 'Room',
+                        value: controller.loading
+                            ? 'Loading room details...'
+                            : 'No active room assignment',
+                        icon: Icons.meeting_room_outlined,
+                      ),
+                  ],
+                ),
+              ),
+              if (tenant.schoolName.isNotEmpty ||
+                  tenant.courseOrProgram.isNotEmpty ||
+                  tenant.emergencyContactName.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                CarmelitaCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'EDUCATION & EMERGENCY',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.1,
+                          fontSize: 12,
+                          color: Color(0xFF7D70A0),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (tenant.schoolName.isNotEmpty)
+                        InfoRow(
+                          label: 'School / Institution',
+                          value: tenant.schoolName,
+                          icon: Icons.school_outlined,
+                        ),
+                      if (tenant.courseOrProgram.isNotEmpty)
+                        InfoRow(
+                          label: 'Program',
+                          value: tenant.yearLevel != null
+                              ? '${tenant.courseOrProgram} (Year ${tenant.yearLevel})'
+                              : tenant.courseOrProgram,
+                          icon: Icons.menu_book_outlined,
+                        ),
+                      if (tenant.emergencyContactName.isNotEmpty)
+                        InfoRow(
+                          label: 'Emergency contact',
+                          value:
+                              '${tenant.emergencyContactName} (${tenant.emergencyContactPhone})',
+                          icon: Icons.emergency_outlined,
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          );
         },
       ),
     );
@@ -681,7 +674,9 @@ class _GuardianPresenceMonitoringPageState
     final controller = GuardianController.instance;
     final allEvents = controller.gateEvents;
     final events = allEvents.any((e) => e.person == controller.linkedTenantName)
-        ? allEvents.where((e) => e.person == controller.linkedTenantName).toList()
+        ? allEvents
+            .where((e) => e.person == controller.linkedTenantName)
+            .toList()
         : allEvents;
 
     return PageFrame(
@@ -710,10 +705,8 @@ class _GuardianPresenceMonitoringPageState
         builder: (context, _) {
           final allRequests = controller.curfewRequests;
           final pendingCount = controller.pendingGuardianCurfewCount;
-          final approvedCount =
-              allRequests.where((r) => r.isApproved).length;
-          final rejectedCount =
-              allRequests.where((r) => r.isRejected).length;
+          final approvedCount = allRequests.where((r) => r.isApproved).length;
+          final rejectedCount = allRequests.where((r) => r.isRejected).length;
 
           final displayedRequests = switch (_filter) {
             'pending' => allRequests
@@ -917,7 +910,8 @@ class _GuardianPresenceMonitoringPageState
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF627FA8).withValues(alpha: 0.12),
+                          color:
+                              const Color(0xFF627FA8).withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -948,11 +942,13 @@ class _GuardianPresenceMonitoringPageState
                         onPressed: () async {
                           final picked = await showTimePicker(
                             context: context,
-                            initialTime: GuardianAlertService.preferredAlertTime,
+                            initialTime:
+                                GuardianAlertService.preferredAlertTime,
                           );
                           if (picked != null) {
                             setState(() {
-                              GuardianAlertService.setPreferredAlertTime(picked);
+                              GuardianAlertService.setPreferredAlertTime(
+                                  picked);
                             });
                           }
                         },
@@ -991,8 +987,7 @@ class _GuardianPresenceMonitoringPageState
                 const SizedBox(height: 22),
                 const SectionTitle(
                   'Recent presence records',
-                  subtitle:
-                      'Automated GPS geofence arrival and departure logs',
+                  subtitle: 'Automated GPS geofence arrival and departure logs',
                 ),
                 const SizedBox(height: 10),
                 if (events.isEmpty)
@@ -1060,8 +1055,8 @@ class _GuardianCurfewRequestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final residentName = request.tenantName ??
-        GuardianController.instance.linkedTenantName;
+    final residentName =
+        request.tenantName ?? GuardianController.instance.linkedTenantName;
 
     return CarmelitaCard(
       padding: const EdgeInsets.all(16),
@@ -1224,8 +1219,8 @@ class _GuardianCurfewRequestCard extends StatelessWidget {
                       'Same-night late returns past 10 PM are reviewed directly by the caretaker or owner. Displayed here for your parental awareness.',
                       style: TextStyle(
                         fontSize: 11,
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: .85),
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: .85),
                       ),
                     ),
                   ),
@@ -1363,8 +1358,7 @@ class _GuardianCurfewRequestCard extends StatelessWidget {
                     'Forwarded to dormitory staff for final review.',
                     style: TextStyle(
                       fontSize: 11,
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: .7),
+                      color: theme.colorScheme.onSurface.withValues(alpha: .7),
                       fontStyle: FontStyle.italic,
                     ),
                   ),
@@ -2630,7 +2624,8 @@ class _GuardianMessagesPageState extends State<GuardianMessagesPage> {
             role: 'Owner & Caretaker',
             lastMessage: lastMsg,
             lastMessageText: previewText,
-            lastMessageTime: lastMsg?.sentAt ?? messaging.activeConversation?.lastMessageAt,
+            lastMessageTime:
+                lastMsg?.sentAt ?? messaging.activeConversation?.lastMessageAt,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => const GuardianConversationPage(),
@@ -2658,7 +2653,10 @@ class _GuardianConversationPageState extends State<GuardianConversationPage> {
   void initState() {
     super.initState();
     final uid = SessionController.instance.currentUser?.id ?? '';
-    MessagingController.instance.loadGuardianConversation(guardianId: uid);
+    MessagingController.instance.loadGuardianConversation(
+      guardianId: uid,
+      openThread: true,
+    );
   }
 
   @override
@@ -2723,7 +2721,8 @@ class _GuardianConversationPageState extends State<GuardianConversationPage> {
                                   ? Alignment.centerRight
                                   : Alignment.centerLeft,
                               child: Container(
-                                constraints: const BoxConstraints(maxWidth: 560),
+                                constraints:
+                                    const BoxConstraints(maxWidth: 560),
                                 margin: const EdgeInsets.symmetric(vertical: 6),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -2731,7 +2730,8 @@ class _GuardianConversationPageState extends State<GuardianConversationPage> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: isMe
-                                      ? const Color(0xFF627FA8).withValues(alpha: .10)
+                                      ? const Color(0xFF627FA8)
+                                          .withValues(alpha: .10)
                                       : Theme.of(context)
                                           .colorScheme
                                           .surfaceContainerHighest
@@ -2761,9 +2761,10 @@ class _GuardianConversationPageState extends State<GuardianConversationPage> {
                                       style: const TextStyle(fontSize: 13),
                                     ),
                                     const SizedBox(height: 3),
-                                    Text(
-                                      timeText(item.sentAt),
-                                      style: Theme.of(context).textTheme.bodySmall,
+                                    MessageDeliveryMeta(
+                                      message: item,
+                                      isMine: item.isMine(SessionController
+                                          .instance.currentUser?.id),
                                     ),
                                   ],
                                 ),

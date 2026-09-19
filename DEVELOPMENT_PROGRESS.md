@@ -104,6 +104,12 @@ geofencing or advanced analytics.
 
 ## Completed Milestones History
 
+> **Sep 19, 2026 — Message Read Receipts:** Added server-timestamped `read_at`
+> receipts, recipient-only read updates through a protected RPC, automatic read
+> marking when a conversation is viewed, realtime receipt updates, and Sent/Read
+> indicators for owner, caretaker, tenant, and guardian message views. Migration
+> `202609190013` is deployed. Multi-account production testing remains.
+
 > **Sep 19, 2026 — Signed Contract Document Workflow:** Added owner-side
 > generation and sharing of versioned contract PDFs, immutable private storage
 > for generated and signed copies, SHA-256 file metadata, signed-copy review,

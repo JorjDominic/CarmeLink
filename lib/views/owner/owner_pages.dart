@@ -5857,10 +5857,10 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
                                       style: const TextStyle(fontSize: 13),
                                     ),
                                     const SizedBox(height: 3),
-                                    Text(
-                                      timeText(item.sentAt),
-                                      style:
-                                          Theme.of(context).textTheme.bodySmall,
+                                    MessageDeliveryMeta(
+                                      message: item,
+                                      isMine: item.isMine(SessionController
+                                          .instance.currentUser?.id),
                                     ),
                                   ],
                                 ),

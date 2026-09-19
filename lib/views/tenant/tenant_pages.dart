@@ -4001,7 +4001,7 @@ class _TenantConversationPageState extends State<TenantConversationPage> {
   void initState() {
     super.initState();
     final uid = SessionController.instance.currentUser?.id ?? '';
-    MessagingController.instance.loadTenantConversation(uid);
+    MessagingController.instance.loadTenantConversation(uid, openThread: true);
   }
 
   @override
@@ -4106,10 +4106,10 @@ class _TenantConversationPageState extends State<TenantConversationPage> {
                                       style: const TextStyle(fontSize: 13),
                                     ),
                                     const SizedBox(height: 3),
-                                    Text(
-                                      timeText(item.sentAt),
-                                      style:
-                                          Theme.of(context).textTheme.bodySmall,
+                                    MessageDeliveryMeta(
+                                      message: item,
+                                      isMine: item.isMine(SessionController
+                                          .instance.currentUser?.id),
                                     ),
                                   ],
                                 ),

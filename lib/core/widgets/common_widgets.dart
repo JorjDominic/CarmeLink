@@ -44,6 +44,37 @@ Color mutedAccentForIcon(BuildContext context, IconData icon) {
   return const Color(0xFF627FA8);
 }
 
+class MessageDeliveryMeta extends StatelessWidget {
+  const MessageDeliveryMeta({
+    required this.message,
+    required this.isMine,
+    super.key,
+  });
+
+  final ChatMessage message;
+  final bool isMine;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodySmall;
+    if (!isMine) return Text(timeText(message.sentAt), style: style);
+    final read = message.isRead && message.readAt != null;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('${timeText(message.sentAt)} • ', style: style),
+        Icon(
+          read ? Icons.done_all_rounded : Icons.done_rounded,
+          size: 14,
+          color: read ? Theme.of(context).colorScheme.primary : style?.color,
+        ),
+        const SizedBox(width: 3),
+        Text(read ? 'Read' : 'Sent', style: style),
+      ],
+    );
+  }
+}
+
 class CarmelitaLogo extends StatelessWidget {
   const CarmelitaLogo({
     this.height = 56,

@@ -14,7 +14,7 @@ class MessagingService {
       'guardian_profile:profiles!guardian_id(full_name, role)';
 
   static const String _messageColumns =
-      'id, conversation_id, sender_id, sender_role, body, is_read, created_at, '
+      'id, conversation_id, sender_id, sender_role, body, is_read, read_at, created_at, '
       'profiles!sender_id(full_name, role)';
 
   /// Retrieves or creates the official conversation thread for a tenant with Management.
@@ -24,9 +24,8 @@ class MessagingService {
     final client = SupabaseConfig.clientSafe;
     if (client == null) return null;
 
-    final effectiveTenantId = tenantId.isNotEmpty
-        ? tenantId
-        : (client.auth.currentUser?.id ?? '');
+    final effectiveTenantId =
+        tenantId.isNotEmpty ? tenantId : (client.auth.currentUser?.id ?? '');
     if (effectiveTenantId.isEmpty) return null;
 
     try {
@@ -231,7 +230,8 @@ class MessagingService {
           .limit(limit);
 
       return (rows as List<dynamic>)
-          .map<ChatMessage>((row) => ChatMessage.fromRow(row as Map<String, dynamic>))
+          .map<ChatMessage>(
+              (row) => ChatMessage.fromRow(row as Map<String, dynamic>))
           .toList();
     } catch (e) {
       debugPrint('Error fetching messages: $e');
@@ -254,9 +254,8 @@ class MessagingService {
       throw Exception('Database client unavailable');
     }
 
-    final effectiveSenderId = senderId.isNotEmpty
-        ? senderId
-        : (client.auth.currentUser?.id ?? '');
+    final effectiveSenderId =
+        senderId.isNotEmpty ? senderId : (client.auth.currentUser?.id ?? '');
 
     if (effectiveSenderId.isEmpty) {
       throw Exception('Authenticated user ID required to send message');
@@ -278,22 +277,21 @@ class MessagingService {
   }
 
   /// Marks all incoming unread messages in a conversation as read.
-  Future<void> markConversationAsRead({
+  Future<DateTime?> markConversationAsRead({
     required String conversationId,
-    required String currentUserId,
   }) async {
     final client = SupabaseConfig.clientSafe;
-    if (client == null) return;
+    if (client == null) return null;
 
     try {
-      await client
-          .from('messages')
-          .update({'is_read': true})
-          .eq('conversation_id', conversationId)
-          .neq('sender_id', currentUserId)
-          .eq('is_read', false);
+      final value = await client.rpc(
+        'mark_conversation_messages_read',
+        params: {'p_conversation_id': conversationId},
+      );
+      return value == null ? null : DateTime.parse(value as String).toLocal();
     } catch (e) {
       debugPrint('Error marking conversation as read: $e');
+      return null;
     }
   }
 
@@ -301,6 +299,7 @@ class MessagingService {
   RealtimeChannel? subscribeToConversation({
     required String conversationId,
     required void Function(ChatMessage message) onMessageReceived,
+    required void Function(ChatMessage message) onMessageUpdated,
   }) {
     final client = SupabaseConfig.clientSafe;
     if (client == null) return null;
@@ -321,6 +320,22 @@ class MessagingService {
               final newRow = payload.newRecord;
               if (newRow.isNotEmpty) {
                 onMessageReceived(ChatMessage.fromRow(newRow));
+              }
+            },
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'messages',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'conversation_id',
+              value: conversationId,
+            ),
+            callback: (payload) {
+              final updatedRow = payload.newRecord;
+              if (updatedRow.isNotEmpty) {
+                onMessageUpdated(ChatMessage.fromRow(updatedRow));
               }
             },
           )
@@ -369,4 +384,3 @@ class MessagingService {
     } catch (_) {}
   }
 }
-

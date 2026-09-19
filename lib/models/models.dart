@@ -653,6 +653,7 @@ class ChatMessage {
     this.conversationId = '',
     this.senderId = '',
     this.isRead = false,
+    this.readAt,
   });
 
   final String id;
@@ -663,6 +664,7 @@ class ChatMessage {
   final String conversationId;
   final String senderId;
   final bool isRead;
+  final DateTime? readAt;
 
   bool isMine(String? currentUserId) {
     if (currentUserId == null || currentUserId.isEmpty) return false;
@@ -689,6 +691,9 @@ class ChatMessage {
       senderRole: role,
       body: row['body'] as String? ?? '',
       isRead: row['is_read'] as bool? ?? false,
+      readAt: row['read_at'] == null
+          ? null
+          : DateTime.parse(row['read_at'] as String).toLocal(),
       sentAt: row['created_at'] != null
           ? DateTime.parse(row['created_at'] as String).toLocal()
           : DateTime.now(),
@@ -704,6 +709,18 @@ class ChatMessage {
       'is_read': isRead,
     };
   }
+
+  ChatMessage copyWith({bool? isRead, DateTime? readAt}) => ChatMessage(
+        id: id,
+        senderName: senderName,
+        senderRole: senderRole,
+        body: body,
+        sentAt: sentAt,
+        conversationId: conversationId,
+        senderId: senderId,
+        isRead: isRead ?? this.isRead,
+        readAt: readAt ?? this.readAt,
+      );
 }
 
 class ConversationRecord {

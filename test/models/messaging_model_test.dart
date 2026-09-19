@@ -30,7 +30,8 @@ void main() {
         'conversation_id': 'conv-999',
         'sender_id': 'user-123',
         'body': 'Good morning, is the water tank fixed?',
-        'is_read': false,
+        'is_read': true,
+        'read_at': '2026-09-19T10:35:00.000Z',
         'created_at': '2026-09-19T10:30:00.000Z',
         'profiles': {
           'full_name': 'Anna Dela Cruz',
@@ -46,7 +47,9 @@ void main() {
       expect(msg.senderName, 'Anna Dela Cruz');
       expect(msg.senderRole, 'tenant');
       expect(msg.body, 'Good morning, is the water tank fixed?');
-      expect(msg.isRead, isFalse);
+      expect(msg.isRead, isTrue);
+      expect(msg.readAt, isNotNull);
+      expect(msg.readAt!.toUtc(), DateTime.utc(2026, 9, 19, 10, 35));
     });
 
     test('toInsertRow produces valid insert payload', () {
@@ -66,6 +69,27 @@ void main() {
       expect(insertMap['sender_role'], 'caretaker');
       expect(insertMap['body'], 'Maintenance completed.');
       expect(insertMap['is_read'], isFalse);
+      expect(insertMap.containsKey('read_at'), isFalse);
+    });
+
+    test('copyWith applies a realtime read receipt', () {
+      final msg = ChatMessage(
+        id: 'msg-copy',
+        conversationId: 'conv-abc',
+        senderId: 'sender',
+        senderName: 'Tenant',
+        senderRole: 'tenant',
+        body: 'Hello',
+        sentAt: now,
+      );
+      final readAt = DateTime(2026, 9, 19, 10, 31);
+
+      final updated = msg.copyWith(isRead: true, readAt: readAt);
+
+      expect(updated.isRead, isTrue);
+      expect(updated.readAt, readAt);
+      expect(updated.body, msg.body);
+      expect(updated.senderName, msg.senderName);
     });
   });
 
@@ -170,4 +194,3 @@ void main() {
     });
   });
 }
-
