@@ -1221,7 +1221,7 @@ class _GuardianCurfewRequestCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Same-night late returns past 10 PM are approved directly by Caretaker/Owner for fast gate clearance. Displayed here for your parental awareness.',
+                      'Same-night late returns past 10 PM are reviewed directly by the caretaker or owner. Displayed here for your parental awareness.',
                       style: TextStyle(
                         fontSize: 11,
                         color: theme.colorScheme.onSurface
@@ -1270,7 +1270,7 @@ class _GuardianCurfewRequestCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Resident requested an overnight stay off-premises. Your parental approval is required before dormitory staff can evaluate and authorize gate release.',
+                        'Resident requested an overnight stay off-premises. Your parental approval is required before dormitory staff can review and authorize the request.',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -1360,7 +1360,7 @@ class _GuardianCurfewRequestCard extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(left: 4),
                   child: Text(
-                    'Forwarded to dormitory staff for final gate clearance.',
+                    'Forwarded to dormitory staff for final review.',
                     style: TextStyle(
                       fontSize: 11,
                       color:

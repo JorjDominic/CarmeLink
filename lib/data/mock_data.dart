@@ -116,15 +116,6 @@ class MockData {
         status: 'Verified'),
   ];
 
-  static List<VisitorRequest> visitors = [
-    VisitorRequest(
-        id: 'v1',
-        visitorName: 'Maria Dela Cruz',
-        relationship: 'Mother',
-        schedule: DateTime(2026, 8, 10, 14),
-        status: 'Approved'),
-  ];
-
   static final announcements = [
     Announcement(
         id: 'a1',
@@ -349,7 +340,7 @@ class MockData {
           id: 'oc2m1',
           senderName: 'Maria Dela Cruz',
           senderRole: 'guardian',
-          body: 'Thank you for the gate update.',
+          body: 'Thank you for the presence update.',
           sentAt: DateTime(2026, 8, 8, 20, 18),
         ),
       ],

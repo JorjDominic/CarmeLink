@@ -4,21 +4,20 @@
 
 CarmeLink is a role-based dormitory management platform for Carmelita's Dormitory. It is designed to centralize tenant records, guardian relationships, room and bed assignments, payments, maintenance, curfew and gate monitoring, visitor requests, announcements, messaging, safety reports, contracts, and administrative reporting in one system.
 
-## Current Completion Snapshot — September 19, 2026
+## Current Production-Readiness Snapshot — September 19, 2026
 
-- **Estimated full-system completion:** 71%
-- **Functional prototype completion:** approximately 89%
-- **Production readiness:** approximately 63%
+- **Primary tracked completion metric — production readiness:** approximately 65%
+- **Secondary implementation reference — functional prototype:** approximately 89%
 
-The estimate credits only connected workflows proportionally; UI-only pages do
-not count as complete. Remaining work is concentrated in visitors,
+The primary estimate credits only connected workflows proportionally; UI-only pages do
+not count as complete. Remaining work is concentrated in
 notifications/preferences, contracts, finance, discipline, analytics, native
 device binding/background location, feedback persistence, MockData removal,
 and final multi-account security/offline validation.
 
 The current project already uses one shared Flutter codebase and one Supabase backend so every role works with the same protected data source rather than separate databases.
 
-> **Implementation status (September 19, 2026):** The repository has live Supabase authentication and role protection, accounts, rooms/assignments, guardian links, payments, maintenance, curfew/gate records, announcements, real-time messaging, and tenant/owner confidential-report workflows. Visitors, notifications, contracts, finance, discipline, analytics, native device binding, and production hardening remain incomplete.
+> **Implementation status (September 19, 2026):** The repository has live Supabase authentication and role protection, accounts, rooms/assignments, guardian links, payments, maintenance, curfew/presence records, visitor requests and arrival/departure history, announcements, real-time messaging, and tenant/owner confidential-report workflows. Notifications, contracts, finance, discipline, analytics, native device binding, and production hardening remain incomplete.
 
 ---
 
@@ -921,7 +920,7 @@ Recommended visitor fields:
 - Expected time out
 - Purpose
 - Approval status
-- Actual time in/out when gate logging is available
+- Actual arrival and departure times when staff presence logging is available
 
 ---
 

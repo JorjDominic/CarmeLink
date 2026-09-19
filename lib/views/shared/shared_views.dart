@@ -27,7 +27,7 @@ class NotificationsPage extends StatelessWidget {
                   .map((n) => TimelineTile(
                         icon: n.type == 'Payment'
                             ? Icons.payments_outlined
-                            : n.type == 'Gate'
+                            : n.type == 'Presence' || n.type == 'Geofence'
                                 ? Icons.sensor_door_outlined
                                 : Icons.build_outlined,
                         title: n.title,
@@ -38,7 +38,7 @@ class NotificationsPage extends StatelessWidget {
     );
   }
 
-  int _urgency(String type) => type == 'Gate'
+  int _urgency(String type) => type == 'Presence' || type == 'Geofence'
       ? 3
       : type == 'Payment'
           ? 2

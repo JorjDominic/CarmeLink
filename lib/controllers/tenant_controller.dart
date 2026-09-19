@@ -10,6 +10,7 @@ import '../services/geofence_service.dart';
 import '../services/maintenance_service.dart';
 import '../services/payment_service.dart';
 import '../services/room_service.dart';
+import '../services/visitor_service.dart';
 
 class TenantController extends ChangeNotifier {
   TenantController._();
@@ -25,11 +26,13 @@ class TenantController extends ChangeNotifier {
   final GateService _gateService = const GateService();
   final GeofenceLocationService _geofenceService =
       const GeofenceLocationService();
+  final VisitorService _visitorService = const VisitorService();
 
   final List<MaintenanceReport> _maintenance = [];
   final List<Payment> _payments = [];
   final List<CurfewRequest> _curfewRequests = [];
   final List<ConcernReport> _concerns = [];
+  final List<VisitorRequest> _visitors = [];
   List<GateEvent> _gateEvents = [];
   Room? _room;
 
@@ -60,6 +63,10 @@ class TenantController extends ChangeNotifier {
   bool _roomLoading = false;
   String? _roomError;
   bool _roomLoadedOnce = false;
+
+  bool _visitorsLoading = false;
+  String? _visitorsError;
+  bool _visitorsLoadedOnce = false;
 
   Room? get room => _room;
   bool get roomLoading => _roomLoading;
@@ -132,7 +139,10 @@ class TenantController extends ChangeNotifier {
         MockData.announcements,
       );
 
-  List<VisitorRequest> get visitors => List.unmodifiable(MockData.visitors);
+  List<VisitorRequest> get visitors => List.unmodifiable(_visitors);
+  bool get visitorsLoading => _visitorsLoading;
+  String? get visitorsError => _visitorsError;
+  bool get visitorsLoadedOnce => _visitorsLoadedOnce;
 
   List<ConcernReport> get concerns => List.unmodifiable(_concerns);
   bool get concernsLoading => _concernsLoading;
@@ -276,6 +286,10 @@ class TenantController extends ChangeNotifier {
     _concernsLoading = false;
     _concernsError = null;
     _concernsLoadedOnce = false;
+    _visitors.clear();
+    _visitorsLoading = false;
+    _visitorsError = null;
+    _visitorsLoadedOnce = false;
     _gateEvents.clear();
     _gateLoading = false;
     _gateError = null;
@@ -494,22 +508,74 @@ class TenantController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void submitVisitor({
+  Future<void> loadVisitors({bool force = false}) async {
+    if (_visitorsLoading || (_visitorsLoadedOnce && !force)) return;
+    _visitorsLoading = true;
+    _visitorsError = null;
+    notifyListeners();
+    try {
+      final items = await _visitorService.listOwnRequests();
+      _visitors
+        ..clear()
+        ..addAll(items);
+      _visitorsLoadedOnce = true;
+    } catch (error) {
+      _visitorsError = _message(error);
+    } finally {
+      _visitorsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<VisitorRequest> submitVisitor({
     required String visitorName,
     required String relationship,
+    required String purpose,
     required DateTime schedule,
-  }) {
-    MockData.visitors.insert(
-      0,
-      VisitorRequest(
-        id: 'v${DateTime.now().millisecondsSinceEpoch}',
-        visitorName: visitorName,
-        relationship: relationship,
-        schedule: schedule,
-        status: 'Pending',
-      ),
+  }) async {
+    final request = await _visitorService.submit(
+      visitorName: visitorName,
+      relationship: relationship,
+      purpose: purpose,
+      schedule: schedule,
     );
+    _visitors.insert(0, request);
+    _visitorsLoadedOnce = true;
+    _visitorsError = null;
+    notifyListeners();
+    return request;
+  }
 
+  Future<void> cancelVisitor(VisitorRequest request) async {
+    final updated = await _visitorService.transition(
+      requestId: request.id,
+      action: 'cancel',
+    );
+    _replaceVisitor(updated);
+  }
+
+  Future<List<VisitorEvent>> loadVisitorEvents(String requestId) =>
+      _visitorService.listEvents(requestId);
+
+  void _replaceVisitor(VisitorRequest updated) {
+    final index = _visitors.indexWhere((item) => item.id == updated.id);
+    if (index == -1) {
+      _visitors.insert(0, updated);
+    } else {
+      _visitors[index] = updated;
+    }
+    _visitorsError = null;
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void setVisitorsForTesting(List<VisitorRequest> items) {
+    _visitors
+      ..clear()
+      ..addAll(items);
+    _visitorsLoadedOnce = true;
+    _visitorsLoading = false;
+    _visitorsError = null;
     notifyListeners();
   }
 

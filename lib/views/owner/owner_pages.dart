@@ -3919,7 +3919,8 @@ class _StaffManualLogDialogState extends State<_StaffManualLogDialog> {
                 maxLines: 3,
                 decoration: const InputDecoration(
                   labelText: 'Observation Notes *',
-                  hintText: 'e.g. Directly observed at gate; phone drained.',
+                  hintText:
+                      'e.g. Directly observed arriving on the premises; phone drained.',
                   border: OutlineInputBorder(),
                 ),
                 validator: (val) {
@@ -3960,19 +3961,144 @@ typedef GateMonitoringPage = GeofenceMonitoringPage;
 typedef CurfewMonitoringPage = GeofenceMonitoringPage;
 typedef CurfewRequestReviewPage = GeofenceMonitoringPage;
 
-class VisitorManagementPage extends StatelessWidget {
+class VisitorManagementPage extends StatefulWidget {
   const VisitorManagementPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final controller = OwnerController.instance;
+  State<VisitorManagementPage> createState() => _VisitorManagementPageState();
+}
 
+class _VisitorManagementPageState extends State<VisitorManagementPage> {
+  final controller = OwnerController.instance;
+  late final TableRefreshSubscription _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    controller.loadVisitors();
+    _subscription = TableRefreshSubscription(
+      'staff-visitors',
+      const ['visitor_requests', 'visitor_events'],
+      () => controller.loadVisitors(force: true),
+    );
+  }
+
+  @override
+  void dispose() {
+    _subscription.dispose();
+    super.dispose();
+  }
+
+  Future<void> _transition(
+    VisitorRequest request,
+    String action, {
+    String? note,
+  }) async {
+    try {
+      await controller.transitionVisitor(request, action, note: note);
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Visitor update failed: $error');
+    }
+  }
+
+  Future<void> _reject(VisitorRequest request) async {
+    final notes = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reject visitor request'),
+        content: TextField(
+          controller: notes,
+          maxLength: 500,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Reason',
+            hintText: 'Required for the tenant and audit history',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (notes.text.trim().length < 2) {
+                showAppSnackBar(context, 'Enter a rejection reason.');
+                return;
+              }
+              Navigator.pop(dialogContext);
+              await _transition(request, 'reject', note: notes.text);
+            },
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+    notes.dispose();
+  }
+
+  Future<void> _showHistory(VisitorRequest request) => showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('${request.visitorName} history'),
+          content: SizedBox(
+            width: 460,
+            child: FutureBuilder<List<VisitorEvent>>(
+              future: controller.loadVisitorEvents(request.id),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final events = snapshot.data ?? const <VisitorEvent>[];
+                if (events.isEmpty) {
+                  return const Text('No review or presence events yet.');
+                }
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: events
+                      .map((event) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(event.eventLabel),
+                            subtitle: Text(
+                              '${event.actorName.isEmpty ? 'Authorized user' : event.actorName} • '
+                              '${shortDate(event.occurredAt)} • ${timeText(event.occurredAt)}'
+                              '${event.note?.isNotEmpty == true ? '\n${event.note}' : ''}',
+                            ),
+                          ))
+                      .toList(),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
     return PageFrame(
       title: 'Visitor management',
-      subtitle: 'Expected visitors and permission status',
+      subtitle: 'Requests, arrivals, and departures',
+      onRefresh: () => controller.loadVisitors(force: true),
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
+          if (controller.visitorsLoading && controller.visitors.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (controller.visitorsError != null && controller.visitors.isEmpty) {
+            return EmptyState(
+              icon: Icons.error_outline,
+              title: 'Unable to load visitor requests',
+              message: controller.visitorsError!,
+            );
+          }
           if (controller.visitors.isEmpty) {
             return const EmptyState(
               icon: Icons.people_outline,
@@ -4001,7 +4127,7 @@ class VisitorManagementPage extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              StatusPill(visitor.status),
+                              StatusPill(visitor.statusLabel),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -4009,35 +4135,68 @@ class VisitorManagementPage extends StatelessWidget {
                             label: 'Relationship',
                             value: visitor.relationship,
                           ),
+                          if (visitor.tenantName.isNotEmpty)
+                            InfoRow(
+                              label: 'Resident',
+                              value: visitor.tenantName,
+                            ),
+                          InfoRow(label: 'Purpose', value: visitor.purpose),
                           InfoRow(
                             label: 'Schedule',
                             value: '${shortDate(visitor.schedule)} • '
                                 '${timeText(visitor.schedule)}',
                           ),
-                          if (visitor.status == 'Pending') ...[
+                          if (visitor.reviewNote?.isNotEmpty == true)
+                            InfoRow(
+                              label: 'Review note',
+                              value: visitor.reviewNote!,
+                            ),
+                          TextButton.icon(
+                            onPressed: () => _showHistory(visitor),
+                            icon: const Icon(Icons.history_rounded),
+                            label: const Text('View history'),
+                          ),
+                          if (visitor.isPending) ...[
                             const SizedBox(height: 12),
                             Row(
                               children: [
                                 Expanded(
                                   child: OutlinedButton(
-                                    onPressed: () => controller.decideVisitor(
-                                      visitor,
-                                      false,
-                                    ),
+                                    onPressed: () => _reject(visitor),
                                     child: const Text('Reject'),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: FilledButton(
-                                    onPressed: () => controller.decideVisitor(
-                                      visitor,
-                                      true,
-                                    ),
+                                    onPressed: () =>
+                                        _transition(visitor, 'approve'),
                                     child: const Text('Approve'),
                                   ),
                                 ),
                               ],
+                            ),
+                          ] else if (visitor.isApproved) ...[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: () =>
+                                    _transition(visitor, 'record_arrival'),
+                                icon: const Icon(Icons.login_rounded),
+                                label: const Text('Record arrival'),
+                              ),
+                            ),
+                          ] else if (visitor.hasArrived) ...[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: () =>
+                                    _transition(visitor, 'record_departure'),
+                                icon: const Icon(Icons.logout_rounded),
+                                label: const Text('Record departure'),
+                              ),
                             ),
                           ],
                         ],

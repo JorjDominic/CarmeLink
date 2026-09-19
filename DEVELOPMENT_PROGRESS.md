@@ -5,15 +5,19 @@ Last updated: September 19, 2026
 This file tracks development separately from the README. Page ownership is
 divided between two developers to reduce merge conflicts.
 
-## Current completion assessment
+## Current production-readiness assessment
 
-**Estimated full-system completion: 71%.** The functional prototype is roughly
-89% complete, while production readiness is approximately 63%. This estimate
-weights live persistence, authorization, validation, testing, and role-complete
-workflows more heavily than screens that exist only as UI.
+**Production readiness: approximately 65%.** This is the primary completion
+metric for the project. It weights live persistence, authorization, validation,
+testing, deployment readiness, and role-complete workflows more heavily than
+screens that exist only as UI.
 
-Major remaining areas are visitors, persisted notifications/preferences,
-contracts, finance/expenses, discipline, analytics, native tenant device
+The functional prototype is roughly 89% complete, but that figure is retained
+only as a secondary implementation reference and is not the tracked completion
+percentage.
+
+Major remaining areas are persisted notifications/preferences, contracts,
+finance/expenses, discipline, analytics, native tenant device
 binding/background location, feedback persistence, MockData removal, and final
 multi-account security/offline testing.
 
@@ -34,11 +38,24 @@ geofencing or advanced analytics.
 3. **Rooms and occupancy** — rooms, beds, assignments, vacancies, and contracts.
 4. **Payments** — charges, balances, receipts, verification, and payment history.
 5. **Maintenance** — submissions, locations, assignments, status, and resolution.
-6. **Gate, curfew, and visitors** — auditable events and approval workflows.
+6. **Presence, curfew, and visitors** — auditable events and approval workflows.
 7. **Communication** — announcements, notifications, and role-scoped messaging.
 8. **Safety and privacy** — confidential reports, audit logs, retention, and permissions.
 
 ## Completed Milestones History
+
+> **Sep 19, 2026 — Visitor Workflow Database Hardening (Phase 1):** Added a
+> controlled visitor lifecycle (`pending` → `approved`/`rejected`/`cancelled`
+> → `arrived` → `completed`), protected staff/tenant transition RPC, reviewer
+> metadata, append-only arrival/departure events, role-scoped RLS, audit-safe
+> cancellation, indexes, and real-time publication. Visitor language now uses
+> arrival, departure, and presence rather than implying gate staff or hardware.
+
+> **Sep 19, 2026 — Live Visitor Workflow (Phase 2):** Replaced visitor mock
+> data with Supabase-backed tenant and staff controllers, request submission,
+> cancellation, approval/rejection, arrival/departure recording, role-visible
+> history, loading/error states, and real-time refresh. Added visitor model and
+> controller coverage; 150/150 tests pass.
 
 > **Sep 19, 2026 — Owner Confidential Report Review:** Connected the owner-only
 > confidential report register to Supabase with mandatory private decision
@@ -112,7 +129,8 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Messages and Conversation** — persisted, role-scoped real-time messaging; production multi-account testing remains.
 - [✓] **Gate and Curfew** — verified IN/OUT events, curfew status, on-device geofence check-in, and presence timeline.
 - [✓] **Curfew Exception (Tenant)** — differentiated request types ('Late Return' direct to caretaker vs 'Overnight Leave' with guardian endorsement), departure/return schedule pickers, status pills, cancellation of pending requests, and live Supabase real-time sync.
-- [ ] **Visitor Request** — visitor identity, schedule, status, and audit history.
+- [✓] **Visitor Request** — live visitor identity, purpose, schedule, review,
+  cancellation, arrival/departure status, and audit-safe real-time history.
 - [✓] **Confidential Concern (Tenant Phase)** — restricted live submission and tenant-only history protected by RLS; staff review is deferred.
 - [✓] **Rules and Policies** — maintained dormitory rules and safety guidance.
 

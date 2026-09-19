@@ -9,6 +9,7 @@ import '../services/payment_service.dart';
 import '../services/room_service.dart';
 import '../services/staff_maintenance_service.dart';
 import '../services/tenant_service.dart';
+import '../services/visitor_service.dart';
 
 class OwnerController extends ChangeNotifier {
   OwnerController._();
@@ -47,10 +48,16 @@ class OwnerController extends ChangeNotifier {
 
   final GateService _gateService = const GateService();
   final TenantService _tenantService = const TenantService();
+  final VisitorService _visitorService = const VisitorService();
   List<GateEvent> _gateEvents = [];
   bool _gateLoading = false;
   String? _gateError;
   bool _gateLoadedOnce = false;
+
+  final List<VisitorRequest> _visitors = [];
+  bool _visitorsLoading = false;
+  String? _visitorsError;
+  bool _visitorsLoadedOnce = false;
 
   List<TenantDirectoryEntry> _tenants = [];
   bool _tenantsLoading = false;
@@ -140,7 +147,10 @@ class OwnerController extends ChangeNotifier {
   List<GateEvent> get geofenceEvents => gateEvents;
   bool get gateLoading => _gateLoading;
   String? get gateError => _gateError;
-  List<VisitorRequest> get visitors => List.unmodifiable(MockData.visitors);
+  List<VisitorRequest> get visitors => List.unmodifiable(_visitors);
+  bool get visitorsLoading => _visitorsLoading;
+  String? get visitorsError => _visitorsError;
+  bool get visitorsLoadedOnce => _visitorsLoadedOnce;
   List<ConcernReport> get concerns => List.unmodifiable(_concerns);
   bool get concernsLoading => _concernsLoading;
   String? get concernsError => _concernsError;
@@ -182,7 +192,7 @@ class OwnerController extends ChangeNotifier {
           .length;
 
   int get pendingVisitors =>
-      visitors.where((visitor) => visitor.status == 'Pending').length;
+      visitors.where((visitor) => visitor.isPending).length;
 
   int get tenantsInsideCount => tenants.where((t) => t.isInside).length;
 
@@ -299,8 +309,56 @@ class OwnerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void decideVisitor(VisitorRequest request, bool approve) {
-    request.status = approve ? 'Approved' : 'Rejected';
+  Future<void> loadVisitors({bool force = false}) async {
+    if (_visitorsLoading || (_visitorsLoadedOnce && !force)) return;
+    _visitorsLoading = true;
+    _visitorsError = null;
+    notifyListeners();
+    try {
+      final items = await _visitorService.listStaffRequests();
+      _visitors
+        ..clear()
+        ..addAll(items);
+      _visitorsLoadedOnce = true;
+    } catch (error) {
+      _visitorsError = error.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _visitorsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> transitionVisitor(
+    VisitorRequest request,
+    String action, {
+    String? note,
+  }) async {
+    final updated = await _visitorService.transition(
+      requestId: request.id,
+      action: action,
+      note: note,
+    );
+    final index = _visitors.indexWhere((item) => item.id == updated.id);
+    if (index == -1) {
+      _visitors.insert(0, updated);
+    } else {
+      _visitors[index] = updated;
+    }
+    _visitorsError = null;
+    notifyListeners();
+  }
+
+  Future<List<VisitorEvent>> loadVisitorEvents(String requestId) =>
+      _visitorService.listEvents(requestId);
+
+  @visibleForTesting
+  void setVisitorsForTesting(List<VisitorRequest> items) {
+    _visitors
+      ..clear()
+      ..addAll(items);
+    _visitorsLoadedOnce = true;
+    _visitorsLoading = false;
+    _visitorsError = null;
     notifyListeners();
   }
 
@@ -575,6 +633,10 @@ class OwnerController extends ChangeNotifier {
     _gateLoading = false;
     _gateError = null;
     _gateLoadedOnce = false;
+    _visitors.clear();
+    _visitorsLoading = false;
+    _visitorsError = null;
+    _visitorsLoadedOnce = false;
     _tenants.clear();
     _tenantsLoading = false;
     _tenantsLoadedOnce = false;

@@ -4379,7 +4379,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                                             ? 'Presence confirmed (${result.direction == "IN" ? "Inside" : "Outside"}), but server sync warning: ${result.errorMessage}'
                                             : 'Presence confirmed: ${result.direction == "IN" ? "Inside perimeter" : "Outside perimeter"}',
                                         'Flagged' =>
-                                          'Gate check recorded (Flagged: curfew hours active)',
+                                          'Presence check recorded (Flagged: curfew hours active)',
                                         _ =>
                                           'Location check failed: ${result.errorMessage ?? (result.failureReason.name != 'none' ? result.failureReason.name : 'Signal error')}',
                                       };
@@ -5158,7 +5158,7 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
                         const SizedBox(height: 2),
                         Text(
                           isLate
-                              ? 'Forwarded directly to the caretaker / owner on duty for fast gate approval. Your guardian will see this on their read-only curfew activity log.'
+                              ? 'Forwarded directly to the caretaker / owner on duty for prompt staff review. Your guardian will see this on their read-only curfew activity log.'
                               : 'Since you will be off-premises overnight, your registered guardian must review and approve this first before caretaker sign-off.',
                           style: const TextStyle(fontSize: 12, height: 1.3),
                         ),
@@ -5329,12 +5329,70 @@ class VisitorRequestPage extends StatefulWidget {
 class _VisitorRequestPageState extends State<VisitorRequestPage> {
   final name = TextEditingController();
   final relation = TextEditingController();
-  DateTime schedule = DateTime(2026, 8, 10, 14);
+  final purpose = TextEditingController();
+  late DateTime schedule;
+  late final TableRefreshSubscription _subscription;
+  bool saving = false;
+
+  Future<void> _showHistory(VisitorRequest request) => showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('${request.visitorName} history'),
+          content: SizedBox(
+            width: 460,
+            child: FutureBuilder<List<VisitorEvent>>(
+              future: TenantController.instance.loadVisitorEvents(request.id),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final events = snapshot.data ?? const <VisitorEvent>[];
+                if (events.isEmpty) {
+                  return const Text('No review or presence events yet.');
+                }
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: events
+                      .map((event) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(event.eventLabel),
+                            subtitle: Text(
+                              '${shortDate(event.occurredAt)} • ${timeText(event.occurredAt)}'
+                              '${event.note?.isNotEmpty == true ? '\n${event.note}' : ''}',
+                            ),
+                          ))
+                      .toList(),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    schedule = DateTime.now().add(const Duration(days: 1));
+    TenantController.instance.loadVisitors();
+    _subscription = TableRefreshSubscription(
+      'tenant-visitors',
+      const ['visitor_requests', 'visitor_events'],
+      () => TenantController.instance.loadVisitors(force: true),
+    );
+  }
 
   @override
   void dispose() {
     name.dispose();
     relation.dispose();
+    purpose.dispose();
+    _subscription.dispose();
     super.dispose();
   }
 
@@ -5343,6 +5401,7 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
     return PageFrame(
       title: 'Visitor request',
       subtitle: 'Register an expected visitor',
+      onRefresh: () => TenantController.instance.loadVisitors(force: true),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680),
         child: Column(
@@ -5368,6 +5427,13 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
               label: 'Relationship',
               controller: relation,
               hint: 'Parent, guardian, sibling, etc.',
+            ),
+            const SizedBox(height: 14),
+            LabeledField(
+              label: 'Purpose',
+              controller: purpose,
+              hint: 'Reason for the visit',
+              maxLines: 3,
             ),
             const SizedBox(height: 14),
             CarmelitaCard(
@@ -5407,26 +5473,139 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () {
-                  if (name.text.trim().isEmpty ||
-                      relation.text.trim().isEmpty) {
-                    showAppSnackBar(
-                      context,
-                      'Complete the visitor name and relationship.',
-                    );
-                    return;
-                  }
-
-                  TenantController.instance.submitVisitor(
-                    visitorName: name.text.trim(),
-                    relationship: relation.text.trim(),
-                    schedule: schedule,
-                  );
-                  showAppSnackBar(context, 'Visitor request submitted.');
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Submit visitor request'),
+                onPressed: saving
+                    ? null
+                    : () async {
+                        if (name.text.trim().isEmpty ||
+                            relation.text.trim().isEmpty ||
+                            purpose.text.trim().isEmpty) {
+                          showAppSnackBar(
+                            context,
+                            'Complete the visitor name, relationship, and purpose.',
+                          );
+                          return;
+                        }
+                        if (!schedule.isAfter(DateTime.now())) {
+                          showAppSnackBar(
+                              context, 'Choose a future visit schedule.');
+                          return;
+                        }
+                        setState(() => saving = true);
+                        try {
+                          await TenantController.instance.submitVisitor(
+                            visitorName: name.text.trim(),
+                            relationship: relation.text.trim(),
+                            purpose: purpose.text.trim(),
+                            schedule: schedule,
+                          );
+                          if (context.mounted) {
+                            showAppSnackBar(
+                                context, 'Visitor request submitted.');
+                            name.clear();
+                            relation.clear();
+                            purpose.clear();
+                          }
+                        } catch (error) {
+                          if (context.mounted) {
+                            showAppSnackBar(
+                              context,
+                              'Unable to submit visitor request: $error',
+                            );
+                          }
+                        } finally {
+                          if (mounted) setState(() => saving = false);
+                        }
+                      },
+                child: Text(saving ? 'Submitting…' : 'Submit visitor request'),
               ),
+            ),
+            const SizedBox(height: 24),
+            const SectionTitle(
+              'Request history',
+              subtitle: 'Live approval and visit status',
+            ),
+            const SizedBox(height: 10),
+            AnimatedBuilder(
+              animation: TenantController.instance,
+              builder: (context, _) {
+                final controller = TenantController.instance;
+                if (controller.visitorsLoading && controller.visitors.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (controller.visitorsError != null &&
+                    controller.visitors.isEmpty) {
+                  return EmptyState(
+                    icon: Icons.error_outline,
+                    title: 'Unable to load visitor requests',
+                    message: controller.visitorsError!,
+                  );
+                }
+                if (controller.visitors.isEmpty) {
+                  return const EmptyState(
+                    icon: Icons.people_outline,
+                    title: 'No visitor requests',
+                    message: 'Submitted requests will appear here.',
+                  );
+                }
+                return Column(
+                  children: controller.visitors
+                      .map((request) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: CarmelitaCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          request.visitorName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      StatusPill(request.statusLabel),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(request.purpose),
+                                  Text(
+                                    '${shortDate(request.schedule)} • ${timeText(request.schedule)}',
+                                  ),
+                                  if (request.reviewNote?.isNotEmpty == true)
+                                    Text('Staff note: ${request.reviewNote}'),
+                                  TextButton.icon(
+                                    onPressed: () => _showHistory(request),
+                                    icon: const Icon(Icons.history_rounded),
+                                    label: const Text('View history'),
+                                  ),
+                                  if (request.isPending) ...[
+                                    const SizedBox(height: 8),
+                                    OutlinedButton(
+                                      onPressed: () async {
+                                        try {
+                                          await controller
+                                              .cancelVisitor(request);
+                                        } catch (error) {
+                                          if (context.mounted) {
+                                            showAppSnackBar(
+                                              context,
+                                              'Cancellation failed: $error',
+                                            );
+                                          }
+                                        }
+                                      },
+                                      child: const Text('Cancel request'),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ))
+                      .toList(),
+                );
+              },
             ),
           ],
         ),

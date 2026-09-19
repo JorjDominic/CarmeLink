@@ -440,19 +440,114 @@ class GateEvent {
 typedef GeofenceEvent = GateEvent;
 
 class VisitorRequest {
-  VisitorRequest({
+  const VisitorRequest({
     required this.id,
     required this.visitorName,
     required this.relationship,
     required this.schedule,
     required this.status,
+    this.tenantId = '',
+    this.tenantName = '',
+    this.purpose = '',
+    this.reviewNote,
+    this.decidedBy,
+    this.decidedAt,
+    this.arrivedAt,
+    this.departedAt,
+    this.createdAt,
   });
 
   final String id;
+  final String tenantId;
+  final String tenantName;
   final String visitorName;
   final String relationship;
+  final String purpose;
   final DateTime schedule;
-  String status;
+  final String status;
+  final String? reviewNote;
+  final String? decidedBy;
+  final DateTime? decidedAt;
+  final DateTime? arrivedAt;
+  final DateTime? departedAt;
+  final DateTime? createdAt;
+
+  bool get isPending => status.toLowerCase() == 'pending';
+  bool get isApproved => status.toLowerCase() == 'approved';
+  bool get isRejected => status.toLowerCase() == 'rejected';
+  bool get isCancelled => status.toLowerCase() == 'cancelled';
+  bool get hasArrived => status.toLowerCase() == 'arrived';
+  bool get isCompleted => status.toLowerCase() == 'completed';
+
+  String get statusLabel => status
+      .split('_')
+      .map((part) => part.isEmpty
+          ? part
+          : '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+      .join(' ');
+
+  factory VisitorRequest.fromRow(Map<String, dynamic> row) {
+    final tenant = row['tenant'];
+    final tenantName = tenant is Map
+        ? tenant['full_name'] as String? ?? ''
+        : row['tenant_name'] as String? ?? '';
+    return VisitorRequest(
+      id: row['id'] as String,
+      tenantId: row['tenant_id'] as String? ?? '',
+      tenantName: tenantName,
+      visitorName: row['visitor_name'] as String? ?? '',
+      relationship: row['relationship'] as String? ?? '',
+      purpose: row['purpose'] as String? ?? '',
+      schedule: DateTime.parse(row['schedule'] as String).toLocal(),
+      status: row['status'] as String? ?? 'pending',
+      reviewNote: row['review_note'] as String?,
+      decidedBy: row['decided_by'] as String?,
+      decidedAt: _optionalLocalDate(row['decided_at']),
+      arrivedAt: _optionalLocalDate(row['arrived_at']),
+      departedAt: _optionalLocalDate(row['departed_at']),
+      createdAt: _optionalLocalDate(row['created_at']),
+    );
+  }
+
+  static DateTime? _optionalLocalDate(dynamic value) =>
+      value is String ? DateTime.tryParse(value)?.toLocal() : null;
+}
+
+class VisitorEvent {
+  const VisitorEvent({
+    required this.id,
+    required this.requestId,
+    required this.eventType,
+    required this.actorId,
+    required this.occurredAt,
+    this.actorName = '',
+    this.note,
+  });
+
+  final String id;
+  final String requestId;
+  final String eventType;
+  final String actorId;
+  final String actorName;
+  final String? note;
+  final DateTime occurredAt;
+
+  String get eventLabel => eventType == 'departed'
+      ? 'Departed'
+      : '${eventType[0].toUpperCase()}${eventType.substring(1)}';
+
+  factory VisitorEvent.fromRow(Map<String, dynamic> row) {
+    final actor = row['actor'];
+    return VisitorEvent(
+      id: row['id'] as String,
+      requestId: row['request_id'] as String,
+      eventType: row['event_type'] as String,
+      actorId: row['actor_id'] as String,
+      actorName: actor is Map ? actor['full_name'] as String? ?? '' : '',
+      note: row['note'] as String?,
+      occurredAt: DateTime.parse(row['occurred_at'] as String).toLocal(),
+    );
+  }
 }
 
 class Announcement {

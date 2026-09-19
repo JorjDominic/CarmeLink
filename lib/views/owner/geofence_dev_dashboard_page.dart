@@ -258,7 +258,7 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Zero-Coordinate Persistence: Lat/Lng coordinates are strictly discarded immediately following on-device computation. Gate logs persist only discrete presence state.',
+                      'Zero-Coordinate Persistence: Lat/Lng coordinates are strictly discarded immediately following on-device computation. Presence logs persist only discrete presence state.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: Colors.green.shade700,
                         fontWeight: FontWeight.w600,
