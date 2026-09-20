@@ -112,6 +112,12 @@ class Payment {
     this.reviewedBy,
     this.reviewedAt,
     this.reviewNotes,
+    this.contractId,
+    this.remainingBalance,
+    this.submittedAmount,
+    this.periodStart,
+    this.periodEnd,
+    this.source = 'manual',
     DateTime? createdAt,
   }) : createdAt = createdAt ?? dueDate;
 
@@ -132,11 +138,20 @@ class Payment {
   final DateTime? reviewedAt;
   final String? reviewNotes;
   final DateTime createdAt;
+  final String? contractId;
+  final double? remainingBalance;
+  final double? submittedAmount;
+  final DateTime? periodStart;
+  final DateTime? periodEnd;
+  final String source;
 
   bool get isPending => status.toLowerCase().contains('pending');
   bool get isVerified => status.toLowerCase().contains('verified');
   bool get isRejected => status.toLowerCase().contains('rejected');
-  bool get isDue => status.toLowerCase() == 'due';
+  bool get isPartiallyPaid => status.toLowerCase().contains('partially');
+  bool get isUpcoming => status.toLowerCase().contains('upcoming');
+  bool get isDue => status.toLowerCase() == 'due' || isPartiallyPaid;
+  double get outstandingAmount => remainingBalance ?? (isVerified ? 0 : amount);
 
   bool get isOverdue {
     if (!isDue) return false;
@@ -168,6 +183,12 @@ class Payment {
     DateTime? reviewedAt,
     String? reviewNotes,
     DateTime? createdAt,
+    String? contractId,
+    double? remainingBalance,
+    double? submittedAmount,
+    DateTime? periodStart,
+    DateTime? periodEnd,
+    String? source,
   }) {
     return Payment(
       id: id ?? this.id,
@@ -187,6 +208,12 @@ class Payment {
       reviewedAt: reviewedAt ?? this.reviewedAt,
       reviewNotes: reviewNotes ?? this.reviewNotes,
       createdAt: createdAt ?? this.createdAt,
+      contractId: contractId ?? this.contractId,
+      remainingBalance: remainingBalance ?? this.remainingBalance,
+      submittedAmount: submittedAmount ?? this.submittedAmount,
+      periodStart: periodStart ?? this.periodStart,
+      periodEnd: periodEnd ?? this.periodEnd,
+      source: source ?? this.source,
     );
   }
 
@@ -197,7 +224,9 @@ class Payment {
       'pending' =>
         'Pending verification',
       'verified' || 'paid' || 'approved' => 'Verified',
+      'partially_paid' => 'Partially paid',
       'rejected' => 'Rejected',
+      'upcoming' => 'Upcoming',
       _ => 'Due',
     };
   }
@@ -209,7 +238,9 @@ class Payment {
       'pending' =>
         'pending_verification',
       'verified' || 'paid' || 'approved' => 'verified',
+      'partially_paid' => 'partially_paid',
       'rejected' => 'rejected',
+      'upcoming' => 'upcoming',
       _ => 'due',
     };
   }
@@ -265,6 +296,12 @@ class Payment {
       reviewedAt: parsedReviewedAt,
       reviewNotes: json['review_notes'] as String?,
       createdAt: parsedCreatedAt,
+      contractId: json['contract_id'] as String?,
+      remainingBalance: (json['remaining_balance'] as num?)?.toDouble(),
+      submittedAmount: (json['submitted_amount'] as num?)?.toDouble(),
+      periodStart: DateTime.tryParse(json['period_start'] as String? ?? ''),
+      periodEnd: DateTime.tryParse(json['period_end'] as String? ?? ''),
+      source: json['source'] as String? ?? 'manual',
     );
   }
 
@@ -953,6 +990,7 @@ class TenantContract {
 
   bool get isActive => status == 'active';
   bool get isExpired => status == 'expired' || endsOn.isBefore(DateTime.now());
+  int get billingDueDay => startsOn.day;
 
   TenantContract copyWith({
     String? tenantId,

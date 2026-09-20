@@ -63,14 +63,18 @@ export async function canReadReference(caller: SupabaseClient, reference: string
     .from('maintenance_reports').select('id').eq('photo_path', reference).limit(1)
   if (!maintenance.error && (maintenance.data?.length ?? 0) > 0) return true
   const payments = await caller
-    .from('payments').select('id').eq('receipt_path', reference).limit(1)
+    .from('payment_transactions').select('id').eq('receipt_path', reference).limit(1)
   return !payments.error && (payments.data?.length ?? 0) > 0
 }
 
 export async function canAttachRecord(
   caller: SupabaseClient, kind: string, recordId: string, userId: string,
 ) {
-  const table = kind === 'maintenance' ? 'maintenance_reports' : kind === 'payment' ? 'payments' : null
+  const table = kind === 'maintenance'
+    ? 'maintenance_reports'
+    : kind === 'payment'
+      ? 'billing_charges'
+      : null
   if (!table) return false
   // Uploads are tenant-originated evidence. Staff/guardian read permission must
   // never imply permission to attach a new asset to somebody else's record.

@@ -47,7 +47,7 @@ class _ContractsPageState extends State<ContractsPage> {
   void initState() {
     super.initState();
     OwnerController.instance.loadContracts();
-    OwnerController.instance.loadTenants();
+    OwnerController.instance.loadTenants(force: true);
   }
 
   @override
@@ -243,7 +243,7 @@ class _ContractCard extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall),
         const Divider(height: 22),
         InfoRow(
-            label: 'Term',
+            label: 'Term • rent due ${_ordinal(contract.billingDueDay)}',
             value: '${date(contract.startsOn)} – ${date(contract.endsOn)}'),
         InfoRow(label: 'Monthly rent', value: money(contract.monthlyRent)),
         InfoRow(label: 'Deposit', value: money(contract.securityDeposit)),
@@ -1008,7 +1008,7 @@ class _ContractEditorState extends State<_ContractEditor> {
     final value = widget.contract;
     _number = TextEditingController(text: value?.contractNumber ?? '');
     _rent = TextEditingController(
-        text: value?.monthlyRent.toStringAsFixed(2) ?? '');
+        text: value?.monthlyRent.toStringAsFixed(2) ?? '2500.00');
     _deposit = TextEditingController(
         text: value?.securityDeposit.toStringAsFixed(2) ?? '0');
     _notes = TextEditingController(text: value?.notes ?? '');
@@ -1029,7 +1029,18 @@ class _ContractEditorState extends State<_ContractEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final tenants = [...OwnerController.instance.tenants];
+    final controller = OwnerController.instance;
+    final unavailableTenantIds = controller.contracts
+        .where((contract) =>
+            contract.id != widget.contract?.id &&
+            (contract.status == 'draft' || contract.status == 'active'))
+        .map((contract) => contract.tenantId)
+        .toSet();
+    final tenants = controller.tenants
+        .where((tenant) =>
+            tenant.id == widget.contract?.tenantId ||
+            !unavailableTenantIds.contains(tenant.id))
+        .toList();
     if (_tenantId != null && !tenants.any((tenant) => tenant.id == _tenantId)) {
       tenants.add(TenantDirectoryEntry(
         id: _tenantId!,
@@ -1149,6 +1160,15 @@ class _ContractEditorState extends State<_ContractEditor> {
               onChanged: (value) => setState(() => _tenantId = value),
               validator: (value) => value == null ? 'Select a tenant' : null,
             ),
+          if (!widget.lockTenant && tenants.isEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'No eligible tenants. Tenants with a Draft or Active contract are excluded.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
           const SizedBox(height: 14),
           TextFormField(
             controller: _number,
@@ -1198,7 +1218,8 @@ class _ContractEditorState extends State<_ContractEditor> {
           const _FormSectionHeading(
             icon: Icons.calendar_month_outlined,
             title: 'Contract period',
-            subtitle: 'Set the inclusive start and end dates.',
+            subtitle:
+                'Set the term. The start day becomes the monthly rent due day.',
           ),
           const SizedBox(height: 14),
           _ResponsivePair(
@@ -1507,3 +1528,13 @@ const _months = <String>[
   'Nov',
   'Dec',
 ];
+
+String _ordinal(int day) {
+  if (day >= 11 && day <= 13) return '${day}th';
+  return switch (day % 10) {
+    1 => '${day}st',
+    2 => '${day}nd',
+    3 => '${day}rd',
+    _ => '${day}th',
+  };
+}

@@ -19,6 +19,15 @@ void main() {
         guardianName: 'Ana Santos',
         guardianPhone: '09171111111',
       ),
+      TenantDirectoryEntry(
+        id: 'tenant-2',
+        name: 'New Tenant',
+        room: 'Unassigned',
+        bedSpace: 'No bed',
+        phone: '09172222222',
+        guardianName: 'Not assigned',
+        guardianPhone: '',
+      ),
     ]);
     OwnerController.instance.setContractsForTesting([
       TenantContract(
@@ -59,6 +68,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Contract number'), findsOneWidget);
     expect(find.text('Monthly rent'), findsWidgets);
+
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    expect(find.text('New Tenant'), findsOneWidget);
+    // Maria remains visible only on the contract card behind the dialog; she
+    // is not duplicated in the picker because her Active contract excludes her.
+    expect(find.text('Maria Santos'), findsOneWidget);
   });
 
   testWidgets('has no overflow at narrow width with enlarged text',

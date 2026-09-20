@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
+import '../../controllers/owner_controller.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../../services/account_service.dart';
 import '../../services/table_refresh_subscription.dart';
+import '../../services/tenant_service.dart';
 import '../owner/contracts_page.dart';
 
 class AccountManagementPage extends StatefulWidget {
@@ -74,6 +76,10 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
               );
               if (created != null && context.mounted) {
                 reload();
+                if (created.role == 'tenant') {
+                  TenantService.invalidateCache();
+                  await OwnerController.instance.loadTenants(force: true);
+                }
                 if (created.role == 'tenant' &&
                     SessionController.instance.currentUser?.role ==
                         UserRole.owner) {

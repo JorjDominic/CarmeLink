@@ -197,7 +197,7 @@ class OwnerController extends ChangeNotifier {
 
   double get totalOutstandingRevenue => payments
       .where((payment) => payment.isDue || payment.isPending)
-      .fold<double>(0.0, (sum, p) => sum + p.amount);
+      .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
 
   int get openMaintenance => _maintenanceLoadedOnce
       ? _staffMaintenanceReports.where((report) => report.isOpen).length

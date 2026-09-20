@@ -17,12 +17,14 @@ Deno.serve(async (request) => {
     if (!(await canReadReference(auth.caller, reference))) return json({ error: 'Forbidden' }, 403)
 
     const { cloudName, apiKey, apiSecret } = cloudinaryConfig()
-    const expiresAt = Math.floor(Date.now() / 1000) + 300
-    const params = `expires_at=${expiresAt}&format=${ref.format}&public_id=${ref.publicId}&type=authenticated`
+    const timestamp = Math.floor(Date.now() / 1000)
+    const expiresAt = timestamp + 300
+    const params = `expires_at=${expiresAt}&format=${ref.format}&public_id=${ref.publicId}&timestamp=${timestamp}&type=authenticated`
     const signature = await sha1Hex(`${params}${apiSecret}`)
     const query = new URLSearchParams({
       public_id: ref.publicId, format: ref.format, type: 'authenticated',
-      expires_at: String(expiresAt), api_key: apiKey, signature,
+      timestamp: String(timestamp), expires_at: String(expiresAt),
+      api_key: apiKey, signature,
     })
     return json({
       url: `https://api.cloudinary.com/v1_1/${cloudName}/image/download?${query}`,

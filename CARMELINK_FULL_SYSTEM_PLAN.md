@@ -11,13 +11,13 @@ CarmeLink is a role-based dormitory management platform for Carmelita's Dormitor
 
 The primary estimate credits only connected workflows proportionally; UI-only pages do
 not count as complete. Remaining work is concentrated in
-notifications/preferences, contract-to-billing synchronization, finance,
+notifications/preferences, finance,
 discipline, analytics, native device binding/background location, feedback persistence,
 and final multi-account security/offline validation.
 
 The current project already uses one shared Flutter codebase and one Supabase backend so every role works with the same protected data source rather than separate databases.
 
-> **Implementation status (September 19, 2026):** The repository has live Supabase authentication and role protection, accounts, rooms/assignments, guardian links, payments, maintenance, curfew/presence records, visitor requests and arrival/departure history, announcements, real-time messaging, confidential-report workflows, and owner contract CRUD. Notifications, contract-to-billing synchronization, finance, discipline, analytics, native device binding, and production hardening remain incomplete.
+> **Implementation status (September 20, 2026):** The repository has live Supabase authentication and role protection, accounts, rooms/assignments, guardian links, contract-to-billing synchronization, payments, maintenance, curfew/presence records, visitor requests and arrival/departure history, announcements, real-time messaging, confidential-report workflows, and owner contract CRUD. Notifications, finance, discipline, analytics, native device binding, and production hardening remain incomplete.
 
 ---
 
@@ -2295,7 +2295,7 @@ Email Verification Link and SMS OTP Sent
       ↓
 Tenant Verifies Email and Mobile Number
       ↓
-Tenant Details Created
+Tenant Sets Permanent Password
       ↓
 Draft Contract Created and PDF Generated
       ↓
@@ -2303,13 +2303,15 @@ Contract Printed and Signed
       ↓
 Signed Copy Uploaded and Owner Verified
       ↓
-Room / Bed Assigned
-      ↓
-Guardian Linked
-      ↓
 Contract Activated
       ↓
-Tenant Dashboard Becomes Fully Active
+Deposit / First Rent Generated and Verified
+      ↓
+Room / Bed Assigned and Guardian Linked
+      ↓
+Trusted Device Bound and Permissions Configured
+      ↓
+Onboarding Completed
 ```
 
 ### Account creation → contract improvement
@@ -2319,8 +2321,9 @@ account workflow should offer **Create contract now** and **Do this later**.
 Email and SMS verification are initiated immediately after profile creation.
 The first contract option passes the new tenant profile ID into the editor,
 where the tenant is preselected and locked for the initial save. The operator
-may save a Draft or activate the contract, then continue to room/bed assignment
-and guardian linking. Guardian and staff account creation skips this step.
+must save a Draft, complete document verification, and use the separate
+prerequisite-aware activation action. Guardian and staff account creation skips
+the rental-contract flow.
 
 This is a guided handoff, not one combined database transaction. Account
 creation is never rolled back because contract entry is deferred or fails
@@ -2335,13 +2338,69 @@ Draft contract preparation may continue while verification is pending, but an
 account remains Pending verification and a contract cannot become Active until
 both required channels are verified.
 
-The contract signing lifecycle is Draft → Ready for signature → Awaiting signed
-copy → Pending document verification → Active. PDF generation creates an
-immutable version snapshot. The signed paper is uploaded to private storage and
-records uploader, upload time, original filename, media type, size, and file
-hash. An owner verifies the document before activation. Any material edit after
-generation creates a new version rather than changing the terms represented by
-an existing printed or signed document.
+### Canonical tenant onboarding workflow
+
+```text
+Create tenant account and profile
+      ↓
+Verify email and SMS OTP
+      ↓
+Set permanent password
+      ↓
+Create tenant-locked Draft contract
+      ↓
+Generate immutable contract PDF
+      ↓
+Collect signatures and upload signed document
+      ↓
+Owner verifies signed document (contract remains Draft)
+      ↓
+Owner activates contract after prerequisite checks
+      ↓
+Generate deposit and first-rent billing charges
+      ↓
+Tenant submits initial payment
+      ↓
+Owner/caretaker verifies payment
+      ↓
+Assign room and bed
+      ↓
+Link guardian when required
+      ↓
+Bind tenant trusted device
+      ↓
+Confirm location and notification permissions
+      ↓
+Mark onboarding complete
+```
+
+Contract lifecycle and document lifecycle are intentionally separate. The
+contract lifecycle is **Draft → Active → Expired/Terminated**. The document
+lifecycle is **Not generated → Awaiting signature → Pending verification →
+Verified/Rejected**. The contract remains Draft throughout PDF generation,
+signature collection, upload, and review. Activation is an explicit owner
+action; it must not be represented as an ordinary editable status chip.
+
+Activation generates immutable deposit and rent charges from snapshotted
+contract terms. The contract start day is the recurring monthly due day.
+Future charges are Upcoming and excluded from outstanding totals until due.
+Only verified payment transactions reduce charge balances. The required first
+payment occurs after activation, because an Active contract establishes the
+financial obligation, and before room/bed assignment when dormitory policy
+requires payment before occupancy. Any pre-signing reservation fee is a
+separate charge and is never mislabeled as rent.
+
+The signed paper is uploaded to private storage and records uploader, upload
+time, original filename, media type, size, and file hash. Any material Draft
+edit after PDF generation invalidates the earlier generated/signed version and
+requires a newly generated version and signatures.
+
+Trusted-device binding is tenant-only and occurs after staff-side financial,
+room, and relationship setup. It uses a device-generated identifier or key,
+never IMEI. Binding and location permission are separate states. Rebinding,
+lost-device revocation, account switching, and every binding change require an
+audit trail. Sensitive tenant workflows may remain locked until binding and
+their required permissions are complete.
 
 ## B. Monthly Billing
 

@@ -16,8 +16,8 @@ The functional prototype is roughly 89% complete, but that figure is retained
 only as a secondary implementation reference and is not the tracked completion
 percentage.
 
-Major remaining areas are persisted notifications/preferences, contract-to-billing
-synchronization, finance/expenses, discipline, analytics, native tenant device
+Major remaining areas are persisted notifications/preferences, finance/expenses,
+discipline, analytics, native tenant device
 binding/background location, feedback persistence, real-device geofencing
 testing, geofence check-timer testing, and final multi-account security/offline
 testing outside the visitor workflow.
@@ -68,6 +68,30 @@ verified email and a verified signed document. Mobile verification remains on
 hold until an SMS provider is selected. Afterward, the guided workflow
 continues to room/bed assignment and guardian linking.
 
+Canonical end-to-end tenant onboarding order:
+
+1. Create the tenant authentication account and protected profile.
+2. Verify email and mobile number, then set a permanent password.
+3. Offer **Create contract now** or **Do this later**.
+4. Create a tenant-locked **Draft** contract with its financial terms, term,
+   and recurring due day (the contract start day).
+5. Generate the immutable PDF, collect signatures, and upload the signed copy.
+6. Owner verifies the signed document; the contract remains Draft.
+7. Owner activates the contract after the verification checklist passes.
+8. Activation generates deposit and first-rent charges; future charges remain
+   Upcoming until their due dates.
+9. Tenant submits the required initial payment and staff verifies it. Only
+   verified transaction amounts reduce the charge balance.
+10. Assign the tenant's room and bed.
+11. Create or confirm the guardian link when required.
+12. Bind the tenant's trusted device and configure required device permissions.
+13. Mark onboarding complete and unlock the permitted tenant workflows.
+
+Contract lifecycle and document lifecycle remain separate: `draft -> active ->
+expired/terminated` versus `not_generated -> awaiting_signature ->
+pending_verification -> verified/rejected`. Device binding is tenant-only and
+must not block staff-side account or Draft-contract preparation.
+
 Implementation follow-up:
 
 - [✓] Return the created tenant profile ID from the account-management flow.
@@ -80,6 +104,12 @@ Implementation follow-up:
 - [✓] Add owner signed-document verification before contract activation.
 - [✓] Display an onboarding-incomplete indicator for tenants without contracts.
 - [✓] Continue from signed-document verification to room/bed assignment and guardian linking.
+- [ ] Replace free contract-status selection with a prerequisite-aware owner
+  **Activate contract** action.
+- [ ] Add initial-payment, room/bed, guardian, permanent-password,
+  device-binding, and permission requirements to one resumable checklist.
+- [ ] Prevent required room/bed assignment until configured initial charges are
+  fully paid, while keeping guardian linking independently resumable.
 
 ## Status legend
 
@@ -103,6 +133,14 @@ geofencing or advanced analytics.
 8. **Safety and privacy** — confidential reports, audit logs, retention, and permissions.
 
 ## Completed Milestones History
+
+> **Sep 20, 2026 — Contract-to-Billing Synchronization:** Added separate
+> immutable billing-charge and payment-transaction ledgers. Activating a
+> contract idempotently generates its deposit and monthly rent schedule with
+> frozen term snapshots. Only verified transactions reduce server-calculated
+> balances; partial payments remain supported, and historical financial facts
+> cannot be rewritten by later contract or review changes. Existing invoices
+> and payment submissions are preserved through a ledger migration.
 
 > **Sep 19, 2026 — Message Read Receipts:** Added server-timestamped `read_at`
 > receipts, recipient-only read updates through a protected RPC, automatic read
@@ -131,8 +169,8 @@ geofencing or advanced analytics.
 > filters. Database constraints enforce valid dates, non-negative amounts,
 > unique contract numbers, and one active contract per tenant. Migration
 > `202609190007` and date-summary sync migration `202609190008` are deployed.
-> Billing synchronization remains
-> a separate follow-up so contract edits never rewrite payment history.
+> Contract-to-billing synchronization was completed on Sep 20, 2026; contract
+> edits never rewrite generated charges or payment history.
 
 > **Sep 19, 2026 — Visitor Production Verification:** Added and ran a remote
 > multi-account smoke test across tenant, guardian, owner, and caretaker

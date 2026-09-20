@@ -463,31 +463,59 @@ their own currently signed-in account.
 
 ### Workflow improvement: account creation → contract
 
-For a newly created tenant, the recommended administrative flow is:
+For a newly created tenant, the complete administrative and tenant flow is:
 
 ```text
-Create tenant account
+Create tenant account and profile
         →
-Confirm profile creation
+Verify email and SMS OTP
         →
-Send email verification link and SMS OTP
+Set permanent password
         →
-Verify email address and mobile number
+Create tenant-locked Draft contract
         →
-Offer “Create contract now”
+Generate immutable contract PDF and collect signatures
         →
-Open a prefilled contract form for that tenant
+Upload signed document for owner verification
         →
-Save Draft and generate printable contract PDF
+Owner verifies document; contract remains Draft
         →
-Print and collect required signatures
+Owner activates contract after prerequisite checks
         →
-Upload and verify the signed paper
+Generate deposit and first-rent charges
         →
-Activate contract
+Tenant submits initial payment and staff verifies it
         →
-Continue to room/bed assignment and guardian linking
+Assign room and bed
+        →
+Link guardian when required
+        →
+Bind tenant trusted device
+        →
+Confirm location and notification permissions
+        →
+Mark onboarding complete
 ```
+
+The contract has two independent state tracks. Its lifecycle is **Draft →
+Active → Expired/Terminated**. Its document lifecycle is **Not generated →
+Awaiting signature → Pending verification → Verified/Rejected**. Preparing,
+generating, signing, uploading, and reviewing the document do not make the
+contract Active. Activation is a separate owner action available only after
+the required account channels and signed document are verified.
+
+Activation creates immutable billing charges from the contract terms. The
+contract start day is the recurring monthly rent due day. Future scheduled
+charges are Upcoming and do not count as outstanding until due. Required
+deposit and first-rent payments are verified before room/bed assignment; only
+verified transactions reduce balances. A pre-signing reservation fee, if the
+dormitory adopts one, must be a separately named charge and not first rent.
+
+Trusted-device binding occurs near the end because staff must be able to
+prepare the account and contract before the tenant signs in. Binding applies
+only to tenants and is separate from granting location permission. Until it is
+complete, location-sensitive gate/geofence, visitor, curfew, recovery, and
+other designated sensitive actions may remain restricted.
 
 Account creation and contract creation must remain separate database
 operations. The account should still succeed if the contract is postponed or
@@ -497,9 +525,10 @@ silently. Only tenant accounts should receive this next step; guardian and
 staff accounts do not require rental contracts.
 
 The contract form should receive the new tenant ID directly, preselect and lock
-that tenant for the initial save, and retain an explicit Draft option. Contract
-activation should remain separate from future billing generation so payment
-history is never embedded in or overwritten by account provisioning.
+that tenant for the initial save and save it as Draft. Contract activation is a
+separate, prerequisite-aware owner action that generates independent billing
+charges; payment history is never embedded in or overwritten by account or
+contract records.
 
 Email verification confirms control of the login address. SMS OTP verification
 separately confirms the mobile number. OTPs must expire, be single-use, store no

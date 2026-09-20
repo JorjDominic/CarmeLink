@@ -82,12 +82,12 @@ class TenantController extends ChangeNotifier {
   double get outstandingBalance {
     final list = payments;
     return list
-        .where((p) => !p.isVerified)
-        .fold<double>(0.0, (sum, p) => sum + p.amount);
+        .where((p) => p.isDue || p.isPending || p.isRejected)
+        .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
   }
 
   Payment? get nextDuePayment {
-    final due = payments.where((p) => p.isDue).toList()
+    final due = payments.where((p) => p.isDue || p.isUpcoming).toList()
       ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
     return due.isNotEmpty ? due.first : null;
   }
@@ -365,6 +365,7 @@ class TenantController extends ChangeNotifier {
     try {
       final updated = await _paymentService.submitPaymentProof(
         paymentId: targetId,
+        amount: amount,
         method: method,
         referenceNumber: reference,
         receiptBytes: receiptBytes,

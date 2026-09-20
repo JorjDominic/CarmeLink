@@ -16,12 +16,13 @@ class PaymentService {
   SupabaseClient get _client => SupabaseConfig.client;
 
   static const String _columns =
-      'id, tenant_id, title, category, amount, due_date, status, '
+      'id, contract_id, tenant_id, title, category, amount, due_date, status, '
       'payment_method, reference_number, receipt_path, paid_at, '
-      'reviewed_by, reviewed_at, review_notes, created_at, updated_at';
+      'reviewed_by, reviewed_at, review_notes, created_at, updated_at, '
+      'remaining_balance, period_start, period_end, source, latest_transaction_id, '
+      'tenant_name, submitted_amount';
 
-  static const String _columnsWithTenant =
-      '$_columns, tenant:profiles!payments_tenant_id_fkey(full_name)';
+  static const String _source = 'billing_charge_summaries';
 
   /// Returns the current logged-in user ID or null if unauthenticated.
   String? get currentUserId => _client.auth.currentUser?.id;
@@ -44,7 +45,7 @@ class PaymentService {
   Future<List<Payment>> listOwnPayments() async {
     final tenantId = _requireAuthId();
     final rows = await _client
-        .from('payments')
+        .from(_source)
         .select(_columns)
         .eq('tenant_id', tenantId)
         .order('due_date', ascending: false);
@@ -57,7 +58,7 @@ class PaymentService {
   /// Allowed for guardians (if linked to the tenant) or staff members by RLS.
   Future<List<Payment>> listPaymentsForTenant(String tenantId) async {
     final rows = await _client
-        .from('payments')
+        .from(_source)
         .select(_columns)
         .eq('tenant_id', tenantId)
         .order('due_date', ascending: false);
@@ -69,13 +70,14 @@ class PaymentService {
   /// Submits proof of payment (GCash/bank reference + optional receipt photo).
   Future<Payment> submitPaymentProof({
     required String paymentId,
+    required double amount,
     required String method,
     required String referenceNumber,
     Uint8List? receiptBytes,
     String? fileName,
     String? mimeType,
   }) async {
-    final tenantId = _requireAuthId();
+    _requireAuthId();
 
     String? uploadedPath;
     if (receiptBytes != null && receiptBytes.isNotEmpty) {
@@ -88,21 +90,16 @@ class PaymentService {
     }
 
     try {
-      final updatedRow = await _client
-          .from('payments')
-          .update({
-            'status': 'pending_verification',
-            'payment_method': method.trim(),
-            'reference_number': referenceNumber.trim(),
-            if (uploadedPath != null) 'receipt_path': uploadedPath,
-            'paid_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq('id', paymentId)
-          .eq('tenant_id', tenantId)
-          .select(_columns)
-          .single();
+      final updatedRow =
+          await _client.rpc('submit_payment_transaction', params: {
+        'p_charge_id': paymentId,
+        'p_method': method.trim(),
+        'p_reference_number': referenceNumber.trim(),
+        'p_receipt_path': uploadedPath,
+        'p_amount': amount,
+      });
 
-      return Payment.fromJson(updatedRow);
+      return Payment.fromJson(Map<String, dynamic>.from(updatedRow as Map));
     } catch (_) {
       if (uploadedPath != null) {
         await _safeRemoveReceipt(uploadedPath);
@@ -118,7 +115,7 @@ class PaymentService {
   /// Fetches payment records for a linked tenant (ward).
   Future<List<Payment>> listGuardianTenantPayments(String tenantId) async {
     final rows = await _client
-        .from('payments')
+        .from(_source)
         .select(_columns)
         .eq('tenant_id', tenantId)
         .order('due_date', ascending: false);
@@ -134,20 +131,18 @@ class PaymentService {
   /// Lists all pending payment verifications for staff review.
   Future<List<Payment>> listPendingVerifications() async {
     final rows = await _client
-        .from('payments')
-        .select(_columnsWithTenant)
+        .from(_source)
+        .select(_columns)
         .eq('status', 'pending_verification')
         .order('created_at', ascending: false);
     return rows.map<Payment>((row) {
-      final tenantMap = row['tenant'] as Map<String, dynamic>?;
-      final tenantName = tenantMap?['full_name'] as String? ?? 'Tenant';
-      return Payment.fromJson(row, tenantName: tenantName);
+      return Payment.fromJson(row);
     }).toList(growable: false);
   }
 
   /// Lists all payments across all tenants with optional status and search filters.
   Future<List<Payment>> listAllPayments({String? statusFilter}) async {
-    var query = _client.from('payments').select(_columnsWithTenant);
+    var query = _client.from(_source).select(_columns);
 
     if (statusFilter != null &&
         statusFilter.isNotEmpty &&
@@ -157,9 +152,7 @@ class PaymentService {
 
     final rows = await query.order('due_date', ascending: false);
     return rows.map<Payment>((row) {
-      final tenantMap = row['tenant'] as Map<String, dynamic>?;
-      final tenantName = tenantMap?['full_name'] as String?;
-      return Payment.fromJson(row, tenantName: tenantName);
+      return Payment.fromJson(row);
     }).toList(growable: false);
   }
 
@@ -169,23 +162,13 @@ class PaymentService {
     required bool approve,
     String? reviewNotes,
   }) async {
-    final staffId = _requireAuthId();
-
-    final updatedRow = await _client
-        .from('payments')
-        .update({
-          'status': approve ? 'verified' : 'rejected',
-          'reviewed_by': staffId,
-          'reviewed_at': DateTime.now().toUtc().toIso8601String(),
-          if (reviewNotes != null) 'review_notes': reviewNotes.trim(),
-        })
-        .eq('id', paymentId)
-        .select(_columnsWithTenant)
-        .single();
-
-    final tenantMap = updatedRow['tenant'] as Map<String, dynamic>?;
-    final tenantName = tenantMap?['full_name'] as String?;
-    return Payment.fromJson(updatedRow, tenantName: tenantName);
+    _requireAuthId();
+    final updatedRow = await _client.rpc('review_payment_transaction', params: {
+      'p_charge_id': paymentId,
+      'p_approve': approve,
+      'p_review_notes': reviewNotes,
+    });
+    return Payment.fromJson(Map<String, dynamic>.from(updatedRow as Map));
   }
 
   /// Creates a new invoice / billing charge for a tenant.
@@ -197,22 +180,24 @@ class PaymentService {
     required DateTime dueDate,
   }) async {
     final row = await _client
-        .from('payments')
+        .from('billing_charges')
         .insert({
           'tenant_id': tenantId,
           'title': title.trim(),
           'category': category.trim().toLowerCase(),
-          'amount': amount,
+          'original_amount': amount,
           'due_date':
               '${dueDate.year.toString().padLeft(4, '0')}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}',
-          'status': 'due',
+          'source': 'manual',
         })
-        .select(_columnsWithTenant)
+        .select('id')
         .single();
-
-    final tenantMap = row['tenant'] as Map<String, dynamic>?;
-    final tenantName = tenantMap?['full_name'] as String?;
-    return Payment.fromJson(row, tenantName: tenantName);
+    final summary = await _client
+        .from(_source)
+        .select(_columns)
+        .eq('id', row['id'] as String)
+        .single();
+    return Payment.fromJson(summary);
   }
 
   // ===========================================================================

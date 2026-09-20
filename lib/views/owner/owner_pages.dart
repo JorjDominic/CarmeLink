@@ -2109,7 +2109,8 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
   late String _selectedTenantId;
   String _selectedCategory = 'rent';
   late final TextEditingController _titleController;
-  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _amountController =
+      TextEditingController(text: '2500.00');
   late DateTime _dueDate;
   bool _isSubmitting = false;
 
@@ -3220,7 +3221,7 @@ class _ReceiptViewerModal extends StatelessWidget {
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
             Text(
-              '${payment.label} • ${money(payment.amount)} • Ref: ${payment.reference ?? "—"}',
+              '${payment.label} • Submitted ${money(payment.submittedAmount ?? payment.amount)} • Bill ${money(payment.amount)} • Ref: ${payment.reference ?? "—"}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12, color: Colors.white70),
@@ -3240,6 +3241,7 @@ class _ReceiptViewerModal extends StatelessWidget {
                       ? Image.asset(imageUrl)
                       : Image.network(
                           imageUrl,
+                          fit: BoxFit.contain,
                           loadingBuilder: (context, child, progress) {
                             if (progress == null) return child;
                             return const Center(
@@ -3247,6 +3249,23 @@ class _ReceiptViewerModal extends StatelessWidget {
                                   color: Colors.white),
                             );
                           },
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.broken_image_outlined,
+                                    color: Colors.white70, size: 48),
+                                SizedBox(height: 12),
+                                Text(
+                                  'Receipt image could not be displayed. Close and try again.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                 ),
               ),
