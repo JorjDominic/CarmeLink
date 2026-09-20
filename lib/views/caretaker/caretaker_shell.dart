@@ -5,9 +5,7 @@ import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../owner/owner_pages.dart';
-import '../owner/room_monitoring_page.dart';
 import '../shared/shared_views.dart';
-import '../shared/account_management_page.dart';
 
 /// Operational workspace that excludes owner-only financial and analytics UI.
 class CaretakerShell extends StatefulWidget {
@@ -35,41 +33,22 @@ class _CaretakerShellState extends State<CaretakerShell> {
           messagePage: OwnerMessagingPage(),
           destinations: [
             AppDestination(
+              label: 'Dashboard',
+              icon: Icons.dashboard_outlined,
+              selectedIcon: Icons.dashboard,
+              page: OwnerDashboardPage(isCaretaker: true),
+            ),
+            AppDestination(
               label: 'Tenants',
               icon: Icons.groups_outlined,
               selectedIcon: Icons.groups,
               page: TenantDirectoryPage(),
             ),
             AppDestination(
-              label: 'Rooms',
-              icon: Icons.bed_outlined,
-              selectedIcon: Icons.bed,
-              page: RoomMonitoringPage(),
-            ),
-            AppDestination(
-              label: 'Payments',
-              icon: Icons.payments_outlined,
-              selectedIcon: Icons.payments,
-              page: PaymentVerificationPage(),
-            ),
-            AppDestination(
-              label: 'Maintenance',
-              icon: Icons.build_outlined,
-              selectedIcon: Icons.build,
-              page: MaintenanceManagementPage(),
-            ),
-            AppDestination(
-              label: 'Curfew',
-              icon: Icons.schedule_outlined,
-              selectedIcon: Icons.schedule,
-              page: GeofenceMonitoringPage(),
-              isWorkInProgress: true,
-            ),
-            AppDestination(
-              label: 'Accounts',
-              icon: Icons.manage_accounts_outlined,
-              selectedIcon: Icons.manage_accounts,
-              page: AccountManagementPage(),
+              label: 'Operations',
+              icon: Icons.tune_outlined,
+              selectedIcon: Icons.tune,
+              page: OperationsHubPage(),
             ),
             AppDestination(
               label: 'Profile',

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../controllers/session_controller.dart';
 import '../../core/constants/app_assets.dart';
@@ -22,6 +23,8 @@ class AuthFlow extends StatefulWidget {
 }
 
 class _AuthFlowState extends State<AuthFlow> {
+  static const _welcomeCompletedKey = 'welcome_completed';
+
   late int stage;
 
   @override
@@ -30,12 +33,27 @@ class _AuthFlowState extends State<AuthFlow> {
     stage = widget.skipIntro ? 2 : 0;
 
     if (!widget.skipIntro) {
-      Timer(const Duration(milliseconds: 1100), () {
-        if (mounted && stage == 0) {
-          setState(() => stage = 1);
-        }
-      });
+      _routeAfterSplash();
     }
+  }
+
+  Future<void> _routeAfterSplash() async {
+    final results = await Future.wait([
+      Future<void>.delayed(const Duration(milliseconds: 1100)),
+      SharedPreferences.getInstance(),
+    ]);
+    final preferences = results[1] as SharedPreferences;
+    final welcomeCompleted = preferences.getBool(_welcomeCompletedKey) ?? false;
+
+    if (mounted && stage == 0) {
+      setState(() => stage = welcomeCompleted ? 2 : 1);
+    }
+  }
+
+  Future<void> _completeWelcome() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_welcomeCompletedKey, true);
+    if (mounted) setState(() => stage = 2);
   }
 
   @override
@@ -74,7 +92,7 @@ class _AuthFlowState extends State<AuthFlow> {
             : stage == 1
                 ? WelcomePage(
                     key: const ValueKey('welcome'),
-                    onContinue: () => setState(() => stage = 2))
+                    onContinue: _completeWelcome)
                 : const SignInPage(key: ValueKey('signin')),
       );
 }

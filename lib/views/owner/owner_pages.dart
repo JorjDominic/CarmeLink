@@ -30,7 +30,15 @@ void _ownerPush(BuildContext context, Widget page) {
 }
 
 class OwnerDashboardPage extends StatelessWidget {
-  const OwnerDashboardPage({super.key});
+  const OwnerDashboardPage({
+    this.isCaretaker = false,
+    super.key,
+  });
+
+  /// Keeps the shared staff dashboard focused on the work available to the
+  /// signed-in role. Caretakers use the same operational data without seeing
+  /// owner-only contract reminders.
+  final bool isCaretaker;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +53,7 @@ class OwnerDashboardPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ElegantHeader(
-              eyebrow: 'Operations',
+              eyebrow: isCaretaker ? 'Caretaker operations' : 'Operations',
               title: 'Good afternoon.',
               subtitle:
                   '${controller.occupiedBeds} of ${controller.totalCapacity} beds are currently occupied.',
@@ -54,20 +62,21 @@ class OwnerDashboardPage extends StatelessWidget {
                 icon: Icons.location_on_outlined,
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 16),
             const PhotoHero(
               image: AppAssets.dormOverview,
               title: 'CarmeLink',
               subtitle: 'Quick monitoring for daily operations',
-              height: 220,
+              height: 176,
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 16),
             const SectionTitle(
               'Property status',
               subtitle: 'The numbers that matter most right now',
             ),
             const SizedBox(height: 10),
             MutedDashboardGrid(
+              compact: true,
               denseFourColumn: true,
               items: [
                 MutedDashboardItem(
@@ -117,21 +126,35 @@ class OwnerDashboardPage extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
             const SectionTitle(
               'Today • highest priority first',
               subtitle: 'Actionable items before routine monitoring',
             ),
             const SizedBox(height: 10),
-            AttentionCard(
-              compact: true,
-              icon: Icons.event_busy_outlined,
-              title:
-                  '${controller.contractsExpiringWithin30Days} contract(s) expire within 30 days',
-              subtitle: 'Review renewal or move-out arrangements.',
-              status: 'Soon',
-              onTap: () => _ownerPush(context, const ContractsPage()),
-            ),
+            if (isCaretaker)
+              AttentionCard(
+                compact: true,
+                icon: Icons.build_outlined,
+                title:
+                    '${controller.openMaintenance} maintenance report(s) open',
+                subtitle: 'Review assignments and update repair progress.',
+                status: controller.openMaintenance > 0 ? 'Open' : 'Clear',
+                onTap: () => _ownerPush(
+                  context,
+                  const MaintenanceManagementPage(),
+                ),
+              )
+            else
+              AttentionCard(
+                compact: true,
+                icon: Icons.event_busy_outlined,
+                title:
+                    '${controller.contractsExpiringWithin30Days} contract(s) expire within 30 days',
+                subtitle: 'Review renewal or move-out arrangements.',
+                status: 'Soon',
+                onTap: () => _ownerPush(context, const ContractsPage()),
+              ),
             const SizedBox(height: 8),
             AttentionCard(
               compact: true,
@@ -942,8 +965,26 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
   final Set<String> _quickAccess = {'Payments', 'Maintenance', 'Floor plan'};
   String query = '';
 
+  bool get _isCaretaker =>
+      SessionController.instance.currentUser?.role == UserRole.caretaker;
+
+  List<_OperationCategory> get _visibleCategories => _operationCategories
+      .map(
+        (category) => _OperationCategory(
+          category.title,
+          category.subtitle,
+          category.icon,
+          category.color,
+          category.items
+              .where((item) => !_isCaretaker || !item.ownerOnly)
+              .toList(),
+        ),
+      )
+      .where((category) => category.items.isNotEmpty)
+      .toList();
+
   List<_OperationItem> get _allOperationItems =>
-      _operationCategories.expand((category) => category.items).toList();
+      _visibleCategories.expand((category) => category.items).toList();
 
   @override
   void dispose() {
@@ -954,7 +995,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
   @override
   Widget build(BuildContext context) {
     final controller = OwnerController.instance;
-    final categories = _operationCategories;
+    final categories = _visibleCategories;
     final filtered = categories.where((category) {
       final searchable = [
         category.title,
@@ -995,8 +1036,8 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
               ),
               const SizedBox(width: 10),
               Container(
-                width: 52,
-                height: 52,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(15),
@@ -1005,7 +1046,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                     color: Theme.of(context).colorScheme.primary),
               ),
             ]),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             LayoutBuilder(builder: (context, constraints) {
               final cards = [
                 _OperationsStatus(
@@ -1036,14 +1077,14 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                   crossAxisCount: constraints.maxWidth < 600 ? 2 : 4,
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 8,
-                  childAspectRatio: constraints.maxWidth < 600 ? 1.55 : 1.2,
+                  childAspectRatio: constraints.maxWidth < 600 ? 1.9 : 1.55,
                 ),
                 itemCount: cards.length,
                 itemBuilder: (context, index) =>
                     _OperationsStatusCard(data: cards[index]),
               );
             }),
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
             Row(
               children: [
                 Expanded(
@@ -1097,7 +1138,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                         )),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Text('Management areas',
                 style: Theme.of(context)
                     .textTheme
@@ -1124,7 +1165,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                     crossAxisCount: columns,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
-                    childAspectRatio: constraints.maxWidth < 520 ? 3.15 : 3.5,
+                    childAspectRatio: constraints.maxWidth < 520 ? 3.8 : 4.2,
                   ),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) => _OperationCategoryCard(
@@ -1254,6 +1295,7 @@ const _operationCategories = [
         'Connect guardians to tenant accounts',
         Icons.family_restroom_outlined,
         GuardianLinkManagementPage(),
+        ownerOnly: true,
       ),
     ],
   ),
@@ -1285,9 +1327,11 @@ const _operationCategories = [
       _OperationItem('Visitors', 'Manage visitor requests',
           Icons.people_outline, VisitorManagementPage()),
       _OperationItem('Confidential reports', 'Review private reports',
-          Icons.shield_outlined, ConfidentialReportsPage()),
+          Icons.shield_outlined, ConfidentialReportsPage(),
+          ownerOnly: true),
       _OperationItem('Disciplinary records', 'Manage violations',
-          Icons.gavel_outlined, DisciplinaryRecordsPage()),
+          Icons.gavel_outlined, DisciplinaryRecordsPage(),
+          ownerOnly: true),
     ],
   ),
   _OperationCategory(
@@ -1299,11 +1343,14 @@ const _operationCategories = [
       _OperationItem('Payments', 'Verify and track payments',
           Icons.payments_outlined, PaymentVerificationPage()),
       _OperationItem('Income & expenses', 'Monitor property finances',
-          Icons.insights_outlined, ExpenseIncomeSummaryPage()),
+          Icons.insights_outlined, ExpenseIncomeSummaryPage(),
+          ownerOnly: true),
       _OperationItem('Contracts', 'Create contracts and track renewals',
-          Icons.event_busy_outlined, ContractsPage()),
+          Icons.event_busy_outlined, ContractsPage(),
+          ownerOnly: true),
       _OperationItem('Reports & analytics', 'View detailed reports',
-          Icons.analytics_outlined, ReportsAnalyticsPage()),
+          Icons.analytics_outlined, ReportsAnalyticsPage(),
+          ownerOnly: true),
     ],
   ),
   _OperationCategory(
@@ -1336,7 +1383,7 @@ class OperationsCategoryPage extends StatelessWidget {
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: category.color.withValues(alpha: .07),
                 borderRadius: BorderRadius.circular(20),
@@ -1346,12 +1393,12 @@ class OperationsCategoryPage extends StatelessWidget {
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: 25,
+                    radius: 21,
                     backgroundColor: category.color.withValues(alpha: .12),
                     foregroundColor: category.color,
                     child: Icon(category.icon),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       '${category.items.length} connected pages',
@@ -1364,7 +1411,7 @@ class OperationsCategoryPage extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
             LayoutBuilder(builder: (context, constraints) {
               final columns = constraints.maxWidth >= 700 ? 2 : 1;
               return GridView.builder(
@@ -1375,7 +1422,7 @@ class OperationsCategoryPage extends StatelessWidget {
                   crossAxisCount: columns,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
-                  childAspectRatio: constraints.maxWidth < 520 ? 4.5 : 4.2,
+                  childAspectRatio: constraints.maxWidth < 520 ? 5.2 : 4.8,
                 ),
                 itemBuilder: (context, index) => _OperationShortcut(
                   item: category.items[index],
@@ -1570,13 +1617,15 @@ class _OperationItem {
     this.title,
     this.subtitle,
     this.icon,
-    this.page,
-  );
+    this.page, {
+    this.ownerOnly = false,
+  });
 
   final String title;
   final String subtitle;
   final IconData icon;
   final Widget page;
+  final bool ownerOnly;
 }
 
 class LegacyRoomMonitoringPage extends StatelessWidget {

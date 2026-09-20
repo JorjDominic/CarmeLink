@@ -87,11 +87,16 @@ Introduces Carmelita's Dormitory and the app's role-based experience, then leads
 
 ### Sign in
 
-Accepts an email and password, validates that both are present, and opens the appropriate role workspace. It also links to password recovery.
+Accepts an email and password, validates that both are present, and opens the
+appropriate role workspace. An unverified account is held on the email
+verification page, where the user explicitly requests and enters a six-digit
+code. Sign-in also links to password recovery.
 
 ### Reset password
 
-Accepts a valid email address and simulates sending account-recovery instructions.
+Accepts a valid email address, opens the recovery-code page without sending an
+email, and lets the user explicitly request a six-digit, single-use code before
+setting a new password.
 
 ## Tenant pages
 
@@ -380,7 +385,9 @@ Explains the one-tenant-account, one-trusted-device policy and provides device/b
 
 #### Verification code
 
-Accepts a one-time code for account or device verification.
+Accepts the six-digit email code requested by an unverified user. The page
+remains active until verification succeeds or the user chooses another
+account, and applies a resend cooldown after the first send.
 
 #### Dormitory information
 
@@ -473,7 +480,7 @@ For a newly created tenant, the complete administrative and tenant flow is:
 ```text
 Create tenant account and profile
         →
-Verify email and SMS OTP
+Verify email OTP; complete SMS verification when enabled
         →
 Set permanent password
         →
@@ -535,9 +542,11 @@ separate, prerequisite-aware owner action that generates independent billing
 charges; payment history is never embedded in or overwritten by account or
 contract records.
 
-Email verification confirms control of the login address. SMS OTP verification
-separately confirms the mobile number. OTPs must expire, be single-use, store no
-plain-text code, and enforce resend and attempt limits. Staff may prepare a
+Email verification confirms control of the login address through a manually
+requested six-digit OTP; account creation itself sends no email. SMS OTP
+verification, when enabled, separately confirms the mobile number. OTPs must
+expire, be single-use, store no plain-text code, and enforce resend and attempt
+limits. Staff may prepare a
 Draft contract while either verification is pending, but the account should
 remain marked **Pending verification**, and the contract must not become Active
 until the required channels and uploaded signed document are verified.

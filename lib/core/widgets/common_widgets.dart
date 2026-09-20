@@ -152,9 +152,7 @@ class MutedDashboardGrid extends StatelessWidget {
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
             childAspectRatio: compact
-                ? (constraints.maxWidth < 500
-                    ? (scaledText ? 1.18 : 1.45)
-                    : (scaledText ? 1.4 : 1.7))
+                ? (scaledText ? 1.05 : 1.25)
                 : denseFourColumn && constraints.maxWidth < 500
                     ? (scaledText ? .54 : .65)
                     : constraints.maxWidth < 500
@@ -400,8 +398,8 @@ class PageFrame extends StatelessWidget {
         extendBody: navScope != null,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          toolbarHeight: 72,
-          leadingWidth: 68,
+          toolbarHeight: isStaff ? 64 : 72,
+          leadingWidth: isStaff ? 60 : 68,
           leading: Padding(
             padding: const EdgeInsets.only(left: 12),
             child: IconButton(
@@ -618,17 +616,21 @@ class CarmelitaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ext = Theme.of(context).extension<CarmelitaThemeExtension>();
     final scheme = Theme.of(context).colorScheme;
+    final role = SessionController.instance.currentUser?.role;
+    final isStaff = role == UserRole.owner || role == UserRole.caretaker;
+    final usesDefaultPadding = padding == const EdgeInsets.all(16);
+    final resolvedPadding =
+        isStaff && usesDefaultPadding ? const EdgeInsets.all(12) : padding;
+    final radius = isStaff ? 16.0 : 20.0;
 
     final content = AnimatedContainer(
       duration: const Duration(milliseconds: 190),
       curve: Curves.easeOutCubic,
-      padding: padding,
+      padding: resolvedPadding,
       decoration: BoxDecoration(
         color:
             emphasis ? scheme.primary.withValues(alpha: .075) : scheme.surface,
-        borderRadius: const BorderRadius.all(
-          Radius.circular(20),
-        ),
+        borderRadius: BorderRadius.all(Radius.circular(radius)),
         border: Border.all(
           color: emphasis
               ? scheme.primary.withValues(alpha: .22)
@@ -652,9 +654,7 @@ class CarmelitaCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: const BorderRadius.all(
-          Radius.circular(20),
-        ),
+        borderRadius: BorderRadius.all(Radius.circular(radius)),
         onTap: onTap,
         child: content,
       ),

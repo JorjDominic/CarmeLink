@@ -31,7 +31,8 @@ supabase functions deploy manage-user
 ## Password-recovery email
 
 Password recovery uses the same six-digit, code-only experience through
-Supabase Auth's mailer.
+Supabase Auth's mailer. Entering an email does not send immediately; the user
+must select **Send code**, after which the 60-second resend cooldown applies.
 
 To send verification and recovery messages through the verified Resend domain,
 enable custom SMTP under **Authentication > Email > SMTP Settings** and enter:

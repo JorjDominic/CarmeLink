@@ -2291,9 +2291,13 @@ Purpose:
 ```text
 Staff Creates Account
       ↓
-Email Verification Link and SMS OTP Sent
+No Verification Message Sent Automatically
       ↓
-Tenant Verifies Email and Mobile Number
+Tenant Attempts Sign-In and Selects Send Code
+      ↓
+Tenant Enters Six-Digit Email OTP
+      ↓
+Tenant Verifies Mobile Number When SMS Is Enabled
       ↓
 Tenant Sets Permanent Password
       ↓
@@ -2318,7 +2322,9 @@ Onboarding Completed
 
 Immediately after a tenant account and profile are created successfully, the
 account workflow should offer **Create contract now** and **Do this later**.
-Email and SMS verification are initiated immediately after profile creation.
+Email verification is initiated only after the user attempts sign-in and
+selects **Send code**. SMS verification remains deferred until a provider is
+enabled.
 The first contract option passes the new tenant profile ID into the editor,
 where the tenant is preselected and locked for the initial save. The operator
 must save a Draft, complete document verification, and use the separate
@@ -2331,9 +2337,11 @@ validation. The tenant remains visible as incomplete onboarding so staff can
 resume later. Keeping the records separate also prevents authentication changes
 from rewriting contract, billing, or payment history.
 
-Email and mobile verification are tracked independently. Email uses a secure
-verification link; mobile verification uses a short-lived, single-use SMS OTP
-with hashed storage, resend cooldowns, attempt limits, and audit timestamps.
+Email and mobile verification are tracked independently. Email uses a
+manually requested, six-digit, single-use OTP with expiry and resend cooldowns;
+account creation sends no message. Mobile verification will use a separate
+short-lived, single-use SMS OTP with hashed storage, resend cooldowns, attempt
+limits, and audit timestamps once enabled.
 Draft contract preparation may continue while verification is pending, but an
 account remains Pending verification and a contract cannot become Active until
 both required channels are verified.
@@ -2348,7 +2356,7 @@ both required channels are verified.
 ```text
 Create tenant account and profile
       ↓
-Verify email and SMS OTP
+Verify email OTP; verify SMS OTP when enabled
       ↓
 Set permanent password
       ↓
