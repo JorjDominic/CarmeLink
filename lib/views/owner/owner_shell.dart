@@ -8,6 +8,7 @@ import '../shared/account_management_page.dart';
 import 'guardian_link_management_page.dart';
 import 'contracts_page.dart';
 import 'owner_pages.dart';
+import 'room_monitoring_page.dart';
 
 class OwnerShell extends StatefulWidget {
   const OwnerShell({super.key});
@@ -36,6 +37,11 @@ class _OwnerShellState extends State<OwnerShell> {
           roleLabel: 'Owner',
           messagePage: OwnerMessagingPage(),
           webDestinations: [
+            AppDestination(
+                label: 'Rooms',
+                icon: Icons.meeting_room_outlined,
+                selectedIcon: Icons.meeting_room,
+                page: RoomMonitoringPage()),
             AppDestination(
                 label: 'Accounts',
                 icon: Icons.manage_accounts_outlined,

@@ -5,6 +5,7 @@ import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../owner/owner_pages.dart';
+import '../owner/room_monitoring_page.dart';
 import '../shared/shared_views.dart';
 import '../shared/account_management_page.dart';
 
@@ -35,6 +36,12 @@ class _CaretakerShellState extends State<CaretakerShell> {
           roleLabel: 'Caretaker',
           messagePage: OwnerMessagingPage(),
           webDestinations: [
+            AppDestination(
+              label: 'Rooms',
+              icon: Icons.meeting_room_outlined,
+              selectedIcon: Icons.meeting_room,
+              page: RoomMonitoringPage(),
+            ),
             AppDestination(
               label: 'Accounts',
               icon: Icons.manage_accounts_outlined,
