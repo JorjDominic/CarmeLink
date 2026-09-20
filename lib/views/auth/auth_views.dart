@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../controllers/session_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/responsive/breakpoints.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../services/auth_service.dart';
+import '../shared/shared_views.dart';
 
 class AuthFlow extends StatefulWidget {
   const AuthFlow({
@@ -472,9 +474,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       if (!mounted) return;
       showAppSnackBar(
         context,
-        'If an account exists for that email, a password reset link has been sent.',
+        'If an account exists for that email, a recovery code has been sent.',
       );
-      Navigator.of(context).pop();
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => PasswordRecoveryCodePage(email: address),
+        ),
+      );
     } catch (error) {
       if (!mounted) return;
       final rawError = error.toString();
@@ -505,7 +511,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text(
-                  'Enter your account email and we will send a secure password reset link.'),
+                  'Enter your account email and we will send a six-digit recovery code.'),
               const SizedBox(height: 20),
               TextField(
                   controller: email,
@@ -521,5 +527,174 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     child: Text(loading ? 'Sending…' : 'Continue'),
                   )),
             ])),
+      );
+}
+
+class PasswordRecoveryCodePage extends StatefulWidget {
+  const PasswordRecoveryCodePage({required this.email, super.key});
+
+  final String email;
+
+  @override
+  State<PasswordRecoveryCodePage> createState() =>
+      _PasswordRecoveryCodePageState();
+}
+
+class _PasswordRecoveryCodePageState extends State<PasswordRecoveryCodePage> {
+  final code = TextEditingController();
+  final AuthService service = SupabaseAuthService();
+  Timer? _timer;
+  int _resendSeconds = 60;
+  bool verifying = false;
+  bool resending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startCountdown();
+  }
+
+  void _startCountdown() {
+    _timer?.cancel();
+    _resendSeconds = 60;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      if (_resendSeconds <= 1) {
+        timer.cancel();
+        setState(() => _resendSeconds = 0);
+      } else {
+        setState(() => _resendSeconds--);
+      }
+    });
+  }
+
+  String get _maskedEmail {
+    final parts = widget.email.split('@');
+    if (parts.length != 2 || parts.first.isEmpty) return widget.email;
+    final visible = parts.first.substring(0, 1);
+    final hidden = List.filled(
+      (parts.first.length - 1).clamp(2, 8),
+      '•',
+    ).join();
+    return '$visible$hidden@${parts.last}';
+  }
+
+  Future<void> _verify() async {
+    if (verifying) return;
+    final value = code.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(value)) {
+      showAppSnackBar(context, 'Enter the complete six-digit code.');
+      return;
+    }
+    setState(() => verifying = true);
+    try {
+      await service.verifyPasswordRecoveryCode(widget.email, value);
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ChangePasswordPage(
+            recoveryMode: true,
+            onComplete: () {
+              SessionController.instance.completePasswordRecovery();
+              navigator.popUntil((route) => route.isFirst);
+            },
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        showAppSnackBar(context, _authMessage(error));
+      }
+    } finally {
+      if (mounted) setState(() => verifying = false);
+    }
+  }
+
+  Future<void> _resend() async {
+    if (_resendSeconds > 0 || resending) return;
+    setState(() => resending = true);
+    try {
+      await service.requestPasswordReset(widget.email);
+      if (!mounted) return;
+      code.clear();
+      _startCountdown();
+      showAppSnackBar(context, 'A new recovery code has been requested.');
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, _authMessage(error));
+    } finally {
+      if (mounted) setState(() => resending = false);
+    }
+  }
+
+  String _authMessage(Object error) => error
+      .toString()
+      .replaceFirst('AuthException(message: ', '')
+      .replaceFirst(RegExp(r', statusCode: \d+\)$'), '')
+      .replaceFirst('Exception: ', '');
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    code.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => PageFrame(
+        title: 'Enter recovery code',
+        subtitle: _maskedEmail,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Enter the six-digit code from your email. Codes expire and can only be used once.',
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: code,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(6),
+                ],
+                autofillHints: const [AutofillHints.oneTimeCode],
+                maxLength: 6,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  labelText: 'Six-digit code',
+                  prefixIcon: Icon(Icons.pin_outlined),
+                  counterText: '',
+                ),
+                onSubmitted: (_) => _verify(),
+              ),
+              const SizedBox(height: 14),
+              FilledButton(
+                onPressed: verifying ? null : _verify,
+                child: Text(verifying ? 'Verifying…' : 'Verify code'),
+              ),
+              TextButton(
+                onPressed: _resendSeconds == 0 && !resending ? _resend : null,
+                child: Text(
+                  resending
+                      ? 'Sending…'
+                      : _resendSeconds > 0
+                          ? 'Resend code in ${_resendSeconds}s'
+                          : 'Resend code',
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => const ForgotPasswordPage(),
+                  ),
+                ),
+                child: const Text('Use a different email'),
+              ),
+            ],
+          ),
+        ),
       );
 }

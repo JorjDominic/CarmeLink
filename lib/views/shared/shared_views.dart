@@ -46,7 +46,6 @@ class NotificationsPage extends StatelessWidget {
                   .toList())),
     );
   }
-
 }
 
 class ProfilePage extends StatelessWidget {
@@ -1414,40 +1413,6 @@ class DeviceBindingPage extends StatelessWidget {
                         label: const Text('Bind trusted device'))),
               ])),
         ),
-      );
-}
-
-class OtpPage extends StatelessWidget {
-  const OtpPage({required this.email, super.key});
-  final String email;
-  @override
-  Widget build(BuildContext context) => PageFrame(
-        title: 'Verification code',
-        subtitle: email,
-        child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text(
-                  'Enter the verification code sent to your email. This is a frontend placeholder until authentication is connected.'),
-              const SizedBox(height: 20),
-              const TextField(
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: InputDecoration(
-                      labelText: '6-digit code',
-                      prefixIcon: Icon(Icons.pin_outlined))),
-              SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                      onPressed: () {
-                        showAppSnackBar(context,
-                            'Verification UI completed. Backend connection comes next.');
-                        Navigator.of(context)
-                            .popUntil((route) => route.isFirst);
-                      },
-                      child: const Text('Verify'))),
-            ])),
       );
 }
 

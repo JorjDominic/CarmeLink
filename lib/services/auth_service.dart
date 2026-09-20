@@ -8,6 +8,7 @@ abstract class AuthService {
   Future<AppUser> signIn(String email, String password);
   Future<void> signOut();
   Future<void> requestPasswordReset(String email);
+  Future<void> verifyPasswordRecoveryCode(String email, String code);
   Future<void> changePassword(String currentPassword, String newPassword);
   Future<void> setRecoveredPassword(String newPassword);
 }
@@ -83,6 +84,24 @@ class SupabaseAuthService implements AuthService {
   }
 
   @override
+  Future<void> verifyPasswordRecoveryCode(String email, String code) async {
+    final normalizedEmail = email.trim();
+    final normalizedCode = code.replaceAll(RegExp(r'\s'), '');
+    if (!normalizedEmail.contains('@') ||
+        !RegExp(r'^\d{6}$').hasMatch(normalizedCode)) {
+      throw const AuthException('Enter the six-digit code from your email.');
+    }
+    final response = await _client.auth.verifyOTP(
+      email: normalizedEmail,
+      token: normalizedCode,
+      type: OtpType.recovery,
+    );
+    if (response.session == null) {
+      throw const AuthException('The recovery code is invalid or expired.');
+    }
+  }
+
+  @override
   Future<void> changePassword(
       String currentPassword, String newPassword) async {
     final email = _client.auth.currentUser?.email;
@@ -100,8 +119,11 @@ class SupabaseAuthService implements AuthService {
   @override
   Future<void> setRecoveredPassword(String newPassword) async {
     if (_client.auth.currentSession == null) {
-      throw const AuthException('The recovery link is invalid or expired.');
+      throw const AuthException('The recovery session is invalid or expired.');
     }
     await _client.auth.updateUser(UserAttributes(password: newPassword));
+    // A recovery session is single-purpose. Require a normal sign-in after the
+    // credential changes instead of retaining a privileged recovery session.
+    await _client.auth.signOut();
   }
 }

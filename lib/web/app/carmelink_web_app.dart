@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../controllers/session_controller.dart';
 import '../auth/staff_gate.dart';
 import '../landing/landing_page.dart';
 import '../theme/web_theme.dart';
@@ -17,14 +18,18 @@ class CarmeLinkWebApp extends StatelessWidget {
       title: 'CarmeLink | Carmelita Dormitory',
       debugShowCheckedModeBanner: false,
       theme: WebTheme.light(),
-      initialRoute: WebRoutes.home,
+      initialRoute: SessionController.isPasswordRecoveryUri(Uri.base)
+          ? WebRoutes.resetPassword
+          : WebRoutes.home,
       routes: {
         WebRoutes.home: (context) => LandingPage(
-              onStaffPortal: () => Navigator.of(context).pushNamed(WebRoutes.staff),
+              onStaffPortal: () =>
+                  Navigator.of(context).pushNamed(WebRoutes.staff),
             ),
-        WebRoutes.staff: (context) => authReady
-            ? const StaffGate()
-            : const _StaffUnavailablePage(),
+        WebRoutes.staff: (context) =>
+            authReady ? const StaffGate() : const _StaffUnavailablePage(),
+        WebRoutes.resetPassword: (context) =>
+            authReady ? const StaffGate() : const _StaffUnavailablePage(),
       },
       onUnknownRoute: (settings) => MaterialPageRoute<void>(
         settings: settings,
@@ -59,7 +64,6 @@ class _NotFoundPage extends StatelessWidget {
     );
   }
 }
-
 
 class _StaffUnavailablePage extends StatelessWidget {
   const _StaffUnavailablePage();

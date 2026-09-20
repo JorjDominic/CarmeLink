@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
+import '../../views/auth/auth_views.dart';
 import '../theme/web_theme.dart';
 import '../widgets/web_brand.dart';
 
@@ -126,6 +127,20 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
                             ? 'Enter your password.'
                             : null,
                       ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _busy
+                              ? null
+                              : () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const ForgotPasswordPage(),
+                                    ),
+                                  ),
+                          child: const Text('Forgot password?'),
+                        ),
+                      ),
                       if (_error != null) ...[
                         const SizedBox(height: 12),
                         Text(_error!,
@@ -150,8 +165,8 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
                       const Text(
                           'Use an existing staff account. Public registration is disabled.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: 12, color: WebPalette.muted)),
+                          style:
+                              TextStyle(fontSize: 12, color: WebPalette.muted)),
                     ],
                   ),
                 ),

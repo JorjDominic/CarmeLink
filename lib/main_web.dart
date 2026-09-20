@@ -20,6 +20,11 @@ Future<void> main() async {
 
   runApp(CarmeLinkWebApp(authReady: authReady));
   if (authReady) {
-    unawaited(SessionController.instance.initialize());
+    unawaited(
+      SessionController.instance.initialize(
+        passwordRecoveryRequested:
+            SessionController.isPasswordRecoveryUri(Uri.base),
+      ),
+    );
   }
 }

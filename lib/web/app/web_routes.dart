@@ -3,4 +3,5 @@
 abstract final class WebRoutes {
   static const home = '/';
   static const staff = '/staff';
+  static const resetPassword = '/reset-password';
 }
