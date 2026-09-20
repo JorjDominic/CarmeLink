@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
@@ -10,6 +11,23 @@ import '../../services/table_refresh_subscription.dart';
 import '../../services/tenant_service.dart';
 import '../owner/contracts_page.dart';
 
+/// Client-side filtering only; the account list and permissions still come
+/// exclusively from the existing authenticated manage-user Edge Function.
+List<Map<String, dynamic>> filterStaffAccounts(
+  List<Map<String, dynamic>> accounts, {
+  String query = '',
+  String role = 'all',
+}) {
+  final needle = query.trim().toLowerCase();
+  return accounts.where((account) {
+    if (role != 'all' && account['role'] != role) return false;
+    if (needle.isEmpty) return true;
+    return ['full_name', 'email', 'phone']
+        .map((field) => (account[field] ?? '').toString().toLowerCase())
+        .any((value) => value.contains(needle));
+  }).toList();
+}
+
 class AccountManagementPage extends StatefulWidget {
   const AccountManagementPage({super.key});
 
@@ -19,6 +37,8 @@ class AccountManagementPage extends StatefulWidget {
 
 class _AccountManagementPageState extends State<AccountManagementPage> {
   final service = const AccountService();
+  String searchQuery = '';
+  String roleFilter = 'all';
   late Future<List<Map<String, dynamic>>> accounts = service.listAccounts();
   late final TableRefreshSubscription subscription;
 
@@ -103,10 +123,66 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
                     child: Text('Unable to load accounts: ${snapshot.error}'));
               }
               final rows = snapshot.data ?? const [];
-              if (rows.isEmpty)
+              if (rows.isEmpty) {
                 return const Center(child: Text('No accounts found.'));
+              }
+              final desktopWeb =
+                  kIsWeb && MediaQuery.sizeOf(context).width >= 1024;
+              final visible = desktopWeb
+                  ? filterStaffAccounts(rows,
+                      query: searchQuery, role: roleFilter)
+                  : rows;
               return Column(
-                children: rows
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (desktopWeb) ...[
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 320,
+                          child: TextField(
+                            key: const Key('web-account-search'),
+                            decoration: const InputDecoration(
+                              labelText: 'Search accounts',
+                              prefixIcon: Icon(Icons.search),
+                              hintText: 'Name, email or phone',
+                            ),
+                            onChanged: (value) =>
+                                setState(() => searchQuery = value),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 180,
+                          child: DropdownButtonFormField<String>(
+                            key: const Key('web-account-role-filter'),
+                            initialValue: roleFilter,
+                            decoration: const InputDecoration(labelText: 'Role'),
+                            items: const [
+                              DropdownMenuItem(value: 'all', child: Text('All roles')),
+                              DropdownMenuItem(value: 'owner', child: Text('Owner')),
+                              DropdownMenuItem(value: 'caretaker', child: Text('Caretaker')),
+                              DropdownMenuItem(value: 'tenant', child: Text('Tenant')),
+                              DropdownMenuItem(value: 'guardian', child: Text('Guardian')),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => roleFilter = value);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text('${visible.length} of ${rows.length} accounts'),
+                    const SizedBox(height: 12),
+                  ],
+                  if (visible.isEmpty)
+                    const Center(child: Text('No accounts match the filters.')),
+                  ...visible
                     .map((row) => Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: CarmelitaCard(
@@ -140,6 +216,7 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
                           ),
                         ))
                     .toList(),
+                ],
               );
             },
           ),

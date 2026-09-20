@@ -68,4 +68,45 @@ void main() {
     expect(find.byKey(const Key('web-staff-sidebar')), findsNothing);
     expect(find.text('Tenants content'), findsOneWidget);
   });
+
+  testWidgets('Web-only staff pages stay out of mobile navigation',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const MaterialApp(
+      home: AdaptiveRoleShell(
+        roleLabel: 'Owner',
+        messagePage: Scaffold(body: Text('Messages')),
+        destinations: [
+          AppDestination(
+              label: 'Dashboard',
+              icon: Icons.dashboard_outlined,
+              selectedIcon: Icons.dashboard,
+              page: Center(child: Text('Dashboard view'))),
+        ],
+        webDestinations: [
+          AppDestination(
+              label: 'Accounts',
+              icon: Icons.manage_accounts_outlined,
+              selectedIcon: Icons.manage_accounts,
+              page: Center(child: Text('Accounts view'))),
+        ],
+      ),
+    ));
+    if (kIsWeb) {
+      expect(find.text('STAFF TOOLS'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('web-staff-destination-1')));
+      await tester.pumpAndSettle();
+      expect(find.text('Accounts view'), findsOneWidget);
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      await tester.pumpAndSettle();
+      expect(find.text('Dashboard view'), findsOneWidget);
+      expect(find.text('Accounts view'), findsNothing);
+      expect(find.byKey(const Key('web-staff-sidebar')), findsNothing);
+    } else {
+      expect(find.text('Accounts view'), findsNothing);
+      expect(find.text('Dashboard view'), findsOneWidget);
+    }
+  });
+
 }

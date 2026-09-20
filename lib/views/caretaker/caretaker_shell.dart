@@ -6,6 +6,7 @@ import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../owner/owner_pages.dart';
 import '../shared/shared_views.dart';
+import '../shared/account_management_page.dart';
 
 /// Operational workspace that excludes owner-only financial and analytics UI.
 class CaretakerShell extends StatefulWidget {
@@ -33,6 +34,14 @@ class _CaretakerShellState extends State<CaretakerShell> {
         child: AdaptiveRoleShell(
           roleLabel: 'Caretaker',
           messagePage: OwnerMessagingPage(),
+          webDestinations: [
+            AppDestination(
+              label: 'Accounts',
+              icon: Icons.manage_accounts_outlined,
+              selectedIcon: Icons.manage_accounts,
+              page: AccountManagementPage(),
+            ),
+          ],
           destinations: [
             AppDestination(
               label: 'Dashboard',
