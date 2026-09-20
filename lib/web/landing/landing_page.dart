@@ -202,9 +202,9 @@ class _LandingPageState extends State<LandingPage> {
       appBar: AppBar(
         toolbarHeight: 82,
         titleSpacing: desktop ? 40 : 14,
-        backgroundColor: _scrolled ? Colors.white : WebPalette.background,
+        backgroundColor: _scrolled ? WebPalette.surface : WebPalette.background,
         elevation: _scrolled ? 2 : 0,
-        shadowColor: const Color(0x20292431),
+        shadowColor: WebPalette.ink.withValues(alpha: .12),
         title: WebBrand(compact: !desktop, onTap: () => _go(_home)),
         actions: desktop
             ? [
@@ -404,9 +404,9 @@ class _LandingPageState extends State<LandingPage> {
                       decoration: BoxDecoration(
                         color: WebPalette.background,
                         borderRadius: BorderRadius.circular(22),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Color(0x25292431),
+                            color: WebPalette.ink.withValues(alpha: .15),
                             blurRadius: 24,
                             offset: Offset(0, 10),
                           ),
@@ -848,7 +848,7 @@ class _LandingPageState extends State<LandingPage> {
           _body(
             "Ask about room availability, living arrangements, or a possible visit "
             "through Carmelita's official Facebook page. Staff will confirm the details.",
-            color: const Color(0xFFF0E6EF),
+            color: WebPalette.cream,
           ),
           const SizedBox(height: 29),
           Wrap(spacing: 11, runSpacing: 11, children: [
@@ -868,7 +868,7 @@ class _LandingPageState extends State<LandingPage> {
           const SizedBox(height: 19),
           const Text(
             'No online booking or inquiry form is active yet. Requests are handled by staff.',
-            style: TextStyle(color: Color(0xFFDDD0DF), fontSize: 12, height: 1.5),
+            style: TextStyle(color: WebPalette.sand, fontSize: 12, height: 1.5),
           ),
         ],
       );

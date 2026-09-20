@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 
 class AppTheme {
-  static const _lightBackground = Color(0xFFF7F3EC);
-  static const _lightSurface = Color(0xFFFFFCF7);
-  static const _lightSurfaceMuted = Color(0xFFF0E8DE);
+  static const _lightBackground = AppColors.lightBackground;
+  static const _lightSurface = AppColors.lightSurface;
+  static const _lightSurfaceMuted = AppColors.lightSurfaceMuted;
   static const _darkBackground = Color(0xFF151310);
   static const _darkSurface = Color(0xFF211D19);
   static const _darkSurfaceMuted = Color(0xFF2B2520);
   static const _darkBorder = Color(0xFF3C342E);
-  static const _lightText = Color(0xFF201B18);
+  static const _lightText = AppColors.lightText;
   static const _darkText = Color(0xFFF7F0E7);
-  static const _lightPrimary = Color(0xFF5E4635);
+  static const _lightPrimary = AppColors.lightPrimary;
   static const _darkPrimary = Color(0xFFD9C0A7);
 
   static ThemeData light() {

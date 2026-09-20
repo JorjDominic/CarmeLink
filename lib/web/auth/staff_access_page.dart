@@ -61,10 +61,10 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
             constraints: const BoxConstraints(maxWidth: 430),
             child: Card(
               elevation: 0,
-              color: Colors.white,
+              color: WebPalette.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
-                side: const BorderSide(color: Color(0xFFE9E1EC)),
+                side: const BorderSide(color: WebPalette.border),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(28),
@@ -75,7 +75,7 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(Icons.admin_panel_settings_outlined,
-                          size: 44, color: Color(0xFF755189)),
+                          size: 44, color: WebPalette.plum),
                       const SizedBox(height: 18),
                       const Text('Staff sign in',
                           textAlign: TextAlign.center,
@@ -129,7 +129,7 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
                       if (_error != null) ...[
                         const SizedBox(height: 12),
                         Text(_error!,
-                            style: const TextStyle(color: Color(0xFFB3261E))),
+                            style: const TextStyle(color: WebPalette.danger)),
                       ],
                       const SizedBox(height: 22),
                       FilledButton(
@@ -151,7 +151,7 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
                           'Use an existing staff account. Public registration is disabled.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                              fontSize: 12, color: Color(0xFF676174))),
+                              fontSize: 12, color: WebPalette.muted)),
                     ],
                   ),
                 ),

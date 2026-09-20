@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
+  // Shared mobile + web light-mode tokens. Keep these values in one place.
+  static const lightPrimary = Color(0xFF5E4635);
+  static const lightBackground = Color(0xFFF7F3EC);
+  static const lightSurface = Color(0xFFFFFCF7);
+  static const lightSurfaceMuted = Color(0xFFF0E8DE);
+  static const lightText = Color(0xFF201B18);
   static const cream = Color(0xFFF5F0E6);
   static const warmWhite = Color(0xFFFCFAF5);
   static const taupe = Color(0xFF8B7867);

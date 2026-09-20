@@ -63,12 +63,12 @@ class _PropertyPhotoTileState extends State<PropertyPhotoTile> {
                     ),
                   ),
                   if (widget.showCaption) ...[
-                    const DecoratedBox(
+                    DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, Color(0xC9201627)],
+                          colors: [Colors.transparent, WebPalette.ink.withValues(alpha: .79)],
                         ),
                       ),
                     ),
