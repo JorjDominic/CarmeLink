@@ -29,6 +29,9 @@ void _ownerPush(BuildContext context, Widget page) {
   );
 }
 
+// Temporarily hidden until the full contract-onboarding flow is resumed.
+const _showOnboardingIncomplete = false;
+
 class OwnerDashboardPage extends StatelessWidget {
   const OwnerDashboardPage({
     this.isCaretaker = false,
@@ -49,140 +52,225 @@ class OwnerDashboardPage extends StatelessWidget {
       subtitle: 'Priority-ranked Today view',
       child: AnimatedBuilder(
         animation: controller,
-        builder: (context, _) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ElegantHeader(
-              eyebrow: isCaretaker ? 'Caretaker operations' : 'Operations',
-              title: 'Good afternoon.',
-              subtitle:
-                  '${controller.occupiedBeds} of ${controller.totalCapacity} beds are currently occupied.',
-              trailing: StatusPill(
-                '${controller.tenantsInsideCount} inside',
-                icon: Icons.location_on_outlined,
+        builder: (context, _) {
+          final occupancyValue = controller.roomsLoadedOnce
+              ? '${controller.occupiedBeds}/${controller.totalCapacity}'
+              : controller.roomsLoading
+                  ? '...'
+                  : 'â€”';
+          final presenceValue = controller.tenantsLoadedOnce
+              ? '${controller.tenantsInsideCount} Inside'
+              : controller.tenantsLoading
+                  ? 'Loading'
+                  : 'Unavailable';
+          final paymentValue = controller.paymentsLoadedOnce
+              ? '${controller.pendingPaymentProofs}'
+              : controller.paymentsLoading
+                  ? '...'
+                  : 'â€”';
+          final maintenanceValue = controller.maintenanceLoadedOnce
+              ? '${controller.openMaintenance}'
+              : controller.maintenanceLoading
+                  ? '...'
+                  : 'â€”';
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ElegantHeader(
+                eyebrow: isCaretaker ? 'Caretaker operations' : 'Operations',
+                title: 'Good afternoon.',
+                subtitle: controller.roomsLoadedOnce
+                    ? '${controller.occupiedBeds} of ${controller.totalCapacity} beds are currently occupied.'
+                    : controller.roomsLoading
+                        ? 'Loading current property status...'
+                        : controller.roomsError != null
+                            ? 'Property status is unavailable.'
+                            : 'No room data available.',
+                trailing: StatusPill(
+                  controller.tenantsLoadedOnce
+                      ? '${controller.tenantsInsideCount} inside'
+                      : controller.tenantsLoading
+                          ? 'Loading'
+                          : 'No data',
+                  icon: Icons.location_on_outlined,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            const PhotoHero(
-              image: AppAssets.dormOverview,
-              title: 'CarmeLink',
-              subtitle: 'Quick monitoring for daily operations',
-              height: 176,
-            ),
-            const SizedBox(height: 16),
-            const SectionTitle(
-              'Property status',
-              subtitle: 'The numbers that matter most right now',
-            ),
-            const SizedBox(height: 10),
-            MutedDashboardGrid(
-              compact: true,
-              denseFourColumn: true,
-              items: [
-                MutedDashboardItem(
-                  label: 'Occupancy',
-                  value:
-                      '${controller.occupiedBeds}/${controller.totalCapacity}',
-                  detail: '${controller.rooms.length} rooms',
-                  icon: Icons.bed_outlined,
-                  color: const Color(0xFF56886B),
-                  onTap: () => _ownerPush(
-                    context,
-                    const RoomMonitoringPage(),
+              const SizedBox(height: 16),
+              const PhotoHero(
+                image: AppAssets.dormOverview,
+                title: 'CarmeLink',
+                subtitle: 'Quick monitoring for daily operations',
+                height: 176,
+              ),
+              const SizedBox(height: 16),
+              const SectionTitle(
+                'Property status',
+                subtitle: 'The numbers that matter most right now',
+              ),
+              const SizedBox(height: 10),
+              MutedDashboardGrid(
+                compact: true,
+                denseFourColumn: true,
+                items: [
+                  MutedDashboardItem(
+                    label: 'Occupancy',
+                    value: occupancyValue,
+                    detail: controller.roomsLoadedOnce
+                        ? '${controller.rooms.length} rooms'
+                        : controller.roomsError != null
+                            ? 'Room data unavailable'
+                            : 'No room data',
+                    icon: Icons.bed_outlined,
+                    color: const Color(0xFF56886B),
+                    onTap: () => _ownerPush(
+                      context,
+                      const RoomMonitoringPage(),
+                    ),
                   ),
-                ),
-                MutedDashboardItem(
-                  label: 'Payment reviews',
-                  value: '${controller.pendingPaymentProofs}',
-                  detail: 'Proofs waiting',
-                  icon: Icons.payments_outlined,
-                  color: const Color(0xFFAA8A45),
-                  onTap: () => _ownerPush(
-                    context,
-                    const PaymentVerificationPage(),
+                  MutedDashboardItem(
+                    label: 'Payment reviews',
+                    value: paymentValue,
+                    detail: controller.paymentsLoadedOnce
+                        ? 'Proofs waiting'
+                        : controller.paymentsError != null
+                            ? 'Payment data unavailable'
+                            : 'No payment data',
+                    icon: Icons.payments_outlined,
+                    color: const Color(0xFFAA8A45),
+                    onTap: () => _ownerPush(
+                      context,
+                      const PaymentVerificationPage(),
+                    ),
                   ),
-                ),
-                MutedDashboardItem(
-                  label: 'Maintenance',
-                  value: '${controller.openMaintenance}',
-                  detail: 'Open reports',
+                  MutedDashboardItem(
+                    label: 'Maintenance',
+                    value: maintenanceValue,
+                    detail: controller.maintenanceLoadedOnce
+                        ? 'Open reports'
+                        : controller.maintenanceError != null
+                            ? 'Maintenance unavailable'
+                            : 'No maintenance data',
+                    icon: Icons.build_outlined,
+                    color: const Color(0xFFB47A52),
+                    onTap: () => _ownerPush(
+                      context,
+                      const MaintenanceManagementPage(),
+                    ),
+                  ),
+                  MutedDashboardItem(
+                    label: 'Curfew',
+                    value: presenceValue,
+                    detail: controller.tenantsLoadedOnce
+                        ? '${controller.tenantsOutsideCount} Outside â€¢ ${controller.tenantsUnavailableCount} Unavailable'
+                        : controller.tenantsError != null
+                            ? 'Presence data unavailable'
+                            : 'No presence data',
+                    icon: Icons.schedule_outlined,
+                    color: const Color(0xFF56886B),
+                    onTap: () => _ownerPush(
+                      context,
+                      const GeofenceMonitoringPage(),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              const SectionTitle(
+                'Today • highest priority first',
+                subtitle: 'Actionable items before routine monitoring',
+              ),
+              const SizedBox(height: 10),
+              if (isCaretaker)
+                AttentionCard(
+                  compact: true,
                   icon: Icons.build_outlined,
-                  color: const Color(0xFFB47A52),
+                  title: controller.maintenanceLoadedOnce
+                      ? '${controller.openMaintenance} maintenance report(s) open'
+                      : 'Maintenance data unavailable',
+                  subtitle: controller.maintenanceLoadedOnce
+                      ? 'Review assignments and update repair progress.'
+                      : controller.maintenanceError ??
+                          'No maintenance information has been loaded.',
+                  status: controller.maintenanceLoadedOnce
+                      ? controller.openMaintenance > 0
+                          ? 'Open'
+                          : 'Clear'
+                      : controller.maintenanceLoading
+                          ? 'Loading'
+                          : 'No data',
                   onTap: () => _ownerPush(
                     context,
                     const MaintenanceManagementPage(),
                   ),
+                )
+              else
+                AttentionCard(
+                  compact: true,
+                  icon: Icons.event_busy_outlined,
+                  title: controller.contractsLoadedOnce
+                      ? '${controller.contractsExpiringWithin30Days} contract(s) expire within 30 days'
+                      : 'Contract data unavailable',
+                  subtitle: controller.contractsLoadedOnce
+                      ? 'Review renewal or move-out arrangements.'
+                      : controller.contractsError ??
+                          'No contract information has been loaded.',
+                  status: controller.contractsLoadedOnce
+                      ? controller.contractsExpiringWithin30Days > 0
+                          ? 'Soon'
+                          : 'Clear'
+                      : controller.contractsLoading
+                          ? 'Loading'
+                          : 'No data',
+                  onTap: () => _ownerPush(context, const ContractsPage()),
                 ),
-                MutedDashboardItem(
-                  label: 'Curfew',
-                  value: '${controller.tenantsInsideCount} Inside',
-                  detail: '${controller.tenantsOutsideCount} Outside',
-                  icon: Icons.schedule_outlined,
-                  color: const Color(0xFF56886B),
-                  onTap: () => _ownerPush(
-                    context,
-                    const GeofenceMonitoringPage(),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            const SectionTitle(
-              'Today • highest priority first',
-              subtitle: 'Actionable items before routine monitoring',
-            ),
-            const SizedBox(height: 10),
-            if (isCaretaker)
+              const SizedBox(height: 8),
               AttentionCard(
                 compact: true,
-                icon: Icons.build_outlined,
-                title:
-                    '${controller.openMaintenance} maintenance report(s) open',
-                subtitle: 'Review assignments and update repair progress.',
-                status: controller.openMaintenance > 0 ? 'Open' : 'Clear',
+                icon: Icons.receipt_long_outlined,
+                title: controller.paymentsLoadedOnce
+                    ? '${controller.pendingPaymentProofs} payment proof(s) waiting'
+                    : 'Payment data unavailable',
+                subtitle: controller.paymentsLoadedOnce
+                    ? 'Review uploaded proof before changing payment status.'
+                    : controller.paymentsError ??
+                        'No payment information has been loaded.',
+                status: controller.paymentsLoadedOnce
+                    ? controller.pendingPaymentProofs > 0
+                        ? 'Pending'
+                        : 'Clear'
+                    : controller.paymentsLoading
+                        ? 'Loading'
+                        : 'No data',
                 onTap: () => _ownerPush(
                   context,
-                  const MaintenanceManagementPage(),
+                  const PaymentVerificationPage(),
                 ),
-              )
-            else
+              ),
+              const SizedBox(height: 8),
               AttentionCard(
                 compact: true,
-                icon: Icons.event_busy_outlined,
-                title:
-                    '${controller.contractsExpiringWithin30Days} contract(s) expire within 30 days',
-                subtitle: 'Review renewal or move-out arrangements.',
-                status: 'Soon',
-                onTap: () => _ownerPush(context, const ContractsPage()),
+                icon: Icons.location_on_outlined,
+                title: controller.tenantsLoadedOnce
+                    ? 'Resident presence overview'
+                    : 'Presence data unavailable',
+                subtitle: controller.tenantsLoadedOnce
+                    ? '${controller.tenantsInsideCount} inside, ${controller.tenantsOutsideCount} outside, and ${controller.tenantsUnavailableCount} unavailable.'
+                    : controller.tenantsError ??
+                        'No resident presence information has been loaded.',
+                status: controller.tenantsLoadedOnce
+                    ? 'Current'
+                    : controller.tenantsLoading
+                        ? 'Loading'
+                        : 'No data',
+                onTap: () => _ownerPush(
+                  context,
+                  const GeofenceMonitoringPage(),
+                ),
               ),
-            const SizedBox(height: 8),
-            AttentionCard(
-              compact: true,
-              icon: Icons.receipt_long_outlined,
-              title:
-                  '${controller.pendingPaymentProofs} payment proof(s) waiting',
-              subtitle: 'Review uploaded proof before changing payment status.',
-              status: controller.pendingPaymentProofs > 0 ? 'Pending' : 'Clear',
-              onTap: () => _ownerPush(
-                context,
-                const PaymentVerificationPage(),
-              ),
-            ),
-            const SizedBox(height: 8),
-            AttentionCard(
-              compact: true,
-              icon: Icons.location_on_outlined,
-              title: 'Dormitory geofencing active',
-              subtitle:
-                  'GPS perimeter monitoring ${controller.tenants.length} registered residents.',
-              status: 'Active',
-              onTap: () => _ownerPush(
-                context,
-                const GeofenceMonitoringPage(),
-              ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -341,7 +429,8 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
                             ),
                           ),
                         ),
-                        if (tenant.hasContract == false)
+                        if (_showOnboardingIncomplete &&
+                            tenant.hasContract == false)
                           const _OnboardingIncompleteBadge(),
                       ],
                     ),
@@ -430,7 +519,7 @@ class TenantDetailsPage extends StatelessWidget {
               ],
             ),
           ),
-          if (tenant.hasContract == false) ...[
+          if (_showOnboardingIncomplete && tenant.hasContract == false) ...[
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.all(16),
@@ -652,6 +741,7 @@ class _TenantAssignmentManagerState extends State<_TenantAssignmentManager> {
             TextButton(
                 onPressed: saving ? null : _end,
                 child: const Text('End current assignment')),
+          const SizedBox(height: 14),
           DropdownButtonFormField<String>(
               initialValue: widget.tenant.residencyStatus,
               decoration: const InputDecoration(labelText: 'Residency status'),
@@ -1048,6 +1138,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
             ]),
             const SizedBox(height: 12),
             LayoutBuilder(builder: (context, constraints) {
+              final textScale = MediaQuery.textScalerOf(context).scale(1);
               final cards = [
                 _OperationsStatus(
                     'Occupied rooms',
@@ -1077,7 +1168,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                   crossAxisCount: constraints.maxWidth < 600 ? 2 : 4,
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 8,
-                  childAspectRatio: constraints.maxWidth < 600 ? 1.9 : 1.55,
+                  mainAxisExtent: 110 + ((textScale - 1).clamp(0, 1) * 65),
                 ),
                 itemCount: cards.length,
                 itemBuilder: (context, index) =>
@@ -1158,6 +1249,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
             else
               LayoutBuilder(builder: (context, constraints) {
                 final columns = constraints.maxWidth >= 700 ? 2 : 1;
+                final textScale = MediaQuery.textScalerOf(context).scale(1);
                 return GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -1165,7 +1257,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                     crossAxisCount: columns,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
-                    childAspectRatio: constraints.maxWidth < 520 ? 3.8 : 4.2,
+                    mainAxisExtent: 76 + ((textScale - 1).clamp(0, 1) * 60),
                   ),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) => _OperationCategoryCard(
@@ -1414,6 +1506,7 @@ class OperationsCategoryPage extends StatelessWidget {
             const SizedBox(height: 12),
             LayoutBuilder(builder: (context, constraints) {
               final columns = constraints.maxWidth >= 700 ? 2 : 1;
+              final textScale = MediaQuery.textScalerOf(context).scale(1);
               return GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -1422,7 +1515,7 @@ class OperationsCategoryPage extends StatelessWidget {
                   crossAxisCount: columns,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
-                  childAspectRatio: constraints.maxWidth < 520 ? 5.2 : 4.8,
+                  mainAxisExtent: 62 + ((textScale - 1).clamp(0, 1) * 28),
                 ),
                 itemBuilder: (context, index) => _OperationShortcut(
                   item: category.items[index],
@@ -1465,6 +1558,8 @@ class _OperationCategoryCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(category.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontWeight: FontWeight.w900, fontSize: 14)),
                   const SizedBox(height: 2),
@@ -2102,6 +2197,9 @@ class _FilterChip extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width - 32,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: selected
@@ -2129,14 +2227,17 @@ class _FilterChip extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                fontSize: 13,
-                color: selected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface,
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: 13,
+                  color: selected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface,
+                ),
               ),
             ),
           ],

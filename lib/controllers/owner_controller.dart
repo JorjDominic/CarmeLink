@@ -43,6 +43,7 @@ class OwnerController extends ChangeNotifier {
   final List<RoomRecord> _roomRecords = [];
   bool _roomsLoading = false;
   String? _roomsError;
+  bool _roomsLoadedOnce = false;
 
   final StaffMaintenanceService _staffMaintenanceService =
       const StaffMaintenanceService();
@@ -135,6 +136,7 @@ class OwnerController extends ChangeNotifier {
   List<RoomRecord> get roomRecords => List.unmodifiable(_roomRecords);
   bool get roomsLoading => _roomsLoading;
   String? get roomsError => _roomsError;
+  bool get roomsLoadedOnce => _roomsLoadedOnce;
   List<MaintenanceReport> get maintenance {
     if (_staffMaintenanceReports.isNotEmpty) {
       return _staffMaintenanceReports
@@ -169,10 +171,12 @@ class OwnerController extends ChangeNotifier {
   List<GateEvent> get geofenceEvents => gateEvents;
   bool get gateLoading => _gateLoading;
   String? get gateError => _gateError;
+  bool get gateLoadedOnce => _gateLoadedOnce;
   List<VisitorRequest> get visitors => List.unmodifiable(_visitors);
   bool get visitorsLoading => _visitorsLoading;
   String? get visitorsError => _visitorsError;
   bool get visitorsLoadedOnce => _visitorsLoadedOnce;
+  bool get tenantsLoadedOnce => _tenantsLoadedOnce;
   List<ConcernReport> get concerns => List.unmodifiable(_concerns);
   bool get concernsLoading => _concernsLoading;
   String? get concernsError => _concernsError;
@@ -261,6 +265,7 @@ class OwnerController extends ChangeNotifier {
       _roomRecords
         ..clear()
         ..addAll(list);
+      _roomsLoadedOnce = true;
     } catch (e) {
       _roomsError = e.toString();
     } finally {
@@ -665,6 +670,7 @@ class OwnerController extends ChangeNotifier {
     _roomRecords.clear();
     _roomsLoading = false;
     _roomsError = null;
+    _roomsLoadedOnce = false;
     _curfewRequests.clear();
     _curfewLoading = false;
     _curfewError = null;

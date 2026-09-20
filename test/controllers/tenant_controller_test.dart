@@ -14,7 +14,8 @@ void main() {
   });
 
   group('TenantController Unit Tests', () {
-    test('clear resets room, maintenance, payment, curfew, and gate states', () {
+    test('clear resets room, maintenance, payment, curfew, and gate states',
+        () {
       controller.setCurrentGateStatusForTesting('OUT');
       controller.setGateEventsForTesting([
         GateEvent(
@@ -55,13 +56,15 @@ void main() {
       expect(controller.gateLoading, isFalse);
       expect(controller.gateError, isNull);
       expect(controller.gateLoadedOnce, isFalse);
-      expect(controller.currentGateStatus, 'IN');
+      expect(controller.currentGateStatus, 'UNAVAILABLE');
       expect(controller.lastGateEventAt, isNull);
       expect(controller.checkingPresence, isFalse);
-      expect(controller.isInside, isTrue);
+      expect(controller.isInside, isFalse);
+      expect(controller.isUnavailable, isTrue);
     });
 
-    test('loadGateEvents handles unauthenticated / offline mode gracefully', () async {
+    test('loadGateEvents handles unauthenticated / offline mode gracefully',
+        () async {
       await controller.loadGateEvents();
       expect(controller.gateEvents, isEmpty);
       expect(controller.gateLoadedOnce, isTrue);
@@ -69,12 +72,14 @@ void main() {
       expect(controller.gateError, isNull);
     });
 
-    test('cancelCurfewRequest falls back to local status update when offline', () async {
+    test('cancelCurfewRequest falls back to local status update when offline',
+        () async {
       await controller.cancelCurfewRequest('non-existent');
       expect(controller.curfewRequests, isEmpty);
     });
 
-    test('gate status getters correctly distinguish IN, OUT, and UNAVAILABLE', () {
+    test('gate status getters correctly distinguish IN, OUT, and UNAVAILABLE',
+        () {
       controller.setCurrentGateStatusForTesting('IN');
       expect(controller.isInside, isTrue);
       expect(controller.isOutside, isFalse);

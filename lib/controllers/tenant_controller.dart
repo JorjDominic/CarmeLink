@@ -39,7 +39,7 @@ class TenantController extends ChangeNotifier {
   String? _gateError;
   bool _gateLoadedOnce = false;
 
-  String _currentGateStatus = 'IN';
+  String _currentGateStatus = 'UNAVAILABLE';
   DateTime? _lastGateEventAt;
   bool _checkingPresence = false;
 
@@ -287,7 +287,7 @@ class TenantController extends ChangeNotifier {
     _gateLoading = false;
     _gateError = null;
     _gateLoadedOnce = false;
-    _currentGateStatus = 'IN';
+    _currentGateStatus = 'UNAVAILABLE';
     _lastGateEventAt = null;
     _checkingPresence = false;
     notifyListeners();
@@ -636,10 +636,13 @@ class TenantController extends ChangeNotifier {
       _gateLoadedOnce = true;
       if (events.isNotEmpty) {
         final latest = events.first;
-        _currentGateStatus =
-            latest.isUnavailable ? 'UNAVAILABLE' : (latest.direction ?? 'IN');
+        _currentGateStatus = latest.isUnavailable
+            ? 'UNAVAILABLE'
+            : (latest.direction ?? 'UNAVAILABLE');
         _lastGateEventAt = latest.checkedAt;
       } else {
+        _currentGateStatus = 'UNAVAILABLE';
+        _lastGateEventAt = null;
         try {
           final row = await client
               .from('tenant_details')
@@ -682,8 +685,9 @@ class TenantController extends ChangeNotifier {
         previousDirection: previous,
       );
 
-      _currentGateStatus =
-          result.isUnavailable ? 'UNAVAILABLE' : (result.direction ?? 'IN');
+      _currentGateStatus = result.isUnavailable
+          ? 'UNAVAILABLE'
+          : (result.direction ?? 'UNAVAILABLE');
       _lastGateEventAt = DateTime.now();
 
       final client = SupabaseConfig.clientSafe;
@@ -748,8 +752,9 @@ class TenantController extends ChangeNotifier {
     _gateError = null;
     if (events.isNotEmpty) {
       final latest = events.first;
-      _currentGateStatus =
-          latest.isUnavailable ? 'UNAVAILABLE' : (latest.direction ?? 'IN');
+      _currentGateStatus = latest.isUnavailable
+          ? 'UNAVAILABLE'
+          : (latest.direction ?? 'UNAVAILABLE');
       _lastGateEventAt = latest.checkedAt;
     }
     notifyListeners();

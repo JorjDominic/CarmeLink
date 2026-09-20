@@ -96,8 +96,10 @@ class TenantService {
         contractEndsOn: _date(detail?['contract_ends_on']),
         gateStatus: detail?['current_gate_status'] as String? ?? 'Unavailable',
         lastGateEventAt: _date(detail?['last_gate_event_at']),
-        hasContract:
-            includeContractStatus ? contractTenantIds.contains(id) : null,
+        hasContract: includeContractStatus
+            ? contractTenantIds.contains(id)
+            : detail?['contract_starts_on'] != null &&
+                detail?['contract_ends_on'] != null,
       );
     }).toList();
     _cachedTenants = entries;

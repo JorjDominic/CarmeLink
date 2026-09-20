@@ -52,9 +52,16 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
         builder: (context, _) {
           final tenant = controller.selectedTenant;
           final firstName = tenant?.name.trim().split(' ').first ?? 'Resident';
+          final presence = controller.linkedTenantPresence;
+          final hasPresence = presence == 'Inside' || presence == 'Outside';
+          final latestPresenceAt = controller.gateEvents.isEmpty
+              ? null
+              : controller.gateEvents.first.time;
 
           final headerTitle = controller.hasLinkedTenant
-              ? '$firstName is inside the dormitory perimeter.'
+              ? hasPresence
+                  ? '$firstName is ${presence.toLowerCase()} the dormitory perimeter.'
+                  : '$firstName\'s presence is unavailable.'
               : (controller.loading
                   ? 'Loading resident details...'
                   : 'Welcome to Carmelita\'s Dormitory');
@@ -66,10 +73,12 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                 eyebrow: 'Guardian view',
                 title: headerTitle,
                 subtitle: controller.hasLinkedTenant
-                    ? 'Real-time GPS geofencing confirms safe arrival and departure.'
+                    ? hasPresence
+                        ? 'Based on the latest recorded geofence event.'
+                        : 'No current geofence event is available.'
                     : 'Manage linked resident information, room, and payments.',
-                trailing: const StatusPill(
-                  'IN',
+                trailing: StatusPill(
+                  controller.loading ? 'Loading' : presence,
                   icon: Icons.location_on_rounded,
                 ),
               ),
@@ -209,10 +218,12 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                 items: [
                   MutedDashboardItem(
                     label: 'Curfew',
-                    value: 'Inside',
+                    value: controller.hasLinkedTenant ? presence : '—',
                     detail: controller.pendingGuardianCurfewCount > 0
                         ? '${controller.pendingGuardianCurfewCount} waiting your review'
-                        : 'GPS Geofence • 8:14 PM',
+                        : latestPresenceAt != null
+                            ? 'Updated ${shortDate(latestPresenceAt)} at ${timeText(latestPresenceAt)}'
+                            : 'No presence event recorded',
                     icon: Icons.schedule_outlined,
                     color: const Color(0xFF56886B),
                     onTap: () => Navigator.of(context).push(
@@ -224,10 +235,18 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                   ),
                   MutedDashboardItem(
                     label: 'Outstanding',
-                    value: money(controller.outstandingTotal),
-                    detail: controller.payments.isEmpty
-                        ? 'No pending dues'
-                        : '${controller.payments.where((p) => !p.isVerified).length} unverified/due',
+                    value: controller.hasLinkedTenant && controller.loadedOnce
+                        ? money(controller.outstandingTotal)
+                        : '—',
+                    detail: controller.loading
+                        ? 'Loading payment records'
+                        : controller.error != null
+                            ? 'Payment data unavailable'
+                            : !controller.hasLinkedTenant
+                                ? 'No linked resident'
+                                : controller.payments.isEmpty
+                                    ? 'No pending charges'
+                                    : '${controller.payments.where((p) => !p.isVerified).length} unverified/due',
                     icon: Icons.payments_outlined,
                     color: const Color(0xFFAA8A45),
                     onTap: () => Navigator.of(context).push(
@@ -247,16 +266,26 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
               CarmelitaCard(
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.verified_user_outlined,
-                      color: Color(0xFF56886B)),
-                  title: const Text(
-                    'Perimeter status: Safe & Inside',
-                    style: TextStyle(fontWeight: FontWeight.w800),
+                  leading: Icon(
+                    hasPresence
+                        ? Icons.location_on_outlined
+                        : Icons.location_off_outlined,
+                    color: hasPresence
+                        ? const Color(0xFF56886B)
+                        : Theme.of(context).colorScheme.outline,
+                  ),
+                  title: Text(
+                    controller.hasLinkedTenant
+                        ? 'Perimeter status: $presence'
+                        : 'No linked resident',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                   subtitle: Text(
                     controller.hasLinkedTenant
-                        ? '${controller.linkedTenantName} is currently within Carmelita\'s Dormitory perimeter. No issues reported.'
-                        : 'Resident monitoring is active when a resident is linked.',
+                        ? latestPresenceAt != null
+                            ? 'Latest recorded event: ${shortDate(latestPresenceAt)} at ${timeText(latestPresenceAt)}.'
+                            : 'No presence history is available for ${controller.linkedTenantName}.'
+                        : 'Link a resident to display presence information.',
                   ),
                   trailing: TextButton(
                     onPressed: () => Navigator.of(context).push(

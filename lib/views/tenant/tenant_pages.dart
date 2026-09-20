@@ -46,6 +46,19 @@ class TenantDashboardPage extends StatelessWidget {
           final maintenance = controller.maintenance.isEmpty
               ? null
               : controller.maintenance.first;
+          final presenceLabel = controller.checkingPresence ||
+                  (controller.gateLoading && !controller.gateLoadedOnce)
+              ? 'Loading'
+              : controller.isInside
+                  ? 'Inside'
+                  : controller.isOutside
+                      ? 'Outside'
+                      : 'Unavailable';
+          final presenceDetail = controller.gateError != null
+              ? 'Presence data unavailable'
+              : controller.lastGateEventAt != null
+                  ? 'Updated ${shortDate(controller.lastGateEventAt!)} at ${timeText(controller.lastGateEventAt!)}'
+                  : 'No presence event recorded';
 
           final roomSubtitle = room != null
               ? 'Room ${room.number} • ${room.bedSpace} • Floor ${room.floor}'
@@ -66,8 +79,8 @@ class TenantDashboardPage extends StatelessWidget {
                 eyebrow: 'Welcome home',
                 title: 'Good afternoon, $firstName.',
                 subtitle: roomSubtitle,
-                trailing: const StatusPill(
-                  'IN',
+                trailing: StatusPill(
+                  presenceLabel,
                   icon: Icons.home_rounded,
                 ),
               ),
@@ -129,12 +142,22 @@ class TenantDashboardPage extends StatelessWidget {
                 items: [
                   MutedDashboardItem(
                     label: 'Amount due',
-                    value: nextDue != null ? money(nextDue.amount) : '₱0.00',
+                    value: nextDue != null
+                        ? money(nextDue.amount)
+                        : controller.paymentsLoadedOnce
+                            ? money(0)
+                            : '—',
                     detail: nextDue != null
                         ? '${nextDue.label} • Due ${shortDate(nextDue.dueDate)}'
                         : (outstanding > 0
                             ? '₱${outstanding.toStringAsFixed(2)} balance'
-                            : 'All bills settled'),
+                            : controller.paymentsLoading
+                                ? 'Loading billing records'
+                                : controller.paymentsError != null
+                                    ? 'Billing data unavailable'
+                                    : controller.paymentsLoadedOnce
+                                        ? 'No outstanding charges'
+                                        : 'No billing data'),
                     icon: Icons.account_balance_wallet_outlined,
                     color: (nextDue != null || outstanding > 0)
                         ? const Color(0xFFAA8A45)
@@ -147,8 +170,8 @@ class TenantDashboardPage extends StatelessWidget {
                   ),
                   MutedDashboardItem(
                     label: 'Curfew',
-                    value: 'Inside',
-                    detail: 'Geofence verified • 8:14 PM',
+                    value: presenceLabel,
+                    detail: presenceDetail,
                     icon: Icons.schedule_outlined,
                     color: const Color(0xFF56886B),
                     onTap: () => Navigator.of(context).push(
@@ -180,12 +203,27 @@ class TenantDashboardPage extends StatelessWidget {
                     ),
                   ),
                 )
-              else
+              else if (controller.paymentsLoadedOnce)
                 AttentionCard(
                   icon: Icons.payments_outlined,
                   title: 'All bills are up to date',
                   subtitle: 'No outstanding dormitory charges at this time.',
                   status: 'Clear',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const PaymentsPage(),
+                    ),
+                  ),
+                )
+              else
+                AttentionCard(
+                  icon: Icons.payments_outlined,
+                  title: controller.paymentsLoading
+                      ? 'Loading billing records'
+                      : 'Billing data unavailable',
+                  subtitle: controller.paymentsError ??
+                      'No billing information has been loaded yet.',
+                  status: controller.paymentsLoading ? 'Loading' : 'No data',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const PaymentsPage(),
@@ -214,7 +252,11 @@ class TenantDashboardPage extends StatelessWidget {
                       : 'No maintenance reports',
                   subtitle: controller.maintenanceError ??
                       'No submitted maintenance issue needs attention.',
-                  status: controller.maintenanceLoading ? 'Loading' : 'Clear',
+                  status: controller.maintenanceLoading
+                      ? 'Loading'
+                      : controller.maintenanceError != null
+                          ? 'No data'
+                          : 'Clear',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const MaintenanceReportsPage(),

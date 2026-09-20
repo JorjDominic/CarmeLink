@@ -101,8 +101,7 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
       animation: _controller,
       builder: (context, _) {
         final allReports = _controller.staffMaintenanceReports;
-        final isLoading =
-            _controller.maintenanceLoading && allReports.isEmpty;
+        final isLoading = _controller.maintenanceLoading && allReports.isEmpty;
         final error = _controller.maintenanceError;
 
         // Apply filters
@@ -157,20 +156,23 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Operations Overview',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.darkBrown,
-                        ),
+                  Expanded(
+                    child: Text(
+                      'Operations Overview',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.darkBrown,
+                          ),
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Row(
                     children: [
                       IconButton(
                         icon: Icon(
-                          _showFloorPlan
-                              ? Icons.map
-                              : Icons.map_outlined,
+                          _showFloorPlan ? Icons.map : Icons.map_outlined,
                           color: _showFloorPlan
                               ? AppColors.brown
                               : AppColors.taupe,
@@ -331,8 +333,7 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                     const SizedBox(width: 8),
                     _buildFilterChip('Resolved', 'resolved', resolvedCount),
                     const SizedBox(width: 8),
-                    _buildFilterChip(
-                        'Cancelled', 'cancelled', cancelledCount),
+                    _buildFilterChip('Cancelled', 'cancelled', cancelledCount),
                   ],
                 ),
               ),
@@ -360,8 +361,8 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                         ),
                         const SizedBox(height: 12),
                         ElevatedButton.icon(
-                          onPressed: () => _controller
-                              .loadStaffMaintenance(force: true),
+                          onPressed: () =>
+                              _controller.loadStaffMaintenance(force: true),
                           icon: const Icon(Icons.refresh),
                           label: const Text('Retry'),
                         ),
@@ -463,8 +464,7 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       report.category,
@@ -480,8 +480,7 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                                     Row(
                                       children: [
                                         const Icon(Icons.room_outlined,
-                                            size: 13,
-                                            color: AppColors.taupe),
+                                            size: 13, color: AppColors.taupe),
                                         const SizedBox(width: 3),
                                         Expanded(
                                           child: Text(
@@ -510,13 +509,11 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color:
-                                          urgencyCol.withValues(alpha: 0.1),
-                                      borderRadius:
-                                          BorderRadius.circular(6),
+                                      color: urgencyCol.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
                                       border: Border.all(
-                                          color: urgencyCol
-                                              .withValues(alpha: 0.3)),
+                                          color: urgencyCol.withValues(
+                                              alpha: 0.3)),
                                     ),
                                     child: Text(
                                       '${report.urgency[0].toUpperCase()}${report.urgency.substring(1).toLowerCase()} Priority',
@@ -582,17 +579,13 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                                       horizontal: 5, vertical: 2),
                                   decoration: BoxDecoration(
                                     color: AppColors.cream,
-                                    borderRadius:
-                                        BorderRadius.circular(5),
+                                    borderRadius: BorderRadius.circular(5),
                                   ),
                                   child: const Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(
-                                          Icons
-                                              .photo_camera_back_outlined,
-                                          size: 11,
-                                          color: AppColors.brown),
+                                      Icon(Icons.photo_camera_back_outlined,
+                                          size: 11, color: AppColors.brown),
                                       SizedBox(width: 2),
                                       Text(
                                         'Photo',
@@ -850,7 +843,6 @@ class _StaffMaintenanceDetailsPageState
                         ],
                       ),
                     ),
-
                   if (report != null) ...[
                     // Report Header Card
                     CarmelitaCard(
@@ -907,7 +899,8 @@ class _StaffMaintenanceDetailsPageState
                                 decoration: BoxDecoration(
                                   color: report.isHighUrgency
                                       ? AppColors.danger.withValues(alpha: 0.1)
-                                      : AppColors.warning.withValues(alpha: 0.1),
+                                      : AppColors.warning
+                                          .withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
@@ -1235,8 +1228,8 @@ class _StaffMaintenanceDetailsPageState
                                       fontWeight: FontWeight.bold),
                                   onPressed: _saving
                                       ? null
-                                      : () => setState(
-                                          () => _status = 'assigned'),
+                                      : () =>
+                                          setState(() => _status = 'assigned'),
                                 ),
                               if (_status != 'resolved' &&
                                   allowedMaintenanceStatuses(report.status)
@@ -1251,8 +1244,8 @@ class _StaffMaintenanceDetailsPageState
                                       fontWeight: FontWeight.bold),
                                   onPressed: _saving
                                       ? null
-                                      : () => setState(
-                                          () => _status = 'resolved'),
+                                      : () =>
+                                          setState(() => _status = 'resolved'),
                                 ),
                               if (_status != 'cancelled' &&
                                   allowedMaintenanceStatuses(report.status)
@@ -1267,8 +1260,8 @@ class _StaffMaintenanceDetailsPageState
                                       fontWeight: FontWeight.bold),
                                   onPressed: _saving
                                       ? null
-                                      : () => setState(
-                                          () => _status = 'cancelled'),
+                                      : () =>
+                                          setState(() => _status = 'cancelled'),
                                 ),
                             ],
                           ),
@@ -1412,8 +1405,7 @@ class _StaffMaintenanceDetailsPageState
                                     .toLocal();
 
                                 return Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Padding(
                                       padding: EdgeInsets.only(top: 2),
@@ -1433,14 +1425,15 @@ class _StaffMaintenanceDetailsPageState
                                             children: [
                                               Flexible(
                                                 child: Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                          horizontal: 6,
-                                                          vertical: 2),
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2),
                                                   decoration: BoxDecoration(
                                                     color: AppColors.cream,
                                                     borderRadius:
-                                                        BorderRadius.circular(4),
+                                                        BorderRadius.circular(
+                                                            4),
                                                   ),
                                                   child: Text(
                                                     '$prevLabel → $nextLabel',
@@ -1449,7 +1442,8 @@ class _StaffMaintenanceDetailsPageState
                                                         TextOverflow.ellipsis,
                                                     style: const TextStyle(
                                                       fontSize: 11,
-                                                      fontWeight: FontWeight.bold,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                       color: AppColors.brown,
                                                     ),
                                                   ),

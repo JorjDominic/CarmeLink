@@ -12,6 +12,7 @@ void main() {
     'tenant visitor workflow': const VisitorRequestPage(),
     'guardian dashboard': const GuardianDashboardPage(),
     'owner dashboard': const OwnerDashboardPage(),
+    'staff operations': const OperationsHubPage(),
     'owner visitor management': const VisitorManagementPage(),
     'caretaker payments': const PaymentVerificationPage(),
   };
@@ -61,6 +62,33 @@ void main() {
         ),
       );
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final page in {
+    'owner dashboard': const OwnerDashboardPage(),
+    'staff operations': const OperationsHubPage(),
+  }.entries) {
+    testWidgets('${page.key} supports 2x accessibility text', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 700);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(2),
+            ),
+            child: child!,
+          ),
+          home: page.value,
+        ),
+      );
       await tester.pump(const Duration(milliseconds: 600));
 
       expect(tester.takeException(), isNull);

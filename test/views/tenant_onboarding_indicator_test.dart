@@ -16,14 +16,14 @@ TenantDirectoryEntry tenant({required bool hasContract}) =>
     );
 
 void main() {
-  testWidgets('shows resumable onboarding warning when contract is missing',
+  testWidgets('temporarily hides onboarding warning when contract is missing',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(home: TenantDetailsPage(tenant: tenant(hasContract: false))),
     );
 
-    expect(find.text('Onboarding incomplete'), findsOneWidget);
-    expect(find.text('Create contract'), findsOneWidget);
+    expect(find.text('Onboarding incomplete'), findsNothing);
+    expect(find.text('Create contract'), findsNothing);
   });
 
   testWidgets('hides onboarding warning when a contract exists',

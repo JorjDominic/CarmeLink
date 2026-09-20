@@ -25,7 +25,7 @@ class GuardianController extends ChangeNotifier {
   bool _gateLoading = false;
   String? _gateError;
   bool _gateLoadedOnce = false;
-  String _linkedTenantPresence = 'Inside';
+  String _linkedTenantPresence = 'Unavailable';
 
   bool _loading = false;
   String? _error;
@@ -153,6 +153,8 @@ class GuardianController extends ChangeNotifier {
     if (_selectedTenant?.tenantId == tenant.tenantId) return;
 
     _selectedTenant = tenant;
+    _linkedTenantPresence = 'Unavailable';
+    _gateLoadedOnce = false;
     _loading = true;
     _error = null;
     notifyListeners();
@@ -168,7 +170,10 @@ class GuardianController extends ChangeNotifier {
         ..clear()
         ..addAll(results[1] as List<Payment>);
 
-      await loadCurfewRequests(force: true);
+      await Future.wait([
+        loadCurfewRequests(force: true),
+        loadGateEvents(force: true),
+      ]);
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
     } finally {
@@ -272,6 +277,8 @@ class GuardianController extends ChangeNotifier {
         } else if (latest.direction == 'OUT') {
           _linkedTenantPresence = 'Outside';
         }
+      } else {
+        _linkedTenantPresence = 'Unavailable';
       }
     } catch (e) {
       _gateError = e.toString();
@@ -327,7 +334,7 @@ class GuardianController extends ChangeNotifier {
     _gateLoading = false;
     _gateError = null;
     _gateLoadedOnce = false;
-    _linkedTenantPresence = 'Inside';
+    _linkedTenantPresence = 'Unavailable';
     GuardianService.invalidateCache();
     notifyListeners();
   }

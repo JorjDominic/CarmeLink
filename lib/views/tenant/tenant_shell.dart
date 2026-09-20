@@ -23,6 +23,7 @@ class _TenantShellState extends State<TenantShell> {
     TenantController.instance.loadMyRoom();
     TenantController.instance.loadCurfewRequests();
     TenantController.instance.loadPayments();
+    TenantController.instance.loadGateEvents();
   }
 
   @override

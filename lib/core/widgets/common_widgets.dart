@@ -151,6 +151,8 @@ class MutedDashboardGrid extends StatelessWidget {
             crossAxisCount: columns,
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
+            mainAxisExtent:
+                compact ? 114 + ((textScale - 1).clamp(0, 1) * 60) : null,
             childAspectRatio: compact
                 ? (scaledText ? 1.05 : 1.25)
                 : denseFourColumn && constraints.maxWidth < 500
@@ -721,9 +723,11 @@ class ElegantHeader extends StatelessWidget {
       return _copy(context);
     }
 
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 360) {
+        if (constraints.maxWidth < 420 || textScale > 1.3) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -767,28 +771,36 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final stack = MediaQuery.sizeOf(context).width < 370 ||
+        MediaQuery.textScalerOf(context).scale(1) > 1.3;
+    final copy = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleLarge),
+        if (subtitle != null) ...[
+          const SizedBox(height: 3),
+          Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ],
+    );
+
+    if (trailing == null) return copy;
+    if (stack) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          copy,
+          const SizedBox(height: 6),
+          trailing!,
+        ],
+      );
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 3),
-                Text(
-                  subtitle!,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ],
-          ),
-        ),
-        if (trailing != null) trailing!,
+        Expanded(child: copy),
+        trailing!,
       ],
     );
   }

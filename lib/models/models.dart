@@ -932,6 +932,8 @@ class TenantDirectoryEntry {
   final DateTime? lastGateEventAt;
   final bool? hasContract;
 
+  bool get onboardingIncomplete => hasContract == false || assignmentId == null;
+
   bool get isInside => gateStatus == 'IN' || gateStatus == 'Inside';
   bool get isOutside => gateStatus == 'OUT' || gateStatus == 'Outside';
   bool get isUnavailable =>
