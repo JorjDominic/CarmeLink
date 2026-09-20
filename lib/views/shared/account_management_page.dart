@@ -28,6 +28,39 @@ List<Map<String, dynamic>> filterStaffAccounts(
   }).toList();
 }
 
+/// Reuses the authenticated account-creation flow with its role locked to
+/// tenant. The Edge Function remains responsible for creating the auth user
+/// and associated profile; this is deliberately not a direct profiles insert.
+Future<CreatedAccount?> showCreateTenantAccount(BuildContext context) =>
+    showModalBottomSheet<CreatedAccount>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => const _CreateAccountSheet(tenantOnly: true),
+    );
+
+/// Fetches the authoritative account record (including its email) before
+/// opening the same edit/delete actions offered by Account management.
+Future<bool> showEditTenantAccount(BuildContext context, String tenantId) async {
+  final accounts = await const AccountService().listAccounts();
+  final matches = accounts.where(
+    (account) => account['id'] == tenantId && account['role'] == 'tenant',
+  );
+  if (matches.isEmpty) {
+    throw StateError('This tenant account no longer exists or is unavailable.');
+  }
+  if (!context.mounted) return false;
+  final changed = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => _EditAccountSheet(account: matches.first),
+  );
+  return changed == true;
+}
+
 class AccountManagementPage extends StatefulWidget {
   const AccountManagementPage({super.key});
 
@@ -127,7 +160,7 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
                 return const Center(child: Text('No accounts found.'));
               }
               final desktopWeb =
-                  kIsWeb && MediaQuery.sizeOf(context).width >= 1024;
+                  kIsWeb && MediaQuery.sizeOf(context).width >= 780;
               final visible = desktopWeb
                   ? filterStaffAccounts(rows,
                       query: searchQuery, role: roleFilter)
@@ -468,7 +501,9 @@ class _EditAccountSheetState extends State<_EditAccountSheet> {
 }
 
 class _CreateAccountSheet extends StatefulWidget {
-  const _CreateAccountSheet();
+  const _CreateAccountSheet({this.tenantOnly = false});
+
+  final bool tenantOnly;
 
   @override
   State<_CreateAccountSheet> createState() => _CreateAccountSheetState();
@@ -485,8 +520,9 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
   String role = 'tenant';
   String? errorMessage;
 
-  List<String> get allowedRoles =>
-      SessionController.instance.currentUser?.role == UserRole.owner
+  List<String> get allowedRoles => widget.tenantOnly
+      ? const ['tenant']
+      : SessionController.instance.currentUser?.role == UserRole.owner
           ? const ['tenant', 'guardian', 'caretaker', 'owner']
           : const ['tenant', 'guardian'];
 
@@ -544,7 +580,7 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Create account',
+                Text(widget.tenantOnly ? 'Create tenant' : 'Create account',
                     style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 18),
                 TextField(
@@ -570,8 +606,9 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
                       .map((value) => DropdownMenuItem(
                           value: value, child: Text(_label(value))))
                       .toList(),
-                  onChanged:
-                      loading ? null : (value) => setState(() => role = value!),
+                  onChanged: loading || widget.tenantOnly
+                      ? null
+                      : (value) => setState(() => role = value!),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -632,7 +669,11 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.person_add_outlined),
-                    label: Text(loading ? 'Creating…' : 'Create account'),
+                    label: Text(loading
+                        ? 'Creating…'
+                        : widget.tenantOnly
+                            ? 'Create tenant'
+                            : 'Create account'),
                   ),
                 ),
               ],
