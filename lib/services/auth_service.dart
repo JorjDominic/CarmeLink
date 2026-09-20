@@ -7,6 +7,8 @@ abstract class AuthService {
   Future<AppUser?> restoreSession();
   Future<AppUser> signIn(String email, String password);
   Future<void> signOut();
+  Future<AppUser> verifyEmailCode(String email, String code);
+  Future<void> resendEmailVerificationCode(String email);
   Future<void> requestPasswordReset(String email);
   Future<void> verifyPasswordRecoveryCode(String email, String code);
   Future<void> changePassword(String currentPassword, String newPassword);
@@ -20,7 +22,12 @@ class SupabaseAuthService implements AuthService {
   Future<AppUser?> restoreSession() async {
     final user = _client.auth.currentUser;
     if (user == null) return null;
-    return _loadProfile(user);
+    try {
+      return await _loadProfile(user);
+    } catch (_) {
+      await _client.auth.signOut();
+      rethrow;
+    }
   }
 
   @override
@@ -29,10 +36,19 @@ class SupabaseAuthService implements AuthService {
       throw const AuthException('Enter both email and password.');
     }
 
-    final response = await _client.auth.signInWithPassword(
-      email: email.trim(),
-      password: password,
-    );
+    late final AuthResponse response;
+    try {
+      response = await _client.auth.signInWithPassword(
+        email: email.trim(),
+        password: password,
+      );
+    } on AuthException catch (error) {
+      if (error.code == 'email_not_confirmed' ||
+          error.message.toLowerCase().contains('email not confirmed')) {
+        throw const EmailVerificationRequiredException();
+      }
+      rethrow;
+    }
     final user = response.user;
     if (user == null) throw const AuthException('Unable to sign in.');
 
@@ -71,6 +87,43 @@ class SupabaseAuthService implements AuthService {
 
   @override
   Future<void> signOut() => _client.auth.signOut();
+
+  @override
+  Future<AppUser> verifyEmailCode(String email, String code) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    final normalizedCode = code.replaceAll(RegExp(r'\s'), '');
+    if (!normalizedEmail.contains('@') ||
+        !RegExp(r'^\d{6}$').hasMatch(normalizedCode)) {
+      throw const AuthException('Enter the six-digit code from your email.');
+    }
+    final response = await _client.auth.verifyOTP(
+      email: normalizedEmail,
+      token: normalizedCode,
+      type: OtpType.signup,
+    );
+    final user = response.user;
+    if (response.session == null || user == null) {
+      throw const AuthException('The verification code is invalid or expired.');
+    }
+    try {
+      return await _loadProfile(user);
+    } catch (_) {
+      await _client.auth.signOut();
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> resendEmailVerificationCode(String email) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail.contains('@')) {
+      throw const AuthException('Enter a valid email address.');
+    }
+    await _client.auth.resend(
+      email: normalizedEmail,
+      type: OtpType.signup,
+    );
+  }
 
   @override
   Future<void> requestPasswordReset(String email) async {
@@ -126,4 +179,9 @@ class SupabaseAuthService implements AuthService {
     // credential changes instead of retaining a privileged recovery session.
     await _client.auth.signOut();
   }
+}
+
+class EmailVerificationRequiredException extends AuthException {
+  const EmailVerificationRequiredException()
+      : super('Verify your email address to continue.');
 }

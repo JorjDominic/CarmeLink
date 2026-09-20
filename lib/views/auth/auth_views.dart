@@ -322,7 +322,9 @@ class _SignInPageState extends State<SignInPage> {
     FocusScope.of(context).unfocus();
     final ok = await session.signIn(email.text.trim(), password.text);
     if (!mounted) return;
-    if (!ok) showAppSnackBar(context, session.error ?? 'Unable to sign in.');
+    if (ok) return;
+    if (session.emailAwaitingVerification != null) return;
+    showAppSnackBar(context, session.error ?? 'Unable to sign in.');
   }
 
   @override
@@ -443,6 +445,192 @@ class _SignInPageState extends State<SignInPage> {
           }));
 }
 
+class EmailVerificationCodePage extends StatefulWidget {
+  const EmailVerificationCodePage({
+    required this.email,
+    super.key,
+  });
+
+  final String email;
+
+  @override
+  State<EmailVerificationCodePage> createState() =>
+      _EmailVerificationCodePageState();
+}
+
+class _EmailVerificationCodePageState extends State<EmailVerificationCodePage> {
+  late final TextEditingController email;
+  final code = TextEditingController();
+  final AuthService service = SupabaseAuthService();
+  final session = SessionController.instance;
+  Timer? _timer;
+  int _resendSeconds = 0;
+  bool codeSent = false;
+  bool verifying = false;
+  bool resending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    email = TextEditingController(text: widget.email);
+  }
+
+  void _startCountdown() {
+    _timer?.cancel();
+    _resendSeconds = 60;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      if (_resendSeconds <= 1) {
+        timer.cancel();
+        setState(() => _resendSeconds = 0);
+      } else {
+        setState(() => _resendSeconds--);
+      }
+    });
+  }
+
+  Future<void> _verify() async {
+    if (verifying) return;
+    final address = email.text.trim();
+    final value = code.text.trim();
+    if (!address.contains('@')) {
+      showAppSnackBar(context, 'Enter a valid email address.');
+      return;
+    }
+    if (!RegExp(r'^\d{6}$').hasMatch(value)) {
+      showAppSnackBar(context, 'Enter the complete six-digit code.');
+      return;
+    }
+    setState(() => verifying = true);
+    try {
+      final ok = await session.verifyEmailCode(address, value);
+      if (mounted && !ok) {
+        showAppSnackBar(context, _authMessage(session.error));
+      }
+    } finally {
+      if (mounted) setState(() => verifying = false);
+    }
+  }
+
+  Future<void> _resend() async {
+    if (_resendSeconds > 0 || resending) return;
+    final address = email.text.trim();
+    if (!address.contains('@')) {
+      showAppSnackBar(context, 'Enter a valid email address.');
+      return;
+    }
+    setState(() => resending = true);
+    try {
+      await service.resendEmailVerificationCode(address);
+      if (!mounted) return;
+      code.clear();
+      codeSent = true;
+      _startCountdown();
+      showAppSnackBar(context, 'Verification code sent.');
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, _authMessage(error));
+    } finally {
+      if (mounted) setState(() => resending = false);
+    }
+  }
+
+  String _authMessage(Object? error) =>
+      (error?.toString() ?? 'Unable to verify.')
+          .replaceFirst('AuthApiException(message: ', '')
+          .replaceFirst('AuthException(message: ', '')
+          .replaceFirst(RegExp(r', statusCode:.*$'), '')
+          .replaceFirst('Exception: ', '');
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    email.dispose();
+    code.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop && !verifying && !resending) {
+            session.cancelEmailVerification();
+          }
+        },
+        child: PageFrame(
+          title: 'Verify your email',
+          subtitle: codeSent
+              ? 'Enter the code sent to your inbox'
+              : 'Send a code when you are ready',
+          onBack: session.cancelEmailVerification,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  codeSent
+                      ? 'Enter the six-digit verification code. Codes expire and can only be used once.'
+                      : 'Select Send code to receive a six-digit verification code.',
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: email,
+                  readOnly: true,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Email address',
+                    prefixIcon: Icon(Icons.mail_outline),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: code,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                  autofillHints: const [AutofillHints.oneTimeCode],
+                  maxLength: 6,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
+                    labelText: 'Six-digit verification code',
+                    prefixIcon: Icon(Icons.verified_outlined),
+                    counterText: '',
+                  ),
+                  onSubmitted: (_) => _verify(),
+                ),
+                const SizedBox(height: 14),
+                FilledButton(
+                  onPressed: verifying ? null : _verify,
+                  child: Text(verifying ? 'Verifying…' : 'Verify email'),
+                ),
+                TextButton(
+                  onPressed: _resendSeconds == 0 && !resending ? _resend : null,
+                  child: Text(
+                    resending
+                        ? 'Sending…'
+                        : _resendSeconds > 0
+                            ? 'Resend code in ${_resendSeconds}s'
+                            : codeSent
+                                ? 'Resend code'
+                                : 'Send code',
+                  ),
+                ),
+                TextButton(
+                  onPressed: verifying || resending
+                      ? null
+                      : session.cancelEmailVerification,
+                  child: const Text('Use a different account'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
   @override
@@ -451,8 +639,6 @@ class ForgotPasswordPage extends StatefulWidget {
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final email = TextEditingController();
-  final AuthService service = SupabaseAuthService();
-  bool loading = false;
 
   @override
   void dispose() {
@@ -468,38 +654,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       return;
     }
 
-    setState(() => loading = true);
-    try {
-      await service.requestPasswordReset(address);
-      if (!mounted) return;
-      showAppSnackBar(
-        context,
-        'If an account exists for that email, a recovery code has been sent.',
-      );
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => PasswordRecoveryCodePage(email: address),
-        ),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      final rawError = error.toString();
-      final message = rawError.contains('Error sending recovery email') ||
-              rawError.contains('unexpected_failure')
-          ? 'The recovery email service is temporarily unavailable. Please try again shortly or contact dormitory management.'
-          : rawError
-              .replaceFirst('AuthException(message: ', '')
-              .replaceFirst('AuthRetryableFetchException(message: ', '')
-              .replaceFirst(', statusCode: 400)', '')
-              .replaceFirst(', statusCode: 500)', '')
-              .replaceFirst('Exception: ', '');
-      showAppSnackBar(
-        context,
-        message,
-      );
-    } finally {
-      if (mounted) setState(() => loading = false);
-    }
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => PasswordRecoveryCodePage(email: address),
+      ),
+    );
   }
 
   @override
@@ -511,20 +670,20 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text(
-                  'Enter your account email and we will send a six-digit recovery code.'),
+                  'Enter your account email to continue to password recovery.'),
               const SizedBox(height: 20),
               TextField(
                   controller: email,
                   keyboardType: TextInputType.emailAddress,
                   autofillHints: const [AutofillHints.email],
                   decoration: const InputDecoration(labelText: 'Email address'),
-                  onSubmitted: (_) => loading ? null : _submit()),
+                  onSubmitted: (_) => _submit()),
               const SizedBox(height: 14),
               SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: loading ? null : _submit,
-                    child: Text(loading ? 'Sending…' : 'Continue'),
+                    onPressed: _submit,
+                    child: const Text('Continue'),
                   )),
             ])),
       );
@@ -544,15 +703,10 @@ class _PasswordRecoveryCodePageState extends State<PasswordRecoveryCodePage> {
   final code = TextEditingController();
   final AuthService service = SupabaseAuthService();
   Timer? _timer;
-  int _resendSeconds = 60;
+  int _resendSeconds = 0;
+  bool codeSent = false;
   bool verifying = false;
   bool resending = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _startCountdown();
-  }
 
   void _startCountdown() {
     _timer?.cancel();
@@ -618,8 +772,9 @@ class _PasswordRecoveryCodePageState extends State<PasswordRecoveryCodePage> {
       await service.requestPasswordReset(widget.email);
       if (!mounted) return;
       code.clear();
+      codeSent = true;
       _startCountdown();
-      showAppSnackBar(context, 'A new recovery code has been requested.');
+      showAppSnackBar(context, 'Recovery code sent.');
     } catch (error) {
       if (mounted) showAppSnackBar(context, _authMessage(error));
     } finally {
@@ -649,8 +804,10 @@ class _PasswordRecoveryCodePageState extends State<PasswordRecoveryCodePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Enter the six-digit code from your email. Codes expire and can only be used once.',
+              Text(
+                codeSent
+                    ? 'Enter the six-digit code from your email. Codes expire and can only be used once.'
+                    : 'Select Send code to receive a six-digit recovery code.',
               ),
               const SizedBox(height: 20),
               TextField(
@@ -682,7 +839,9 @@ class _PasswordRecoveryCodePageState extends State<PasswordRecoveryCodePage> {
                       ? 'Sending…'
                       : _resendSeconds > 0
                           ? 'Resend code in ${_resendSeconds}s'
-                          : 'Resend code',
+                          : codeSent
+                              ? 'Resend code'
+                              : 'Send code',
                 ),
               ),
               TextButton(

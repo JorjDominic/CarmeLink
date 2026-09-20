@@ -305,6 +305,7 @@ class PageFrame extends StatelessWidget {
     this.heroTitle,
     this.useScriptTitle = true,
     this.onRefresh,
+    this.onBack,
     super.key,
   });
 
@@ -316,6 +317,7 @@ class PageFrame extends StatelessWidget {
   final List<Widget>? actions;
   final Widget? floatingActionButton;
   final Future<void> Function()? onRefresh;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -411,6 +413,8 @@ class PageFrame extends StatelessWidget {
               onPressed: () {
                 if (navScope != null) {
                   navScope.openMenu();
+                } else if (onBack != null) {
+                  onBack!();
                 } else if (canPop) {
                   Navigator.of(context).maybePop();
                 }

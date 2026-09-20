@@ -64,6 +64,10 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
         onComplete: sessionController.completePasswordRecovery,
       );
     }
+    final verificationEmail = sessionController.emailAwaitingVerification;
+    if (verificationEmail != null) {
+      return EmailVerificationCodePage(email: verificationEmail);
+    }
     final user = sessionController.currentUser;
     if (user == null) {
       return AuthFlow(

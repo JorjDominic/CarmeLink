@@ -23,6 +23,7 @@ class SessionController extends ChangeNotifier {
   String? _error;
   bool _justSignedOut = false;
   bool _passwordRecovery = false;
+  String? _emailAwaitingVerification;
   StreamSubscription<AuthState>? _authSubscription;
 
   AppUser? get currentUser => _currentUser;
@@ -30,6 +31,7 @@ class SessionController extends ChangeNotifier {
   String? get error => _error;
   bool get justSignedOut => _justSignedOut;
   bool get passwordRecovery => _passwordRecovery;
+  String? get emailAwaitingVerification => _emailAwaitingVerification;
 
   static bool isPasswordRecoveryUri(Uri uri) {
     final path = uri.path.toLowerCase().replaceAll(RegExp(r'/+$'), '');
@@ -83,6 +85,7 @@ class SessionController extends ChangeNotifier {
   Future<bool> signIn(String email, String password) async {
     _loading = true;
     _error = null;
+    _emailAwaitingVerification = null;
     notifyListeners();
     try {
       _currentUser = await _authService.signIn(email, password);
@@ -94,6 +97,10 @@ class SessionController extends ChangeNotifier {
         GeofenceScheduler.instance.stop();
       }
       return true;
+    } on EmailVerificationRequiredException catch (e) {
+      _emailAwaitingVerification = email.trim().toLowerCase();
+      _error = e.message;
+      return false;
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
       return false;
@@ -103,9 +110,44 @@ class SessionController extends ChangeNotifier {
     }
   }
 
+  Future<bool> verifyEmailCode(String email, String code) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _currentUser = await _authService
+          .verifyEmailCode(email, code)
+          .timeout(const Duration(seconds: 15));
+      await _syncEmailVerification();
+      _emailAwaitingVerification = null;
+      _justSignedOut = false;
+      if (_currentUser?.role == UserRole.tenant) {
+        unawaited(GeofenceScheduler.instance.start(_currentUser!.id));
+      }
+      return true;
+    } on TimeoutException {
+      _error = 'Verification timed out. Check your connection and try again.';
+      return false;
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      return false;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  void cancelEmailVerification() {
+    _emailAwaitingVerification = null;
+    _error = null;
+    notifyListeners();
+  }
+
   Future<void> _syncEmailVerification() async {
     try {
-      await SupabaseConfig.client.rpc('sync_current_email_verification');
+      await SupabaseConfig.client
+          .rpc('sync_current_email_verification')
+          .timeout(const Duration(seconds: 5));
     } catch (error) {
       debugPrint('Could not sync email verification timestamp: $error');
     }
@@ -116,6 +158,7 @@ class SessionController extends ChangeNotifier {
     await _authService.signOut();
     _currentUser = null;
     _error = null;
+    _emailAwaitingVerification = null;
     _justSignedOut = true;
     TenantController.instance.clear();
     GuardianController.instance.clear();

@@ -9,47 +9,6 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   headers: { ...cors, 'Content-Type': 'application/json' },
 })
 
-const escapeHtml = (value: string) => value
-  .replaceAll('&', '&amp;')
-  .replaceAll('<', '&lt;')
-  .replaceAll('>', '&gt;')
-  .replaceAll('"', '&quot;')
-  .replaceAll("'", '&#039;')
-
-const sendVerificationEmail = async (
-  apiKey: string,
-  from: string,
-  to: string,
-  fullName: string,
-  actionLink: string,
-  idempotencyKey: string,
-) => {
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'Idempotency-Key': idempotencyKey,
-    },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject: 'Verify your CarmeLink account',
-      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#202124">
-        <h1 style="font-size:24px">Verify your CarmeLink account</h1>
-        <p>Hello ${escapeHtml(fullName)},</p>
-        <p>Use this time-limited link to verify your email address.</p>
-        <p style="margin:28px 0"><a href="${escapeHtml(actionLink)}" style="background:#6d3b25;color:white;padding:12px 20px;border-radius:8px;text-decoration:none">Verify email address</a></p>
-        <p>If you did not request this message, contact the dormitory office.</p>
-      </div>`,
-      text: `Hello ${fullName},\n\nVerify your CarmeLink email address: ${actionLink}`,
-      tags: [{ name: 'category', value: 'account-verification' }],
-    }),
-  })
-  const result = await response.json().catch(() => ({}))
-  return { ok: response.ok && typeof result.id === 'string', result }
-}
-
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
@@ -126,12 +85,6 @@ Deno.serve(async (request) => {
   }
 
   if (action === 'resend_verification') {
-    const resendKey = Deno.env.get('RESEND_API_KEY')
-    const resendFrom = Deno.env.get('RESEND_FROM_EMAIL')
-    const inviteRedirect = Deno.env.get('APP_INVITE_REDIRECT_URL')
-    if (!resendKey || !resendFrom) {
-      return json({ error: 'Email invitations are not configured' }, 503)
-    }
     const { data: profile } = await admin.from('profiles')
       .select('email_verified_at, email_verification_sent_at, email_verification_attempts, email_verification_window_started_at')
       .eq('id', targetId).single()
@@ -154,26 +107,21 @@ Deno.serve(async (request) => {
     const { data: authUser } = await admin.auth.admin.getUserById(targetId)
     const targetEmail = authUser.user?.email
     if (!targetEmail) return json({ error: 'Account email not found' }, 404)
-    const { data: link, error: linkError } = await admin.auth.admin.generateLink({
-      type: 'magiclink',
+    const resendClient = createClient(url, anonKey, { auth: { persistSession: false } })
+    const { error: resendError } = await resendClient.auth.resend({
+      type: 'signup',
       email: targetEmail,
-      options: inviteRedirect ? { redirectTo: inviteRedirect } : {},
     })
-    if (linkError || !link.properties?.action_link) {
-      return json({ error: linkError?.message ?? 'Unable to generate verification link' }, 400)
+    if (resendError) {
+      return json({ error: resendError.message ?? 'Unable to send verification code' }, 400)
     }
-    const sent = await sendVerificationEmail(
-      resendKey, resendFrom, targetEmail, target.full_name,
-      link.properties.action_link, `verify/${targetId}/${attempts + 1}/${inWindow ? windowStart : now}`,
-    )
-    if (!sent.ok) return json({ error: sent.result.message ?? 'Unable to send verification email' }, 502)
 
     const sentAt = new Date(now).toISOString()
     await admin.from('profiles').update({
       email_verification_sent_at: sentAt,
       email_verification_window_started_at: new Date(inWindow ? windowStart : now).toISOString(),
       email_verification_attempts: attempts + 1,
-      invitation_email_id: sent.result.id,
+      invitation_email_id: null,
     }).eq('id', targetId)
     return json({ sent: true, sent_at: sentAt, attempts: attempts + 1 })
   }

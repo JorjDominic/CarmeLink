@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../views/shared/shared_views.dart';
+import '../../views/auth/auth_views.dart';
 import '../../controllers/session_controller.dart';
 import '../../models/models.dart';
 import '../app/web_routes.dart';
@@ -42,6 +43,11 @@ class _StaffGateState extends State<StaffGate> {
             recoveryMode: true,
             onComplete: _session.completePasswordRecovery,
           );
+        }
+
+        final verificationEmail = _session.emailAwaitingVerification;
+        if (verificationEmail != null) {
+          return EmailVerificationCodePage(email: verificationEmail);
         }
 
         final user = _session.currentUser;
