@@ -1,5 +1,7 @@
 name: carmelitas_dormitory_system
+
 description: "CarmeLink dormitory management app"
+
 publish_to: "none"
 
 version: 1.0.0+1
@@ -19,10 +21,11 @@ dependencies:
   file_picker: ^13.1.0
   crypto: ^3.0.7
   shared_preferences: ^2.5.3
+  url_launcher: ^6.3.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
 
@@ -32,7 +35,8 @@ flutter:
   assets:
     - assets/branding/
     - assets/images/
-
+    - assets/web/brand/
+    - assets/web/photos/
   fonts:
     - family: GreatVibes
       fonts:
@@ -41,10 +45,7 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-
   image_path: "assets/branding/carmelita_logo.jpg"
-
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/branding/carmelita_logo.jpg"
-
   remove_alpha_ios: true
