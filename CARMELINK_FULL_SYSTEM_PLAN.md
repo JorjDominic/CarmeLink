@@ -2340,6 +2340,11 @@ both required channels are verified.
 
 ### Canonical tenant onboarding workflow
 
+> [!IMPORTANT]
+> This workflow is temporarily deferred pending the group web application. It
+> remains a release-critical requirement and the authoritative integration
+> order for the future web, mobile, and backend implementation.
+
 ```text
 Create tenant account and profile
       ↓

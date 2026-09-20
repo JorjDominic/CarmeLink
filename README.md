@@ -463,6 +463,11 @@ their own currently signed-in account.
 
 ### Workflow improvement: account creation → contract
 
+> [!IMPORTANT]
+> This complete workflow is release-critical but temporarily deferred pending
+> the companion group web app. The mobile/backend contracts below remain the
+> required integration specification and must not be removed.
+
 For a newly created tenant, the complete administrative and tenant flow is:
 
 ```text

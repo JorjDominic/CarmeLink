@@ -22,6 +22,27 @@ binding/background location, feedback persistence, real-device geofencing
 testing, geofence check-timer testing, and final multi-account security/offline
 testing outside the visitor workflow.
 
+## Immediate agenda
+
+1. **Income and expense management** — add owner-only financial records,
+   categories, validation, recurring/one-time entries, audit fields, summaries,
+   and RLS. This is the next active implementation priority.
+2. **Persistent notifications and preferences** — generate role-scoped events,
+   read/unread state, deep links, and per-user delivery settings.
+3. **Disciplinary records** — restricted incident, notice, evidence, and history
+   workflow.
+4. **Live reports and analytics** — derive owner metrics from the completed
+   operational and financial tables.
+5. **Native device binding and geofence scheduling** — complete tenant device
+   registration, revocation, audit history, and background checks.
+
+> [!IMPORTANT]
+> **Account creation and the complete tenant onboarding workflow are deferred,
+> not cancelled.** They depend on the group web app and remain a release-critical
+> integration. Do not remove their schema, security rules, or documented flow.
+> Resume them when the web implementation is available; they are intentionally
+> excluded from the immediate agenda above.
+
 The planned contracts module must synchronize through separate contract,
 billing-charge, and payment-transaction records. Verified payment amounts and
 exact transaction timestamps reduce charge balances; contract changes must not
@@ -46,7 +67,7 @@ operating-system background restrictions across supported platforms.
 - [ ] Confirm duplicate checks do not create duplicate IN/OUT events and that retry/backoff behavior is bounded.
 - [ ] Run an on-site inside/outside boundary walk test and compare recorded transitions with the configured dormitory polygon.
 
-### Account creation → contract
+### Account creation → contract — IMPORTANT, DEFERRED
 
 After an authorized owner or caretaker creates a **tenant** account, the
 system sends an email verification link and SMS OTP. The success screen should
