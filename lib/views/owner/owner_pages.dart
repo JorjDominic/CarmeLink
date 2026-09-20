@@ -3651,6 +3651,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const WorkInProgressNotice(),
+              const SizedBox(height: 16),
               AdaptiveGrid(
                 children: [
                   MetricCard(

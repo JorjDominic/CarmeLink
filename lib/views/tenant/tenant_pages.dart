@@ -4277,6 +4277,8 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const WorkInProgressNotice(),
+              const SizedBox(height: 16),
               Text(
                 'CURFEW STATUS',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -4973,6 +4975,11 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const WorkInProgressNotice(
+              message:
+                  'Work in progress: requests are available, but automated curfew and geofence behavior is still undergoing physical-device validation.',
+            ),
+            const SizedBox(height: 16),
             Text(
               'REQUEST TYPE',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(

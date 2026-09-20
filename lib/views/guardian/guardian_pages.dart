@@ -722,6 +722,8 @@ class _GuardianPresenceMonitoringPageState
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const WorkInProgressNotice(),
+              const SizedBox(height: 16),
               AdaptiveGrid(
                 children: [
                   MetricCard(

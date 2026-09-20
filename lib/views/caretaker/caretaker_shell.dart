@@ -63,6 +63,7 @@ class _CaretakerShellState extends State<CaretakerShell> {
               icon: Icons.schedule_outlined,
               selectedIcon: Icons.schedule,
               page: GeofenceMonitoringPage(),
+              isWorkInProgress: true,
             ),
             AppDestination(
               label: 'Accounts',

@@ -50,7 +50,8 @@ class _OwnerShellState extends State<OwnerShell> {
                 label: 'Curfew',
                 icon: Icons.schedule_outlined,
                 selectedIcon: Icons.schedule,
-                page: GeofenceMonitoringPage()),
+                page: GeofenceMonitoringPage(),
+                isWorkInProgress: true),
             AppDestination(
                 label: 'Profile',
                 icon: Icons.person_outline,

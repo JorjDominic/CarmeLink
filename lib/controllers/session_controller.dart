@@ -7,6 +7,7 @@ import '../core/config/supabase_config.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../services/room_service.dart';
+import '../services/geofence_scheduler.dart';
 import '../services/tenant_service.dart';
 import 'guardian_controller.dart';
 import 'messaging_controller.dart';
@@ -48,6 +49,7 @@ class SessionController extends ChangeNotifier {
         _currentUser = null;
         notifyListeners();
       } else if (state.event == AuthChangeEvent.signedOut) {
+        GeofenceScheduler.instance.stop();
         _currentUser = null;
         _passwordRecovery = false;
         TenantController.instance.clear();
@@ -62,6 +64,9 @@ class SessionController extends ChangeNotifier {
         _currentUser = await _authService
             .restoreSession()
             .timeout(const Duration(seconds: 4));
+        if (_currentUser?.role == UserRole.tenant) {
+          unawaited(GeofenceScheduler.instance.start(_currentUser!.id));
+        }
       }
     } catch (e) {
       debugPrint('Session restore failed or timed out: $e');
@@ -83,6 +88,11 @@ class SessionController extends ChangeNotifier {
       _currentUser = await _authService.signIn(email, password);
       await _syncEmailVerification();
       _justSignedOut = false;
+      if (_currentUser?.role == UserRole.tenant) {
+        unawaited(GeofenceScheduler.instance.start(_currentUser!.id));
+      } else {
+        GeofenceScheduler.instance.stop();
+      }
       return true;
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
@@ -102,6 +112,7 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    GeofenceScheduler.instance.stop();
     await _authService.signOut();
     _currentUser = null;
     _error = null;

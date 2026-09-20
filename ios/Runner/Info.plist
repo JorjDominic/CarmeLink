@@ -47,6 +47,12 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>CarmeLink requires location access to verify your presence at the dormitory perimeter for curfew checks.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>CarmeLink uses location in the background for dormitory perimeter and curfew safety checks.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>CarmeLink requires camera access to capture photos of maintenance issues and payment receipts.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

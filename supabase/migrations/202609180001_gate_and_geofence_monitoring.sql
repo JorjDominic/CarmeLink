@@ -134,7 +134,7 @@ begin
   v_current_hour := extract(hour from (now() at time zone 'Asia/Manila'));
   v_is_curfew_hours := (v_current_hour >= 22 or v_current_hour < 6);
 
-  if p_status = 'Verified' and v_is_curfew_hours then
+  if p_status = 'Verified' and p_direction = 'OUT' and v_is_curfew_hours then
     -- Check if tenant has an approved curfew exception or overnight leave covering now
     select exists (
       select 1 from public.curfew_requests
@@ -292,4 +292,3 @@ begin
     alter publication supabase_realtime add table public.gate_events;
   end if;
 end $$;
-

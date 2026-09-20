@@ -12,12 +12,14 @@ class AppDestination {
     required this.icon,
     required this.selectedIcon,
     required this.page,
+    this.isWorkInProgress = false,
   });
 
   final String label;
   final IconData icon;
   final IconData selectedIcon;
   final Widget page;
+  final bool isWorkInProgress;
 }
 
 class CarmelitaNavScope extends InheritedWidget {
@@ -278,6 +280,7 @@ class _FloatingIslandNavigation extends StatelessWidget {
                           icon: item.icon,
                           selectedIcon: item.selectedIcon,
                           selected: selected,
+                          isWorkInProgress: item.isWorkInProgress,
                           onTap: () => onSelected(navIndex),
                         ),
                       );
@@ -300,6 +303,7 @@ class _IslandItem extends StatelessWidget {
     required this.selectedIcon,
     required this.selected,
     required this.onTap,
+    this.isWorkInProgress = false,
   });
 
   final String label;
@@ -307,6 +311,7 @@ class _IslandItem extends StatelessWidget {
   final IconData selectedIcon;
   final bool selected;
   final VoidCallback onTap;
+  final bool isWorkInProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -337,13 +342,24 @@ class _IslandItem extends StatelessWidget {
           alignment: Alignment.center,
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 160),
-            child: Icon(
-              selected ? selectedIcon : icon,
-              key: ValueKey(selected),
-              size: 23,
-              color: selected
-                  ? scheme.primary
-                  : scheme.onSurface.withValues(alpha: .56),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  selected ? selectedIcon : icon,
+                  key: ValueKey(selected),
+                  size: 23,
+                  color: selected
+                      ? scheme.primary
+                      : scheme.onSurface.withValues(alpha: .56),
+                ),
+                if (isWorkInProgress)
+                  Positioned(
+                    right: -16,
+                    top: -9,
+                    child: _WipBadge(compact: true),
+                  ),
+              ],
             ),
           ),
         ),
@@ -489,7 +505,9 @@ class _RoleMenu extends StatelessWidget {
                       selected ? Theme.of(context).colorScheme.primary : null,
                 ),
                 title: Text(item.label),
-                trailing: const Icon(Icons.chevron_right_rounded),
+                trailing: item.isWorkInProgress
+                    ? const _WipBadge()
+                    : const Icon(Icons.chevron_right_rounded),
                 onTap: () => onSelect(navIndex),
               );
             },
@@ -535,4 +553,31 @@ class _RoleMenu extends StatelessWidget {
       ),
     );
   }
+}
+
+class _WipBadge extends StatelessWidget {
+  const _WipBadge({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 3 : 7,
+          vertical: compact ? 1 : 3,
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.tertiaryContainer,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          'WIP',
+          style: TextStyle(
+            fontSize: compact ? 7 : 10,
+            fontWeight: FontWeight.w900,
+            letterSpacing: .3,
+            color: Theme.of(context).colorScheme.onTertiaryContainer,
+          ),
+        ),
+      );
 }

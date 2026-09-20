@@ -108,6 +108,9 @@ class GeofenceLocationService {
 
   /// Boundary evaluation mode: true for polygon (default), false for circular fallback.
   static bool usePolygonBoundary = true;
+  static List<LatLngPoint>? _remotePolygon;
+  static double? _remoteRadiusMeters;
+  static double _remoteEdgeBufferMeters = debounceBufferMeters;
 
   // In-memory test override fields (strictly volatile, never written to DB or storage)
   static List<LatLngPoint>? _testPolygonOverride;
@@ -137,7 +140,33 @@ class GeofenceLocationService {
   static List<LatLngPoint> get activePolygon =>
       (_useTestOverride && _testPolygonOverride != null)
           ? _testPolygonOverride!
-          : productionDormitoryPolygon;
+          : (_remotePolygon ?? productionDormitoryPolygon);
+
+  static double get activeEdgeBufferMeters => _remoteEdgeBufferMeters;
+
+  /// Applies the active server-owned boundary without retaining tenant location.
+  static void applyBoundaryConfiguration(Map<String, dynamic> row) {
+    usePolygonBoundary = row['boundary_mode'] != 'circle';
+    final radius = row['radius_meters'];
+    if (radius is num && radius > 0) _remoteRadiusMeters = radius.toDouble();
+    final buffer = row['edge_buffer_meters'];
+    if (buffer is num && buffer >= 0) {
+      _remoteEdgeBufferMeters = buffer.toDouble();
+    }
+    final rawPoints = row['polygon_points'];
+    if (rawPoints is List) {
+      final points = <LatLngPoint>[];
+      for (final value in rawPoints) {
+        if (value is Map && value['lat'] is num && value['lng'] is num) {
+          points.add(LatLngPoint(
+            (value['lat'] as num).toDouble(),
+            (value['lng'] as num).toDouble(),
+          ));
+        }
+      }
+      if (points.length >= 3) _remotePolygon = List.unmodifiable(points);
+    }
+  }
 
   // Mock hooks for headless unit and widget testing
   static Position? mockPosition;
@@ -152,6 +181,9 @@ class GeofenceLocationService {
     mockShouldTimeout = false;
     usePolygonBoundary = true;
     resetTestOverride();
+    _remotePolygon = null;
+    _remoteRadiusMeters = null;
+    _remoteEdgeBufferMeters = debounceBufferMeters;
   }
 
   /// Point-in-polygon ray casting algorithm (even-odd rule).
@@ -242,14 +274,15 @@ class GeofenceLocationService {
     double lng, {
     String? previousDirection,
     List<LatLngPoint>? customPolygon,
-    double edgeBufferMeters = debounceBufferMeters,
+    double? edgeBufferMeters,
   }) {
+    final effectiveBuffer = edgeBufferMeters ?? activeEdgeBufferMeters;
     if (usePolygonBoundary) {
       final poly = customPolygon ?? activePolygon;
       final inside = isPointInPolygon(lat, lng, poly);
       final distToEdge = distanceToPolygonEdgeMeters(lat, lng, poly);
 
-      if (edgeBufferMeters > 0 && distToEdge <= edgeBufferMeters) {
+      if (effectiveBuffer > 0 && distToEdge <= effectiveBuffer) {
         if (previousDirection == 'IN') {
           return true;
         } else if (previousDirection == 'OUT') {
@@ -261,7 +294,7 @@ class GeofenceLocationService {
       // Legacy circular boundary check with hysteresis
       final radius = (_useTestOverride && _testRadiusOverride != null)
           ? _testRadiusOverride!
-          : geofenceRadiusMeters;
+          : (_remoteRadiusMeters ?? geofenceRadiusMeters);
       final distance = Geolocator.distanceBetween(
         lat,
         lng,
@@ -270,9 +303,9 @@ class GeofenceLocationService {
       );
 
       if (previousDirection == 'IN') {
-        return distance <= (radius + edgeBufferMeters);
+        return distance <= (radius + effectiveBuffer);
       } else if (previousDirection == 'OUT') {
-        return distance <= (radius - edgeBufferMeters);
+        return distance <= (radius - effectiveBuffer);
       } else {
         return distance <= radius;
       }
@@ -376,6 +409,23 @@ class GeofenceLocationService {
       }
 
       // 4. Pure On-Device Evaluation (Coordinates strictly discarded after this line)
+      final age = DateTime.now().difference(position.timestamp);
+      if (position.isMocked) {
+        return const GeofenceCheckResult(
+          direction: null,
+          status: 'UNAVAILABLE',
+          failureReason: GeofenceFailureReason.timeoutOrSignalError,
+          errorMessage: 'Mocked device locations cannot verify presence.',
+        );
+      }
+      if (position.accuracy > 35 || age > const Duration(minutes: 2)) {
+        return const GeofenceCheckResult(
+          direction: null,
+          status: 'UNAVAILABLE',
+          failureReason: GeofenceFailureReason.timeoutOrSignalError,
+          errorMessage: 'Location fix is stale or not accurate enough.',
+        );
+      }
       return evaluateCoordinates(
         latitude: position.latitude,
         longitude: position.longitude,
@@ -405,7 +455,8 @@ class GeofenceLocationService {
     final isPreCurfewHours = (hour >= 20 && hour < 22);
 
     if (isCurfewHours) {
-      final isInside = currentGateStatus == 'IN' || currentGateStatus == 'Inside';
+      final isInside =
+          currentGateStatus == 'IN' || currentGateStatus == 'Inside';
       if (isInside) {
         return CheckpointIntensity.curfewSleep;
       }

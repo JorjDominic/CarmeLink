@@ -1657,6 +1657,49 @@ void showAppSnackBar(
   );
 }
 
+class WorkInProgressNotice extends StatelessWidget {
+  const WorkInProgressNotice({
+    this.message =
+        'Work in progress: curfew and background location behavior is still undergoing physical-device validation.',
+    super.key,
+  });
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      label: 'Work in progress notice',
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: scheme.tertiaryContainer.withValues(alpha: .65),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: scheme.tertiary.withValues(alpha: .35)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.construction_rounded,
+                size: 20, color: scheme.onTertiaryContainer),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onTertiaryContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 String money(double value) => '₱${value.toStringAsFixed(0)}';
 
 String shortDate(DateTime value) => '${value.month}/${value.day}/${value.year}';

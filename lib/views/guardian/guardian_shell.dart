@@ -37,7 +37,8 @@ class _GuardianShellState extends State<GuardianShell> {
                 label: 'Curfew',
                 icon: Icons.schedule_outlined,
                 selectedIcon: Icons.schedule,
-                page: GuardianPresenceMonitoringPage()),
+                page: GuardianPresenceMonitoringPage(),
+                isWorkInProgress: true),
             AppDestination(
                 label: 'Notices',
                 icon: Icons.campaign_outlined,

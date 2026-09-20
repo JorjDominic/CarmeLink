@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
@@ -22,6 +25,7 @@ class GateService {
   }
 
   SupabaseClient get _client => SupabaseConfig.client;
+  static const _pendingKey = 'pending_geofence_events_v1';
 
   /// Loads recent gate events chronologically descending.
   ///
@@ -52,9 +56,8 @@ class GateService {
         query = query.eq('tenant_id', tenantId);
       }
 
-      final rows = await query
-          .order('checked_at', ascending: false)
-          .limit(limit);
+      final rows =
+          await query.order('checked_at', ascending: false).limit(limit);
 
       final list = (rows as List)
           .map((row) => GateEvent.fromRow(row as Map<String, dynamic>))
@@ -82,11 +85,78 @@ class GateService {
   }) async {
     invalidateCache();
 
+    await flushPendingGeofenceChecks();
+
+    await _sendGeofenceCheck(
+      direction: direction,
+      status: status,
+      checkpointType: checkpointType,
+    );
+  }
+
+  Future<void> _sendGeofenceCheck({
+    String? direction,
+    required String status,
+    required String checkpointType,
+  }) async {
     await _client.rpc('record_tenant_geofence_check', params: {
       'p_direction': direction,
       'p_status': status,
       'p_checkpoint_type': checkpointType,
     });
+  }
+
+  /// Persists only minimized presence state for bounded offline recovery.
+  Future<void> queueGeofenceCheck({
+    String? direction,
+    required String status,
+    required String checkpointType,
+  }) async {
+    final tenantId = SupabaseConfig.clientSafe?.auth.currentUser?.id;
+    if (tenantId == null) return;
+    final preferences = await SharedPreferences.getInstance();
+    final queue = preferences.getStringList(_pendingKey) ?? <String>[];
+    queue.add(jsonEncode({
+      'tenant_id': tenantId,
+      'direction': direction,
+      'status': status,
+      'checkpoint_type': checkpointType,
+      'queued_at': DateTime.now().toUtc().toIso8601String(),
+    }));
+    // Bound storage and retries to the most recent 24 minimized events.
+    await preferences.setStringList(
+      _pendingKey,
+      queue.length <= 24 ? queue : queue.sublist(queue.length - 24),
+    );
+  }
+
+  Future<void> flushPendingGeofenceChecks() async {
+    final tenantId = SupabaseConfig.clientSafe?.auth.currentUser?.id;
+    if (tenantId == null) return;
+    final preferences = await SharedPreferences.getInstance();
+    final queue = preferences.getStringList(_pendingKey) ?? <String>[];
+    if (queue.isEmpty) return;
+    final remaining = <String>[];
+    for (final encoded in queue) {
+      try {
+        final event = jsonDecode(encoded) as Map<String, dynamic>;
+        if (event['tenant_id'] != tenantId) continue;
+        final queuedAt = DateTime.tryParse(event['queued_at'] as String? ?? '');
+        if (queuedAt == null ||
+            DateTime.now().toUtc().difference(queuedAt) >
+                const Duration(hours: 24)) {
+          continue;
+        }
+        await _sendGeofenceCheck(
+          direction: event['direction'] as String?,
+          status: event['status'] as String,
+          checkpointType: event['checkpoint_type'] as String,
+        );
+      } catch (_) {
+        remaining.add(encoded);
+      }
+    }
+    await preferences.setStringList(_pendingKey, remaining);
   }
 
   /// Records a direct staff-observed entry/exit to resolve UNAVAILABLE gaps.
@@ -105,4 +175,3 @@ class GateService {
     });
   }
 }
-

@@ -59,12 +59,12 @@ physical device. Production readiness also requires validating the timer and
 operating-system background restrictions across supported platforms.
 
 - [✓] Unit-test polygon/radius boundaries, hysteresis, permissions, failures, and adaptive interval calculations.
-- [ ] Implement the actual recurring geofence check scheduler; interval recommendations alone are not a running timer.
+- [✓] Implement the actual recurring geofence check scheduler; interval recommendations alone are not a running timer.
 - [ ] Test timer rescheduling at daytime, pre-curfew, active-curfew, and curfew-sleep transitions.
-- [ ] Verify that only one timer is active and that logout, account changes, and disposal cancel it.
+- [✓] Verify that only one timer is active and that logout, account changes, and disposal cancel it.
 - [ ] Test foreground, background, app-resume, device-restart, and battery-optimization behavior on physical Android devices.
 - [ ] Test denied permission, permanently denied permission, disabled GPS, timeouts, poor signal, and restored-location recovery.
-- [ ] Confirm duplicate checks do not create duplicate IN/OUT events and that retry/backoff behavior is bounded.
+- [✓] Confirm duplicate checks do not create duplicate IN/OUT events and that retry/backoff behavior is bounded.
 - [ ] Run an on-site inside/outside boundary walk test and compare recorded transitions with the configured dormitory polygon.
 
 ### Account creation → contract — IMPORTANT, DEFERRED

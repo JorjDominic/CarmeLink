@@ -12,7 +12,9 @@ void main() {
   });
 
   group('Data Minimization Guarantee', () {
-    test('GateEvent and GeofenceCheckResult maintain strict zero-coordinate persistence', () {
+    test(
+        'GateEvent and GeofenceCheckResult maintain strict zero-coordinate persistence',
+        () {
       const result = GeofenceCheckResult(
         direction: 'IN',
         status: 'Verified',
@@ -65,6 +67,24 @@ void main() {
   });
 
   group('Boundary Evaluation & Hysteresis Buffer', () {
+    test('applies the active server boundary configuration', () {
+      GeofenceService.applyBoundaryConfiguration({
+        'boundary_mode': 'polygon',
+        'radius_meters': 25,
+        'edge_buffer_meters': 1,
+        'polygon_points': [
+          {'lat': 0.0, 'lng': 0.0},
+          {'lat': 0.0, 'lng': 1.0},
+          {'lat': 1.0, 'lng': 1.0},
+          {'lat': 1.0, 'lng': 0.0},
+        ],
+      });
+
+      expect(GeofenceService.activePolygon.first, const LatLngPoint(0, 0));
+      expect(GeofenceService.activeEdgeBufferMeters, 1);
+      expect(GeofenceService.isWithinDormBoundary(0.5, 0.5), isTrue);
+    });
+
     test('evaluates exact center coordinate as IN', () {
       final result = GeofenceService.evaluateCoordinates(
         latitude: GeofenceService.carmelitaLatitude,
@@ -139,17 +159,21 @@ void main() {
   group('Geofence Failure States (Nullable Direction on UNAVAILABLE)', () {
     const service = GeofenceService();
 
-    test('handles location service disabled with UNAVAILABLE and null direction', () async {
+    test(
+        'handles location service disabled with UNAVAILABLE and null direction',
+        () async {
       GeofenceService.mockLocationServiceEnabled = false;
 
       final result = await service.checkCurrentPresence();
       expect(result.status, 'UNAVAILABLE');
       expect(result.direction, isNull);
-      expect(result.failureReason, GeofenceFailureReason.locationServiceDisabled);
+      expect(
+          result.failureReason, GeofenceFailureReason.locationServiceDisabled);
       expect(result.isUnavailable, isTrue);
     });
 
-    test('handles permission denied with UNAVAILABLE and null direction', () async {
+    test('handles permission denied with UNAVAILABLE and null direction',
+        () async {
       GeofenceService.mockLocationServiceEnabled = true;
       GeofenceService.mockPermission = LocationPermission.denied;
 
@@ -160,7 +184,8 @@ void main() {
       expect(result.isUnavailable, isTrue);
     });
 
-    test('handles permission deniedForever with UNAVAILABLE and null direction', () async {
+    test('handles permission deniedForever with UNAVAILABLE and null direction',
+        () async {
       GeofenceService.mockLocationServiceEnabled = true;
       GeofenceService.mockPermission = LocationPermission.deniedForever;
 
@@ -171,7 +196,8 @@ void main() {
       expect(result.isUnavailable, isTrue);
     });
 
-    test('handles timeout or signal error with UNAVAILABLE and null direction', () async {
+    test('handles timeout or signal error with UNAVAILABLE and null direction',
+        () async {
       GeofenceService.mockLocationServiceEnabled = true;
       GeofenceService.mockPermission = LocationPermission.whileInUse;
       GeofenceService.mockShouldTimeout = true;
@@ -205,10 +231,33 @@ void main() {
       expect(result.isInside, isTrue);
       expect(result.failureReason, GeofenceFailureReason.none);
     });
+
+    test('rejects stale or low-accuracy fixes', () async {
+      GeofenceService.mockLocationServiceEnabled = true;
+      GeofenceService.mockPermission = LocationPermission.always;
+      GeofenceService.mockPosition = Position(
+        latitude: GeofenceService.carmelitaLatitude,
+        longitude: GeofenceService.carmelitaLongitude,
+        timestamp: DateTime.now().subtract(const Duration(minutes: 3)),
+        accuracy: 50,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+      );
+
+      final result = await service.checkCurrentPresence();
+      expect(result.status, 'UNAVAILABLE');
+      expect(result.direction, isNull);
+      expect(result.errorMessage, contains('stale'));
+    });
   });
 
   group('Adaptive Curfew Throttling ("Intelligent Curfew Sleep")', () {
-    test('throttles to curfewSleep when resident is IN during curfew hours', () {
+    test('throttles to curfewSleep when resident is IN during curfew hours',
+        () {
       // 11:30 PM (23:30) is during curfew
       final curfewTime = DateTime(2026, 9, 18, 23, 30);
       final intensity = GeofenceService.determineIntensity(
@@ -216,7 +265,8 @@ void main() {
         currentGateStatus: 'IN',
       );
       expect(intensity, CheckpointIntensity.curfewSleep);
-      expect(GeofenceService.intervalForIntensity(intensity), const Duration(hours: 8));
+      expect(GeofenceService.intervalForIntensity(intensity),
+          const Duration(hours: 8));
 
       // 3:00 AM is also during curfew
       final earlyMorning = DateTime(2026, 9, 18, 3, 0);
@@ -227,7 +277,9 @@ void main() {
       expect(intensityEarly, CheckpointIntensity.curfewSleep);
     });
 
-    test('uses aggressive 1-minute active polling when OUT or UNAVAILABLE during curfew', () {
+    test(
+        'uses aggressive 1-minute active polling when OUT or UNAVAILABLE during curfew',
+        () {
       final curfewTime = DateTime(2026, 9, 18, 23, 30);
 
       final outIntensity = GeofenceService.determineIntensity(
@@ -235,14 +287,16 @@ void main() {
         currentGateStatus: 'OUT',
       );
       expect(outIntensity, CheckpointIntensity.curfewActive);
-      expect(GeofenceService.intervalForIntensity(outIntensity), const Duration(minutes: 1));
+      expect(GeofenceService.intervalForIntensity(outIntensity),
+          const Duration(minutes: 1));
 
       final unavailIntensity = GeofenceService.determineIntensity(
         now: curfewTime,
         currentGateStatus: 'UNAVAILABLE',
       );
       expect(unavailIntensity, CheckpointIntensity.curfewActive);
-      expect(GeofenceService.intervalForIntensity(unavailIntensity), const Duration(minutes: 1));
+      expect(GeofenceService.intervalForIntensity(unavailIntensity),
+          const Duration(minutes: 1));
     });
 
     test('uses preCurfew polling 1 hour prior to curfew', () {
@@ -253,7 +307,8 @@ void main() {
         currentGateStatus: 'OUT',
       );
       expect(intensity, CheckpointIntensity.preCurfew);
-      expect(GeofenceService.intervalForIntensity(intensity), const Duration(minutes: 2));
+      expect(GeofenceService.intervalForIntensity(intensity),
+          const Duration(minutes: 2));
     });
 
     test('uses standard daytime polling during normal daytime hours', () {
@@ -264,12 +319,14 @@ void main() {
         currentGateStatus: 'IN',
       );
       expect(intensity, CheckpointIntensity.daytime);
-      expect(GeofenceService.intervalForIntensity(intensity), const Duration(minutes: 10));
+      expect(GeofenceService.intervalForIntensity(intensity),
+          const Duration(minutes: 10));
     });
   });
 
   group('Guardian Alert Service Preference & Isolation', () {
-    test('triggers alert only when past preferred alert time and tenant is OUT', () {
+    test('triggers alert only when past preferred alert time and tenant is OUT',
+        () {
       // Alert time set to 9:00 PM (21:00)
       const alertTime = TimeOfDay(hour: 21, minute: 0);
 
@@ -332,12 +389,15 @@ void main() {
       expect(GuardianAlertService.preferredAlertTime, customTime);
 
       // Reset to default 9:00 PM
-      GuardianAlertService.setPreferredAlertTime(const TimeOfDay(hour: 21, minute: 0));
+      GuardianAlertService.setPreferredAlertTime(
+          const TimeOfDay(hour: 21, minute: 0));
     });
   });
 
   group('TenantController Check-in Resilience', () {
-    test('handles geofence failure gracefully without throwing uncaught exceptions', () async {
+    test(
+        'handles geofence failure gracefully without throwing uncaught exceptions',
+        () async {
       GeofenceService.mockLocationServiceEnabled = false;
 
       final controller = TenantController.instance;
@@ -345,11 +405,14 @@ void main() {
 
       expect(result.isUnavailable, isTrue);
       expect(result.direction, isNull);
-      expect(result.failureReason, GeofenceFailureReason.locationServiceDisabled);
+      expect(
+          result.failureReason, GeofenceFailureReason.locationServiceDisabled);
       expect(controller.currentGateStatus, 'UNAVAILABLE');
     });
 
-    test('handles database sync error gracefully and preserves on-device evaluation', () async {
+    test(
+        'handles database sync error gracefully and preserves on-device evaluation',
+        () async {
       GeofenceService.mockLocationServiceEnabled = true;
       GeofenceService.mockPermission = LocationPermission.whileInUse;
       GeofenceService.mockPosition = Position(

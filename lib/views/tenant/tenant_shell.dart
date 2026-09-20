@@ -57,6 +57,7 @@ class _TenantShellState extends State<TenantShell> {
               icon: Icons.schedule_outlined,
               selectedIcon: Icons.schedule,
               page: TenantPresencePage(),
+              isWorkInProgress: true,
             ),
             AppDestination(
               label: 'Profile',

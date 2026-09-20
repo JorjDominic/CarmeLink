@@ -697,6 +697,11 @@ class TenantController extends ChangeNotifier {
         );
       } catch (dbError) {
         _gateError = _message(dbError);
+        await _gateService.queueGeofenceCheck(
+          direction: result.direction,
+          status: result.status,
+          checkpointType: checkpointType,
+        );
         final localEvent = GateEvent(
           id: 'ge_${DateTime.now().millisecondsSinceEpoch}',
           person: 'Me',
