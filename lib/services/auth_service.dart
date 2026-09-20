@@ -76,7 +76,10 @@ class SupabaseAuthService implements AuthService {
     if (!email.contains('@')) {
       throw const AuthException('Enter a valid email address.');
     }
-    await _client.auth.resetPasswordForEmail(email.trim());
+    await _client.auth.resetPasswordForEmail(
+      email.trim(),
+      redirectTo: SupabaseConfig.passwordRecoveryRedirectUrl,
+    );
   }
 
   @override

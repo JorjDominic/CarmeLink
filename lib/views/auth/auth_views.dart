@@ -453,6 +453,50 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   bool loading = false;
 
   @override
+  void dispose() {
+    email.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
+    final address = email.text.trim();
+    if (address.isEmpty || !address.contains('@')) {
+      showAppSnackBar(context, 'Enter a valid email address.');
+      return;
+    }
+
+    setState(() => loading = true);
+    try {
+      await service.requestPasswordReset(address);
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        'If an account exists for that email, a password reset link has been sent.',
+      );
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      final rawError = error.toString();
+      final message = rawError.contains('Error sending recovery email') ||
+              rawError.contains('unexpected_failure')
+          ? 'The recovery email service is temporarily unavailable. Please try again shortly or contact dormitory management.'
+          : rawError
+              .replaceFirst('AuthException(message: ', '')
+              .replaceFirst('AuthRetryableFetchException(message: ', '')
+              .replaceFirst(', statusCode: 400)', '')
+              .replaceFirst(', statusCode: 500)', '')
+              .replaceFirst('Exception: ', '');
+      showAppSnackBar(
+        context,
+        message,
+      );
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) => PageFrame(
         title: 'Reset password',
         subtitle: 'Account recovery',
@@ -461,39 +505,19 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text(
-                  'Enter your account email. The backend can later send a recovery code or secure reset link.'),
+                  'Enter your account email and we will send a secure password reset link.'),
               const SizedBox(height: 20),
               TextField(
                   controller: email,
                   keyboardType: TextInputType.emailAddress,
-                  decoration:
-                      const InputDecoration(labelText: 'Email address')),
+                  autofillHints: const [AutofillHints.email],
+                  decoration: const InputDecoration(labelText: 'Email address'),
+                  onSubmitted: (_) => loading ? null : _submit()),
               const SizedBox(height: 14),
               SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: loading
-                        ? null
-                        : () async {
-                            setState(() => loading = true);
-                            try {
-                              await service
-                                  .requestPasswordReset(email.text.trim());
-                              if (!context.mounted) return;
-                              showAppSnackBar(context,
-                                  'Password reset instructions were sent to your email.');
-                              Navigator.of(context).pop();
-                            } catch (e) {
-                              if (context.mounted)
-                                showAppSnackBar(
-                                    context,
-                                    e
-                                        .toString()
-                                        .replaceFirst('Exception: ', ''));
-                            } finally {
-                              if (mounted) setState(() => loading = false);
-                            }
-                          },
+                    onPressed: loading ? null : _submit,
                     child: Text(loading ? 'Sending…' : 'Continue'),
                   )),
             ])),

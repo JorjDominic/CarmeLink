@@ -30,12 +30,22 @@ class SessionController extends ChangeNotifier {
   bool get justSignedOut => _justSignedOut;
   bool get passwordRecovery => _passwordRecovery;
 
-  Future<void> initialize() async {
+  static bool isPasswordRecoveryUri(Uri uri) {
+    final path = uri.path.toLowerCase().replaceAll(RegExp(r'/+$'), '');
+    return path.endsWith('/reset-password') ||
+        uri.fragment.toLowerCase().contains('/reset-password');
+  }
+
+  Future<void> initialize({bool passwordRecoveryRequested = false}) async {
+    if (passwordRecoveryRequested) {
+      _passwordRecovery = true;
+      _currentUser = null;
+    }
     _authSubscription ??=
         SupabaseConfig.client.auth.onAuthStateChange.listen((state) async {
       if (state.event == AuthChangeEvent.passwordRecovery) {
         _passwordRecovery = true;
-        _currentUser = await _authService.restoreSession();
+        _currentUser = null;
         notifyListeners();
       } else if (state.event == AuthChangeEvent.signedOut) {
         _currentUser = null;
@@ -48,9 +58,11 @@ class SessionController extends ChangeNotifier {
       }
     });
     try {
-      _currentUser = await _authService
-          .restoreSession()
-          .timeout(const Duration(seconds: 4));
+      if (!passwordRecoveryRequested) {
+        _currentUser = await _authService
+            .restoreSession()
+            .timeout(const Duration(seconds: 4));
+      }
     } catch (e) {
       debugPrint('Session restore failed or timed out: $e');
       try {

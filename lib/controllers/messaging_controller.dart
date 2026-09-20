@@ -106,7 +106,10 @@ class MessagingController extends ChangeNotifier {
               '');
 
       if (effectiveUid.isEmpty) {
-        throw StateError('Authentication is required to load messages');
+        _activeConversation = null;
+        _activeMessages = [];
+        _messagesError = 'Authentication is required to load messages';
+        return;
       }
 
       final conv =
@@ -151,7 +154,10 @@ class MessagingController extends ChangeNotifier {
               '');
 
       if (effectiveGid.isEmpty) {
-        throw StateError('Authentication is required to load messages');
+        _activeConversation = null;
+        _activeMessages = [];
+        _messagesError = 'Authentication is required to load messages';
+        return;
       }
 
       final conv = await _service.getOrCreateGuardianConversation(

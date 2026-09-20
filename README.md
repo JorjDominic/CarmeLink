@@ -1,5 +1,7 @@
 # CarmeLink
 
+Production domain: `https://carmelitasdormitory.site`
+
 CarmeLink is a Flutter dormitory-management app for Carmelita's Dormitory. It gives tenants, guardians, and dormitory staff role-specific tools for payments, maintenance, gate activity, curfew, visitors, announcements, and communication.
 
 This README is a guide to every user-facing page currently implemented in the app.

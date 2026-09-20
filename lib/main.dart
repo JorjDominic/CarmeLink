@@ -16,5 +16,10 @@ Future<void> main() async {
 
   runApp(const CarmelitaBootstrap());
 
-  unawaited(SessionController.instance.initialize());
+  unawaited(
+    SessionController.instance.initialize(
+      passwordRecoveryRequested:
+          SessionController.isPasswordRecoveryUri(Uri.base),
+    ),
+  );
 }
