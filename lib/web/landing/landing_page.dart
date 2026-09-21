@@ -11,6 +11,7 @@ import 'widgets/editorial_photo_gallery.dart';
 import 'widgets/photo_lightbox.dart';
 import 'widgets/property_photo_tile.dart';
 import 'widgets/signature_hero.dart';
+import 'widgets/tailored_residence_sections.dart';
 
 /// Public website only. Staff authentication and mobile screens stay untouched.
 /// Room prices, availability and booking confirmations are intentionally absent.
@@ -30,6 +31,7 @@ class _LandingPageState extends State<LandingPage> {
   final GlobalKey _rooms = GlobalKey();
   final GlobalKey _spaces = GlobalKey();
   final GlobalKey _gallery = GlobalKey();
+  final GlobalKey _people = GlobalKey();
   final GlobalKey _faq = GlobalKey();
   final GlobalKey _contact = GlobalKey();
   bool _entered = false;
@@ -157,19 +159,25 @@ class _LandingPageState extends State<LandingPage> {
       Text(text, style: TextStyle(color: color, fontSize: size, height: 1.65));
 
   Widget _section(GlobalKey key, Widget child,
-      {Color color = WebPalette.background, double vertical = 92}) {
+      {Color color = WebPalette.background,
+      double vertical = 92,
+      double maxWidth = 1380}) {
     return Container(
       key: key,
       width: double.infinity,
       color: color,
       padding: EdgeInsets.symmetric(
-        horizontal: MediaQuery.sizeOf(context).width < 600 ? 18 : 24,
+        horizontal: MediaQuery.sizeOf(context).width < 600
+            ? 18
+            : MediaQuery.sizeOf(context).width >= 1200
+                ? 34
+                : 24,
         vertical:
             MediaQuery.sizeOf(context).width < 600 ? vertical * .76 : vertical,
       ),
       alignment: Alignment.center,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1220),
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: child,
       ),
     );
@@ -277,6 +285,7 @@ class _LandingPageState extends State<LandingPage> {
               RevealOnScroll(child: _roomsSection(wide)),
               RevealOnScroll(child: _spacesSection(wide)),
               RevealOnScroll(child: _gallerySection(wide)),
+              RevealOnScroll(child: _peopleSection()),
               RevealOnScroll(child: _faqSection(wide)),
               RevealOnScroll(child: _contactSection(wide)),
               _footer(wide),
@@ -300,6 +309,7 @@ class _LandingPageState extends State<LandingPage> {
         ),
         color: WebPalette.cream,
         vertical: desktop ? 48 : 33,
+        maxWidth: 1480,
       );
 
   Widget _highlights(bool wide) => Container(
@@ -308,7 +318,7 @@ class _LandingPageState extends State<LandingPage> {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 19),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1220),
+            constraints: const BoxConstraints(maxWidth: 1480),
             child: Wrap(
               alignment: WrapAlignment.spaceBetween,
               spacing: 24,
@@ -325,166 +335,23 @@ class _LandingPageState extends State<LandingPage> {
         ),
       );
 
-  Widget _aboutSection(bool wide) {
-    final image = Stack(
-      children: [
-        _image(
-          'assets/web/photos/room_overview.jpg',
-          height: wide ? 460 : 310,
-          label: 'An actual dormitory bedroom interior',
+  Widget _aboutSection(bool wide) => _section(
+        _about,
+        ResidenceNarrativeSection(
+          onGallery: () => _go(_gallery),
+          onOpenRoom: () => _showPhoto(LandingContent.photos[1]),
         ),
-        Positioned(
-          bottom: 18,
-          right: 18,
-          child: Material(
-            color: WebPalette.background,
-            borderRadius: BorderRadius.circular(12),
-            child: InkWell(
-              onTap: () => _showPhoto(LandingContent.photos[1]),
-              borderRadius: BorderRadius.circular(12),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.open_in_full, size: 16, color: WebPalette.plum),
-                  SizedBox(width: 8),
-                  Text('View photo',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: WebPalette.ink,
-                      )),
-                ]),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-    final text = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _eyebrow('01  /  The residence'),
-        const SizedBox(height: 17),
-        _headline('More than just\nfour walls.', size: wide ? 52 : 39),
-        const SizedBox(height: 19),
-        _body(
-          "Get to know Carmelita's Dormitory through photographs of its rooms "
-          'and shared spaces. Explore the property first, then contact the team '
-          'for up-to-date information before making plans.',
-        ),
-        const SizedBox(height: 24),
-        TextButton.icon(
-          onPressed: () => _go(_gallery),
-          icon: const Icon(Icons.arrow_outward, size: 18),
-          label: const Text('See the photo gallery'),
-          style: TextButton.styleFrom(foregroundColor: WebPalette.plum),
-        ),
-      ],
-    );
-    return _section(
-      _about,
-      wide
-          ? Row(children: [
-              Expanded(child: image),
-              const SizedBox(width: 68),
-              Expanded(child: text),
-            ])
-          : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              image,
-              const SizedBox(height: 33),
-              text,
-            ]),
-    );
-  }
-
-  Widget _roomCard(PropertyPhoto photo, String heading, String copy) =>
-      Container(
-        decoration: BoxDecoration(
-          color: WebPalette.background,
-          border: Border.all(color: WebPalette.border),
-          borderRadius: BorderRadius.circular(22),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            PropertyPhotoTile(
-              photo: photo,
-              height: 310,
-              onOpen: () => _showPhoto(photo),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 23, 12, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _headline(heading, size: 27),
-                  const SizedBox(height: 10),
-                  _body(copy, size: 15),
-                  const SizedBox(height: 13),
-                  TextButton.icon(
-                    onPressed: () => _go(_contact),
-                    icon: const Icon(Icons.arrow_outward, size: 17),
-                    label: const Text('Ask about this space'),
-                    style:
-                        TextButton.styleFrom(foregroundColor: WebPalette.plum),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        maxWidth: 1410,
       );
 
   Widget _roomsSection(bool wide) => _section(
         _rooms,
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _eyebrow('02  /  Inside Carmelita'),
-            const SizedBox(height: 16),
-            _headline('Find your kind of space.', size: wide ? 55 : 38),
-            const SizedBox(height: 15),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 730),
-              child: _body(
-                'Browse actual room photographs. Contact staff to confirm which '
-                'rooms or bed spaces are currently available. Prices are provided on inquiry.',
-              ),
-            ),
-            const SizedBox(height: 36),
-            if (wide)
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(
-                    child: _roomCard(
-                  LandingContent.photos[1],
-                  'Inside the rooms',
-                  'A closer view of the room layout and sleeping spaces.',
-                )),
-                const SizedBox(width: 22),
-                Expanded(
-                    child: _roomCard(
-                  LandingContent.photos[2],
-                  'Study and settle in',
-                  'Take a look at the desk and window in this room photograph.',
-                )),
-              ])
-            else ...[
-              _roomCard(
-                LandingContent.photos[1],
-                'Inside the rooms',
-                'A closer view of the room layout and sleeping spaces.',
-              ),
-              const SizedBox(height: 20),
-              _roomCard(
-                LandingContent.photos[2],
-                'Study and settle in',
-                'Take a look at the desk and window in this room photograph.',
-              ),
-            ],
-          ],
+        RoomStoriesSection(
+          onOpenPhoto: _showPhoto,
+          onInquire: () => _go(_contact),
         ),
         color: WebPalette.cream,
+        maxWidth: 1480,
       );
 
   Widget _spacesSection(bool wide) => _section(
@@ -526,6 +393,7 @@ class _LandingPageState extends State<LandingPage> {
             ],
           ],
         ),
+        maxWidth: 1450,
       );
 
   Widget _spacesCopy() => Column(
@@ -596,15 +464,24 @@ class _LandingPageState extends State<LandingPage> {
         ],
       ),
       color: WebPalette.cream,
+      maxWidth: 1480,
     );
   }
+
+  Widget _peopleSection() => _section(
+        _people,
+        StudentGuardianSection(onInquire: () => _go(_contact)),
+        color: WebPalette.cream,
+        maxWidth: 1410,
+        vertical: 84,
+      );
 
   Widget _faqSection(bool wide) => _section(
         _faq,
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _eyebrow('05  /  For students and families'),
+            _eyebrow('06  /  For students and families'),
             const SizedBox(height: 16),
             _headline('Good to know, before you go.', size: wide ? 54 : 37),
             const SizedBox(height: 18),
@@ -681,7 +558,7 @@ class _LandingPageState extends State<LandingPage> {
   Widget _contactText(bool wide) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _eyebrow('06  /  Your next step', color: WebPalette.gold),
+          _eyebrow('07  /  Your next step', color: WebPalette.gold),
           const SizedBox(height: 20),
           _headline('Your next chapter\nstarts with a hello.',
               size: wide ? 52 : 37, color: Colors.white),
