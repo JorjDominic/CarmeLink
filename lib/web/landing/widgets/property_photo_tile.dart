@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/web_theme.dart';
+import '../../theme/web_motion.dart';
 import '../landing_content.dart';
 
 /// Tappable photograph with keyboard-focusable ink response and subtle hover.
@@ -47,11 +48,9 @@ class _PropertyPhotoTileState extends State<PropertyPhotoTile> {
                 fit: StackFit.expand,
                 children: [
                   AnimatedScale(
-                    scale: _hovered && !reduceMotion ? 1.045 : 1,
-                    duration: reduceMotion
-                        ? Duration.zero
-                        : const Duration(milliseconds: 230),
-                    curve: Curves.easeOutCubic,
+                    scale: _hovered && !reduceMotion ? 1.025 : 1,
+                    duration: WebMotion.duration(context, WebMotion.caption),
+                    curve: WebMotion.enter,
                     child: Image.asset(
                       widget.photo.path,
                       fit: BoxFit.cover,
@@ -76,20 +75,27 @@ class _PropertyPhotoTileState extends State<PropertyPhotoTile> {
                       left: 18,
                       right: 18,
                       bottom: 16,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              widget.photo.title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
+                      child: AnimatedSlide(
+                        offset: _hovered && !reduceMotion
+                            ? const Offset(0, -0.075)
+                            : Offset.zero,
+                        duration: WebMotion.duration(context, WebMotion.feedback),
+                        curve: WebMotion.enter,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                widget.photo.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
-                          ),
-                          const Icon(Icons.north_east, color: Colors.white),
-                        ],
+                            const Icon(Icons.north_east, color: Colors.white),
+                          ],
+                        ),
                       ),
                     ),
                   ],

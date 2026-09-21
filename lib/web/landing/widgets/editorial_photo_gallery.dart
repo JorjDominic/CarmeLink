@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/web_theme.dart';
+import '../../theme/web_motion.dart';
 import '../landing_content.dart';
 
 /// One featured image with manual navigation and a compact thumbnail rail.
@@ -42,8 +43,8 @@ class _EditorialPhotoGalleryState extends State<EditorialPhotoGallery> {
     } else {
       _controller.animateToPage(
         index,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeInOutCubic,
+        duration: WebMotion.gallery,
+        curve: WebMotion.travel,
       );
     }
   }
@@ -151,24 +152,36 @@ class _EditorialPhotoGalleryState extends State<EditorialPhotoGallery> {
         const SizedBox(height: 18),
         Row(
           children: [
-            Text(
-              '${(_index + 1).toString().padLeft(2, '0')} / ${widget.photos.length.toString().padLeft(2, '0')}',
-              style: const TextStyle(
-                color: WebPalette.muted,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-                letterSpacing: 1.8,
+            AnimatedSwitcher(
+              duration: WebMotion.duration(context, WebMotion.caption),
+              switchInCurve: WebMotion.enter,
+              switchOutCurve: WebMotion.enter,
+              child: Text(
+                '${(_index + 1).toString().padLeft(2, '0')} / ${widget.photos.length.toString().padLeft(2, '0')}',
+                key: ValueKey<int>(_index),
+                style: const TextStyle(
+                  color: WebPalette.muted,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                  letterSpacing: 1.8,
+                ),
               ),
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: Text(
-                photo.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: WebPalette.ink,
-                  fontWeight: FontWeight.w700,
+              child: AnimatedSwitcher(
+                duration: WebMotion.duration(context, WebMotion.caption),
+                switchInCurve: WebMotion.enter,
+                switchOutCurve: WebMotion.enter,
+                child: Text(
+                  photo.title,
+                  key: ValueKey<String>(photo.path),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: WebPalette.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -205,7 +218,9 @@ class _EditorialPhotoGalleryState extends State<EditorialPhotoGallery> {
                     key: ValueKey('gallery-thumbnail-$index'),
                     onTap: () => _select(index),
                     borderRadius: BorderRadius.circular(10),
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: WebMotion.duration(context, WebMotion.feedback),
+                      curve: WebMotion.enter,
                       width: 112,
                       padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
