@@ -27,6 +27,8 @@ Development assignments and completion status are tracked separately in
 
 ## Getting started
 
+For production web hosting, see [`VERCEL_DEPLOYMENT.md`](VERCEL_DEPLOYMENT.md).
+
 ### Requirements
 
 - Flutter with Dart `>=3.3.0 <4.0.0`
