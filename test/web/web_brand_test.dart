@@ -1,12 +1,12 @@
+import 'package:carmelitas_dormitory_system/web/widgets/web_brand.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:carmelitas_dormitory_system/web/widgets/web_brand.dart';
 
 void main() {
-  testWidgets(
-      'Website branding displays the existing logo and a readable wordmark',
+  testWidgets('Website branding shows only the wordmark and supports tapping',
       (tester) async {
     var tapped = false;
+
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -17,13 +17,17 @@ void main() {
 
     expect(find.text("Carmelita's"), findsOneWidget);
     expect(find.text('DORMITORY'), findsOneWidget);
-    expect(find.byType(Image), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+
+    final title = tester.widget<Text>(find.text("Carmelita's"));
+    expect(title.style?.fontFamily, 'GreatVibes');
 
     await tester.tap(find.text("Carmelita's"));
     expect(tapped, isTrue);
+    expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Compact website branding fits a 211px app bar/sidebar slot',
+  testWidgets('Compact branding fits a 211px app bar or sidebar slot',
       (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
@@ -37,11 +41,11 @@ void main() {
 
     expect(find.text("Carmelita's"), findsOneWidget);
     expect(find.text('DORMITORY'), findsOneWidget);
-    expect(find.byType(Image), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Extra narrow branding keeps logo without horizontal overflow',
+  testWidgets('Extra narrow branding keeps text without horizontal overflow',
       (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
@@ -53,7 +57,9 @@ void main() {
       ),
     );
 
-    expect(find.byType(Image), findsOneWidget);
+    expect(find.text("Carmelita's"), findsOneWidget);
+    expect(find.text('DORMITORY'), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
