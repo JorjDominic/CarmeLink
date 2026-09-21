@@ -2,7 +2,10 @@
 
 Production domain: `https://carmelitasdormitory.site`
 
-CarmeLink is a Flutter dormitory-management app for Carmelita's Dormitory. It gives tenants, guardians, and dormitory staff role-specific tools for payments, maintenance, gate activity, curfew, visitors, announcements, and communication.
+CarmeLink is a cross-platform Flutter dormitory-management app for Carmelita's
+Dormitory, targeting both **Android and iOS** for production mobile release. It
+gives tenants, guardians, and dormitory staff role-specific tools for payments,
+maintenance, gate activity, curfew, visitors, announcements, and communication.
 
 This README is a guide to every user-facing page currently implemented in the app.
 Development assignments and completion status are tracked separately in
@@ -27,7 +30,9 @@ Development assignments and completion status are tracked separately in
 ### Requirements
 
 - Flutter with Dart `>=3.3.0 <4.0.0`
-- A configured Flutter device, emulator, browser, or desktop target
+- A configured Flutter environment with Android tooling
+- macOS with Xcode for iOS builds, signing, and physical-device validation
+- A physical Android device and iPhone for release-critical permission, push-notification, and background-location testing
 
 ### Run and check the app
 

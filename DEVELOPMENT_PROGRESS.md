@@ -1,6 +1,6 @@
 # CarmeLink Development Progress
 
-Last updated: September 19, 2026
+Last updated: September 20, 2026
 
 This file tracks development separately from the README. Page ownership is
 divided between two developers to reduce merge conflicts.
@@ -20,7 +20,9 @@ Major remaining areas are persisted notifications/preferences, finance/expenses,
 discipline, analytics, native tenant device
 binding/background location, feedback persistence, real-device geofencing
 testing, geofence check-timer testing, and final multi-account security/offline
-testing outside the visitor workflow.
+testing outside the visitor workflow. Android and iOS are both production mobile
+targets; a feature is not release-complete until its platform-specific behavior
+has either been validated on both or is explicitly tracked as blocked.
 
 ## Immediate agenda
 
@@ -28,7 +30,9 @@ testing outside the visitor workflow.
    categories, validation, recurring/one-time entries, audit fields, summaries,
    and RLS. This is the next active implementation priority.
 2. **Persistent notifications and preferences** — generate role-scoped events,
-   read/unread state, deep links, and per-user delivery settings.
+   read/unread state, deep links, per-user delivery settings, and FCM delivery.
+   Implement Android first while keeping the token schema, payloads, routing,
+   and Flutter handlers compatible with iOS/APNs from the start.
 3. **Disciplinary records** — restricted incident, notice, evidence, and history
    workflow.
 4. **Live reports and analytics** — derive owner metrics from the completed
@@ -62,10 +66,35 @@ operating-system background restrictions across supported platforms.
 - [✓] Implement the actual recurring geofence check scheduler; interval recommendations alone are not a running timer.
 - [ ] Test timer rescheduling at daytime, pre-curfew, active-curfew, and curfew-sleep transitions.
 - [✓] Verify that only one timer is active and that logout, account changes, and disposal cancel it.
-- [ ] Test foreground, background, app-resume, device-restart, and battery-optimization behavior on physical Android devices.
+- [ ] Test foreground, background, app-resume, device-restart, and operating-system power-management behavior on physical Android and iOS devices.
 - [ ] Test denied permission, permanently denied permission, disabled GPS, timeouts, poor signal, and restored-location recovery.
 - [✓] Confirm duplicate checks do not create duplicate IN/OUT events and that retry/backoff behavior is bounded.
 - [ ] Run an on-site inside/outside boundary walk test and compare recorded transitions with the configured dormitory polygon.
+
+### Mobile-store approval and cross-platform release risk
+
+Both **Google Play** and the **Apple App Store** are release targets. Current
+planning estimates are risk indicators rather than guarantees: approximately
+75% first-submission approval likelihood for Google Play and 55% for the Apple
+App Store in the current state. After the release-readiness checklist below is
+completed, the working estimates rise to about 90% and 80–85%, respectively.
+
+The largest shared review risk is background location/geofencing. Google Play
+requires background location to be demonstrably central to the app and may
+require a declaration and review video. Apple also requires a clear purpose,
+appropriate permission timing, accurate privacy disclosures, and reliable
+on-device behavior. FCM itself is not a material approval risk when permission,
+privacy, and notification behavior are implemented correctly.
+
+- [ ] Publish an accurate privacy policy and complete Google Data Safety and Apple App Privacy disclosures.
+- [ ] Provide in-app account deletion and the required web deletion-request route when in-app account creation is enabled.
+- [ ] Prepare stable reviewer accounts/instructions for owner, caretaker, tenant, and guardian roles.
+- [ ] Provide a reviewer-safe method or instructions for evaluating geofence behavior away from the dormitory.
+- [ ] Document and justify background-location use; request only the minimum permission scope on each platform.
+- [ ] Validate notifications, location, camera, photo access, deep links, sign-out, and account switching on physical Android and iOS devices.
+- [ ] Remove mock data, test credentials, placeholders, broken actions, visible overflow, and incomplete metadata before submission.
+- [ ] Produce signed Android App Bundle and iOS archive/TestFlight builds from the same release candidate.
+- [ ] Complete any applicable Google Play closed-testing requirement before applying for production access.
 
 ### Account creation → contract — IMPORTANT, DEFERRED
 
