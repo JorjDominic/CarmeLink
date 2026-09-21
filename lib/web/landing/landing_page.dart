@@ -10,6 +10,7 @@ import 'landing_content.dart';
 import 'widgets/editorial_photo_gallery.dart';
 import 'widgets/photo_lightbox.dart';
 import 'widgets/property_photo_tile.dart';
+import 'widgets/signature_hero.dart';
 
 /// Public website only. Staff authentication and mobile screens stay untouched.
 /// Room prices, availability and booking confirmations are intentionally absent.
@@ -151,9 +152,9 @@ class _LandingPageState extends State<LandingPage> {
         ),
       );
 
-  Widget _body(String text, {Color color = WebPalette.muted, double size = 16}) =>
-      Text(text,
-          style: TextStyle(color: color, fontSize: size, height: 1.65));
+  Widget _body(String text,
+          {Color color = WebPalette.muted, double size = 16}) =>
+      Text(text, style: TextStyle(color: color, fontSize: size, height: 1.65));
 
   Widget _section(GlobalKey key, Widget child,
       {Color color = WebPalette.background, double vertical = 92}) {
@@ -163,9 +164,8 @@ class _LandingPageState extends State<LandingPage> {
       color: color,
       padding: EdgeInsets.symmetric(
         horizontal: MediaQuery.sizeOf(context).width < 600 ? 18 : 24,
-        vertical: MediaQuery.sizeOf(context).width < 600
-            ? vertical * .76
-            : vertical,
+        vertical:
+            MediaQuery.sizeOf(context).width < 600 ? vertical * .76 : vertical,
       ),
       alignment: Alignment.center,
       child: ConstrainedBox(
@@ -176,7 +176,9 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   Widget _image(String asset,
-      {double? height, BoxFit fit = BoxFit.cover, String label = 'Dormitory photo'}) {
+      {double? height,
+      BoxFit fit = BoxFit.cover,
+      String label = 'Dormitory photo'}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(19),
       child: Image.asset(
@@ -285,227 +287,20 @@ class _LandingPageState extends State<LandingPage> {
     );
   }
 
-  Widget _hero(bool desktop, bool reducedMotion) {
-    final introduction = AnimatedOpacity(
-      opacity: _entered || reducedMotion ? 1 : 0,
-      duration: reducedMotion ? Duration.zero : const Duration(milliseconds: 650),
-      child: AnimatedSlide(
-        offset: _entered || reducedMotion ? Offset.zero : const Offset(0, 0.055),
-        duration: reducedMotion ? Duration.zero : const Duration(milliseconds: 650),
-        curve: Curves.easeOutCubic,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _eyebrow("Carmelita's Dormitory  /  Baliwag, Bulacan"),
-            const SizedBox(height: 28),
-            Semantics(
-              label: 'A place to feel at home.',
-              child: ExcludeSemantics(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _headline('A place to', size: desktop ? 67 : 42),
-                    Text(
-                      'feel at home.',
-                      style: TextStyle(
-                        fontFamily: 'GreatVibes',
-                        color: WebPalette.plum,
-                        fontSize: desktop
-                            ? 86
-                            : MediaQuery.sizeOf(context).width < 390 ? 50 : 60,
-                        height: 1.12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 23),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 470),
-              child: _body(
-                'A closer look at your possible home away from home. '
-                'Explore the actual property, discover the spaces, and ask us about a room.',
-                size: 17,
-              ),
-            ),
-            const SizedBox(height: 32),
-            AnimatedOpacity(
-              opacity: _ctaEntered || reducedMotion ? 1 : 0,
-              duration: reducedMotion
-                  ? Duration.zero
-                  : const Duration(milliseconds: 580),
-              curve: Curves.easeOutCubic,
-              child: AnimatedSlide(
-                offset: _ctaEntered || reducedMotion
-                    ? Offset.zero
-                    : const Offset(0, 0.09),
-                duration: reducedMotion
-                    ? Duration.zero
-                    : const Duration(milliseconds: 580),
-                curve: Curves.easeOutCubic,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        _primary('Explore the rooms', () => _go(_rooms)),
-                        _outline('Get in touch', () => _go(_contact)),
-                      ],
-                    ),
-                    const SizedBox(height: 34),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          height: 2,
-                          width: 31,
-                          color: WebPalette.gold,
-                        ),
-                        const SizedBox(width: 13),
-                        const Flexible(
-                          child: Text(
-                            'REAL PHOTOS. REAL SPACES. YOUR NEXT CHAPTER.',
-                            style: TextStyle(
-                              color: WebPalette.muted,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.1,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+  Widget _hero(bool desktop, bool reducedMotion) => _section(
+        _home,
+        SignatureHero(
+          onExploreRooms: () => _go(_rooms),
+          onContact: () => _go(_contact),
+          onDiscover: () => _go(_about),
+          headlineEntered: _entered,
+          photoEntered: _photoEntered,
+          actionsEntered: _ctaEntered,
+          reducedMotion: reducedMotion,
         ),
-      ),
-    );
-
-    // Composition is deliberately offset: the inset room photo has its own
-    // white frame instead of accidentally blending into the courtyard photo.
-    final photography = LayoutBuilder(
-      builder: (context, constraints) {
-        final height = desktop ? 525.0 : 380.0;
-        final insetWidth = constraints.maxWidth * (desktop ? 0.38 : 0.42);
-        return AnimatedOpacity(
-          opacity: _photoEntered || reducedMotion ? 1 : 0,
-          duration: reducedMotion
-              ? Duration.zero
-              : const Duration(milliseconds: 850),
-          curve: Curves.easeOutCubic,
-          child: AnimatedScale(
-            scale: _photoEntered || reducedMotion ? 1 : 0.975,
-            duration: reducedMotion
-                ? Duration.zero
-                : const Duration(milliseconds: 850),
-            curve: Curves.easeOutCubic,
-            child: SizedBox(
-              height: height,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned(
-                    left: 0,
-                    right: desktop ? 38 : 22,
-                    top: 0,
-                    bottom: desktop ? 38 : 28,
-                    child: _image(
-                      'assets/web/photos/courtyard.jpg',
-                      label: 'The actual Carmelita Dormitory courtyard',
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    width: insetWidth,
-                    height: desktop ? 215 : 155,
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: WebPalette.background,
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: [
-                          BoxShadow(
-                            color: WebPalette.ink.withValues(alpha: .15),
-                            blurRadius: 24,
-                            offset: Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: Image.asset(
-                          'assets/web/photos/bunk_corner.jpg',
-                          fit: BoxFit.cover,
-                          alignment: Alignment.topCenter,
-                          semanticLabel: 'An actual dormitory bunk bed',
-                          errorBuilder: (_, __, ___) => const Center(
-                            child: Text('Photo unavailable'),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 16,
-                    top: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: WebPalette.background,
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: const Text(
-                        'CARMELITA  /  01',
-                        style: TextStyle(
-                          color: WebPalette.ink,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 10,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-    return _section(
-      _home,
-      desktop
-          ? Row(
-              children: [
-                Expanded(flex: 11, child: Padding(
-                  padding: const EdgeInsets.only(right: 62), child: introduction,
-                )),
-                Expanded(flex: 10, child: photography),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                introduction,
-                const SizedBox(height: 40),
-                photography,
-              ],
-            ),
-      color: WebPalette.cream,
-      vertical: desktop ? 67 : 43,
-    );
-  }
+        color: WebPalette.cream,
+        vertical: desktop ? 48 : 33,
+      );
 
   Widget _highlights(bool wide) => Container(
         color: WebPalette.plum,
@@ -519,8 +314,10 @@ class _LandingPageState extends State<LandingPage> {
               spacing: 24,
               runSpacing: 14,
               children: const [
-                _Highlight(Icons.photo_library_outlined, 'REAL PROPERTY PHOTOS'),
-                _Highlight(Icons.chat_bubble_outline, 'ASK ABOUT ROOM AVAILABILITY'),
+                _Highlight(
+                    Icons.photo_library_outlined, 'REAL PROPERTY PHOTOS'),
+                _Highlight(
+                    Icons.chat_bubble_outline, 'ASK ABOUT ROOM AVAILABILITY'),
                 _Highlight(Icons.place_outlined, 'BALIWAG, BULACAN'),
               ],
             ),
@@ -550,9 +347,11 @@ class _LandingPageState extends State<LandingPage> {
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.open_in_full, size: 16, color: WebPalette.plum),
                   SizedBox(width: 8),
-                  Text('View photo', style: TextStyle(
-                    fontWeight: FontWeight.w700, color: WebPalette.ink,
-                  )),
+                  Text('View photo',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: WebPalette.ink,
+                      )),
                 ]),
               ),
             ),
@@ -598,7 +397,8 @@ class _LandingPageState extends State<LandingPage> {
     );
   }
 
-  Widget _roomCard(PropertyPhoto photo, String heading, String copy) => Container(
+  Widget _roomCard(PropertyPhoto photo, String heading, String copy) =>
+      Container(
         decoration: BoxDecoration(
           color: WebPalette.background,
           border: Border.all(color: WebPalette.border),
@@ -626,7 +426,8 @@ class _LandingPageState extends State<LandingPage> {
                     onPressed: () => _go(_contact),
                     icon: const Icon(Icons.arrow_outward, size: 17),
                     label: const Text('Ask about this space'),
-                    style: TextButton.styleFrom(foregroundColor: WebPalette.plum),
+                    style:
+                        TextButton.styleFrom(foregroundColor: WebPalette.plum),
                   ),
                 ],
               ),
@@ -654,13 +455,15 @@ class _LandingPageState extends State<LandingPage> {
             const SizedBox(height: 36),
             if (wide)
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(child: _roomCard(
+                Expanded(
+                    child: _roomCard(
                   LandingContent.photos[1],
                   'Inside the rooms',
                   'A closer view of the room layout and sleeping spaces.',
                 )),
                 const SizedBox(width: 22),
-                Expanded(child: _roomCard(
+                Expanded(
+                    child: _roomCard(
                   LandingContent.photos[2],
                   'Study and settle in',
                   'Take a look at the desk and window in this room photograph.',
@@ -693,7 +496,8 @@ class _LandingPageState extends State<LandingPage> {
             const SizedBox(height: 16),
             _headline('Little details. Everyday spaces.', size: wide ? 53 : 37),
             const SizedBox(height: 16),
-            _body('Discover a shared outdoor space through real photographs of the residence.'),
+            _body(
+                'Discover a shared outdoor space through real photographs of the residence.'),
             const SizedBox(height: 33),
             if (wide)
               Row(
@@ -804,7 +608,8 @@ class _LandingPageState extends State<LandingPage> {
             const SizedBox(height: 16),
             _headline('Good to know, before you go.', size: wide ? 54 : 37),
             const SizedBox(height: 18),
-            _body('Important details can change. These answers explain how to verify them with staff.'),
+            _body(
+                'Important details can change. These answers explain how to verify them with staff.'),
             const SizedBox(height: 28),
             _faqTile(
               'How do I check room availability?',
@@ -840,7 +645,8 @@ class _LandingPageState extends State<LandingPage> {
           child: ExpansionTile(
             shape: const Border(),
             collapsedShape: const Border(),
-            tilePadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 5),
+            tilePadding:
+                const EdgeInsets.symmetric(horizontal: 22, vertical: 5),
             title: Text(question,
                 style: const TextStyle(
                   color: WebPalette.ink,
@@ -848,7 +654,9 @@ class _LandingPageState extends State<LandingPage> {
                   fontSize: 16,
                 )),
             childrenPadding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
-            children: [Align(alignment: Alignment.centerLeft, child: _body(answer))],
+            children: [
+              Align(alignment: Alignment.centerLeft, child: _body(answer))
+            ],
           ),
         ),
       );
@@ -930,10 +738,12 @@ class _LandingPageState extends State<LandingPage> {
             const SizedBox(height: 11),
             _headline("Carmelita's Dormitory", size: 25),
             const SizedBox(height: 9),
-            _body('Dr. Luis Reyes St., Brgy. Concepcion, Baliwag, Bulacan', size: 14),
+            _body('Dr. Luis Reyes St., Brgy. Concepcion, Baliwag, Bulacan',
+                size: 14),
             const SizedBox(height: 16),
             TextButton.icon(
-              onPressed: () => WebExternalLinks.open(context, LandingContent.mapsUrl),
+              onPressed: () =>
+                  WebExternalLinks.open(context, LandingContent.mapsUrl),
               icon: const Icon(Icons.navigation_outlined, size: 18),
               label: const Text('Open Google Maps'),
               style: TextButton.styleFrom(foregroundColor: WebPalette.plum),
@@ -964,7 +774,8 @@ class _LandingPageState extends State<LandingPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Property information subject to staff confirmation.',
+                  const Text(
+                      'Property information subject to staff confirmation.',
                       style: TextStyle(color: WebPalette.muted, fontSize: 12)),
                   const SizedBox(height: 7),
                   const Text('Carmelita Dormitory · Baliwag, Bulacan',
@@ -973,16 +784,19 @@ class _LandingPageState extends State<LandingPage> {
               ),
               Wrap(spacing: 6, children: [
                 TextButton(
-                  onPressed: () => WebExternalLinks.open(context, LandingContent.facebookUrl),
+                  onPressed: () => WebExternalLinks.open(
+                      context, LandingContent.facebookUrl),
                   child: const Text('Facebook'),
                 ),
                 TextButton(
-                  onPressed: () => WebExternalLinks.open(context, LandingContent.mapsUrl),
+                  onPressed: () =>
+                      WebExternalLinks.open(context, LandingContent.mapsUrl),
                   child: const Text('Maps'),
                 ),
                 TextButton(
                   onPressed: widget.onStaffPortal,
-                  style: TextButton.styleFrom(foregroundColor: WebPalette.muted),
+                  style:
+                      TextButton.styleFrom(foregroundColor: WebPalette.muted),
                   child: const Text('Staff sign in'),
                 ),
               ]),
