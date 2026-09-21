@@ -4,7 +4,11 @@ import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../shared/shared_views.dart';
+import '../shared/account_management_page.dart';
+import 'guardian_link_management_page.dart';
+import 'contracts_page.dart';
 import 'owner_pages.dart';
+import 'room_monitoring_page.dart';
 
 class OwnerShell extends StatefulWidget {
   const OwnerShell({super.key});
@@ -32,6 +36,28 @@ class _OwnerShellState extends State<OwnerShell> {
         child: AdaptiveRoleShell(
           roleLabel: 'Owner',
           messagePage: OwnerMessagingPage(),
+          webDestinations: [
+            AppDestination(
+                label: 'Rooms',
+                icon: Icons.meeting_room_outlined,
+                selectedIcon: Icons.meeting_room,
+                page: RoomMonitoringPage()),
+            AppDestination(
+                label: 'Accounts',
+                icon: Icons.manage_accounts_outlined,
+                selectedIcon: Icons.manage_accounts,
+                page: AccountManagementPage()),
+            AppDestination(
+                label: 'Guardian links',
+                icon: Icons.family_restroom_outlined,
+                selectedIcon: Icons.family_restroom,
+                page: GuardianLinkManagementPage()),
+            AppDestination(
+                label: 'Contracts',
+                icon: Icons.description_outlined,
+                selectedIcon: Icons.description,
+                page: ContractsPage()),
+          ],
           destinations: [
             AppDestination(
                 label: 'Dashboard',

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -6,10 +7,32 @@ import '../../core/widgets/common_widgets.dart';
 import '../../services/room_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/tenant_service.dart';
+import '../shared/staff_quick_panel.dart';
 import 'floor_plan_page.dart';
 import 'owner_pages.dart';
 
 enum RoomViewMode { list, floorPlan }
+
+/// A display-only filter over already authorized RoomService records.
+List<RoomRecord> filterRoomDirectory(
+  List<RoomRecord> rooms, {
+  String query = '',
+  String availability = 'all',
+}) {
+  final needle = query.trim().toLowerCase();
+  return rooms.where((room) {
+    if (availability == 'available' && room.physicallyAvailable == 0) {
+      return false;
+    }
+    if (availability == 'full' &&
+        !(room.capacity > 0 && room.occupied >= room.capacity)) {
+      return false;
+    }
+    return needle.isEmpty ||
+        [room.number, room.floor, room.description]
+            .any((value) => value.toLowerCase().contains(needle));
+  }).toList();
+}
 
 class RoomMonitoringPage extends StatefulWidget {
   const RoomMonitoringPage({
@@ -29,6 +52,8 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
   List<RoomRecord>? rooms;
   bool loading = true;
   String? errorMessage;
+  String _roomQuery = '';
+  String _availabilityFilter = 'all';
   int _requestVersion = 0;
   Timer? _debounceTimer;
   late final TableRefreshSubscription subscription;
@@ -120,6 +145,10 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
           currentRooms.fold<int>(0, (sum, room) => sum + room.beds.length);
       final available = currentRooms.fold<int>(
           0, (sum, room) => sum + room.physicallyAvailable);
+      final visibleRooms = kIsWeb
+          ? filterRoomDirectory(currentRooms,
+              query: _roomQuery, availability: _availabilityFilter)
+          : currentRooms;
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -169,12 +198,62 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
             ],
           ),
           const SizedBox(height: 18),
-          if (_viewMode == RoomViewMode.list)
-            AdaptiveGrid(
-              minTileWidth: 260,
-              children: currentRooms.map(roomCard).toList(),
-            )
-          else
+          if (kIsWeb && _viewMode == RoomViewMode.list) ...[
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: 300,
+                  child: TextField(
+                    key: const Key('web-room-search'),
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      hintText: 'Search room number or floor',
+                    ),
+                    onChanged: (value) => setState(() => _roomQuery = value),
+                  ),
+                ),
+                SizedBox(
+                  width: 200,
+                  child: DropdownButtonFormField<String>(
+                    key: const Key('web-room-availability-filter'),
+                    initialValue: _availabilityFilter,
+                    decoration:
+                        const InputDecoration(labelText: 'Availability'),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('All rooms')),
+                      DropdownMenuItem(
+                          value: 'available', child: Text('Beds available')),
+                      DropdownMenuItem(
+                          value: 'full', child: Text('Fully occupied')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _availabilityFilter = value);
+                      }
+                    },
+                  ),
+                ),
+                Text('${visibleRooms.length} of ${currentRooms.length} rooms'),
+              ],
+            ),
+            const SizedBox(height: 14),
+          ],
+          if (_viewMode == RoomViewMode.list) ...[
+            if (visibleRooms.isEmpty)
+              const EmptyState(
+                icon: Icons.search_off_outlined,
+                title: 'No matching rooms',
+                message: 'Try another search or availability filter.',
+              )
+            else
+              AdaptiveGrid(
+                minTileWidth: 260,
+                children: visibleRooms.map(roomCard).toList(),
+              ),
+          ] else
             RoomFloorPlanView(
               rooms: currentRooms,
               onRoomTap: _openRoomDetail,
@@ -296,7 +375,20 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
   }
 
   Future<void> _openRoomDetail(RoomRecord room) async {
-    final changed = await Navigator.of(context).push<bool>(
+    if (kIsWeb && MediaQuery.sizeOf(context).width >= 1024) {
+      final openFull = await showStaffQuickPanel<bool>(
+        context,
+        builder: (panelContext) => RoomQuickPreview(
+          room: room,
+          onClose: () => Navigator.of(panelContext).pop(),
+          onFullDetails: () => Navigator.of(panelContext).pop(true),
+        ),
+      );
+
+      if (!mounted || openFull != true) return;
+    }
+
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => RoomDetailPage(
           initialRoom: room,
@@ -304,10 +396,90 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
         ),
       ),
     );
-    if (changed == true || mounted) {
+
+    if (mounted) {
       await _loadRooms();
     }
   }
+}
+
+/// Quick, read-only summary. All room/bed mutations remain in RoomDetailPage.
+class RoomQuickPreview extends StatelessWidget {
+  const RoomQuickPreview({
+    required this.room,
+    required this.onFullDetails,
+    required this.onClose,
+    super.key,
+  });
+
+  final RoomRecord room;
+  final VoidCallback onFullDetails;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        key: const Key('room-quick-preview'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('Room ${room.number}',
+                    style: Theme.of(context).textTheme.titleLarge),
+              ),
+              IconButton(
+                tooltip: 'Close quick details',
+                onPressed: onClose,
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(room.floor, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 16),
+          InfoRow(
+            label: 'Occupied beds',
+            value: '${room.occupied} of ${room.capacity}',
+            icon: Icons.bed_outlined,
+          ),
+          InfoRow(
+            label: 'Available beds',
+            value: '${room.physicallyAvailable}',
+            icon: Icons.event_available_outlined,
+          ),
+          if (room.description.trim().isNotEmpty)
+            InfoRow(
+              label: 'Notes',
+              value: room.description,
+              icon: Icons.notes_outlined,
+            ),
+          const Divider(height: 32),
+          Text('Bed spaces', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          if (room.beds.isEmpty)
+            const Text('No bed spaces configured.')
+          else
+            ...room.beds.map(
+              (bed) => ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                    bed.occupied ? Icons.person_outline : Icons.bed_outlined),
+                title: Text(bed.label),
+                subtitle: Text(bed.occupied
+                    ? (bed.tenantName ?? 'Occupied')
+                    : bedStatusLabel(bed.status)),
+              ),
+            ),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            key: const Key('room-quick-full-details'),
+            onPressed: onFullDetails,
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('Open room management'),
+          ),
+        ],
+      );
 }
 
 class RoomDetailPage extends StatefulWidget {

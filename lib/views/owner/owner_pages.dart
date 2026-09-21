@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'package:flutter/services.dart';
@@ -16,12 +17,35 @@ import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../widgets/feature_widgets.dart';
 import '../shared/account_management_page.dart';
+import '../shared/staff_quick_panel.dart';
 import 'floor_plan_page.dart';
 import 'guardian_link_management_page.dart';
 import 'staff_maintenance_page.dart';
 import 'room_monitoring_page.dart';
 import 'geofence_dev_dashboard_page.dart';
 import 'contracts_page.dart';
+import 'tenant_onboarding_flow.dart';
+
+/// Filters existing Supabase-backed directory entries; no client-side
+/// tenant records are created or mutated here.
+List<TenantDirectoryEntry> filterTenantDirectory(
+  List<TenantDirectoryEntry> tenants, {
+  String query = '',
+  String residency = 'all',
+}) {
+  final needle = query.trim().toLowerCase();
+  return tenants.where((tenant) {
+    if (residency != 'all' && tenant.residencyStatus != residency) return false;
+    if (needle.isEmpty) return true;
+    return [
+      tenant.name,
+      tenant.room,
+      tenant.bedSpace,
+      tenant.phone,
+      tenant.guardianName,
+    ].any((field) => field.toLowerCase().contains(needle));
+  }).toList();
+}
 
 void _ownerPush(BuildContext context, Widget page) {
   Navigator.of(context).push(
@@ -290,6 +314,110 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
   String? _errorMessage;
   late final TableRefreshSubscription _subscription;
   String query = '';
+  String residencyFilter = 'all';
+  bool _creatingTenant = false;
+
+  Future<void> _createTenant() async {
+    if (_creatingTenant) return;
+    setState(() => _creatingTenant = true);
+    bool accountCreated = false;
+    try {
+      final created = await showCreateTenantAccount(context);
+      if (created == null || !mounted) return;
+      accountCreated = true;
+      TenantService.invalidateCache();
+      await _fetchTenants(showSpinner: false);
+      await OwnerController.instance.loadTenants(force: true);
+      if (!mounted) return;
+      if (SessionController.instance.currentUser?.role == UserRole.owner) {
+        final createContract = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Tenant account created'),
+            content: Text('Create a draft contract for ${created.fullName} now? '
+                'You can also do this later from the tenant details.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Do this later'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Create contract'),
+              ),
+            ],
+          ),
+        );
+        if (createContract == true && mounted) {
+          await showContractEditor(
+            context,
+            initialTenantId: created.id,
+            initialTenantName: created.fullName,
+            lockTenant: true,
+          );
+          if (!mounted) return;
+          await _fetchTenants(showSpinner: false);
+        }
+      } else {
+        showAppSnackBar(context, 'Tenant account created.');
+      }
+    } catch (error) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          accountCreated
+              ? 'Tenant account was created, but a follow-up step failed: $error'
+              : 'Could not create tenant: $error',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _creatingTenant = false);
+    }
+  }
+
+  Future<void> _openTenant(TenantDirectoryEntry tenant) async {
+    // On wide web, quick inspection should not lose search/filter position.
+    // On mobile and narrow web, preserve the existing full-page behavior.
+    if (kIsWeb && MediaQuery.sizeOf(context).width >= 1024) {
+      final action = await showStaffQuickPanel<_TenantQuickAction>(
+        context,
+        builder: (panelContext) => TenantQuickPreview(
+          tenant: tenant,
+          onClose: () => Navigator.of(panelContext).pop(),
+          onFullDetails: () => Navigator.of(panelContext).pop(_TenantQuickAction.full),
+          onManageAccount: () => Navigator.of(panelContext).pop(_TenantQuickAction.manage),
+        ),
+      );
+      if (!mounted) return;
+      if (action == _TenantQuickAction.manage) {
+        await _editTenant(tenant);
+      } else if (action == _TenantQuickAction.full) {
+        await _openFullTenantDetails(tenant);
+      }
+    } else {
+      await _openFullTenantDetails(tenant);
+    }
+  }
+
+  Future<void> _openFullTenantDetails(TenantDirectoryEntry tenant) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => TenantDetailsPage(tenant: tenant)),
+    );
+    if (mounted) await _fetchTenants(showSpinner: false);
+  }
+
+  Future<void> _editTenant(TenantDirectoryEntry tenant) async {
+    try {
+      final changed = await showEditTenantAccount(context, tenant.id);
+      if (!changed || !mounted) return;
+      TenantService.invalidateCache();
+      await _fetchTenants(showSpinner: false);
+      await OwnerController.instance.loadTenants(force: true);
+      if (mounted) showAppSnackBar(context, 'Tenant account updated.');
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Could not manage tenant: $error');
+    }
+  }
 
   @override
   void initState() {
@@ -372,25 +500,69 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
       );
     } else {
       final allTenants = currentTenants ?? [];
-      final filtered = allTenants
-          .where(
-            (tenant) =>
-                tenant.name.toLowerCase().contains(
-                      query.toLowerCase(),
-                    ) ||
-                tenant.room.contains(query),
-          )
-          .toList();
+      final filtered = kIsWeb
+          ? filterTenantDirectory(
+              allTenants,
+              query: query,
+              residency: residencyFilter,
+            )
+          : allTenants
+              .where((tenant) =>
+                  tenant.name.toLowerCase().contains(query.toLowerCase()) ||
+                  tenant.room.contains(query))
+              .toList();
 
       body = Column(
         children: [
-          TextField(
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Search tenant name or room',
+          if (kIsWeb)
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: 340,
+                  child: TextField(
+                    key: const Key('web-tenant-search'),
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      hintText: 'Search name, room, phone or guardian',
+                    ),
+                    onChanged: (value) => setState(() => query = value),
+                  ),
+                ),
+                SizedBox(
+                  width: 190,
+                  child: DropdownButtonFormField<String>(
+                    key: const Key('web-tenant-residency-filter'),
+                    initialValue: residencyFilter,
+                    decoration:
+                        const InputDecoration(labelText: 'Residency status'),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('All statuses')),
+                      DropdownMenuItem(value: 'active', child: Text('Active')),
+                      DropdownMenuItem(
+                          value: 'moving_out', child: Text('Moving out')),
+                      DropdownMenuItem(value: 'inactive', child: Text('Inactive')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => residencyFilter = value);
+                      }
+                    },
+                  ),
+                ),
+                Text('${filtered.length} of ${allTenants.length} tenants'),
+              ],
+            )
+          else
+            TextField(
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: 'Search tenant name or room',
+              ),
+              onChanged: (value) => setState(() => query = value),
             ),
-            onChanged: (value) => setState(() => query = value),
-          ),
           const SizedBox(height: 14),
           if (filtered.isEmpty)
             const EmptyState(
@@ -435,14 +607,27 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
                       ],
                     ),
                     subtitle: Text('Room ${tenant.room} • ${tenant.bedSpace}'),
-                    trailing:
-                        StatusPill(_residencyLabel(tenant.residencyStatus)),
-                    onTap: () async {
-                      await Navigator.of(context).push(MaterialPageRoute<void>(
-                        builder: (_) => TenantDetailsPage(tenant: tenant),
-                      ));
-                      if (mounted) _fetchTenants(showSpinner: false);
-                    },
+                    trailing: kIsWeb
+                        ? SizedBox(
+                            width: 156,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Flexible(
+                                  child: StatusPill(
+                                      _residencyLabel(tenant.residencyStatus)),
+                                ),
+                                IconButton(
+                                  key: Key('web-edit-tenant-${tenant.id}'),
+                                  tooltip: 'Edit or delete tenant account',
+                                  icon: const Icon(Icons.manage_accounts_outlined),
+                                  onPressed: () => _editTenant(tenant),
+                                ),
+                              ],
+                            ),
+                          )
+                        : StatusPill(_residencyLabel(tenant.residencyStatus)),
+                    onTap: () => _openTenant(tenant),
                   ),
                 ),
               ),
@@ -453,7 +638,17 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
 
     return PageFrame(
       title: 'Tenants',
-      subtitle: 'Search and view tenant records',
+      subtitle: kIsWeb
+          ? 'Search and manage tenant records'
+          : 'Search and view tenant records',
+      floatingActionButton: kIsWeb
+          ? FloatingActionButton.extended(
+              key: const Key('web-create-tenant'),
+              onPressed: _creatingTenant ? null : _createTenant,
+              icon: const Icon(Icons.person_add_outlined),
+              label: Text(_creatingTenant ? 'Creating...' : 'Add tenant'),
+            )
+          : null,
       actions: [
         IconButton(
           tooltip: 'Refresh',
@@ -466,6 +661,84 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
   }
 }
 
+
+// Only preview and navigation here. Changes still go through the existing
+// tenant/account services and the full mobile-equivalent detail screen.
+enum _TenantQuickAction { full, manage }
+
+class TenantQuickPreview extends StatelessWidget {
+  const TenantQuickPreview({
+    required this.tenant,
+    required this.onFullDetails,
+    required this.onManageAccount,
+    required this.onClose,
+    super.key,
+  });
+
+  final TenantDirectoryEntry tenant;
+  final VoidCallback onFullDetails;
+  final VoidCallback onManageAccount;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        key: const Key('tenant-quick-preview'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('Tenant details',
+                    style: Theme.of(context).textTheme.titleLarge),
+              ),
+              IconButton(
+                tooltip: 'Close quick details',
+                onPressed: onClose,
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(tenant.name,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  )),
+          const SizedBox(height: 6),
+          StatusPill(_residencyLabel(tenant.residencyStatus)),
+          const Divider(height: 32),
+          InfoRow(
+            label: 'Room and bed',
+            value: '${tenant.room} • ${tenant.bedSpace}',
+            icon: Icons.bed_outlined,
+          ),
+          InfoRow(
+            label: 'Phone',
+            value: tenant.phone,
+            icon: Icons.phone_outlined,
+          ),
+          InfoRow(
+            label: 'Guardian',
+            value: tenant.guardianName,
+            icon: Icons.family_restroom_outlined,
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            key: const Key('tenant-quick-full-details'),
+            onPressed: onFullDetails,
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('Open full tenant details'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            key: const Key('tenant-quick-manage-account'),
+            onPressed: onManageAccount,
+            icon: const Icon(Icons.manage_accounts_outlined),
+            label: const Text('Manage account'),
+          ),
+        ],
+      );
+}
+
 class TenantDetailsPage extends StatelessWidget {
   const TenantDetailsPage({
     required this.tenant,
@@ -476,9 +749,40 @@ class TenantDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isOwnerWeb = kIsWeb &&
+        SessionController.instance.currentUser?.role == UserRole.owner;
+    final isStaffWeb = kIsWeb &&
+        {UserRole.owner, UserRole.caretaker}.contains(
+          SessionController.instance.currentUser?.role,
+        );
+    final needsContract = tenant.hasContract == false;
+    final needsBed = tenant.assignmentId == null;
+    final needsGuardian = tenant.guardianName == 'Not assigned';
+
     return PageFrame(
       title: tenant.name,
       subtitle: 'Tenant details',
+      actions: isStaffWeb
+          ? [
+              IconButton(
+                tooltip: 'Edit or delete tenant account',
+                icon: const Icon(Icons.manage_accounts_outlined),
+                onPressed: () async {
+                  try {
+                    final changed = await showEditTenantAccount(context, tenant.id);
+                    if (changed && context.mounted) {
+                      TenantService.invalidateCache();
+                      Navigator.of(context).pop();
+                    }
+                  } catch (error) {
+                    if (context.mounted) {
+                      showAppSnackBar(context, 'Could not manage tenant: $error');
+                    }
+                  }
+                },
+              ),
+            ]
+          : null,
       child: Column(
         children: [
           CarmelitaCard(
@@ -519,6 +823,53 @@ class TenantDetailsPage extends StatelessWidget {
               ],
             ),
           ),
+          if (isOwnerWeb && (needsContract || needsBed || needsGuardian)) ...[
+            const SizedBox(height: 14),
+            CarmelitaCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SectionTitle('Onboarding checklist'),
+                  const SizedBox(height: 8),
+                  Text('Contract: ${needsContract ? 'Not created' : 'Created'}'),
+                  Text('Bed: ${needsBed ? 'Not assigned' : 'Assigned'}'),
+                  Text('Primary guardian: '
+                      '${needsGuardian ? 'Not assigned' : 'Assigned'}'),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    key: const Key('web-tenant-onboarding-action'),
+                    onPressed: () async {
+                      if (needsContract) {
+                        final saved = await showContractEditor(
+                          context,
+                          initialTenantId: tenant.id,
+                          initialTenantName: tenant.name,
+                          lockTenant: true,
+                        );
+                        if (saved == true && context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      } else {
+                        await continueTenantOnboarding(
+                          context,
+                          tenantId: tenant.id,
+                          tenantName: tenant.name,
+                          fromSavedContract: false,
+                        );
+                        if (context.mounted) Navigator.pop(context);
+                      }
+                    },
+                    icon: Icon(needsContract
+                        ? Icons.description_outlined
+                        : Icons.task_alt_outlined),
+                    label: Text(needsContract
+                        ? 'Create draft contract'
+                        : 'Continue onboarding'),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (_showOnboardingIncomplete && tenant.hasContract == false) ...[
             const SizedBox(height: 14),
             Container(

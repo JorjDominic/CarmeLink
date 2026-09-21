@@ -8,13 +8,14 @@ Future<void> continueTenantOnboarding(
   BuildContext context, {
   required String tenantId,
   required String tenantName,
+  bool fromSavedContract = true,
 }) async {
   final proceed = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
     builder: (dialogContext) => AlertDialog(
       icon: const Icon(Icons.task_alt_rounded),
-      title: const Text('Contract saved'),
+      title: Text(fromSavedContract ? 'Contract saved' : 'Continue onboarding'),
       content: Text(
         'Continue $tenantName\'s onboarding with room and bed assignment, then guardian linking.',
       ),

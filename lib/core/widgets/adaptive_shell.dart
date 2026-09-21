@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
@@ -56,12 +58,17 @@ class AdaptiveRoleShell extends StatefulWidget {
     required this.destinations,
     required this.roleLabel,
     required this.messagePage,
+    this.webDestinations = const [],
     super.key,
   });
 
   final List<AppDestination> destinations;
   final String roleLabel;
   final Widget messagePage;
+
+  /// Extra desktop-only navigation to existing role-authorized pages.
+  /// Mobile destinations and the in-app backend services stay unchanged.
+  final List<AppDestination> webDestinations;
 
   static Widget? activeMessagePage;
 
@@ -175,24 +182,219 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   @override
   Widget build(BuildContext context) {
     AdaptiveRoleShell.activeMessagePage = widget.messagePage;
-    final destination = widget.destinations[index];
+    // Mobile keeps the original tab count, even when the browser is resized
+    // after selecting a desktop-only management destination.
+    final desktopWeb = kIsWeb && MediaQuery.sizeOf(context).width >= 1024;
+    final activeDestinations = desktopWeb
+        ? [...widget.destinations, ...widget.webDestinations]
+        : widget.destinations;
+    final activeIndex = index < activeDestinations.length ? index : 0;
+    final destination = activeDestinations[activeIndex];
+    final page = RepaintBoundary(
+      child: KeyedSubtree(
+        key: ValueKey(activeIndex),
+        child: destination.page,
+      ),
+    );
 
     return CarmelitaNavScope(
       openMenu: _openMenu,
       openMessages: _openMessages,
       selectIndex: _select,
       child: Scaffold(
-        extendBody: true,
-        body: RepaintBoundary(
-          child: KeyedSubtree(
-            key: ValueKey(index),
-            child: destination.page,
+        extendBody: !desktopWeb,
+        body: desktopWeb
+            ? Row(
+                children: [
+                  _WebStaffSidebar(
+                    roleLabel: widget.roleLabel,
+                    destinations: activeDestinations,
+                    mainDestinationCount: widget.destinations.length,
+                    selectedIndex: activeIndex,
+                    onSelected: _select,
+                    onOpenMessages: _openMessages,
+                  ),
+                  const VerticalDivider(width: 1),
+                  Expanded(child: page),
+                ],
+              )
+            : page,
+        bottomNavigationBar: desktopWeb
+            ? null
+            : _FloatingIslandNavigation(
+                destinations: widget.destinations,
+                selectedIndex: activeIndex,
+                onSelected: _select,
+              ),
+      ),
+    );
+  }
+}
+
+/// Wide-screen web navigation for the existing OwnerShell/CaretakerShell.
+/// The destination list belongs to the mobile role shell, so module access,
+/// business logic and unfinished-feature labels cannot drift to demo data.
+class _WebStaffSidebar extends StatelessWidget {
+  const _WebStaffSidebar({
+    required this.roleLabel,
+    required this.destinations,
+    required this.mainDestinationCount,
+    required this.selectedIndex,
+    required this.onSelected,
+    required this.onOpenMessages,
+  });
+
+  final String roleLabel;
+  final List<AppDestination> destinations;
+  final int mainDestinationCount;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  final VoidCallback onOpenMessages;
+
+  void _open(BuildContext context, Widget page) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => page),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return SizedBox(
+      key: const Key('web-staff-sidebar'),
+      width: 248,
+      child: Material(
+        color: colors.surface,
+        child: SafeArea(
+          right: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 16, 16),
+                child: Row(
+                  children: [
+                    Icon(Icons.apartment_rounded,
+                        color: colors.primary, size: 28),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('CarmeLink',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              )),
+                          Text('$roleLabel workspace',
+                              style: theme.textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView(
+                  key: const Key('web-staff-navigation'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 14,
+                  ),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 5, 12, 10),
+                      child: Text('MANAGEMENT',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colors.primary,
+                            letterSpacing: 1.4,
+                            fontWeight: FontWeight.bold,
+                          )),
+                    ),
+                    ...List.generate(destinations.length, (itemIndex) {
+                      final item = destinations[itemIndex];
+                      final selected = itemIndex == selectedIndex;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (itemIndex == mainDestinationCount)
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(12, 14, 12, 10),
+                              child: Text('STAFF TOOLS',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: colors.primary,
+                                    letterSpacing: 1.4,
+                                    fontWeight: FontWeight.bold,
+                                  )),
+                            ),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Material(
+                              color: selected
+                                  ? colors.primary.withValues(alpha: .10)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              child: ListTile(
+                                key: Key('web-staff-destination-$itemIndex'),
+                                dense: true,
+                                minTileHeight: 48,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                selected: selected,
+                                selectedColor: colors.primary,
+                                leading: Icon(
+                                  selected ? item.selectedIcon : item.icon,
+                                  size: 21,
+                                ),
+                                title: Text(item.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
+                                trailing: item.isWorkInProgress
+                                    ? const _WipBadge()
+                                    : null,
+                                onTap: () => onSelected(itemIndex),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
+                    const Divider(height: 24),
+                    ListTile(
+                      key: const Key('web-staff-messages'),
+                      dense: true,
+                      leading: const Icon(Icons.chat_bubble_outline),
+                      title: const Text('Messages'),
+                      onTap: onOpenMessages,
+                    ),
+                    ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.notifications_outlined),
+                      title: const Text('Notifications'),
+                      onTap: () => _open(context, const NotificationsPage()),
+                    ),
+                    ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.settings_outlined),
+                      title: const Text('Settings'),
+                      onTap: () => _open(context, const SettingsPage()),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text('Staff portal · $roleLabel',
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ],
           ),
-        ),
-        bottomNavigationBar: _FloatingIslandNavigation(
-          destinations: widget.destinations,
-          selectedIndex: index,
-          onSelected: _select,
         ),
       ),
     );
