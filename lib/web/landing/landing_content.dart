@@ -20,7 +20,7 @@ abstract final class LandingContent {
   static const facebookUrl =
       'https://www.facebook.com/profile.php?id=61562079845434';
   static const mapsUrl =
-      'https://www.google.com/maps/search/?api=1&query=Carmelita%27s%20Dormitory%2C%20Dr%20Luis%20Reyes%20St%2C%20Brgy%20Concepcion%2C%20Baliwag%2C%20Bulacan';
+      'https://maps.app.goo.gl/wKXQG8GzEx9jiyDV9';
 
   static const photos = <PropertyPhoto>[
     PropertyPhoto(
