@@ -106,6 +106,25 @@ class GateService {
     });
   }
 
+  /// Synchronizes one native tripwire transition captured while Flutter may
+  /// have been suspended. The event ID makes retries idempotent and
+  /// [observedAt] preserves detection time when upload is delayed.
+  Future<void> recordNativeTransition({
+    required String direction,
+    required String clientEventId,
+    required DateTime observedAt,
+  }) async {
+    if (direction != 'IN' && direction != 'OUT') {
+      throw ArgumentError.value(direction, 'direction', 'Must be IN or OUT');
+    }
+    invalidateCache();
+    await _client.rpc('record_tenant_geofence_transition', params: {
+      'p_direction': direction,
+      'p_observed_at': observedAt.toUtc().toIso8601String(),
+      'p_client_event_id': clientEventId,
+    });
+  }
+
   /// Persists only minimized presence state for bounded offline recovery.
   Future<void> queueGeofenceCheck({
     String? direction,

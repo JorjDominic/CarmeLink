@@ -334,8 +334,9 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
           context: context,
           builder: (dialogContext) => AlertDialog(
             title: const Text('Tenant account created'),
-            content: Text('Create a draft contract for ${created.fullName} now? '
-                'You can also do this later from the tenant details.'),
+            content:
+                Text('Create a draft contract for ${created.fullName} now? '
+                    'You can also do this later from the tenant details.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
@@ -384,8 +385,10 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
         builder: (panelContext) => TenantQuickPreview(
           tenant: tenant,
           onClose: () => Navigator.of(panelContext).pop(),
-          onFullDetails: () => Navigator.of(panelContext).pop(_TenantQuickAction.full),
-          onManageAccount: () => Navigator.of(panelContext).pop(_TenantQuickAction.manage),
+          onFullDetails: () =>
+              Navigator.of(panelContext).pop(_TenantQuickAction.full),
+          onManageAccount: () =>
+              Navigator.of(panelContext).pop(_TenantQuickAction.manage),
         ),
       );
       if (!mounted) return;
@@ -539,11 +542,13 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
                     decoration:
                         const InputDecoration(labelText: 'Residency status'),
                     items: const [
-                      DropdownMenuItem(value: 'all', child: Text('All statuses')),
+                      DropdownMenuItem(
+                          value: 'all', child: Text('All statuses')),
                       DropdownMenuItem(value: 'active', child: Text('Active')),
                       DropdownMenuItem(
                           value: 'moving_out', child: Text('Moving out')),
-                      DropdownMenuItem(value: 'inactive', child: Text('Inactive')),
+                      DropdownMenuItem(
+                          value: 'inactive', child: Text('Inactive')),
                     ],
                     onChanged: (value) {
                       if (value != null) {
@@ -620,7 +625,8 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
                                 IconButton(
                                   key: Key('web-edit-tenant-${tenant.id}'),
                                   tooltip: 'Edit or delete tenant account',
-                                  icon: const Icon(Icons.manage_accounts_outlined),
+                                  icon: const Icon(
+                                      Icons.manage_accounts_outlined),
                                   onPressed: () => _editTenant(tenant),
                                 ),
                               ],
@@ -660,7 +666,6 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
     );
   }
 }
-
 
 // Only preview and navigation here. Changes still go through the existing
 // tenant/account services and the full mobile-equivalent detail screen.
@@ -769,14 +774,16 @@ class TenantDetailsPage extends StatelessWidget {
                 icon: const Icon(Icons.manage_accounts_outlined),
                 onPressed: () async {
                   try {
-                    final changed = await showEditTenantAccount(context, tenant.id);
+                    final changed =
+                        await showEditTenantAccount(context, tenant.id);
                     if (changed && context.mounted) {
                       TenantService.invalidateCache();
                       Navigator.of(context).pop();
                     }
                   } catch (error) {
                     if (context.mounted) {
-                      showAppSnackBar(context, 'Could not manage tenant: $error');
+                      showAppSnackBar(
+                          context, 'Could not manage tenant: $error');
                     }
                   }
                 },
@@ -831,7 +838,8 @@ class TenantDetailsPage extends StatelessWidget {
                 children: [
                   const SectionTitle('Onboarding checklist'),
                   const SizedBox(height: 8),
-                  Text('Contract: ${needsContract ? 'Not created' : 'Created'}'),
+                  Text(
+                      'Contract: ${needsContract ? 'Not created' : 'Created'}'),
                   Text('Bed: ${needsBed ? 'Not assigned' : 'Assigned'}'),
                   Text('Primary guardian: '
                       '${needsGuardian ? 'Not assigned' : 'Assigned'}'),
@@ -4077,7 +4085,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
 
     return PageFrame(
       title: 'Curfew',
-      subtitle: 'Geofence perimeter and live resident presence',
+      subtitle: 'Automatic dormitory entry and exit records',
       actions: [
         IconButton(
           tooltip: 'Refresh presence & events',
@@ -4157,15 +4165,15 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
               AdaptiveGrid(
                 children: [
                   MetricCard(
-                    label: 'Inside perimeter',
+                    label: 'Last event: IN',
                     value: '${controller.tenantsInsideCount}',
-                    detail: 'Residents on premises',
+                    detail: 'Latest recorded crossing was entry',
                     icon: Icons.home_outlined,
                   ),
                   MetricCard(
-                    label: 'Outside perimeter',
+                    label: 'Last event: OUT',
                     value: '${controller.tenantsOutsideCount}',
-                    detail: 'Residents away',
+                    detail: 'Latest recorded crossing was exit',
                     icon: Icons.directions_walk_outlined,
                   ),
                   MetricCard(
@@ -4246,8 +4254,9 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
               ),
               const SizedBox(height: 22),
               const SectionTitle(
-                'Resident presence directory',
-                subtitle: 'Current presence verified via on-device geofence',
+                'Last recorded crossing by resident',
+                subtitle:
+                    'Tripwire history is supporting evidence, not live tracking',
               ),
               const SizedBox(height: 8),
               Wrap(

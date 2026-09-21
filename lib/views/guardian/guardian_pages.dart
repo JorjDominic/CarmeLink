@@ -60,8 +60,8 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
 
           final headerTitle = controller.hasLinkedTenant
               ? hasPresence
-                  ? '$firstName is ${presence.toLowerCase()} the dormitory perimeter.'
-                  : '$firstName\'s presence is unavailable.'
+                  ? '$firstName\'s last crossing was ${presence == 'Inside' ? 'IN' : 'OUT'}.'
+                  : '$firstName has no recorded crossing yet.'
               : (controller.loading
                   ? 'Loading resident details...'
                   : 'Welcome to Carmelita\'s Dormitory');
@@ -74,8 +74,8 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                 title: headerTitle,
                 subtitle: controller.hasLinkedTenant
                     ? hasPresence
-                        ? 'Based on the latest recorded geofence event.'
-                        : 'No current geofence event is available.'
+                        ? 'Based on the latest automatic tripwire event${latestPresenceAt == null ? '' : ' at ${timeText(latestPresenceAt)}'}.'
+                        : 'No automatic entry or exit event is available.'
                     : 'Manage linked resident information, room, and payments.',
                 trailing: StatusPill(
                   controller.loading ? 'Loading' : presence,
@@ -1018,7 +1018,7 @@ class _GuardianPresenceMonitoringPageState
                 const SizedBox(height: 22),
                 const SectionTitle(
                   'Recent presence records',
-                  subtitle: 'Automated GPS geofence arrival and departure logs',
+                  subtitle: 'Automatic tripwire entry and exit records',
                 ),
                 const SizedBox(height: 10),
                 if (events.isEmpty)
