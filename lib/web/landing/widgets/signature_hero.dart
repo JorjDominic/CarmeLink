@@ -11,6 +11,8 @@ class SignatureHero extends StatelessWidget {
     required this.onExploreRooms,
     required this.onContact,
     required this.onDiscover,
+    required this.onOpenCourtyard,
+    required this.onOpenRoom,
     required this.headlineEntered,
     required this.photoEntered,
     required this.actionsEntered,
@@ -20,6 +22,8 @@ class SignatureHero extends StatelessWidget {
   final VoidCallback onExploreRooms;
   final VoidCallback onContact;
   final VoidCallback onDiscover;
+  final VoidCallback onOpenCourtyard;
+  final VoidCallback onOpenRoom;
   final bool headlineEntered;
   final bool photoEntered;
   final bool actionsEntered;
@@ -85,8 +89,7 @@ class SignatureHero extends StatelessWidget {
     required Offset offset,
   }) {
     final show = visible || reducedMotion;
-    final time =
-        reducedMotion ? Duration.zero : Duration(milliseconds: duration);
+    final time = reducedMotion ? Duration.zero : Duration(milliseconds: duration);
     return AnimatedOpacity(
       opacity: show ? 1 : 0,
       duration: time,
@@ -136,18 +139,8 @@ class SignatureHero extends StatelessWidget {
 
   Widget _title(double width) {
     final desktop = width >= 980;
-    final size = desktop
-        ? 84.0
-        : width >= 620
-            ? 68.0
-            : width < 360
-                ? 43.0
-                : 49.0;
-    final scriptSize = desktop
-        ? 99.0
-        : width >= 620
-            ? 89.0
-            : 71.0;
+    final size = desktop ? 84.0 : width >= 620 ? 68.0 : width < 360 ? 43.0 : 49.0;
+    final scriptSize = desktop ? 99.0 : width >= 620 ? 89.0 : 71.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -203,8 +196,7 @@ class SignatureHero extends StatelessWidget {
           const SizedBox(height: 12),
           const Text(
             'Get to know the spaces at Carmelita\'s Dormitory through real photographs. Explore the rooms, then ask us about availability.',
-            style:
-                TextStyle(color: WebPalette.muted, fontSize: 15.5, height: 1.6),
+            style: TextStyle(color: WebPalette.muted, fontSize: 15.5, height: 1.6),
           ),
           SizedBox(height: desktop ? 24 : 19),
           _entrance(
@@ -222,8 +214,7 @@ class SignatureHero extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     backgroundColor: WebPalette.plum,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 19, vertical: 18),
+                    padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 18),
                   ),
                 ),
                 OutlinedButton(
@@ -231,8 +222,7 @@ class SignatureHero extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: WebPalette.plum,
                     side: const BorderSide(color: WebPalette.border),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 19, vertical: 18),
+                    padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 18),
                   ),
                   child: const Text('Get in touch'),
                 ),
@@ -242,54 +232,87 @@ class SignatureHero extends StatelessWidget {
         ],
       );
 
-  Widget _photograph(String path, String description) => Image.asset(
-        path,
-        width: double.infinity,
-        height: double.infinity,
-        fit: BoxFit.cover,
-        semanticLabel: description,
-        errorBuilder: (context, error, stack) => Container(
-          color: WebPalette.sand,
+  Widget _photograph(String path, String description) => ColoredBox(
+        color: WebPalette.sand,
+        child: Image.asset(
+          path,
+          width: double.infinity,
+          height: double.infinity,
+          // Crop only within a carefully proportioned frame; the full photo
+          // is always available from the existing lightbox.
+          fit: BoxFit.cover,
           alignment: Alignment.center,
-          child: const Text('Photo unavailable',
-              style: TextStyle(color: WebPalette.muted)),
+          semanticLabel: description,
+          errorBuilder: (context, error, stack) => Container(
+            color: WebPalette.sand,
+            alignment: Alignment.center,
+            child: const Text('Photo unavailable',
+                style: TextStyle(color: WebPalette.muted)),
+          ),
         ),
       );
 
-  Widget _desktopPhotoSpread() => SizedBox(
-        height: 465,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              flex: 8,
+  // Tappable web-only photographs use the existing full-size lightbox.
+  Widget _interactivePhoto({
+    required String path,
+    required String description,
+    required String tooltip,
+    required String semanticsLabel,
+    required Key photoKey,
+    required VoidCallback onOpen,
+    required BorderRadius radius,
+    bool showCourtyardCaption = false,
+  }) => Semantics(
+        button: true,
+        label: semanticsLabel,
+        child: Tooltip(
+          message: tooltip,
+          child: Material(
+            color: WebPalette.sand,
+            borderRadius: radius,
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              key: photoKey,
+              onTap: onOpen,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(100),
-                      bottomRight: Radius.circular(12),
+                  _photograph(path, description),
+                  if (showCourtyardCaption)
+                    Positioned(
+                      left: 16,
+                      bottom: 16,
+                      child: IgnorePointer(
+                        child: Container(
+                          color: WebPalette.background,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 9,
+                          ),
+                          child: const Text(
+                            '01  /  THE COURTYARD',
+                            style: TextStyle(
+                              color: WebPalette.ink,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.3,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                    child: _photograph(
-                      _courtyard,
-                      'Actual Carmelita Dormitory courtyard photograph',
-                    ),
-                  ),
                   Positioned(
-                    bottom: 18,
-                    left: 22,
-                    child: Container(
-                      color: WebPalette.background,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 11),
-                      child: const Text(
-                        '01  /  THE COURTYARD',
-                        style: TextStyle(
-                          color: WebPalette.ink,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.6,
+                    top: 14,
+                    right: 14,
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: WebPalette.background,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: const Padding(
+                          padding: EdgeInsets.all(9),
+                          child: Icon(Icons.open_in_full,
+                              color: WebPalette.plum, size: 17),
                         ),
                       ),
                     ),
@@ -297,21 +320,54 @@ class SignatureHero extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+        ),
+      );
+
+  // A narrower, shorter spread keeps the established silhouette without
+  // letting a landscape crop dominate the opening viewport.
+  Widget _desktopPhotoSpread() => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1260),
+          child: SizedBox(
+            key: const ValueKey('signature-photo-spread'),
+            height: 410,
+            child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 7,
+              child: _interactivePhoto(
+                path: _courtyard,
+                description: 'Actual Carmelita Dormitory courtyard photograph',
+                tooltip: 'View courtyard photograph',
+                semanticsLabel: 'Open courtyard photograph',
+                photoKey: const ValueKey('signature-courtyard-photo'),
+                onOpen: onOpenCourtyard,
+                radius: const BorderRadius.only(
+                  topLeft: Radius.circular(76),
+                  bottomRight: Radius.circular(12),
+                ),
+                showCourtyardCaption: true,
+              ),
+            ),
             const SizedBox(width: 14),
             Expanded(
-              flex: 3,
+              flex: 4,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
                     flex: 5,
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.only(
+                    child: _interactivePhoto(
+                      path: _room,
+                      description: 'Actual Carmelita Dormitory bedroom photograph',
+                      tooltip: 'View room photograph',
+                      semanticsLabel: 'Open room photograph',
+                      photoKey: const ValueKey('signature-room-photo'),
+                      onOpen: onOpenRoom,
+                      radius: const BorderRadius.only(
                         topRight: Radius.circular(12),
-                      ),
-                      child: _photograph(
-                        _room,
-                        'Actual Carmelita Dormitory bedroom photograph',
                       ),
                     ),
                   ),
@@ -352,6 +408,8 @@ class SignatureHero extends StatelessWidget {
               ),
             ),
           ],
+            ),
+          ),
         ),
       );
 
@@ -359,16 +417,19 @@ class SignatureHero extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: mobile ? 315 : 415,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
+            height: mobile ? 265 : 345,
+            child: _interactivePhoto(
+              path: _courtyard,
+              description: 'Actual Carmelita Dormitory courtyard photograph',
+              tooltip: 'View courtyard photograph',
+              semanticsLabel: 'Open courtyard photograph',
+              photoKey: const ValueKey('signature-courtyard-photo'),
+              onOpen: onOpenCourtyard,
+              radius: const BorderRadius.only(
                 topLeft: Radius.circular(68),
                 bottomRight: Radius.circular(10),
               ),
-              child: _photograph(
-                _courtyard,
-                'Actual Carmelita Dormitory courtyard photograph',
-              ),
+              showCourtyardCaption: true,
             ),
           ),
           const SizedBox(height: 12),
@@ -377,13 +438,15 @@ class SignatureHero extends StatelessWidget {
               SizedBox(
                 width: mobile ? 84 : 112,
                 height: mobile ? 84 : 112,
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.only(
+                child: _interactivePhoto(
+                  path: _room,
+                  description: 'Actual Carmelita Dormitory bedroom photograph',
+                  tooltip: 'View room photograph',
+                  semanticsLabel: 'Open room photograph',
+                  photoKey: const ValueKey('signature-room-photo'),
+                  onOpen: onOpenRoom,
+                  radius: const BorderRadius.only(
                     bottomLeft: Radius.circular(8),
-                  ),
-                  child: _photograph(
-                    _room,
-                    'Actual Carmelita Dormitory bedroom photograph',
                   ),
                 ),
               ),

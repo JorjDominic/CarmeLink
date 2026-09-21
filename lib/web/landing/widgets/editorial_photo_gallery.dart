@@ -57,13 +57,19 @@ class _EditorialPhotoGalleryState extends State<EditorialPhotoGallery> {
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= 700;
     final photo = widget.photos[_index];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1040),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
         ClipRRect(
+          key: const ValueKey('gallery-featured-stage'),
           borderRadius: BorderRadius.circular(wide ? 24 : 16),
           child: AspectRatio(
-            aspectRatio: wide ? 1.95 : 1.08,
+            // A contained stage avoids the previous oversized photo while
+            // keeping a filled editorial frame and a full-photo lightbox.
+            aspectRatio: wide ? 1.65 : 1.08,
             child: PageView.builder(
               controller: _controller,
               itemCount: widget.photos.length,
@@ -80,25 +86,37 @@ class _EditorialPhotoGalleryState extends State<EditorialPhotoGallery> {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          Image.asset(
-                            item.path,
-                            fit: BoxFit.cover,
-                            alignment: Alignment.center,
-                            semanticLabel: item.description,
-                            errorBuilder: (_, __, ___) => const Center(
-                              child: Text('Photo unavailable'),
+                          ColoredBox(
+                            color: WebPalette.sand,
+                            child: Image.asset(
+                              item.path,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.center,
+                              semanticLabel: item.description,
+                              errorBuilder: (_, __, ___) => const Center(
+                                child: Text('Photo unavailable'),
+                              ),
                             ),
                           ),
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                stops: const [0.38, 1],
-                                colors: [
-                                  Colors.transparent,
-                                  WebPalette.ink.withValues(alpha: .83),
-                                ],
+                          // Limit the caption shade to its own short band;
+                          // do not darken most of the photograph.
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            height: wide ? 145 : 120,
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      WebPalette.ink.withValues(alpha: .82),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -232,12 +250,15 @@ class _EditorialPhotoGalleryState extends State<EditorialPhotoGallery> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(7),
-                        child: Image.asset(
-                          item.path,
-                          fit: BoxFit.cover,
-                          semanticLabel: 'Select ${item.title}',
-                          errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(Icons.broken_image_outlined),
+                        child: ColoredBox(
+                          color: WebPalette.sand,
+                          child: Image.asset(
+                            item.path,
+                            fit: BoxFit.cover,
+                            semanticLabel: 'Select ${item.title}',
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(Icons.broken_image_outlined),
+                            ),
                           ),
                         ),
                       ),
@@ -248,7 +269,9 @@ class _EditorialPhotoGalleryState extends State<EditorialPhotoGallery> {
             },
           ),
         ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 }

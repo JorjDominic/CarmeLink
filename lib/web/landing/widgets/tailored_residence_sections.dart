@@ -39,11 +39,9 @@ class ResidenceNarrativeSection extends StatelessWidget {
               const SizedBox(height: 29),
               const Divider(color: WebPalette.border, height: 1),
               const SizedBox(height: 18),
-              const _NumberedNote(
-                  '01', 'See the property through real photos.'),
+              const _NumberedNote('01', 'See the property through real photos.'),
               const SizedBox(height: 15),
-              const _NumberedNote(
-                  '02', 'Confirm current arrangements with staff.'),
+              const _NumberedNote('02', 'Confirm current arrangements with staff.'),
               const SizedBox(height: 20),
               TextButton.icon(
                 onPressed: onGallery,
@@ -58,7 +56,7 @@ class ResidenceNarrativeSection extends StatelessWidget {
             children: [
               PropertyPhotoTile(
                 photo: LandingContent.photos[1],
-                height: sideBySide ? 495 : 330,
+                height: sideBySide ? 560 : 350,
                 showCaption: false,
                 onOpen: onOpenRoom,
               ),
@@ -164,7 +162,7 @@ class RoomStoriesSection extends StatelessWidget {
                       flex: 7,
                       child: _photoWithNote(
                         mainPhoto,
-                        height: 475,
+                        height: 545,
                         note: '01 / THE ROOM LAYOUT',
                       ),
                     ),
@@ -180,11 +178,9 @@ class RoomStoriesSection extends StatelessWidget {
                   ],
                 )
               else ...[
-                _photoWithNote(mainPhoto,
-                    height: 330, note: '01 / THE ROOM LAYOUT'),
+                _photoWithNote(mainPhoto, height: 330, note: '01 / THE ROOM LAYOUT'),
                 const SizedBox(height: 26),
-                _photoWithNote(detailPhoto,
-                    height: 260, note: '02 / THE STUDY CORNER'),
+                _photoWithNote(detailPhoto, height: 260, note: '02 / THE STUDY CORNER'),
               ],
               const SizedBox(height: 29),
               const Divider(color: WebPalette.border, height: 1),
@@ -194,19 +190,17 @@ class RoomStoriesSection extends StatelessWidget {
                 spacing: 24,
                 runSpacing: 9,
                 children: [
-                  const Text('MORE QUESTIONS ABOUT A ROOM?',
-                      style: TextStyle(
-                        color: WebPalette.plum,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.4,
-                      )),
+                  const Text('MORE QUESTIONS ABOUT A ROOM?', style: TextStyle(
+                    color: WebPalette.plum,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.4,
+                  )),
                   TextButton.icon(
                     onPressed: onInquire,
                     icon: const Icon(Icons.arrow_outward, size: 18),
                     label: const Text('Ask the team'),
-                    style:
-                        TextButton.styleFrom(foregroundColor: WebPalette.plum),
+                    style: TextButton.styleFrom(foregroundColor: WebPalette.plum),
                   ),
                 ],
               ),
@@ -215,12 +209,10 @@ class RoomStoriesSection extends StatelessWidget {
         },
       );
 
-  Widget _photoWithNote(
-    PropertyPhoto photo, {
+  Widget _photoWithNote(PropertyPhoto photo, {
     required double height,
     required String note,
-  }) =>
-      Column(
+  }) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PropertyPhotoTile(
@@ -230,13 +222,12 @@ class RoomStoriesSection extends StatelessWidget {
             onOpen: () => onOpenPhoto(photo),
           ),
           const SizedBox(height: 13),
-          Text(note,
-              style: const TextStyle(
-                color: WebPalette.plum,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.5,
-              )),
+          Text(note, style: const TextStyle(
+            color: WebPalette.plum,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+          )),
         ],
       );
 }
@@ -271,18 +262,15 @@ class StudentGuardianSection extends StatelessWidget {
               ? const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                        child: _AudienceNote(
+                    Expanded(child: _AudienceNote(
                       label: 'FOR PROSPECTIVE TENANTS',
                       number: '01',
                       heading: 'Picture your space.',
-                      body:
-                          'Browse the real room and property photos, then ask '
+                      body: 'Browse the real room and property photos, then ask '
                           'which rooms or bed spaces are currently available.',
                     )),
                     SizedBox(width: 45),
-                    Expanded(
-                        child: _AudienceNote(
+                    Expanded(child: _AudienceNote(
                       label: 'FOR PARENTS & GUARDIANS',
                       number: '02',
                       heading: 'Get the details directly.',
@@ -298,8 +286,7 @@ class StudentGuardianSection extends StatelessWidget {
                       label: 'FOR PROSPECTIVE TENANTS',
                       number: '01',
                       heading: 'Picture your space.',
-                      body:
-                          'Browse the real room and property photos, then ask '
+                      body: 'Browse the real room and property photos, then ask '
                           'which rooms or bed spaces are currently available.',
                     ),
                     SizedBox(height: 30),
@@ -356,13 +343,12 @@ class _AudienceNote extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('$number / $label',
-                style: const TextStyle(
-                  color: WebPalette.plum,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.3,
-                )),
+            Text('$number / $label', style: const TextStyle(
+              color: WebPalette.plum,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.3,
+            )),
             const SizedBox(height: 18),
             Text(heading, style: _sectionTitle(27)),
             const SizedBox(height: 13),
@@ -376,8 +362,7 @@ class _EditorialLabel extends StatelessWidget {
   const _EditorialLabel(this.label);
   final String label;
   @override
-  Widget build(BuildContext context) => Text(
-        label,
+  Widget build(BuildContext context) => Text(label,
         style: const TextStyle(
           color: WebPalette.plumLight,
           fontSize: 11,
@@ -391,8 +376,7 @@ class _EditorialBody extends StatelessWidget {
   const _EditorialBody(this.value);
   final String value;
   @override
-  Widget build(BuildContext context) => Text(
-        value,
+  Widget build(BuildContext context) => Text(value,
         style: const TextStyle(
           color: WebPalette.muted,
           fontSize: 16,
@@ -409,20 +393,17 @@ class _NumberedNote extends StatelessWidget {
   Widget build(BuildContext context) => Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(number,
-              style: const TextStyle(
-                color: WebPalette.plum,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              )),
+          Text(number, style: const TextStyle(
+            color: WebPalette.plum,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          )),
           const SizedBox(width: 15),
-          Expanded(
-              child: Text(value,
-                  style: const TextStyle(
-                    color: WebPalette.muted,
-                    fontSize: 14,
-                    height: 1.45,
-                  ))),
+          Expanded(child: Text(value, style: const TextStyle(
+            color: WebPalette.muted,
+            fontSize: 14,
+            height: 1.45,
+          ))),
         ],
       );
 }

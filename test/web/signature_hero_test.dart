@@ -4,12 +4,12 @@ import 'package:carmelitas_dormitory_system/web/landing/widgets/signature_hero.d
 import 'package:carmelitas_dormitory_system/web/theme/web_theme.dart';
 
 void main() {
-  Future<void> pumpHero(
-    WidgetTester tester,
-    double width, {
+  Future<void> pumpHero(WidgetTester tester, double width, {
     VoidCallback? onRooms,
     VoidCallback? onContact,
     VoidCallback? onDiscover,
+    VoidCallback? onCourtyard,
+    VoidCallback? onRoom,
     bool reducedMotion = false,
   }) async {
     tester.view.devicePixelRatio = 1;
@@ -32,6 +32,8 @@ void main() {
                 onExploreRooms: onRooms ?? () {},
                 onContact: onContact ?? () {},
                 onDiscover: onDiscover ?? () {},
+                onOpenCourtyard: onCourtyard ?? () {},
+                onOpenRoom: onRoom ?? () {},
                 headlineEntered: !reducedMotion,
                 photoEntered: !reducedMotion,
                 actionsEntered: !reducedMotion,
@@ -79,11 +81,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final width in <double>[375, 1440]) {
+    testWidgets('hero photos open their full-size viewer at ${width.toInt()}px',
+        (tester) async {
+      var courtyardOpens = 0;
+      var roomOpens = 0;
+      await pumpHero(tester, width,
+        onCourtyard: () => courtyardOpens++,
+        onRoom: () => roomOpens++,
+      );
+      final courtyard = find.byKey(const ValueKey('signature-courtyard-photo'));
+      final room = find.byKey(const ValueKey('signature-room-photo'));
+      await tester.ensureVisible(courtyard);
+      await tester.tap(courtyard);
+      await tester.ensureVisible(room);
+      await tester.tap(room);
+      expect(courtyardOpens, 1);
+      expect(roomOpens, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('reduced motion reveals all hero elements immediately',
       (tester) async {
     await pumpHero(tester, 375, reducedMotion: true);
-    final fades =
-        tester.widgetList<AnimatedOpacity>(find.byType(AnimatedOpacity));
+    final fades = tester.widgetList<AnimatedOpacity>(find.byType(AnimatedOpacity));
     expect(fades, isNotEmpty);
     expect(fades.every((fade) => fade.opacity == 1), isTrue);
     expect(tester.takeException(), isNull);

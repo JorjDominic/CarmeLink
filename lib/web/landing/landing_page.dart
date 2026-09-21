@@ -154,9 +154,9 @@ class _LandingPageState extends State<LandingPage> {
         ),
       );
 
-  Widget _body(String text,
-          {Color color = WebPalette.muted, double size = 16}) =>
-      Text(text, style: TextStyle(color: color, fontSize: size, height: 1.65));
+  Widget _body(String text, {Color color = WebPalette.muted, double size = 16}) =>
+      Text(text,
+          style: TextStyle(color: color, fontSize: size, height: 1.65));
 
   Widget _section(GlobalKey key, Widget child,
       {Color color = WebPalette.background,
@@ -169,11 +169,10 @@ class _LandingPageState extends State<LandingPage> {
       padding: EdgeInsets.symmetric(
         horizontal: MediaQuery.sizeOf(context).width < 600
             ? 18
-            : MediaQuery.sizeOf(context).width >= 1200
-                ? 34
-                : 24,
-        vertical:
-            MediaQuery.sizeOf(context).width < 600 ? vertical * .76 : vertical,
+            : MediaQuery.sizeOf(context).width >= 1200 ? 34 : 24,
+        vertical: MediaQuery.sizeOf(context).width < 600
+            ? vertical * .76
+            : vertical,
       ),
       alignment: Alignment.center,
       child: ConstrainedBox(
@@ -184,9 +183,7 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   Widget _image(String asset,
-      {double? height,
-      BoxFit fit = BoxFit.cover,
-      String label = 'Dormitory photo'}) {
+      {double? height, BoxFit fit = BoxFit.cover, String label = 'Dormitory photo'}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(19),
       child: Image.asset(
@@ -302,6 +299,8 @@ class _LandingPageState extends State<LandingPage> {
           onExploreRooms: () => _go(_rooms),
           onContact: () => _go(_contact),
           onDiscover: () => _go(_about),
+          onOpenCourtyard: () => _showPhoto(LandingContent.photos.first),
+          onOpenRoom: () => _showPhoto(LandingContent.photos[1]),
           headlineEntered: _entered,
           photoEntered: _photoEntered,
           actionsEntered: _ctaEntered,
@@ -324,10 +323,8 @@ class _LandingPageState extends State<LandingPage> {
               spacing: 24,
               runSpacing: 14,
               children: const [
-                _Highlight(
-                    Icons.photo_library_outlined, 'REAL PROPERTY PHOTOS'),
-                _Highlight(
-                    Icons.chat_bubble_outline, 'ASK ABOUT ROOM AVAILABILITY'),
+                _Highlight(Icons.photo_library_outlined, 'REAL PROPERTY PHOTOS'),
+                _Highlight(Icons.chat_bubble_outline, 'ASK ABOUT ROOM AVAILABILITY'),
                 _Highlight(Icons.place_outlined, 'BALIWAG, BULACAN'),
               ],
             ),
@@ -363,8 +360,7 @@ class _LandingPageState extends State<LandingPage> {
             const SizedBox(height: 16),
             _headline('Little details. Everyday spaces.', size: wide ? 53 : 37),
             const SizedBox(height: 16),
-            _body(
-                'Discover a shared outdoor space through real photographs of the residence.'),
+            _body('Discover a shared outdoor space through real photographs of the residence.'),
             const SizedBox(height: 33),
             if (wide)
               Row(
@@ -485,8 +481,7 @@ class _LandingPageState extends State<LandingPage> {
             const SizedBox(height: 16),
             _headline('Good to know, before you go.', size: wide ? 54 : 37),
             const SizedBox(height: 18),
-            _body(
-                'Important details can change. These answers explain how to verify them with staff.'),
+            _body('Important details can change. These answers explain how to verify them with staff.'),
             const SizedBox(height: 28),
             _faqTile(
               'How do I check room availability?',
@@ -522,8 +517,7 @@ class _LandingPageState extends State<LandingPage> {
           child: ExpansionTile(
             shape: const Border(),
             collapsedShape: const Border(),
-            tilePadding:
-                const EdgeInsets.symmetric(horizontal: 22, vertical: 5),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 5),
             title: Text(question,
                 style: const TextStyle(
                   color: WebPalette.ink,
@@ -531,9 +525,7 @@ class _LandingPageState extends State<LandingPage> {
                   fontSize: 16,
                 )),
             childrenPadding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
-            children: [
-              Align(alignment: Alignment.centerLeft, child: _body(answer))
-            ],
+            children: [Align(alignment: Alignment.centerLeft, child: _body(answer))],
           ),
         ),
       );
@@ -615,12 +607,10 @@ class _LandingPageState extends State<LandingPage> {
             const SizedBox(height: 11),
             _headline("Carmelita's Dormitory", size: 25),
             const SizedBox(height: 9),
-            _body('Dr. Luis Reyes St., Brgy. Concepcion, Baliwag, Bulacan',
-                size: 14),
+            _body('Dr. Luis Reyes St., Brgy. Concepcion, Baliwag, Bulacan', size: 14),
             const SizedBox(height: 16),
             TextButton.icon(
-              onPressed: () =>
-                  WebExternalLinks.open(context, LandingContent.mapsUrl),
+              onPressed: () => WebExternalLinks.open(context, LandingContent.mapsUrl),
               icon: const Icon(Icons.navigation_outlined, size: 18),
               label: const Text('Open Google Maps'),
               style: TextButton.styleFrom(foregroundColor: WebPalette.plum),
@@ -651,8 +641,7 @@ class _LandingPageState extends State<LandingPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                      'Property information subject to staff confirmation.',
+                  const Text('Property information subject to staff confirmation.',
                       style: TextStyle(color: WebPalette.muted, fontSize: 12)),
                   const SizedBox(height: 7),
                   const Text('Carmelita Dormitory · Baliwag, Bulacan',
@@ -661,19 +650,16 @@ class _LandingPageState extends State<LandingPage> {
               ),
               Wrap(spacing: 6, children: [
                 TextButton(
-                  onPressed: () => WebExternalLinks.open(
-                      context, LandingContent.facebookUrl),
+                  onPressed: () => WebExternalLinks.open(context, LandingContent.facebookUrl),
                   child: const Text('Facebook'),
                 ),
                 TextButton(
-                  onPressed: () =>
-                      WebExternalLinks.open(context, LandingContent.mapsUrl),
+                  onPressed: () => WebExternalLinks.open(context, LandingContent.mapsUrl),
                   child: const Text('Maps'),
                 ),
                 TextButton(
                   onPressed: widget.onStaffPortal,
-                  style:
-                      TextButton.styleFrom(foregroundColor: WebPalette.muted),
+                  style: TextButton.styleFrom(foregroundColor: WebPalette.muted),
                   child: const Text('Staff sign in'),
                 ),
               ]),
