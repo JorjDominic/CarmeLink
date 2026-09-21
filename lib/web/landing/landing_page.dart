@@ -7,6 +7,7 @@ import '../widgets/reveal_on_scroll.dart';
 import '../widgets/web_brand.dart';
 import '../widgets/web_external_links.dart';
 import 'landing_content.dart';
+import 'widgets/editorial_photo_gallery.dart';
 import 'widgets/photo_lightbox.dart';
 import 'widgets/property_photo_tile.dart';
 
@@ -160,7 +161,12 @@ class _LandingPageState extends State<LandingPage> {
       key: key,
       width: double.infinity,
       color: color,
-      padding: EdgeInsets.symmetric(horizontal: 24, vertical: vertical),
+      padding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.sizeOf(context).width < 600 ? 18 : 24,
+        vertical: MediaQuery.sizeOf(context).width < 600
+            ? vertical * .76
+            : vertical,
+      ),
       alignment: Alignment.center,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1220),
@@ -264,8 +270,8 @@ class _LandingPageState extends State<LandingPage> {
           child: Column(
             children: [
               _hero(desktop, reducedMotion),
-              _highlights(wide),
               RevealOnScroll(child: _aboutSection(wide)),
+              _highlights(wide),
               RevealOnScroll(child: _roomsSection(wide)),
               RevealOnScroll(child: _spacesSection(wide)),
               RevealOnScroll(child: _gallerySection(wide)),
@@ -293,7 +299,28 @@ class _LandingPageState extends State<LandingPage> {
           children: [
             _eyebrow("Carmelita's Dormitory  /  Baliwag, Bulacan"),
             const SizedBox(height: 28),
-            _headline('A place to\nfeel at home.', size: desktop ? 68 : 43),
+            Semantics(
+              label: 'A place to feel at home.',
+              child: ExcludeSemantics(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _headline('A place to', size: desktop ? 67 : 42),
+                    Text(
+                      'feel at home.',
+                      style: TextStyle(
+                        fontFamily: 'GreatVibes',
+                        color: WebPalette.plum,
+                        fontSize: desktop
+                            ? 86
+                            : MediaQuery.sizeOf(context).width < 390 ? 50 : 60,
+                        height: 1.12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 23),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 470),
@@ -483,7 +510,7 @@ class _LandingPageState extends State<LandingPage> {
   Widget _highlights(bool wide) => Container(
         color: WebPalette.plum,
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 23),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 19),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1220),
@@ -666,36 +693,56 @@ class _LandingPageState extends State<LandingPage> {
             const SizedBox(height: 16),
             _headline('Little details. Everyday spaces.', size: wide ? 53 : 37),
             const SizedBox(height: 16),
-            _body('See the actual spaces captured at the residence.'),
+            _body('Discover a shared outdoor space through real photographs of the residence.'),
             const SizedBox(height: 33),
-            LayoutBuilder(builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 970
-                  ? 3
-                  : constraints.maxWidth >= 530 ? 2 : 1;
-              final items = [
-                LandingContent.photos[3],
-                LandingContent.photos[0],
-                LandingContent.photos[5],
-              ];
-              return GridView.builder(
-                itemCount: items.length,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: columns,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: columns == 1 ? 1.55 : 0.98,
-                ),
-                itemBuilder: (context, index) => PropertyPhotoTile(
-                  photo: items[index],
-                  height: null,
-                  onOpen: () => _showPhoto(items[index]),
-                ),
-              );
-            }),
+            if (wide)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    flex: 12,
+                    child: PropertyPhotoTile(
+                      photo: LandingContent.photos[3],
+                      height: 420,
+                      onOpen: () => _showPhoto(LandingContent.photos[3]),
+                    ),
+                  ),
+                  const SizedBox(width: 54),
+                  Expanded(flex: 8, child: _spacesCopy()),
+                ],
+              )
+            else ...[
+              PropertyPhotoTile(
+                photo: LandingContent.photos[3],
+                height: 285,
+                onOpen: () => _showPhoto(LandingContent.photos[3]),
+              ),
+              const SizedBox(height: 25),
+              _spacesCopy(),
+            ],
           ],
         ),
+      );
+
+  Widget _spacesCopy() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _eyebrow('The outdoor space'),
+          const SizedBox(height: 15),
+          _headline('Room to unwind.', size: 35),
+          const SizedBox(height: 18),
+          _body(
+            'Take a look at the outdoor seating area, then browse the full '
+            'gallery for room layouts and more perspectives of the property.',
+          ),
+          const SizedBox(height: 23),
+          TextButton.icon(
+            onPressed: () => _go(_gallery),
+            icon: const Icon(Icons.arrow_outward, size: 18),
+            label: const Text('Explore the full gallery'),
+            style: TextButton.styleFrom(foregroundColor: WebPalette.plum),
+          ),
+        ],
       );
 
   Widget _filterButton(String label, PropertyCategory? category) {
@@ -725,7 +772,10 @@ class _LandingPageState extends State<LandingPage> {
           const SizedBox(height: 16),
           _headline('The story, in pictures.', size: wide ? 56 : 38),
           const SizedBox(height: 16),
-          _body('Real images supplied by Carmelita Dormitory. Select any photo for a closer view.'),
+          _body(
+            'Real images supplied by Carmelita Dormitory. Choose a category, '
+            'browse the photographs, and select a featured image to enlarge it.',
+          ),
           const SizedBox(height: 27),
           Wrap(spacing: 9, runSpacing: 9, children: [
             _filterButton('All photos', null),
@@ -734,28 +784,11 @@ class _LandingPageState extends State<LandingPage> {
             _filterButton('Shared areas', PropertyCategory.shared),
           ]),
           const SizedBox(height: 25),
-          LayoutBuilder(builder: (context, constraints) {
-            final columns = constraints.maxWidth >= 890
-                ? 3
-                : constraints.maxWidth >= 540 ? 2 : 1;
-            return GridView.builder(
-              key: ValueKey(_filter),
-              itemCount: visible.length,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: columns,
-                crossAxisSpacing: 15,
-                mainAxisSpacing: 15,
-                childAspectRatio: columns == 1 ? 1.55 : 1.18,
-              ),
-              itemBuilder: (context, index) => PropertyPhotoTile(
-                photo: visible[index],
-                height: null,
-                onOpen: () => _showPhoto(visible[index], selection: visible),
-              ),
-            );
-          }),
+          EditorialPhotoGallery(
+            key: ValueKey(_filter),
+            photos: visible,
+            onOpen: (photo) => _showPhoto(photo, selection: visible),
+          ),
         ],
       ),
       color: WebPalette.cream,
