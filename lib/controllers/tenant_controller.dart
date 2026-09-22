@@ -655,7 +655,7 @@ class TenantController extends ChangeNotifier {
             }
             if (row['last_gate_event_at'] != null) {
               _lastGateEventAt =
-                  DateTime.parse(row['last_gate_event_at'] as String);
+                  DateTime.parse(row['last_gate_event_at'] as String).toLocal();
             }
           }
         } catch (_) {}

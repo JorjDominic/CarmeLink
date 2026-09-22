@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:carmelitas_dormitory_system/controllers/tenant_controller.dart';
+import 'package:carmelitas_dormitory_system/core/widgets/common_widgets.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/services/geofence_service.dart';
 import 'package:carmelitas_dormitory_system/services/guardian_alert_service.dart';
@@ -63,6 +64,27 @@ void main() {
       expect(unavailEvent.isUnavailable, isTrue);
       expect(unavailEvent.person, 'Mark Santos');
       expect(unavailEvent.notes, contains('permission denied'));
+    });
+
+    test('GateEvent.fromRow and timeText correctly convert UTC timestamps to local time', () {
+      const utcIsoString = '2026-09-22T01:36:34.000Z';
+      final row = {
+        'id': 'ge-utc-1',
+        'tenant_id': 'tenant-103',
+        'direction': 'IN',
+        'status': 'Verified',
+        'verification_method': 'GPS Geofence',
+        'checkpoint_type': 'on_demand',
+        'checked_at': utcIsoString,
+        'user_profiles': {'full_name': 'Juan Luna'},
+      };
+
+      final parsed = GateEvent.fromRow(row);
+      final expectedLocal = DateTime.parse(utcIsoString).toLocal();
+      expect(parsed.time.isUtc, isFalse);
+      expect(parsed.time, equals(expectedLocal));
+      expect(timeText(parsed.time), equals(timeText(expectedLocal)));
+      expect(shortDate(parsed.time), equals(shortDate(expectedLocal)));
     });
   });
 

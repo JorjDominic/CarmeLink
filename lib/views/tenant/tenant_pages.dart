@@ -4466,7 +4466,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                                     pendingTransitions > 0
                                         ? '$pendingTransitions crossing event(s) waiting to sync.'
                                         : monitoringActive
-                                            ? 'IN and OUT are logged automatically. No check-in button is needed.'
+                                            ? 'Crossings are monitored automatically. You can also manually check in below.'
                                             : 'Enable Always / Allow all the time location access.',
                                     style:
                                         Theme.of(context).textTheme.bodySmall,
@@ -4490,6 +4490,55 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                                   : const Icon(Icons.refresh_rounded),
                             ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: controller.checkingPresence
+                              ? null
+                              : () async {
+                                  try {
+                                    final result = await controller
+                                        .performGeofenceCheckIn();
+                                    if (context.mounted) {
+                                      final msg = switch (result.status) {
+                                        'Verified' => result.errorMessage !=
+                                                null
+                                            ? 'Presence confirmed (${result.direction == "IN" ? "Inside perimeter" : "Outside perimeter"}), but server sync warning: ${result.errorMessage}'
+                                            : 'Presence confirmed: ${result.direction == "IN" ? "Inside perimeter" : "Outside perimeter"}',
+                                        'Flagged' =>
+                                          'Presence check recorded (Flagged: curfew hours active)',
+                                        _ =>
+                                          'Location check failed: ${result.errorMessage ?? (result.failureReason.name != 'none' ? result.failureReason.name : 'Signal error')}',
+                                      };
+                                      showAppSnackBar(context, msg);
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      showAppSnackBar(
+                                        context,
+                                        'Location check error: $e',
+                                      );
+                                    }
+                                  }
+                                },
+                          icon: controller.checkingPresence
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.my_location_rounded, size: 18),
+                          label: Text(
+                            controller.checkingPresence
+                                ? 'Checking boundary...'
+                                : 'Manual Check-in / Verify Location',
+                          ),
                         ),
                       ),
                     ],

@@ -1718,11 +1718,15 @@ class WorkInProgressNotice extends StatelessWidget {
 
 String money(double value) => '₱${value.toStringAsFixed(0)}';
 
-String shortDate(DateTime value) => '${value.month}/${value.day}/${value.year}';
+String shortDate(DateTime value) {
+  final local = value.toLocal();
+  return '${local.month}/${local.day}/${local.year}';
+}
 
 String timeText(DateTime value) {
+  final local = value.toLocal();
   final hour =
-      value.hour == 0 ? 12 : (value.hour > 12 ? value.hour - 12 : value.hour);
-  final minute = value.minute.toString().padLeft(2, '0');
-  return '$hour:$minute ${value.hour >= 12 ? 'PM' : 'AM'}';
+      local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$hour:$minute ${local.hour >= 12 ? 'PM' : 'AM'}';
 }

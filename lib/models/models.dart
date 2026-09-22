@@ -431,8 +431,9 @@ class GateEvent {
     final creator = row['creator'] as Map<String, dynamic>?;
     final checkedAtStr =
         row['checked_at'] as String? ?? row['created_at'] as String?;
-    final time =
-        checkedAtStr != null ? DateTime.parse(checkedAtStr) : DateTime.now();
+    final time = checkedAtStr != null
+        ? DateTime.parse(checkedAtStr).toLocal()
+        : DateTime.now();
     final direction = row['direction'] as String?;
     final status = row['status'] as String? ?? 'Verified';
     final verificationMethod =
@@ -964,15 +965,15 @@ class TenantContract {
       tenantId: row['tenant_id'] as String,
       tenantName: profile?['full_name'] as String? ?? 'Unknown tenant',
       contractNumber: row['contract_number'] as String,
-      startsOn: DateTime.parse(row['starts_on'] as String),
-      endsOn: DateTime.parse(row['ends_on'] as String),
+      startsOn: DateTime.parse(row['starts_on'] as String).toLocal(),
+      endsOn: DateTime.parse(row['ends_on'] as String).toLocal(),
       monthlyRent: (row['monthly_rent'] as num).toDouble(),
       securityDeposit: (row['security_deposit'] as num).toDouble(),
       status: row['status'] as String,
       notes: row['notes'] as String?,
       signatureStatus: row['signature_status'] as String? ?? 'not_generated',
-      createdAt: DateTime.parse(row['created_at'] as String),
-      updatedAt: DateTime.parse(row['updated_at'] as String),
+      createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+      updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
     );
   }
 
@@ -1052,10 +1053,10 @@ class ContractDocument {
         sizeBytes: (row['size_bytes'] as num).toInt(),
         sha256: row['sha256'] as String,
         reviewStatus: row['review_status'] as String,
-        uploadedAt: DateTime.parse(row['uploaded_at'] as String),
+        uploadedAt: DateTime.parse(row['uploaded_at'] as String).toLocal(),
         reviewedAt: row['reviewed_at'] == null
             ? null
-            : DateTime.parse(row['reviewed_at'] as String),
+            : DateTime.parse(row['reviewed_at'] as String).toLocal(),
         reviewNotes: row['review_notes'] as String?,
       );
 
@@ -1165,10 +1166,12 @@ class CurfewRequest {
       destination: json['destination'] as String? ?? '',
       reason: json['reason'] as String? ?? '',
       departureTime:
-          DateTime.tryParse(json['departure_time']?.toString() ?? '') ??
+          DateTime.tryParse(json['departure_time']?.toString() ?? '')
+                  ?.toLocal() ??
               DateTime.now(),
       expectedReturnTime:
-          DateTime.tryParse(json['expected_return_time']?.toString() ?? '') ??
+          DateTime.tryParse(json['expected_return_time']?.toString() ?? '')
+                  ?.toLocal() ??
               DateTime.now().add(const Duration(hours: 4)),
       status: json['status'] as String? ?? 'pending_guardian',
       requestType: json['request_type'] as String? ?? 'late_return',
@@ -1178,22 +1181,22 @@ class CurfewRequest {
       guardianRemarks:
           (json['guardian_remarks'] ?? json['guardian_notes']) as String?,
       guardianDecidedAt: json['guardian_decided_at'] != null
-          ? DateTime.tryParse(json['guardian_decided_at'].toString())
+          ? DateTime.tryParse(json['guardian_decided_at'].toString())?.toLocal()
           : null,
       staffId: json['staff_id'] as String?,
       staffDecision: json['staff_decision'] as String?,
       staffNotes: json['staff_notes'] as String?,
       staffDecidedAt: json['staff_decided_at'] != null
-          ? DateTime.tryParse(json['staff_decided_at'].toString())
+          ? DateTime.tryParse(json['staff_decided_at'].toString())?.toLocal()
           : null,
       actualReturnTime: json['actual_return_time'] != null
-          ? DateTime.tryParse(json['actual_return_time'].toString())
+          ? DateTime.tryParse(json['actual_return_time'].toString())?.toLocal()
           : null,
       createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'].toString())
+          ? DateTime.tryParse(json['created_at'].toString())?.toLocal()
           : null,
       updatedAt: json['updated_at'] != null
-          ? DateTime.tryParse(json['updated_at'].toString())
+          ? DateTime.tryParse(json['updated_at'].toString())?.toLocal()
           : null,
     );
   }

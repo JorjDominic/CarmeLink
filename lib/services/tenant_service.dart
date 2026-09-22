@@ -108,7 +108,7 @@ class TenantService {
   }
 
   DateTime? _date(dynamic value) =>
-      value == null ? null : DateTime.tryParse(value.toString());
+      value == null ? null : DateTime.tryParse(value.toString())?.toLocal();
 
   Future<List<AvailableBed>> loadAvailableBeds() async {
     final client = SupabaseConfig.client;

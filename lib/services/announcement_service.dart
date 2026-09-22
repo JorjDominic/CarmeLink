@@ -29,8 +29,8 @@ class AnnouncementRecord {
       audience: row['audience'] as String? ?? 'all',
       isPinned: row['is_pinned'] as bool? ?? false,
       fcmSent: row['fcm_sent'] as bool? ?? false,
-      createdAt: DateTime.parse(row['created_at'] as String),
-      updatedAt: DateTime.parse(row['updated_at'] as String),
+      createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+      updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
     );
   }
 
