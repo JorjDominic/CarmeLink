@@ -32,7 +32,7 @@ class AppBreakpoints {
     final value = width(context);
     if (value < phone) return double.infinity;
     if (value < largeTablet) return 920;
-    return 1180;
+    return 1024;
   }
 
   static int dashboardColumns(BuildContext context) {

@@ -51,6 +51,10 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
           themeMode: themeController.themeMode,
+          scrollBehavior: const ScrollBehavior().copyWith(
+            overscroll: false,
+            physics: const ClampingScrollPhysics(),
+          ),
           home: _rootForSession(),
         );
       },

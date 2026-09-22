@@ -62,6 +62,7 @@ class ProfilePage extends StatelessWidget {
     return PageFrame(
       title: 'Profile',
       subtitle: 'Personal and contact information',
+      maxWidth: 720,
       child: user.role == UserRole.tenant
           ? _TenantProfileContent(user: user)
           : user.role == UserRole.guardian

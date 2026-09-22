@@ -4086,6 +4086,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     return PageFrame(
       title: 'Curfew',
       subtitle: 'Automatic dormitory entry and exit records',
+      maxWidth: 780,
       actions: [
         IconButton(
           tooltip: 'Refresh presence & events',

@@ -145,36 +145,9 @@ class StaffWorkspaceChrome extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: Padding(
-                padding: spacious
-                    ? const EdgeInsets.fromLTRB(16, 14, 16, 16)
-                    : EdgeInsets.zero,
-                child: spacious
-                    ? DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: WebPalette.surface,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: WebPalette.border),
-                          boxShadow: [
-                            BoxShadow(
-                              color: WebPalette.ink.withValues(alpha: .035),
-                              blurRadius: 26,
-                              offset: const Offset(0, 9),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
-                          child: Theme(
-                            data: StaffPortalTheme.from(Theme.of(context)),
-                            child: child,
-                          ),
-                        ),
-                      )
-                    : Theme(
-                        data: StaffPortalTheme.from(Theme.of(context)),
-                        child: child,
-                      ),
+              child: Theme(
+                data: StaffPortalTheme.from(Theme.of(context)),
+                child: child,
               ),
             ),
           ],

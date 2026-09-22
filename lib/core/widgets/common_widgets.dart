@@ -306,6 +306,7 @@ class PageFrame extends StatelessWidget {
     this.useScriptTitle = true,
     this.onRefresh,
     this.onBack,
+    this.maxWidth,
     super.key,
   });
 
@@ -318,6 +319,7 @@ class PageFrame extends StatelessWidget {
   final Widget? floatingActionButton;
   final Future<void> Function()? onRefresh;
   final VoidCallback? onBack;
+  final double? maxWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -467,10 +469,13 @@ class PageFrame extends StatelessWidget {
               ? RefreshIndicator(
                   onRefresh: onRefresh!,
                   child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: ClampingScrollPhysics(),
+                    ),
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     child: ResponsiveContent(
+                      maxWidth: maxWidth,
                       padding: EdgeInsets.fromLTRB(
                         AppBreakpoints.horizontalPadding(context),
                         6,
@@ -482,9 +487,11 @@ class PageFrame extends StatelessWidget {
                   ),
                 )
               : SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   child: ResponsiveContent(
+                    maxWidth: maxWidth,
                     padding: EdgeInsets.fromLTRB(
                       AppBreakpoints.horizontalPadding(context),
                       6,

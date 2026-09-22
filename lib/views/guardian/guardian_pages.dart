@@ -711,6 +711,7 @@ class _GuardianPresenceMonitoringPageState
     return PageFrame(
       title: 'Curfew',
       subtitle: 'Linked resident exceptions & boundary tracking',
+      maxWidth: 720,
       actions: [
         IconButton(
           tooltip: 'Refresh curfew data',
