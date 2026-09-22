@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/web_theme.dart';
+import '../../theme/web_motion.dart';
 import '../landing_content.dart';
 
-/// Tappable photograph with keyboard-focusable ink response and subtle hover.
+/// Photo fills its tailored frame; no extra hover zoom is applied.
 class PropertyPhotoTile extends StatefulWidget {
   const PropertyPhotoTile({
     super.key,
@@ -46,16 +47,14 @@ class _PropertyPhotoTileState extends State<PropertyPhotoTile> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  AnimatedScale(
-                    scale: _hovered && !reduceMotion ? 1.045 : 1,
-                    duration: reduceMotion
-                        ? Duration.zero
-                        : const Duration(milliseconds: 230),
-                    curve: Curves.easeOutCubic,
+                  ColoredBox(
+                    color: WebPalette.sand,
                     child: Image.asset(
                       widget.photo.path,
+                      // Use a moderate editorial crop instead of letterboxing.
+                      // The caller chooses a taller frame for square photos.
                       fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
+                      alignment: Alignment.center,
                       semanticLabel: widget.photo.description,
                       errorBuilder: (_, __, ___) => const Center(
                         child: Text('Photo unavailable'),
@@ -63,12 +62,24 @@ class _PropertyPhotoTileState extends State<PropertyPhotoTile> {
                     ),
                   ),
                   if (widget.showCaption) ...[
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, WebPalette.ink.withValues(alpha: .79)],
+                    // Keep the photo bright outside the caption area.
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 90,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                WebPalette.ink.withValues(alpha: .79),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -76,20 +87,27 @@ class _PropertyPhotoTileState extends State<PropertyPhotoTile> {
                       left: 18,
                       right: 18,
                       bottom: 16,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              widget.photo.title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
+                      child: AnimatedSlide(
+                        offset: _hovered && !reduceMotion
+                            ? const Offset(0, -0.075)
+                            : Offset.zero,
+                        duration: WebMotion.duration(context, WebMotion.feedback),
+                        curve: WebMotion.enter,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                widget.photo.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
-                          ),
-                          const Icon(Icons.north_east, color: Colors.white),
-                        ],
+                            const Icon(Icons.north_east, color: Colors.white),
+                          ],
+                        ),
                       ),
                     ),
                   ],

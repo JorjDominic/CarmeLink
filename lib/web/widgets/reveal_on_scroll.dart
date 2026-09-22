@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/web_motion.dart';
+
 /// Lightweight one-time reveal. Listens to the existing Scrollable, no packages.
 /// Reduced-motion users see content immediately.
 class RevealOnScroll extends StatefulWidget {
@@ -51,15 +53,18 @@ class _RevealOnScrollState extends State<RevealOnScroll> {
   @override
   Widget build(BuildContext context) {
     if (MediaQuery.disableAnimationsOf(context)) return widget.child;
-    return AnimatedOpacity(
-      opacity: _revealed ? 1 : 0,
-      duration: const Duration(milliseconds: 550),
-      curve: Curves.easeOutCubic,
-      child: AnimatedSlide(
-        offset: _revealed ? Offset.zero : const Offset(0, 0.045),
-        duration: const Duration(milliseconds: 550),
-        curve: Curves.easeOutCubic,
-        child: widget.child,
+    return IgnorePointer(
+      ignoring: !_revealed,
+      child: AnimatedOpacity(
+        opacity: _revealed ? 1 : 0,
+        duration: WebMotion.reveal,
+        curve: WebMotion.enter,
+        child: AnimatedSlide(
+          offset: _revealed ? Offset.zero : const Offset(0, 0.022),
+          duration: WebMotion.reveal,
+          curve: WebMotion.enter,
+          child: widget.child,
+        ),
       ),
     );
   }
