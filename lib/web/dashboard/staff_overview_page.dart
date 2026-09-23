@@ -5,6 +5,7 @@ import '../../models/models.dart';
 import '../../views/owner/contracts_page.dart';
 import '../../views/owner/owner_pages.dart';
 import '../../views/owner/room_monitoring_page.dart';
+import '../../views/shared/conduct_case_pages.dart';
 import '../theme/web_theme.dart';
 import 'widgets/staff_overview_card.dart';
 
@@ -42,7 +43,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Some data could not be refreshed. Check the status below.'),
+          content:
+              Text('Some data could not be refreshed. Check the status below.'),
         ));
       }
     } finally {
@@ -85,7 +87,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                     '${data.openMaintenance}'),
                 data.maintenanceLoadedOnce
                     ? 'Open reports'
-                    : data.maintenanceError ?? 'Maintenance records unavailable',
+                    : data.maintenanceError ??
+                        'Maintenance records unavailable',
                 Icons.handyman_outlined,
                 const MaintenanceManagementPage(),
               ),
@@ -154,14 +157,16 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                         const SizedBox(height: 28),
                         const _SectionLabel(
                           title: 'Work requiring attention',
-                          subtitle: 'Open the original management module to act',
+                          subtitle:
+                              'Open the original management module to act',
                         ),
                         const SizedBox(height: 12),
                         StaffActionRow(
                           title: 'Maintenance requests',
                           description: data.maintenanceLoadedOnce
                               ? 'Review open reports and repair progress'
-                              : data.maintenanceError ?? 'Waiting for maintenance data',
+                              : data.maintenanceError ??
+                                  'Waiting for maintenance data',
                           value: data.maintenanceLoadedOnce
                               ? '${data.openMaintenance}'
                               : null,
@@ -173,7 +178,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                           title: 'Payment proofs',
                           description: data.paymentsLoadedOnce
                               ? 'Verify submitted payment evidence'
-                              : data.paymentsError ?? 'Waiting for payment data',
+                              : data.paymentsError ??
+                                  'Waiting for payment data',
                           value: data.paymentsLoadedOnce
                               ? '${data.pendingPaymentProofs}'
                               : null,
@@ -186,7 +192,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                             title: 'Contract renewals',
                             description: data.contractsLoadedOnce
                                 ? 'Active contracts expiring within 30 days'
-                                : data.contractsError ?? 'Waiting for contract data',
+                                : data.contractsError ??
+                                    'Waiting for contract data',
                             value: data.contractsLoadedOnce
                                 ? '${data.contractsExpiringWithin30Days}'
                                 : null,
@@ -197,7 +204,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                         const SizedBox(height: 28),
                         const _SectionLabel(
                           title: 'Jump into management',
-                          subtitle: 'Existing live pages and permissions are preserved',
+                          subtitle:
+                              'Existing live pages and permissions are preserved',
                         ),
                         const SizedBox(height: 12),
                         Wrap(spacing: 9, runSpacing: 9, children: [
@@ -208,13 +216,20 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                           ),
                           OutlinedButton.icon(
                             onPressed: () => _open(const RoomMonitoringPage()),
-                            icon: const Icon(Icons.meeting_room_outlined, size: 18),
+                            icon: const Icon(Icons.meeting_room_outlined,
+                                size: 18),
                             label: const Text('Room monitoring'),
                           ),
                           OutlinedButton.icon(
                             onPressed: () => _open(const OperationsHubPage()),
                             icon: const Icon(Icons.tune_outlined, size: 18),
                             label: const Text('Operations'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                _open(const StaffConductCasesPage()),
+                            icon: const Icon(Icons.gavel_outlined, size: 18),
+                            label: const Text('Conduct & cases'),
                           ),
                         ]),
                       ],
@@ -228,8 +243,11 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
       );
 }
 
-String _display(bool ready, bool loading, String value) =>
-    ready ? value : loading ? 'Loading…' : 'Unavailable';
+String _display(bool ready, bool loading, String value) => ready
+    ? value
+    : loading
+        ? 'Loading…'
+        : 'Unavailable';
 
 class _Metric {
   const _Metric(this.label, this.value, this.detail, this.icon, this.page);
@@ -287,7 +305,8 @@ class _OverviewHeader extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     )),
                 const SizedBox(height: 5),
-                const Text('Your operational overview, drawn from current records.',
+                const Text(
+                    'Your operational overview, drawn from current records.',
                     style: TextStyle(color: WebPalette.muted, fontSize: 13)),
               ],
             ),

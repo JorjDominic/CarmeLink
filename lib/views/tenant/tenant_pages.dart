@@ -17,6 +17,7 @@ import '../../services/table_refresh_subscription.dart';
 import '../../services/tripwire_geofence_service.dart';
 import '../shared/room_cleaning_pages.dart';
 import '../shared/room_inspection_pages.dart';
+import '../shared/conduct_case_pages.dart';
 import '../widgets/feature_widgets.dart';
 
 class TenantDashboardPage extends StatelessWidget {
@@ -2121,6 +2122,15 @@ class TenantReportsHubPage extends StatelessWidget {
                 Icons.shield_outlined,
                 const Color(0xFF7D70A0),
                 const ConfidentialConcernPage(),
+              ),
+              const SizedBox(height: 12),
+              _hub(
+                context,
+                'Conduct & cases',
+                'View conduct records published to you and submit responses.',
+                Icons.gavel_outlined,
+                const Color(0xFF7B6D62),
+                const TenantConductCasesPage(),
               ),
               if (controller.concerns.isNotEmpty) ...[
                 const SizedBox(height: 24),
