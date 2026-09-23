@@ -3356,6 +3356,45 @@ Required parties sign; owner verifies the completed document
 Verified contract becomes available in the tenant's private contract area
 ```
 
+### Implemented workflow state — September 24, 2026
+
+The backend for QR invitations, required documents, independent signer states,
+and activation gates is deployed. The application flow is:
+
+```text
+Staff-created tenant account and verified email
+      ↓
+Owner-created Draft contract
+      ↓
+Tenant-bound, expiring/revocable QR invitation
+      ↓
+Authenticated tenant submits onboarding details
+      ↓
+Owner verifies tenant ID and three-signature physical photocopies
+      ↓
+Owner optionally requires and verifies guardian ID
+      ↓
+Immutable PDF version generated and physically signed
+      ↓
+Signed copy uploaded, previewed, and owner-verified
+      ↓
+Lessor + tenant and any required guardian/witness verified independently
+      ↓
+UI checklist and database trigger validate every required prerequisite
+      ↓
+Contract activated; deposit/rent billing schedule generated
+      ↓
+Verified initial payments, room/bed assignment, guardian link, and device setup
+```
+
+The database rejects direct Active creation and activation attempts missing the
+verified email, latest verified signed PDF, any required document, or any
+required signer. Guardian ID/signature and witness signature are optional by
+default but configurable per contract. Electronic signature capture remains
+planned and cannot be treated as a replacement for the physical process until
+the client approves it. The canonical detailed staff/tenant run-through is in
+`DEVELOPMENT_PROGRESS.md` under **Canonical new-tenant workflow**.
+
 ### Security and document rules
 
 - The QR code must not embed raw personal or contract data. It contains an

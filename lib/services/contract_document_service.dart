@@ -269,6 +269,13 @@ class ContractDocumentService {
           pw.Expanded(child: _signatureLine('Owner signature and date')),
         ]),
         pw.SizedBox(height: 44),
+        pw.Row(children: [
+          pw.Expanded(
+              child: _signatureLine('Parent/guardian signature and date')),
+          pw.SizedBox(width: 36),
+          pw.Expanded(child: _signatureLine('Witness (optional) and date')),
+        ]),
+        pw.SizedBox(height: 44),
         pw.Container(
           width: double.infinity,
           padding: const pw.EdgeInsets.all(12),

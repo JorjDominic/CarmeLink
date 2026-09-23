@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 
 import 'controllers/session_controller.dart';
@@ -10,6 +13,7 @@ import 'views/caretaker/caretaker_shell.dart';
 import 'views/guardian/guardian_shell.dart';
 import 'views/owner/owner_shell.dart';
 import 'views/tenant/tenant_shell.dart';
+import 'views/tenant/onboarding_form_page.dart';
 import 'views/shared/shared_views.dart';
 
 class CarmelitaBootstrap extends StatefulWidget {
@@ -22,7 +26,73 @@ class CarmelitaBootstrap extends StatefulWidget {
 class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   final ThemeController themeController = ThemeController.instance;
   final SessionController sessionController = SessionController.instance;
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri>? _linkSubscription;
+  String? _pendingOnboardingToken;
+  String? _openedOnboardingToken;
   bool assetsCached = false;
+
+  @override
+  void initState() {
+    super.initState();
+    sessionController.addListener(_tryOpenPendingOnboarding);
+    _listenForLinks();
+  }
+
+  Future<void> _listenForLinks() async {
+    try {
+      final initialLink = await _appLinks.getInitialLink();
+      if (initialLink != null) _handleLink(initialLink);
+    } catch (error) {
+      debugPrint('Could not read initial app link: $error');
+    }
+    _linkSubscription = _appLinks.uriLinkStream.listen(
+      _handleLink,
+      onError: (Object error) => debugPrint('App link error: $error'),
+    );
+  }
+
+  void _handleLink(Uri uri) {
+    if (uri.scheme.toLowerCase() != 'carmelink' ||
+        uri.host.toLowerCase() != 'onboarding') {
+      return;
+    }
+    final token = uri.queryParameters['token']?.trim();
+    if (token == null || token.isEmpty) return;
+    _pendingOnboardingToken = token;
+    _tryOpenPendingOnboarding();
+  }
+
+  void _tryOpenPendingOnboarding() {
+    final token = _pendingOnboardingToken;
+    final user = sessionController.currentUser;
+    final navigator = _navigatorKey.currentState;
+    if (token == null ||
+        token == _openedOnboardingToken ||
+        user?.role != UserRole.tenant ||
+        navigator == null) {
+      return;
+    }
+    _openedOnboardingToken = token;
+    _pendingOnboardingToken = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await navigator.push(
+        MaterialPageRoute<void>(
+          builder: (_) => OnboardingFormPage(token: token),
+        ),
+      );
+      _openedOnboardingToken = null;
+    });
+  }
+
+  @override
+  void dispose() {
+    sessionController.removeListener(_tryOpenPendingOnboarding);
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -46,6 +116,7 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
       animation: Listenable.merge([themeController, sessionController]),
       builder: (context, _) {
         return MaterialApp(
+          navigatorKey: _navigatorKey,
           title: 'CarmeLink',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light(),

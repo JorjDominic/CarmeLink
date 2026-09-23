@@ -94,10 +94,12 @@ policy choices are recorded in the full system plan.
 1. [ ] Finish Step 1 UI, migration deployment, and focused rent/utility tests;
    add electricity/water usage inputs after calculation rules are confirmed.
 2. [ ] Build secure QR/walk-in onboarding and a resumable Draft checklist.
-3. [ ] Add tenant/guardian ID and three-signature photocopy verification.
-4. [ ] Add independent lessor, tenant, guardian, and optional-witness signature
-   states, immutable PDFs, upload/e-sign paths, and owner verification.
-5. [ ] Replace free status editing with prerequisite-aware activation; keep the
+3. [✓] Add tenant/guardian ID and three-signature photocopy verification.
+4. [✓] Add independent lessor, tenant, guardian, and optional-witness signature
+   states, immutable PDFs, the physical-upload path, and owner verification.
+   Physical-upload verification is implemented; electronic signature capture
+   remains intentionally open pending client approval.
+5. [✓] Replace free status editing with prerequisite-aware activation; keep the
    guardian blocking rule configurable until the client decides it.
 6. [ ] Add versioned policies/addenda for visitors, utilities, employee curfew,
    rent changes, and enforcement/review rules missing from the lease.
@@ -117,6 +119,109 @@ policy choices are recorded in the full system plan.
 16. [ ] Add formal termination/eviction cases; never auto-evict from an incident.
 17. [ ] Configure sensitive-record retention after client and legal/privacy
     review.
+
+Progress update — September 24, 2026:
+
+- [✓] Added staff-created, tenant-bound, expiring/revocable QR invitations with
+  private opaque tokens and protected Supabase operations.
+- [✓] Added Android/iOS `carmelink://onboarding` deep-link handling that waits
+  for an authenticated tenant session before opening the invitation form.
+- [✓] Added the tenant academic/employment and emergency-contact submission
+  flow, invitation history, QR display, and completion state.
+- [✓] Added a prerequisite-aware activation sheet using the currently enforced
+  verified-email and verified-latest-signed-document requirements. QR data,
+  guardian linking, and room/bed assignment remain visible follow-up checks
+  until the client decides which must block activation.
+- [✓] Deployed onboarding invitation and contract requirement/signer migrations
+  to the linked Carmelita's Dormitory Supabase project on September 24, 2026;
+  local/remote migration history matches and linked database lint reports no
+  schema errors.
+- [ ] Run authenticated owner/tenant/guardian/caretaker remote smoke tests for
+  invitation ownership, requirement storage access, signer updates, and denied
+  cross-role operations.
+- [✓] Added tenant/guardian ID records, private PDF/image uploads and previews,
+  three-signature/physical-copy checks, approve/reject history, and independent
+  lessor/tenant/guardian/witness signature states. Guardian and witness remain
+  configurable and optional by default.
+- [✓] Expanded activation enforcement so verified email, the latest verified
+  signed contract, every required document, and every required signer are all
+  checked by the database as well as shown in the owner UI.
+- [ ] Replace the temporary generated PDF layout with a clean source version of
+  the client's official contract; electronic signature capture remains pending
+  client confirmation.
+
+### Canonical new-tenant workflow — deployed backend/current app implementation
+
+This is the current end-to-end operating sequence for a newly accepted tenant.
+Guardian and witness requirements are configurable per contract and remain
+optional by default while the client policy is open. Electronic signature
+capture is not yet represented as a substitute for the physical signed copy.
+
+1. **Authorized staff creates the tenant account.** The account and profile are
+   created separately from the contract so a failed/deferred contract never
+   deletes the tenant identity. The tenant must request and verify the six-digit
+   email code on first sign-in.
+2. **Owner creates a Draft contract or defers it.** `Create contract now` opens
+   a tenant-locked editor. The owner records the contract number, term, monthly
+   rent, security deposit, and notes. A contract must begin as Draft; direct
+   creation as Active is rejected by the database.
+3. **Owner creates the QR invitation.** The system creates a random, tenant-bound
+   token that expires after seven days and can be revoked. The QR contains only
+   `carmelink://onboarding?token=...`; it contains no tenant personal data.
+4. **Tenant scans the QR and signs in.** Android/iOS opens CarmeLink through the
+   custom deep link. If the tenant is not signed in, the app retains the pending
+   token and opens the form only after an authenticated tenant session exists.
+   The backend rejects another tenant, guardian, staff member, expired token,
+   revoked token, or reused token.
+5. **Tenant submits onboarding data.** The tenant reviews the instructions and
+   submits school/employer, course/program, year level, and required emergency
+   contact information. Successful submission updates only that tenant's detail
+   record and permanently completes the one-time invitation.
+6. **Owner reviews required documents.** From Contract documents → Required
+   documents & signers, the owner uploads/reviews the tenant school/employee ID
+   and the signed verification photocopies. PDF/JPG/PNG files are stored in the
+   private contract bucket with size, hash, uploader, timestamps, and review
+   history. The photocopy requirement cannot be verified until staff confirms
+   that the physical copy was received and all three signatures are present.
+7. **Guardian requirement is decided for that contract.** Parent/guardian ID is
+   optional by default so a walk-in student can continue. If the owner marks it
+   required, a verified guardian ID becomes an activation prerequisite. The
+   guardian account/link may be completed later under the configured policy.
+8. **System generates the immutable contract PDF.** The generated version
+   snapshots the Draft contract terms and includes lessor, tenant, guardian, and
+   optional-witness signature lines. Any material Draft-term change invalidates
+   the prior signature state and requires a new generated version.
+9. **Parties sign the exact generated version.** The physical signed PDF/image
+   is uploaded against the latest version only. The owner previews it and either
+   verifies or rejects it with review notes. Rejected or replaced documents do
+   not satisfy activation.
+10. **Owner verifies signers independently.** Lessor and tenant are required by
+    default. Guardian and witness are optional but may be made required per
+    contract. Each party has an independent Pending/Signed/Verified/Rejected/
+    Waived state, signer name, method, timestamps, and notes. A verified PDF does
+    not by itself prove every required signer was verified.
+11. **Owner opens Activate contract.** The sheet displays required and follow-up
+    checks. Activation is enabled only when email, the latest signed PDF, all
+    required documents, and every required signer are verified. QR completion,
+    guardian linking, and room/bed assignment remain visible follow-up checks
+    unless their corresponding per-contract requirement is enabled.
+12. **Database rechecks activation.** Server triggers reject client bypasses,
+    missing verified email, unverified signed PDF, missing required documents,
+    or incomplete required signers. Successful activation makes financial terms
+    immutable and generates the existing security-deposit and rent schedule.
+13. **Initial payments are submitted and verified.** Tenant proof is allocated
+    to the intended deposit/rent charges. Only staff-verified transactions reduce
+    balances. Rent, electricity, water, penalties, and damages remain separate.
+14. **Staff completes occupancy and relationships.** Room/bed assignment,
+    guardian linking where applicable, trusted-device setup, and permissions are
+    completed through the resumable onboarding checklist. Historical contract,
+    document, signer, charge, and payment facts remain immutable/auditable.
+
+Backend deployment status: migrations `202609240001` and `202609240002` are
+deployed to Supabase project `iuplkgvitovzjbmtzpme`; local/remote migration
+history matches and linked database lint reports no schema errors. Authenticated
+multi-account RLS/storage smoke testing and real Android/iOS QR testing remain
+release checks.
 
 1. **Income and expense management** — add owner-only financial records,
    categories, validation, recurring/one-time entries, audit fields, summaries,

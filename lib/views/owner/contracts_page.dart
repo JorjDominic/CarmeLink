@@ -5,11 +5,16 @@ import 'package:file_picker/file_picker.dart';
 import 'package:printing/printing.dart';
 
 import '../../controllers/owner_controller.dart';
+import '../../core/config/supabase_config.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/contract_document_service.dart';
+import '../../services/contract_onboarding_service.dart';
 import '../../services/guardian_link_service.dart';
+import '../../services/onboarding_invitation_service.dart';
 import '../../services/tenant_service.dart';
+import 'onboarding_invitation_page.dart';
+import 'contract_onboarding_checklist_page.dart';
 import 'tenant_onboarding_flow.dart';
 
 Future<bool?> showContractEditor(
@@ -303,19 +308,37 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
   bool _working = false;
 
   Future<_OnboardingNeeds> _loadOnboardingNeeds() async {
+    final tenantId = widget.contract.tenantId;
     final results = await Future.wait<dynamic>([
       const TenantService().loadTenants(forceRefresh: true),
       const GuardianLinkService().listLinks(),
+      const OnboardingInvitationService().listInvitations(tenantId: tenantId),
+      SupabaseConfig.client
+          .from('profiles')
+          .select('email_verified_at')
+          .eq('id', tenantId)
+          .maybeSingle(),
+      const ContractOnboardingService().listRequirements(widget.contract.id),
+      const ContractOnboardingService().listSigners(widget.contract.id),
     ]);
     final tenants = results[0] as List<TenantDirectoryEntry>;
     final links = results[1] as List<Map<String, dynamic>>;
-    final tenant = tenants
-        .where((item) => item.id == widget.contract.tenantId)
-        .firstOrNull;
+    final invitations = results[2] as List<OnboardingInvitation>;
+    final profile = results[3] as Map<String, dynamic>?;
+    final requirements = results[4] as List<ContractRequirement>;
+    final signers = results[5] as List<ContractSigner>;
+    final tenant = tenants.where((item) => item.id == tenantId).firstOrNull;
     return _OnboardingNeeds(
       needsBed: tenant?.assignmentId == null,
-      needsGuardian:
-          !links.any((link) => link['tenant_id'] == widget.contract.tenantId),
+      needsGuardian: !links.any((link) => link['tenant_id'] == tenantId),
+      invitationCompleted: invitations.any((inv) => inv.isCompleted),
+      emailVerified: profile?['email_verified_at'] != null,
+      requiredDocumentsVerified: requirements
+          .where((item) => item.isRequired)
+          .every((item) => item.isVerified),
+      requiredSignersVerified: signers
+          .where((item) => item.isRequired)
+          .every((item) => item.isVerified),
     );
   }
 
@@ -444,6 +467,28 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
     _reloadOnboardingNeeds();
   }
 
+  Future<void> _showActivateSheet({
+    required List<ContractDocument> documents,
+    required _OnboardingNeeds? needs,
+  }) async {
+    final activated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => _ActivateContractSheet(
+        contract: widget.contract,
+        documents: documents,
+        needs: needs,
+      ),
+    );
+    if (activated == true && mounted) {
+      showAppSnackBar(context, 'Contract activated successfully.');
+      Navigator.pop(context); // close documents dialog
+      await OwnerController.instance.loadContracts(force: true);
+    }
+  }
+
   Future<void> _open(ContractDocument document) async {
     await Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute<void>(
@@ -565,12 +610,72 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
                   ? 'Generate printable PDF'
                   : 'Printable contract already generated'),
             ),
+            // QR onboarding invitation button — always visible
+            const SizedBox(height: 10),
+            FutureBuilder<_OnboardingNeeds>(
+              future: _onboardingNeeds,
+              builder: (context, snap) {
+                final completed = snap.data?.invitationCompleted ?? false;
+                return OutlinedButton.icon(
+                  onPressed: _working
+                      ? null
+                      : () async {
+                          await showOnboardingInvitations(
+                            context,
+                            tenantId: widget.contract.tenantId,
+                            tenantName: widget.contract.tenantName,
+                          );
+                          _reloadOnboardingNeeds();
+                        },
+                  icon: Icon(completed
+                      ? Icons.check_circle_outline_rounded
+                      : Icons.qr_code_2_rounded),
+                  label: Text(completed
+                      ? 'Onboarding data submitted — view invitations'
+                      : 'Send QR invitation for data entry'),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _working
+                  ? null
+                  : () async {
+                      await showContractOnboardingChecklist(
+                        context,
+                        contract: widget.contract,
+                      );
+                      _reloadOnboardingNeeds();
+                    },
+              icon: const Icon(Icons.fact_check_outlined),
+              label: const Text('Required documents & signers'),
+            ),
             if (latestVersion != null && signed.isEmpty) ...[
               const SizedBox(height: 10),
               OutlinedButton.icon(
                 onPressed: _working ? null : () => _uploadSigned(latestVersion),
                 icon: const Icon(Icons.upload_file_outlined),
                 label: Text('Upload signed copy for version $latestVersion'),
+              ),
+            ],
+            // Activate contract — only shown for draft contracts
+            if (widget.contract.status == 'draft') ...[
+              const SizedBox(height: 10),
+              FutureBuilder<_OnboardingNeeds>(
+                future: _onboardingNeeds,
+                builder: (context, snap) {
+                  final needs = snap.data;
+                  return FilledButton.icon(
+                    onPressed: _working
+                        ? null
+                        : () => _showActivateSheet(
+                              documents: documents,
+                              needs: needs,
+                            ),
+                    icon: const Icon(Icons.verified_outlined),
+                    label: const Text('Activate contract'),
+                  );
+                },
               ),
             ],
             if (latestSigned?.reviewStatus == 'verified') ...[
@@ -674,11 +779,206 @@ class _OnboardingNeeds {
   const _OnboardingNeeds({
     required this.needsBed,
     required this.needsGuardian,
+    this.invitationCompleted = false,
+    this.emailVerified = false,
+    this.requiredDocumentsVerified = false,
+    this.requiredSignersVerified = false,
   });
 
   final bool needsBed;
   final bool needsGuardian;
+  final bool invitationCompleted;
+  final bool emailVerified;
+  final bool requiredDocumentsVerified;
+  final bool requiredSignersVerified;
   bool get hasRemainingSteps => needsBed || needsGuardian;
+}
+
+class _ActivateContractSheet extends StatefulWidget {
+  const _ActivateContractSheet({
+    required this.contract,
+    required this.documents,
+    required this.needs,
+  });
+
+  final TenantContract contract;
+  final List<ContractDocument> documents;
+  final _OnboardingNeeds? needs;
+
+  @override
+  State<_ActivateContractSheet> createState() => _ActivateContractSheetState();
+}
+
+class _ActivateContractSheetState extends State<_ActivateContractSheet> {
+  bool _working = false;
+
+  bool get _hasVerifiedSignedDocument {
+    final generatedVersions = widget.documents
+        .where((item) => item.isGenerated)
+        .map((item) => item.version);
+    if (generatedVersions.isEmpty) return false;
+    final latestVersion = generatedVersions.reduce((a, b) => a > b ? a : b);
+    return widget.documents.any((item) =>
+        item.isSigned &&
+        item.version == latestVersion &&
+        item.reviewStatus == 'verified');
+  }
+
+  bool get _canActivate =>
+      widget.needs?.emailVerified == true &&
+      _hasVerifiedSignedDocument &&
+      widget.needs?.requiredDocumentsVerified == true &&
+      widget.needs?.requiredSignersVerified == true;
+
+  Future<void> _activate() async {
+    if (!_canActivate || _working) return;
+    setState(() => _working = true);
+    try {
+      await OwnerController.instance.updateContract(
+        widget.contract.copyWith(status: 'active'),
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          'Contract could not be activated: $error',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final needs = widget.needs;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        4,
+        24,
+        24 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Activate contract',
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Activation starts the contract billing schedule. Review every '
+            'requirement before continuing.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 20),
+          _ActivationRequirement(
+            complete: needs?.emailVerified == true,
+            label: 'Tenant email verified',
+            requiredForActivation: true,
+          ),
+          _ActivationRequirement(
+            complete: _hasVerifiedSignedDocument,
+            label: 'Latest signed contract verified',
+            requiredForActivation: true,
+          ),
+          _ActivationRequirement(
+            complete: needs?.requiredDocumentsVerified == true,
+            label: 'Required identity and verification documents approved',
+            requiredForActivation: true,
+          ),
+          _ActivationRequirement(
+            complete: needs?.requiredSignersVerified == true,
+            label: 'Every required signer independently verified',
+            requiredForActivation: true,
+          ),
+          _ActivationRequirement(
+            complete: needs?.invitationCompleted == true,
+            label: 'QR onboarding information submitted',
+          ),
+          _ActivationRequirement(
+            complete: needs?.needsBed == false,
+            label: 'Room and bed assigned',
+          ),
+          _ActivationRequirement(
+            complete: needs?.needsGuardian == false,
+            label: 'Guardian linked',
+          ),
+          if (needs == null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Some onboarding checks could not be loaded. Refresh before '
+              'activation.',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed:
+                  _canActivate && needs != null && !_working ? _activate : null,
+              icon: _working
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.verified_outlined),
+              label: Text(_working ? 'Activating…' : 'Activate contract'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Room/bed, guardian, and QR onboarding are tracked as follow-up '
+            'steps until the client finalizes which ones must block activation.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivationRequirement extends StatelessWidget {
+  const _ActivationRequirement({
+    required this.complete,
+    required this.label,
+    this.requiredForActivation = false,
+  });
+
+  final bool complete;
+  final String label;
+  final bool requiredForActivation;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Icon(
+              complete
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color: complete
+                  ? Colors.green
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(label)),
+            if (requiredForActivation)
+              const Text(
+                'Required',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+          ],
+        ),
+      );
 }
 
 class _DocumentVersionCard extends StatelessWidget {

@@ -1119,6 +1119,163 @@ class ContractDocument {
   bool get isPending => reviewStatus == 'pending';
 }
 
+class OnboardingInvitation {
+  const OnboardingInvitation({
+    required this.id,
+    required this.tenantId,
+    required this.token,
+    required this.status,
+    required this.expiresAt,
+    required this.createdAt,
+    this.completedAt,
+  });
+
+  factory OnboardingInvitation.fromRow(Map<String, dynamic> row) =>
+      OnboardingInvitation(
+        id: row['id'] as String,
+        tenantId: row['tenant_id'] as String,
+        token: row['token'] as String,
+        status: row['status'] as String,
+        expiresAt: DateTime.parse(row['expires_at'] as String).toLocal(),
+        createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+        completedAt: row['completed_at'] == null
+            ? null
+            : DateTime.parse(row['completed_at'] as String).toLocal(),
+      );
+
+  final String id;
+  final String tenantId;
+  final String token;
+  final String status;
+  final DateTime expiresAt;
+  final DateTime createdAt;
+  final DateTime? completedAt;
+
+  bool get isPending => status == 'pending';
+  bool get isCompleted => status == 'completed';
+  bool get isExpired =>
+      status == 'expired' || (isPending && expiresAt.isBefore(DateTime.now()));
+  bool get isRevoked => status == 'revoked';
+  bool get isUsable => isPending && !isExpired;
+
+  /// The deep link URL encoded in the QR code.
+  String get deepLink => 'carmelink://onboarding?token=$token';
+}
+
+class ContractRequirement {
+  const ContractRequirement({
+    required this.id,
+    required this.contractId,
+    required this.type,
+    required this.isRequired,
+    required this.status,
+    required this.physicalCopyReceived,
+    required this.signatureCount,
+    this.storagePath,
+    this.originalFilename,
+    this.submittedAt,
+    this.reviewedAt,
+    this.reviewNotes,
+  });
+
+  factory ContractRequirement.fromRow(Map<String, dynamic> row) =>
+      ContractRequirement(
+        id: row['id'] as String,
+        contractId: row['contract_id'] as String,
+        type: row['requirement_type'] as String,
+        isRequired: row['is_required'] as bool? ?? true,
+        status: row['status'] as String,
+        physicalCopyReceived: row['physical_copy_received'] as bool? ?? false,
+        signatureCount: (row['signature_count'] as num?)?.toInt() ?? 0,
+        storagePath: row['storage_path'] as String?,
+        originalFilename: row['original_filename'] as String?,
+        submittedAt: row['submitted_at'] == null
+            ? null
+            : DateTime.parse(row['submitted_at'] as String).toLocal(),
+        reviewedAt: row['reviewed_at'] == null
+            ? null
+            : DateTime.parse(row['reviewed_at'] as String).toLocal(),
+        reviewNotes: row['review_notes'] as String?,
+      );
+
+  final String id;
+  final String contractId;
+  final String type;
+  final bool isRequired;
+  final String status;
+  final bool physicalCopyReceived;
+  final int signatureCount;
+  final String? storagePath;
+  final String? originalFilename;
+  final DateTime? submittedAt;
+  final DateTime? reviewedAt;
+  final String? reviewNotes;
+
+  bool get isVerified => status == 'verified';
+  bool get isPendingReview => status == 'pending_review';
+  bool get isSatisfied => !isRequired || isVerified;
+  String get label => switch (type) {
+        'tenant_identity' => 'Tenant school/employee ID',
+        'guardian_identity' => 'Parent/guardian valid ID',
+        'signed_photocopies' => 'Three-signature photocopies',
+        _ => 'Required document',
+      };
+}
+
+class ContractSigner {
+  const ContractSigner({
+    required this.id,
+    required this.contractId,
+    required this.role,
+    required this.isRequired,
+    required this.status,
+    this.signerName,
+    this.signatureMethod,
+    this.signedAt,
+    this.verifiedAt,
+    this.notes,
+  });
+
+  factory ContractSigner.fromRow(Map<String, dynamic> row) => ContractSigner(
+        id: row['id'] as String,
+        contractId: row['contract_id'] as String,
+        role: row['signer_role'] as String,
+        isRequired: row['is_required'] as bool? ?? true,
+        status: row['status'] as String,
+        signerName: row['signer_name'] as String?,
+        signatureMethod: row['signature_method'] as String?,
+        signedAt: row['signed_at'] == null
+            ? null
+            : DateTime.parse(row['signed_at'] as String).toLocal(),
+        verifiedAt: row['verified_at'] == null
+            ? null
+            : DateTime.parse(row['verified_at'] as String).toLocal(),
+        notes: row['notes'] as String?,
+      );
+
+  final String id;
+  final String contractId;
+  final String role;
+  final bool isRequired;
+  final String status;
+  final String? signerName;
+  final String? signatureMethod;
+  final DateTime? signedAt;
+  final DateTime? verifiedAt;
+  final String? notes;
+
+  bool get isVerified => status == 'verified';
+  bool get isSatisfied => !isRequired || isVerified;
+  bool get isConfigurable => role == 'guardian' || role == 'witness';
+  String get label => switch (role) {
+        'lessor' => 'Lessor / owner',
+        'tenant' => 'Lessee / tenant',
+        'guardian' => 'Parent / guardian',
+        'witness' => 'Witness',
+        _ => 'Signer',
+      };
+}
+
 class OwnerConversation {
   OwnerConversation({
     required this.id,

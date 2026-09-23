@@ -21,6 +21,12 @@ Development assignments and completion status are tracked separately in
 > deposit/move-out handling, disciplinary safeguards, confirmed procedures, and
 > unresolved decisions are documented as requirements only; the review did not
 > change application behavior.
+> QR onboarding, required identity/photocopy verification, independent signer
+> states, and prerequisite-aware activation are now implemented in the current
+> app changes, and their database migrations are deployed. The detailed
+> new-tenant run-through is documented in `DEVELOPMENT_PROGRESS.md` under
+> **Canonical new-tenant workflow**. Physical-device and authenticated
+> multi-account security testing remain required before release.
 > See the implementation sequence in
 > [`DEVELOPMENT_PROGRESS.md`](DEVELOPMENT_PROGRESS.md) and the complete
 > requirements in
