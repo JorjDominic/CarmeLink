@@ -1,6 +1,6 @@
 # CarmeLink Development Progress
 
-Last updated: September 20, 2026
+Last updated: September 23, 2026
 
 This file tracks development separately from the README. Page ownership is
 divided between two developers to reduce merge conflicts.
@@ -25,6 +25,49 @@ targets; a feature is not release-complete until its platform-specific behavior
 has either been validated on both or is explicitly tracked as blocked.
 
 ## Immediate agenda
+
+### Approved additions — implementation gate
+
+The following additions were approved on September 23, 2026. They are
+requirements only at this point; existing checkmarks elsewhere in this file do
+not mean these additions are implemented. Implementation must proceed one step
+at a time, and **Step 1 must not begin until the project owner says `go` after
+reviewing these Markdown updates**.
+
+1. **Step 1 — Separate rent and utility billing.** Keep contract rent as a
+   fixed, contract-derived charge. Let an authorized owner or caretaker enter
+   each variable utility charge (for example, higher electricity usage) and
+   its independent due date. Tenant, guardian, and staff views must distinguish
+   charge category, amount, due date, balance, and payment allocation. A utility
+   change must never modify the fixed rent or rewrite historical charges.
+2. **Step 2 — Digital tenant onboarding and contract workflow.** Use a QR code
+   to open a secure tenant-specific data-entry/onboarding flow; generate a
+   versioned PDF from the official contract template that will be supplied;
+   support either an uploaded signed copy or an on-screen electronic signature;
+   retain verification and audit history; and let each tenant securely view and
+   download only their own contract. Do not finalize template field mapping
+   until the official contract copy is received.
+3. **Step 3 — Cleaning schedules by bed.** Add a privacy-conscious module that
+   assigns cleaning duties to bed identifiers rather than publicly identifying
+   roommates. Tenants can view the schedule relevant to their room/bed and
+   privately report non-compliance. Owner/caretaker users manage schedules and
+   restricted reports; reports and reporter identities must not be exposed to
+   roommates.
+4. **Step 4 — Advance visitor registration.** Require a visit request no later
+   than the calendar day before the visit, capture only the visitor ID details
+   needed by dormitory policy, and require staff approval before the visit.
+   Store sensitive ID data privately with restricted access, audit logs, and a
+   defined retention/deletion policy. Same-day requests are invalid unless a
+   separately authorized emergency override is later approved as policy.
+5. **Step 5 — Room and bed identifier rules.** Room identifiers are plain
+   sequential numbers and must not use floor-style ranges such as `101–110` or
+   `201–210`. Each room has beds `1` through `4`; odd identifiers (`1`, `3`)
+   are upper bunks and even identifiers (`2`, `4`) are lower bunks. Enforce the
+   mapping in validation, display labels, assignments, and migration checks.
+
+The canonical acceptance criteria and data/security notes for these additions
+are in **Approved Additions — September 23, 2026** in
+`CARMELINK_FULL_SYSTEM_PLAN.md`.
 
 1. **Income and expense management** — add owner-only financial records,
    categories, validation, recurring/one-time entries, audit fields, summaries,
@@ -332,9 +375,11 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Messages and Conversation** — persisted, role-scoped real-time messaging; production multi-account testing remains.
 - [✓] **Gate and Curfew** — verified IN/OUT events, curfew status, on-device geofence check-in, and presence timeline.
 - [✓] **Curfew Exception (Tenant)** — differentiated request types ('Late Return' direct to caretaker vs 'Overnight Leave' with guardian endorsement), departure/return schedule pickers, status pills, cancellation of pending requests, and live Supabase real-time sync.
-- [✓] **Visitor Request** — live visitor identity, purpose, schedule, review,
-  contact details, pending edits, same-day-only arrival/departure scheduling,
-  cancellation, visit status, and audit-safe real-time history.
+- [✓] **Visitor Request (current implementation)** — live visitor identity,
+  purpose, schedule, review, contact details, pending edits, same-day-only
+  arrival/departure scheduling, cancellation, visit status, and audit-safe
+  real-time history. **Step 4 must replace same-day scheduling with prior-day
+  registration and add protected visitor ID capture.**
 - [✓] **Confidential Concern (Tenant Phase)** — restricted live submission and tenant-only history protected by RLS; staff review is deferred.
 - [✓] **Rules and Policies** — maintained dormitory rules and safety guidance.
 
@@ -655,7 +700,8 @@ Owned folders and files:
 - [✓] Messages and conversation — live Supabase persistence and realtime first iteration
 - [ ] Gate and curfew overview — UI implemented, **Mock**
 - [ ] Curfew-exception request — UI implemented, **Mock**
-- [✓] Visitor request — **Live**, same-day-only and audit-safe
+- [✓] Visitor request — **Live**, same-day-only and audit-safe; approved Step 4
+  prior-day registration and protected ID capture are not yet implemented
 - [✓] Confidential concern — live tenant-only persistence and RLS
 - [✓] Rules and policies
 

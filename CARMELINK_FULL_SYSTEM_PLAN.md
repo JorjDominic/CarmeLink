@@ -3233,3 +3233,221 @@ The system principle remains:
 > **One Flutter system, one backend, one relational database, strict role-based access, and one source of truth for tenant, room, payment, maintenance, gate, curfew, visitor, guardian, and communication records.**
 
 Advanced features such as OCR, geofencing, facial recognition, IoT monitoring, and biometrics should support the core dormitory workflows rather than replace them.
+
+---
+
+# 56. Approved Additions — September 23, 2026
+
+This section is the canonical specification for the additions below and
+supersedes any conflicting earlier description. All items are **planned**, not
+implemented. Work proceeds in the numbered order, and Step 1 starts only after
+the project owner reviews the Markdown changes and says `go`.
+
+## Step 1 — Separate Rent and Utility Billing
+
+Rent and utilities are separate financial obligations even when they appear in
+the same account summary.
+
+### Rules
+
+- Rent amount comes from the active contract snapshot and is fixed for the
+  applicable contract period. Only an authorized contract amendment or renewal
+  may change future rent; it must not rewrite issued rent charges.
+- Utilities are variable charges entered by an authorized owner or caretaker.
+  Examples include electricity and water, and an amount may increase because
+  actual usage is higher.
+- Every utility charge has its own billing period, amount, due date, notes, and
+  audit metadata. Its due date is entered by the owner/caretaker and need not
+  match the rent due date.
+- A bill and payment history must label rent and each utility separately. A
+  combined account total may be shown only as a summary.
+- Payment allocation is charge-specific and auditable. Partial payment of one
+  charge must not incorrectly mark another charge paid.
+- Editing a pending utility entry creates an audit trail. An issued or partly
+  paid charge is adjusted through a correction/adjustment record rather than
+  destructive replacement.
+
+### Minimum data contract
+
+Use the existing immutable charge and transaction ledgers. Each charge needs a
+category (`rent`, `electricity`, `water`, or another controlled utility type),
+source (`contract` or `staff_entry`), service/billing period, amount, due date,
+status, creator, and timestamps. Payment allocations link transaction amounts
+to one or more individual charges. RLS permits tenants to read only their own
+charges, guardians only linked-tenant summaries where allowed, and authorized
+staff to create utility charges. Contract-derived rent cannot be edited through
+the utility-entry workflow.
+
+### Acceptance criteria
+
+- Staff can issue a variable utility amount with an independently selected due
+  date and see who created or changed it.
+- A tenant can clearly distinguish fixed rent from every utility charge and
+  can submit proof against the intended charge(s).
+- Rent remains equal to the active contract snapshot after utility edits.
+- Overdue state is calculated per charge using its own due date.
+- Existing billing/payment history remains intact through migration.
+
+## Step 2 — Digital Tenant Onboarding and Contract Workflow
+
+The official Carmelita's Dormitory contract will be supplied separately and is
+the source for the final PDF layout and field mapping. Do not treat a temporary
+developer template as the official agreement.
+
+### Workflow
+
+```text
+Authorized staff creates a time-limited onboarding invitation
+      ↓
+System presents a QR code containing a secure invitation URL/token reference
+      ↓
+Tenant scans QR and completes required data entry
+      ↓
+Staff reviews the submitted data and creates/updates the Draft contract
+      ↓
+System generates an immutable, versioned PDF from the official template
+      ↓
+Tenant chooses on-screen signing or uploads an already signed copy
+      ↓
+Required parties sign; owner verifies the completed document
+      ↓
+Verified contract becomes available in the tenant's private contract area
+```
+
+### Security and document rules
+
+- The QR code must not embed raw personal or contract data. It contains an
+  opaque, single-purpose, expiring token or secure URL and becomes unusable
+  after completion, expiry, or revocation.
+- A tenant invitation is bound to the intended onboarding record. Scanning it
+  does not grant access to another tenant or to staff functions.
+- Generated PDFs are immutable versions. A material data change creates a new
+  version and invalidates outstanding signatures on the replaced version.
+- Support two signature paths: a private upload of an externally signed
+  document, or an on-screen electronic signature with signer identity,
+  consent, timestamp, document version/hash, and audit evidence.
+- Owner verification remains separate from signature collection and contract
+  activation.
+- Tenants may list, view, and download only their own authorized contract
+  versions. Storage is private and access uses short-lived authorized links.
+- Retain uploader/signer, timestamps, original filename where applicable,
+  media type, size, hash, verification result, and the full audit trail.
+
+### Acceptance criteria
+
+- A valid QR invitation opens the correct onboarding form; expired, reused,
+  revoked, or mismatched invitations fail safely.
+- The generated PDF matches the supplied official template and frozen data.
+- Both signing paths preserve an auditable document version.
+- Tenant and staff access tests prove cross-tenant contract access is denied.
+
+## Step 3 — Cleaning Schedules by Bed
+
+Cleaning duties are assigned by room and bed identifier to reduce unnecessary
+display of tenant identities. This is a distinct module, not a public roommate
+complaint feed.
+
+### Rules and workflow
+
+- Owner/caretaker users create recurring or one-time duties with room, assigned
+  bed, task, scheduled date/time window, and instructions.
+- Tenants see the schedule for their assigned room and the bed identifier
+  responsible for each duty. Names are hidden where the bed identifier is
+  sufficient for accountability.
+- Completion may be recorded by the assigned tenant and reviewed by authorized
+  staff. Status transitions and edits are audited.
+- A tenant may privately report that a scheduled duty was not followed. The
+  report references the schedule/duty, not an unrestricted accusation field.
+- Only the reporter and authorized owner/caretaker reviewers can access the
+  report and reporter identity. Roommates cannot view the report or its author.
+- Notifications must use privacy-safe wording and must not disclose reporter
+  identity.
+
+### Acceptance criteria
+
+- Schedules remain correct after a tenant changes beds; historical duties keep
+  the bed assignment snapshot that applied at the scheduled time.
+- Tenants outside the room cannot read its cleaning schedule.
+- RLS tests deny roommate access to private non-compliance reports.
+- Staff can review, resolve, and audit a report without publishing it.
+
+## Step 4 — Visitor Registration Before the Visit
+
+The required lead time is interpreted as **no later than the calendar day
+before the scheduled visit**, using the dormitory's `Asia/Manila` timezone. The
+UI must display this rule clearly. Same-day registration is rejected unless a
+future written policy defines an authorized emergency override.
+
+### Required flow
+
+```text
+Tenant enters visit schedule and visitor details before the deadline
+      ↓
+Tenant captures the minimum required visitor ID information
+      ↓
+Request remains Pending
+      ↓
+Authorized staff reviews identity and visit details
+      ↓
+Staff approves or rejects with audit metadata
+      ↓
+Only an approved request can be used for arrival/departure logging
+```
+
+### Privacy and validation rules
+
+- Capture only the ID fields required by the dormitory's approved policy (for
+  example ID type and a masked identifier). If an ID image is required, store
+  it privately and never expose it through a public URL.
+- Define who may view ID data, access logging, retention duration, and secure
+  deletion before production rollout. Tenant list views should mask sensitive
+  identifiers after submission.
+- Validate that the requested visit date is later than the current local
+  calendar date, arrival precedes departure, and staff approval exists before
+  check-in.
+- Record reviewer, decision time, decision reason/notes, and all arrival and
+  departure events without overwriting history.
+
+### Acceptance criteria
+
+- Same-day and past-date requests are rejected server-side as well as in the
+  client.
+- Staff can inspect authorized ID information and approve or reject a pending
+  request; tenants cannot self-approve.
+- Unapproved visitors cannot be checked in.
+- RLS and storage tests prevent cross-tenant and unauthorized ID access.
+
+## Step 5 — Room and Bed Identifier Standard
+
+### Canonical format
+
+- Rooms use plain sequential numeric identifiers such as `1`, `2`, `3`, and so
+  on. Do not generate floor-prefixed identifiers such as `101–110` or
+  `201–210`.
+- Every standard room has exactly four numbered bed positions: `1`, `2`, `3`,
+  and `4`.
+- Odd bed numbers are upper bunks: `1` and `3`.
+- Even bed numbers are lower bunks: `2` and `4`.
+- Display labels may read `Bed 1 — Upper`, `Bed 2 — Lower`, `Bed 3 — Upper`,
+  and `Bed 4 — Lower`, but the stored canonical identifier remains the number.
+
+### Validation and migration rules
+
+- Room numbers must be positive numeric identifiers and unique after
+  normalization. Floor, when needed, is stored as separate metadata and is not
+  encoded in the room number.
+- Bed identifiers must be integers from `1` through `4`, unique within a room.
+  Bunk position is derived and validated from parity rather than freely typed.
+- Before enforcing constraints, produce a migration report for existing rooms,
+  beds, assignments, cleaning duties, and related records. Any ambiguous room
+  renumbering requires an explicit mapping; do not guess or discard history.
+- Assignment and occupancy protections already documented in Section 27 remain
+  in force.
+
+### Acceptance criteria
+
+- Creation/edit forms reject nonconforming room and bed identifiers.
+- All tenant, staff, contract, billing, visitor, cleaning, and report views use
+  the same canonical labels.
+- Existing active assignments remain linked correctly after an approved data
+  migration.

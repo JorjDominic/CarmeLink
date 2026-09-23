@@ -11,6 +11,17 @@ This README is a guide to every user-facing page currently implemented in the ap
 Development assignments and completion status are tracked separately in
 [`DEVELOPMENT_PROGRESS.md`](DEVELOPMENT_PROGRESS.md).
 
+> [!IMPORTANT]
+> Additions approved on September 23, 2026 are documented but not yet
+> implemented: separate rent/utility billing, QR-assisted digital contract
+> onboarding and signing, cleaning schedules by bed, advance visitor
+> registration with protected ID capture, and standardized room/bed
+> identifiers. Work begins with separate billing only after the project owner
+> says `go`. See the implementation gate in
+> [`DEVELOPMENT_PROGRESS.md`](DEVELOPMENT_PROGRESS.md) and the complete
+> requirements in
+> [`CARMELINK_FULL_SYSTEM_PLAN.md`](CARMELINK_FULL_SYSTEM_PLAN.md).
+
 ## Contents
 
 - [Getting started](#getting-started)
@@ -117,6 +128,11 @@ Summarizes room assignment, amount due, gate status, urgent items, the latest ma
 
 Shows the outstanding balance, next due date, and payment history. **Upload proof** starts receipt submission.
 
+Planned Step 1 separates fixed, contract-derived rent from variable utilities.
+Owner/caretaker users will enter utility amounts and utility-specific due dates;
+rent and utilities will remain independently identifiable through billing,
+payment allocation, and history.
+
 #### Reports
 
 Combines maintenance and confidential reporting. It summarizes report counts, shows recent maintenance progress, and links to both reporting workflows.
@@ -174,6 +190,9 @@ Collects the reason, destination, and return information for an exception and in
 #### Visitor request
 
 Registers an expected visitor's name, relationship, and schedule for review.
+The current same-day scheduling behavior is scheduled for replacement: the
+request must be filed no later than the calendar day before the visit, include
+protected visitor ID information, and receive staff approval.
 
 #### Rules & policies
 
