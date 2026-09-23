@@ -16,6 +16,7 @@ import '../../services/receipt_ocr_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/tripwire_geofence_service.dart';
 import '../shared/room_cleaning_pages.dart';
+import '../shared/room_inspection_pages.dart';
 import '../widgets/feature_widgets.dart';
 
 class TenantDashboardPage extends StatelessWidget {
@@ -538,6 +539,41 @@ class _MyRoomPageState extends State<MyRoomPage> {
                           SizedBox(height: 3),
                           Text(
                             'View your room rota or privately report a missed duty',
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              CarmelitaCard(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const TenantRoomInspectionsPage(),
+                  ),
+                ),
+                child: const Row(
+                  children: [
+                    CircleAvatar(
+                      child: Icon(Icons.fact_check_outlined),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Room inspections',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'View inspection notices, findings, and follow-up',
                           ),
                         ],
                       ),
