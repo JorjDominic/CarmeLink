@@ -4610,7 +4610,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Room ${tenant.room} • Bed ${tenant.bedSpace}',
+                                  'Room ${tenant.room} • ${tenant.bedSpace}',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
