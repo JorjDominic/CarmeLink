@@ -8,6 +8,7 @@ import '../../services/room_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/tenant_service.dart';
 import '../shared/staff_quick_panel.dart';
+import '../shared/room_cleaning_pages.dart';
 import 'floor_plan_page.dart';
 import 'owner_pages.dart';
 
@@ -858,6 +859,50 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               ),
             ),
           ],
+          const SizedBox(height: 22),
+          const SectionTitle(
+            'Room operations',
+            subtitle: 'Cleaning duties and private compliance reports',
+          ),
+          const SizedBox(height: 12),
+          CarmelitaCard(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => StaffRoomCleaningPage(
+                  roomId: room.id,
+                  roomNumber: room.number,
+                  beds: room.beds,
+                ),
+              ),
+            ),
+            child: const Row(
+              children: [
+                CircleAvatar(
+                  child: Icon(Icons.cleaning_services_outlined),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cleaning schedule',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'Manage bed-based duties and restricted tenant reports',
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded),
+              ],
+            ),
+          ),
           const SizedBox(height: 22),
           const SectionTitle(
             'Bed spaces',
