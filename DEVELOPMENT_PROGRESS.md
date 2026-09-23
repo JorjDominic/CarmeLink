@@ -120,6 +120,74 @@ policy choices are recorded in the full system plan.
 17. [ ] Configure sensitive-record retention after client and legal/privacy
     review.
 
+### Consolidated modules and developer ownership
+
+The numbered priorities are requirements, not instructions to create seventeen
+separate navigation modules. Related screens may be merged into an existing
+module, while security-sensitive records, status lifecycles, and financial
+ledgers remain separate in the database.
+
+> [!IMPORTANT]
+> **The Leader Developer owns all workflow-related implementation.** This
+> includes any feature that coordinates multiple roles/modules or controls a
+> tenant lifecycle transition: account → onboarding → contract → documents →
+> signatures → activation → billing → occupancy, as well as conduct decisions →
+> charges → termination and move-out → inspection → deposit settlement. The
+> groupmate must not independently change these workflow state machines,
+> activation gates, cross-module RPCs, or shared status values without agreeing
+> the contract with the Leader Developer first.
+
+| Consolidated area | Priorities merged | Implementation owner | Boundary |
+|---|---:|---|---|
+| Contracts & Onboarding | 2–6 | **Leader Developer** | QR onboarding, required documents, signers, PDF versions, addenda, activation, and contract-to-billing/occupancy orchestration |
+| Visitor Management | 7 | Groupmate | Extend the existing visitor module; approval-to-gate integration and shared status/RPC changes require Leader Developer review |
+| Room Operations & Inspections | 8, 9, 12 | Groupmate | One inspection system for move-in, monthly, follow-up, and move-out; cleaning appears under Rooms |
+| Conduct & Cases | 10, 16 | Groupmate, with Leader Developer integration | Incidents, evidence, responses, warnings, repeat history, and termination recommendation; Leader Developer owns cross-module decision transitions |
+| Billing Consequences | 11 | **Leader Developer** | Converts only approved incidents/inspections into separate penalty or damage ledger charges |
+| Curfew & Gate | 13 | Groupmate | Add employee curfew profiles inside the existing module; Leader Developer reviews gate-evaluator/status changes |
+| Move-out & Settlement | 14, 15 | **Leader Developer** | Notice, final inspection coordination, clearance, deposit ledger, refund/shortfall, contract and occupancy closure |
+| Security & Retention Settings | 17 | Groupmate, with Leader Developer review | Administrative retention configuration; destructive jobs and authorization rules require Leader Developer approval |
+
+Recommended groupmate sequence:
+
+1. Visitor Management (Priority 7) and its policy presentation from Priority 6.
+2. Room Operations & Inspections (Priorities 8, 9, and 12).
+3. Conduct & Cases records/UI (Priorities 10 and 16), stopping before financial
+   charge creation or irreversible contract transitions.
+4. Employee curfew profiles inside Curfew & Gate (Priority 13).
+5. Retention-settings UI/configuration (Priority 17), without enabling deletion
+   jobs until policy and Leader Developer review are complete.
+
+The Leader Developer continues the implemented contract workflow and owns the
+integration portions of Priorities 6, 10–11, and 14–16. Each developer should
+use a separate feature branch and avoid editing the same migration or workflow
+files simultaneously.
+
+### Merge rules that remain mandatory
+
+- Merge policy/addendum screens into Contracts and Rules & Policies, but keep
+  immutable signed contract versions separate from editable policy drafts.
+- Merge advance-visitor features into Visitor Management; do not build a second
+  visitor module. Keep visitor requests separate from actual gate events.
+- Merge move-in/monthly/follow-up/move-out checks into one Room Inspections
+  module using an inspection type. Keep resulting maintenance work orders,
+  disciplinary cases, and damage charges as linked records rather than one row.
+- Merge cleaning schedules into Room Operations. Keep private non-compliance
+  reports restricted under Conduct/Reports.
+- Merge incidents, violations, warnings, and termination review into Conduct &
+  Cases. A verified case may request a charge, but must not directly mutate the
+  payment ledger or auto-evict a tenant.
+- Merge employee curfew schedules into Curfew & Gate rather than creating a new
+  module.
+- Merge move-out clearance and deposit computation into one workflow, while
+  preserving the deposit ledger and ordinary payment ledger as distinct facts.
+- Place retention controls under Security/Settings rather than daily navigation.
+
+Never merge contract status with signature status, an incident with its charge,
+an inspection with its repair task, a visitor request with a gate event, or rent
+with utility/penalty/damage balances. Those distinctions are required for RLS,
+auditability, correction, and payment allocation.
+
 Progress update — September 24, 2026:
 
 - [✓] Added staff-created, tenant-bound, expiring/revocable QR invitations with

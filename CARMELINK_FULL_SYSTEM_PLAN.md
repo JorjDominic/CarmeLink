@@ -3600,24 +3600,49 @@ absent from the lease belong in a versioned rules document or signed addendum.
 - Costs exceeding the deposit may be proposed separately, but must not become a
   charge until the client confirms the rule and an authorized reviewer approves.
 
-## New modules or distinct workflows
+## Consolidated module architecture and ownership
 
-1. **Monthly inspections:** recurring schedules, room/inspector, three days'
-   written notice and delivery evidence, checklist, private photos, findings,
-   correction tasks, acknowledgment, and follow-up.
-2. **Move-in room condition:** a client-approved fixture/inventory checklist,
-   existing damage, dated evidence, and immutable tenant/staff acknowledgment.
-3. **Move-out and clearance:** 30-day notice, final inspection, key/property
-   return, unpaid-charge check, deposit proposal, refund, and contract/occupancy
-   closure.
-4. **Termination/eviction case:** grounds, linked verified records, evidence,
-   notices, tenant response, authorized decision, settlement, room release, and
-   audit history. An incident alone never causes automatic eviction.
-5. **Policy/addendum management:** version and acknowledge advance-visitor,
-   utility, employee-curfew, rent-change, and enforcement/review procedures that
-   are missing from the lease.
-6. **Retention/privacy configuration:** define access, retention, and deletion
-   for IDs, signatures, contracts, visitor data, inspection media, and evidence.
+These requirements must extend existing domains where practical instead of
+creating a separate top-level module for every numbered priority.
+
+**The Leader Developer owns workflow-related implementation and integration.**
+This includes cross-role state transitions, contract activation, contract-to-
+billing and occupancy coordination, incident-to-charge handoff, termination,
+and move-out/deposit settlement. A groupmate may build bounded records and UI,
+but may not change shared statuses, RLS boundaries, workflow RPCs, or irreversible
+transitions without Leader Developer review.
+
+1. **Contracts & Onboarding (Priorities 2–6; Leader Developer):** merge QR
+   onboarding, requirements, signers, PDF versions, policy addenda, activation,
+   and onboarding history into Contract Management.
+2. **Visitor Management (Priority 7; Groupmate):** extend the existing visitor
+   request/approval area with lead-time, visiting hours, ID handling, and
+   reception events. Keep requests and actual gate events separate.
+3. **Room Operations & Inspections (Priorities 8, 9, 12; Groupmate):** use one
+   inspection domain with `move_in`, `monthly`, `follow_up`, `move_out`, and
+   `emergency` types; show bed-based cleaning under Rooms. Inspection findings
+   link to, but do not replace, maintenance/case/charge records.
+4. **Conduct & Cases (Priorities 10, 16; Groupmate records/UI, Leader Developer
+   transitions):** combine incidents, evidence, tenant responses, warnings,
+   repeat history, and termination review. No case directly edits a contract or
+   payment ledger.
+5. **Billing Consequences (Priority 11; Leader Developer):** approved case or
+   inspection outcomes may create separately allocated penalty/damage charges
+   through protected billing operations.
+6. **Curfew & Gate (Priority 13; Groupmate):** add employee profiles/exceptions
+   to the existing module rather than creating an employee-curfew module.
+7. **Move-out & Settlement (Priorities 14–15; Leader Developer):** orchestrate
+   notice, final inspection, clearance, deposit calculation, refund/shortfall,
+   and contract/occupancy closure while keeping financial ledgers distinct.
+8. **Security & Retention Settings (Priority 17; Groupmate with Leader Developer
+   review):** configure record-class retention in administration settings;
+   deletion jobs remain disabled until policy/legal approval.
+
+Required separation remains: contract lifecycle versus document/signature
+lifecycle; inspection finding versus maintenance task; incident decision versus
+financial charge; deposit versus ordinary payments; visitor request versus gate
+event; cleaning assignment versus private report; and rent versus utilities,
+penalties, and damages.
 
 ## Client decisions that remain open
 
