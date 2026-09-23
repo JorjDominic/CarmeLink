@@ -296,19 +296,25 @@ class OwnerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<Payment> createInvoice({
+  Future<Payment> createUtilityCharge({
     required String tenantId,
     required String title,
     required String category,
     required double amount,
     required DateTime dueDate,
+    required DateTime periodStart,
+    required DateTime periodEnd,
+    String? notes,
   }) async {
-    final invoice = await _paymentService.createInvoice(
+    final invoice = await _paymentService.createUtilityCharge(
       tenantId: tenantId,
       title: title,
       category: category,
       amount: amount,
       dueDate: dueDate,
+      periodStart: periodStart,
+      periodEnd: periodEnd,
+      notes: notes,
     );
 
     final index = _payments.indexWhere((p) => p.id == invoice.id);
@@ -319,6 +325,51 @@ class OwnerController extends ChangeNotifier {
     }
     notifyListeners();
     return invoice;
+  }
+
+  Future<int> applyRentRateOverride({
+    required String tenantId,
+    required double newMonthlyRent,
+    required DateTime effectiveDate,
+    required String reason,
+  }) async {
+    final count = await _paymentService.applyRentRateOverride(
+      tenantId: tenantId,
+      newMonthlyRent: newMonthlyRent,
+      effectiveDate: effectiveDate,
+      reason: reason,
+    );
+    await loadPayments(force: true);
+    return count;
+  }
+
+  Future<int> createUtilityChargeCart(
+    List<Map<String, dynamic>> items,
+  ) async {
+    final count = await _paymentService.createUtilityChargeCart(items);
+    await loadPayments(force: true);
+    return count;
+  }
+
+  @Deprecated('Use createUtilityCharge; rent is generated from contracts.')
+  Future<Payment> createInvoice({
+    required String tenantId,
+    required String title,
+    required String category,
+    required double amount,
+    required DateTime dueDate,
+  }) {
+    final periodStart = DateTime(dueDate.year, dueDate.month, 1);
+    final periodEnd = DateTime(dueDate.year, dueDate.month + 1, 0);
+    return createUtilityCharge(
+      tenantId: tenantId,
+      title: title,
+      category: category,
+      amount: amount,
+      dueDate: dueDate,
+      periodStart: periodStart,
+      periodEnd: periodEnd,
+    );
   }
 
   void updateMaintenance(

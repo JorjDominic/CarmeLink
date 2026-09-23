@@ -38,7 +38,8 @@ void main() {
       tenantId: 't-1',
       tenantName: 'Juan Dela Cruz Extra Long Name That Might Overflow',
       tenantRoom: 'Room 101 • Bed Space 2 Second Floor',
-      label: 'Monthly Dormitory Rent with Very Long Description - September 2026',
+      label:
+          'Monthly Dormitory Rent with Very Long Description - September 2026',
       amount: 14500.0,
       dueDate: DateTime.now().subtract(const Duration(days: 5)),
       status: 'Due',
@@ -134,8 +135,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets(
-        'Issue Invoice dialog does not overflow on 320px width screen',
+    testWidgets('Utility charge dialog does not overflow on 320px width screen',
         (tester) async {
       tester.view.physicalSize = const Size(320, 640);
       tester.view.devicePixelRatio = 1.0;
@@ -149,12 +149,14 @@ void main() {
       await tester.pumpWidget(buildTestable(const PaymentVerificationPage()));
       await tester.pumpAndSettle();
 
-      // Tap 'Issue invoice' FAB
-      await tester.tap(find.byType(FloatingActionButton));
+      // Tap the in-page utility charge action.
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'Add utility charge'),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget);
-      expect(find.text('Issue Invoice'), findsWidgets);
+      expect(find.text('Utility Charge Cart'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

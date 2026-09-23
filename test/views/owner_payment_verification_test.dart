@@ -266,7 +266,7 @@ void main() {
       expect(find.textContaining('Failed to update payment:'), findsOneWidget);
     });
 
-    testWidgets('tapping Issue invoice button opens create invoice dialog',
+    testWidgets('tapping Issue invoice button opens utility charge dialog',
         (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
       tester.view.devicePixelRatio = 1.0;
@@ -280,25 +280,26 @@ void main() {
       await tester.pumpWidget(buildTestable(const PaymentVerificationPage()));
       await tester.pumpAndSettle();
 
-      // Tap AppBar 'Issue invoice' button
-      final issueBtn = find.byTooltip('Issue invoice');
+      // Tap the in-page utility charge action.
+      final issueBtn = find.widgetWithText(FilledButton, 'Add utility charge');
       expect(issueBtn, findsOneWidget);
 
       await tester.tap(issueBtn);
       await tester.pumpAndSettle();
 
       // Dialog should be open
-      expect(find.text('Issue Invoice'), findsWidgets);
-      expect(find.text('Billing Category'), findsOneWidget);
-      expect(find.text('Amount'), findsOneWidget);
-      expect(find.text('Due Date'), findsOneWidget);
+      expect(find.text('Utility Charge Cart'), findsOneWidget);
+      expect(find.text('Charging scope'), findsOneWidget);
+      expect(find.text('Utility type'), findsOneWidget);
+      expect(find.text('Source bill total'), findsOneWidget);
+      expect(find.text('Add to cart'), findsOneWidget);
       expect(find.text('Cancel'), findsOneWidget);
 
       // Close dialog
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Billing Category'), findsNothing);
+      expect(find.text('Charging scope'), findsNothing);
     });
 
     testWidgets('tapping Collected dashboard item switches to verified filter',
@@ -326,6 +327,31 @@ void main() {
       expect(find.text('Maria Santos'), findsNothing);
     });
 
+    testWidgets('opens audited future rent override dialog', (tester) async {
+      tester.view.physicalSize = const Size(1200, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      OwnerController.instance.setPaymentsForTesting(createTestPayments());
+      await tester.pumpWidget(buildTestable(const PaymentVerificationPage()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.widgetWithText(OutlinedButton, 'Override future rent'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Override Future Rent'), findsOneWidget);
+      expect(find.text('New monthly rent'), findsOneWidget);
+      expect(find.text('Effective date'), findsOneWidget);
+      expect(find.text('Reason for increase or decrease'), findsOneWidget);
+      expect(find.text('Apply Override'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('failed backend submission does not fabricate an invoice',
         (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
@@ -340,22 +366,33 @@ void main() {
       await tester.pumpWidget(buildTestable(const PaymentVerificationPage()));
       await tester.pumpAndSettle();
 
-      // Tap 'Issue invoice'
-      await tester.tap(find.byTooltip('Issue invoice'));
+      // Tap the in-page utility charge action.
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'Add utility charge'),
+      );
+      await tester.pumpAndSettle();
+
+      // Use the all-rooms scope so this backend-failure test does not depend
+      // on a seeded tenant directory.
+      await tester.tap(find.text('Individual tenant').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All occupied rooms').last);
       await tester.pumpAndSettle();
 
       // Fill in amount
-      final amountField = find.widgetWithText(TextFormField, '0.00');
+      final amountField =
+          find.widgetWithText(TextFormField, 'Source bill total');
       await tester.enterText(amountField, '5000');
       await tester.pump();
 
-      // Tap 'Issue Invoice' submit button
-      final submitBtn = find.widgetWithText(FilledButton, 'Issue Invoice');
-      await tester.tap(submitBtn);
+      await tester.tap(find.text('Add to cart'));
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Issue cart'));
       await tester.pumpAndSettle();
 
       expect(OwnerController.instance.payments.first.amount, equals(4000.0));
-      expect(find.textContaining('Failed to issue invoice:'), findsOneWidget);
+      expect(
+          find.textContaining('Failed to issue utility cart:'), findsOneWidget);
     });
   });
 }

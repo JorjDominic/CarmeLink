@@ -20,7 +20,7 @@ class PaymentService {
       'payment_method, reference_number, receipt_path, paid_at, '
       'reviewed_by, reviewed_at, review_notes, created_at, updated_at, '
       'remaining_balance, period_start, period_end, source, latest_transaction_id, '
-      'tenant_name, submitted_amount';
+      'tenant_name, submitted_amount, notes, created_by, contract_amount, rent_adjustment';
 
   static const String _source = 'billing_charge_summaries';
 
@@ -171,33 +171,62 @@ class PaymentService {
     return Payment.fromJson(Map<String, dynamic>.from(updatedRow as Map));
   }
 
-  /// Creates a new invoice / billing charge for a tenant.
-  Future<Payment> createInvoice({
+  /// Creates a variable utility charge. Rent is generated only from contracts.
+  Future<Payment> createUtilityCharge({
     required String tenantId,
     required String title,
     required String category,
     required double amount,
     required DateTime dueDate,
+    required DateTime periodStart,
+    required DateTime periodEnd,
+    String? notes,
   }) async {
-    final row = await _client
-        .from('billing_charges')
-        .insert({
-          'tenant_id': tenantId,
-          'title': title.trim(),
-          'category': category.trim().toLowerCase(),
-          'original_amount': amount,
-          'due_date':
-              '${dueDate.year.toString().padLeft(4, '0')}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}',
-          'source': 'manual',
-        })
-        .select('id')
-        .single();
-    final summary = await _client
-        .from(_source)
-        .select(_columns)
-        .eq('id', row['id'] as String)
-        .single();
-    return Payment.fromJson(summary);
+    _requireAuthId();
+    final row = await _client.rpc('create_utility_charge', params: {
+      'p_tenant_id': tenantId,
+      'p_title': title.trim(),
+      'p_category': category.trim().toLowerCase(),
+      'p_amount': amount,
+      'p_due_date': _dateOnly(dueDate),
+      'p_period_start': _dateOnly(periodStart),
+      'p_period_end': _dateOnly(periodEnd),
+      'p_notes': notes?.trim(),
+    });
+    return Payment.fromJson(Map<String, dynamic>.from(row as Map));
+  }
+
+  String _dateOnly(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+
+  /// Applies an audited increase/decrease to unpaid future contract rent.
+  Future<int> applyRentRateOverride({
+    required String tenantId,
+    required double newMonthlyRent,
+    required DateTime effectiveDate,
+    required String reason,
+  }) async {
+    _requireAuthId();
+    final result = await _client.rpc('apply_rent_rate_override', params: {
+      'p_tenant_id': tenantId,
+      'p_new_monthly_rent': newMonthlyRent,
+      'p_effective_date': _dateOnly(effectiveDate),
+      'p_reason': reason.trim(),
+    });
+    final row = Map<String, dynamic>.from(result as Map);
+    return (row['adjusted_charge_count'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Atomically issues every allocation produced from a utility cart.
+  Future<int> createUtilityChargeCart(
+    List<Map<String, dynamic>> items,
+  ) async {
+    _requireAuthId();
+    final result = await _client.rpc('create_utility_charge_cart', params: {
+      'p_items': items,
+    });
+    final row = Map<String, dynamic>.from(result as Map);
+    return (row['charge_count'] as num?)?.toInt() ?? 0;
   }
 
   // ===========================================================================

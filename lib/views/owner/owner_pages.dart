@@ -25,6 +25,7 @@ import 'room_monitoring_page.dart';
 import 'geofence_dev_dashboard_page.dart';
 import 'contracts_page.dart';
 import 'tenant_onboarding_flow.dart';
+import 'utility_charge_cart_dialog.dart';
 
 /// Filters existing Supabase-backed directory entries; no client-side
 /// tenant records are created or mutated here.
@@ -2180,6 +2181,7 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         OwnerController.instance.loadPayments();
+        OwnerController.instance.loadTenants();
       }
     });
 
@@ -2204,7 +2206,7 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
   void _openCreateInvoiceDialog(BuildContext context) {
     showDialog<void>(
       context: context,
-      builder: (_) => const _CreateInvoiceDialog(),
+      builder: (_) => const UtilityChargeCartDialog(),
     );
   }
 
@@ -2283,19 +2285,8 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
     return PageFrame(
       title: 'Payment review',
       subtitle: 'Inspect tenant receipts, issue invoices, and verify balances',
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openCreateInvoiceDialog(context),
-        icon: const Icon(Icons.add_card_rounded),
-        label: const Text('Issue invoice',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-      ),
       onRefresh: () => OwnerController.instance.loadPayments(force: true),
       actions: [
-        IconButton(
-          tooltip: 'Issue invoice',
-          icon: const Icon(Icons.post_add_rounded),
-          onPressed: () => _openCreateInvoiceDialog(context),
-        ),
         IconButton(
           tooltip: 'Refresh payments',
           icon: controller.paymentsLoading
@@ -2383,6 +2374,27 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => const _RentOverrideDialog(),
+                    ),
+                    icon: const Icon(Icons.price_change_outlined),
+                    label: const Text('Override future rent'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () => _openCreateInvoiceDialog(context),
+                    icon: const Icon(Icons.add_card_rounded),
+                    label: const Text('Add utility charge'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               // Financial Summary Metrics
               MutedDashboardGrid(items: dashboardItems),
               const SizedBox(height: 16),
@@ -2616,21 +2628,20 @@ class _CreateInvoiceDialog extends StatefulWidget {
 class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
   final _formKey = GlobalKey<FormState>();
   late String _selectedTenantId;
-  String _selectedCategory = 'rent';
+  String _selectedCategory = 'electricity';
   late final TextEditingController _titleController;
-  final TextEditingController _amountController =
-      TextEditingController(text: '2500.00');
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
   late DateTime _dueDate;
+  late DateTime _periodStart;
+  late DateTime _periodEnd;
   bool _isSubmitting = false;
 
   final List<String> _categories = const [
-    'rent',
     'electricity',
     'water',
     'internet',
-    'maintenance fee',
-    'penalty',
-    'other',
+    'utility',
   ];
 
   @override
@@ -2639,26 +2650,26 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
     final tenants = OwnerController.instance.tenants;
     _selectedTenantId = tenants.isNotEmpty ? tenants.first.id : 't1';
     _dueDate = DateTime.now().add(const Duration(days: 7));
+    _periodStart = DateTime(DateTime.now().year, DateTime.now().month, 1);
+    _periodEnd = DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
     _titleController =
-        TextEditingController(text: _defaultTitleForCategory('rent'));
+        TextEditingController(text: _defaultTitleForCategory('electricity'));
   }
 
   @override
   void dispose() {
     _titleController.dispose();
     _amountController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
   String _defaultTitleForCategory(String category) {
     return switch (category.toLowerCase()) {
-      'rent' => 'Monthly Dorm Rent',
       'electricity' => 'Electricity Utility Share',
       'water' => 'Water Utility Share',
       'internet' => 'WiFi Internet Fee',
-      'maintenance fee' => 'Maintenance / Repair Fee',
-      'penalty' => 'Late Fee / Violation Penalty',
-      _ => 'Dormitory Charge',
+      _ => 'Other Utility Charge',
     };
   }
 
@@ -2674,6 +2685,25 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
     }
   }
 
+  Future<void> _pickPeriodDate({required bool start}) async {
+    final current = start ? _periodStart : _periodEnd;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime.now().subtract(const Duration(days: 730)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      if (start) {
+        _periodStart = picked;
+        if (_periodEnd.isBefore(picked)) _periodEnd = picked;
+      } else {
+        _periodEnd = picked;
+      }
+    });
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -2682,12 +2712,15 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
 
     setState(() => _isSubmitting = true);
     try {
-      await OwnerController.instance.createInvoice(
+      await OwnerController.instance.createUtilityCharge(
         tenantId: _selectedTenantId,
         title: _titleController.text.trim(),
         category: _selectedCategory,
         amount: amount,
         dueDate: _dueDate,
+        periodStart: _periodStart,
+        periodEnd: _periodEnd,
+        notes: _notesController.text.trim(),
       );
 
       if (!mounted) return;
@@ -2695,7 +2728,7 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'Invoice for ${_titleController.text.trim()} issued successfully.'),
+              'Utility charge for ${_titleController.text.trim()} issued successfully.'),
           backgroundColor: const Color(0xFF56886B),
         ),
       );
@@ -2703,7 +2736,7 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to issue invoice: $e'),
+          content: Text('Failed to issue utility charge: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -2737,7 +2770,7 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Issue Invoice',
+              'Add Utility Charge',
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
             ),
           ),
@@ -2786,6 +2819,19 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
                   },
                 ),
                 const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer
+                        .withValues(alpha: .35),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'Rent is fixed by the active contract and cannot be entered here. Add only the tenant’s actual variable utility charge.',
+                    style: TextStyle(fontSize: 12.5, height: 1.35),
+                  ),
+                ),
+                const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
                   isExpanded: true,
                   initialValue: _selectedCategory,
@@ -2820,7 +2866,7 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
                   controller: _titleController,
                   decoration: const InputDecoration(
                     labelText: 'Invoice Title / Description',
-                    hintText: 'e.g. September Rent',
+                    hintText: 'e.g. September Electricity',
                     prefixIcon: Icon(Icons.edit_note_rounded),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -2857,6 +2903,18 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 14),
+                _UtilityPeriodField(
+                  label: 'Billing period start',
+                  value: _periodStart,
+                  onTap: () => _pickPeriodDate(start: true),
+                ),
+                const SizedBox(height: 14),
+                _UtilityPeriodField(
+                  label: 'Billing period end',
+                  value: _periodEnd,
+                  onTap: () => _pickPeriodDate(start: false),
                 ),
                 const SizedBox(height: 14),
                 InkWell(
@@ -2909,6 +2967,19 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _notesController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Usage notes (optional)',
+                    hintText: 'e.g. Higher electricity usage for September',
+                    prefixIcon: Icon(Icons.notes_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -2929,8 +3000,202 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
                       strokeWidth: 2, color: Colors.white),
                 )
               : const Icon(Icons.send_rounded, size: 18),
-          label: const Text('Issue Invoice',
+          label: const Text('Add Utility Charge',
               style: TextStyle(fontWeight: FontWeight.w700)),
+        ),
+      ],
+    );
+  }
+}
+
+class _UtilityPeriodField extends StatelessWidget {
+  const _UtilityPeriodField({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final String label;
+  final DateTime value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: const Icon(Icons.date_range_outlined),
+            border: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+          ),
+          child: Text(
+            '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      );
+}
+
+class _RentOverrideDialog extends StatefulWidget {
+  const _RentOverrideDialog();
+
+  @override
+  State<_RentOverrideDialog> createState() => _RentOverrideDialogState();
+}
+
+class _RentOverrideDialogState extends State<_RentOverrideDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _amountController = TextEditingController();
+  final _reasonController = TextEditingController();
+  late String _tenantId;
+  late DateTime _effectiveDate;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final tenants = OwnerController.instance.tenants;
+    _tenantId = tenants.isNotEmpty ? tenants.first.id : '';
+    final now = DateTime.now();
+    _effectiveDate = DateTime(now.year, now.month + 1, 1);
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _effectiveDate,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (picked != null && mounted) setState(() => _effectiveDate = picked);
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _saving = true);
+    try {
+      final count = await OwnerController.instance.applyRentRateOverride(
+        tenantId: _tenantId,
+        newMonthlyRent: double.parse(_amountController.text.trim()),
+        effectiveDate: _effectiveDate,
+        reason: _reasonController.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+          'Rent override applied to $count future charge${count == 1 ? '' : 's'}.',
+        ),
+      ));
+    } catch (error) {
+      if (mounted) {
+        showAppSnackBar(context, 'Failed to override rent: $error');
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tenants = OwnerController.instance.tenants;
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: const Text('Override Future Rent'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Increase or decrease unpaid future rent. Contract terms and historical charges remain unchanged.',
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: _tenantId.isEmpty ? null : _tenantId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Tenant / Resident',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  items: tenants
+                      .map((tenant) => DropdownMenuItem(
+                            value: tenant.id,
+                            child: Text('${tenant.name} (${tenant.room})',
+                                overflow: TextOverflow.ellipsis),
+                          ))
+                      .toList(),
+                  validator: (value) =>
+                      value == null || value.isEmpty ? 'Select a tenant' : null,
+                  onChanged: _saving
+                      ? null
+                      : (value) {
+                          if (value != null) setState(() => _tenantId = value);
+                        },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _amountController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'New monthly rent',
+                    prefixText: '₱ ',
+                    prefixIcon: Icon(Icons.payments_outlined),
+                  ),
+                  validator: (value) {
+                    final amount = double.tryParse(value?.trim() ?? '');
+                    return amount == null || amount <= 0
+                        ? 'Enter a valid rent amount'
+                        : null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                _UtilityPeriodField(
+                  label: 'Effective date',
+                  value: _effectiveDate,
+                  onTap: _pickDate,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _reasonController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Reason for increase or decrease',
+                    prefixIcon: Icon(Icons.notes_outlined),
+                  ),
+                  validator: (value) =>
+                      (value?.trim().length ?? 0) < 3 ? 'Enter a reason' : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _submit,
+          child: Text(_saving ? 'Applying…' : 'Apply Override'),
         ),
       ],
     );

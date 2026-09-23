@@ -143,6 +143,20 @@ class TenantDashboardPage extends StatelessWidget {
               MutedDashboardGrid(
                 items: [
                   MutedDashboardItem(
+                    label: 'Rent balance',
+                    value: money(controller.outstandingRent),
+                    detail: 'Fixed by your contract',
+                    icon: Icons.home_work_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  MutedDashboardItem(
+                    label: 'Utility balance',
+                    value: money(controller.outstandingUtilities),
+                    detail: 'Based on recorded usage',
+                    icon: Icons.bolt_outlined,
+                    color: const Color(0xFFD97706),
+                  ),
+                  MutedDashboardItem(
                     label: 'Amount due',
                     value: nextDue != null
                         ? money(nextDue.amount)
@@ -722,6 +736,20 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 compact: true,
                 items: [
                   MutedDashboardItem(
+                    label: 'Rent balance',
+                    value: money(c.outstandingRent),
+                    detail: 'Fixed by your contract',
+                    icon: Icons.home_work_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  MutedDashboardItem(
+                    label: 'Utility balance',
+                    value: money(c.outstandingUtilities),
+                    detail: 'Based on recorded usage',
+                    icon: Icons.bolt_outlined,
+                    color: const Color(0xFFD97706),
+                  ),
+                  MutedDashboardItem(
                     label: 'Outstanding',
                     value: money(c.outstandingBalance),
                     detail: overdueCount > 0
@@ -1073,6 +1101,33 @@ class _TenantPaymentCard extends StatelessWidget {
                         fontSize: 11,
                         color: Colors.grey.shade600,
                       ),
+                ),
+              ],
+              if (payment.periodStart != null && payment.periodEnd != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Billing period: ${shortDate(payment.periodStart!)} – ${shortDate(payment.periodEnd!)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        color: Colors.grey.shade700,
+                      ),
+                ),
+              ],
+              if (payment.hasRentOverride) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Contract rent ${money(payment.contractAmount ?? payment.amount - payment.rentAdjustment)} → adjusted rent ${money(payment.amount)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                ),
+              ],
+              if (payment.notes != null && payment.notes!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  payment.notes!,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
               if (payment.reviewNotes != null &&
@@ -4907,7 +4962,8 @@ class _CurfewRequestCard extends StatelessWidget {
               const SizedBox(height: 10),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: Theme.of(context)
                       .colorScheme
@@ -4915,79 +4971,79 @@ class _CurfewRequestCard extends StatelessWidget {
                       .withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(8),
                 ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.flight_takeoff_outlined, size: 16),
-                      const SizedBox(width: 6),
-                      const Text(
-                        'Departure: ',
-                        style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        '${shortDate(request.departureTime)} ${timeText(request.departureTime)}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.flight_land_outlined, size: 16),
-                      const SizedBox(width: 6),
-                      const Text(
-                        'Expected return: ',
-                        style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        '${shortDate(request.expectedReturnTime)} ${timeText(request.expectedReturnTime)}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            if (request.guardianNotes != null &&
-                request.guardianNotes!.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Guardian note: ${request.guardianNotes!}',
-                style:
-                    const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
-              ),
-            ],
-            if (request.staffNotes != null &&
-                request.staffNotes!.trim().isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Staff note: ${request.staffNotes!}',
-                style:
-                    const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
-              ),
-            ],
-            if (request.canCancel) ...[
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: onCancel,
-                  icon: const Icon(Icons.close, size: 16),
-                  label: const Text('Cancel request'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                  ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.flight_takeoff_outlined, size: 16),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Departure: ',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          '${shortDate(request.departureTime)} ${timeText(request.departureTime)}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.flight_land_outlined, size: 16),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Expected return: ',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          '${shortDate(request.expectedReturnTime)} ${timeText(request.expectedReturnTime)}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
+              if (request.guardianNotes != null &&
+                  request.guardianNotes!.trim().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Guardian note: ${request.guardianNotes!}',
+                  style: const TextStyle(
+                      fontSize: 12, fontStyle: FontStyle.italic),
+                ),
+              ],
+              if (request.staffNotes != null &&
+                  request.staffNotes!.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Staff note: ${request.staffNotes!}',
+                  style: const TextStyle(
+                      fontSize: 12, fontStyle: FontStyle.italic),
+                ),
+              ],
+              if (request.canCancel) ...[
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: onCancel,
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Cancel request'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 }
 

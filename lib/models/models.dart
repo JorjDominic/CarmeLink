@@ -117,6 +117,10 @@ class Payment {
     this.submittedAmount,
     this.periodStart,
     this.periodEnd,
+    this.notes,
+    this.createdBy,
+    this.contractAmount,
+    this.rentAdjustment = 0,
     this.source = 'manual',
     DateTime? createdAt,
   }) : createdAt = createdAt ?? dueDate;
@@ -143,7 +147,20 @@ class Payment {
   final double? submittedAmount;
   final DateTime? periodStart;
   final DateTime? periodEnd;
+  final String? notes;
+  final String? createdBy;
+  final double? contractAmount;
+  final double rentAdjustment;
   final String source;
+
+  bool get isRent => category.toLowerCase().trim() == 'rent';
+  bool get isUtility => const {
+        'electricity',
+        'water',
+        'internet',
+        'utility',
+      }.contains(category.toLowerCase().trim());
+  bool get hasRentOverride => isRent && rentAdjustment != 0;
 
   bool get isPending => status.toLowerCase().contains('pending');
   bool get isVerified => status.toLowerCase().contains('verified');
@@ -188,6 +205,10 @@ class Payment {
     double? submittedAmount,
     DateTime? periodStart,
     DateTime? periodEnd,
+    String? notes,
+    String? createdBy,
+    double? contractAmount,
+    double? rentAdjustment,
     String? source,
   }) {
     return Payment(
@@ -213,6 +234,10 @@ class Payment {
       submittedAmount: submittedAmount ?? this.submittedAmount,
       periodStart: periodStart ?? this.periodStart,
       periodEnd: periodEnd ?? this.periodEnd,
+      notes: notes ?? this.notes,
+      createdBy: createdBy ?? this.createdBy,
+      contractAmount: contractAmount ?? this.contractAmount,
+      rentAdjustment: rentAdjustment ?? this.rentAdjustment,
       source: source ?? this.source,
     );
   }
@@ -301,6 +326,10 @@ class Payment {
       submittedAmount: (json['submitted_amount'] as num?)?.toDouble(),
       periodStart: DateTime.tryParse(json['period_start'] as String? ?? ''),
       periodEnd: DateTime.tryParse(json['period_end'] as String? ?? ''),
+      notes: json['notes'] as String?,
+      createdBy: json['created_by'] as String?,
+      contractAmount: (json['contract_amount'] as num?)?.toDouble(),
+      rentAdjustment: (json['rent_adjustment'] as num?)?.toDouble() ?? 0,
       source: json['source'] as String? ?? 'manual',
     );
   }
@@ -321,6 +350,17 @@ class Payment {
         if (reviewedBy != null) 'reviewed_by': reviewedBy,
         if (reviewedAt != null) 'reviewed_at': reviewedAt!.toIso8601String(),
         if (reviewNotes != null) 'review_notes': reviewNotes,
+        if (periodStart != null)
+          'period_start':
+              '${periodStart!.year.toString().padLeft(4, '0')}-${periodStart!.month.toString().padLeft(2, '0')}-${periodStart!.day.toString().padLeft(2, '0')}',
+        if (periodEnd != null)
+          'period_end':
+              '${periodEnd!.year.toString().padLeft(4, '0')}-${periodEnd!.month.toString().padLeft(2, '0')}-${periodEnd!.day.toString().padLeft(2, '0')}',
+        if (notes != null) 'notes': notes,
+        if (createdBy != null) 'created_by': createdBy,
+        if (contractAmount != null) 'contract_amount': contractAmount,
+        'rent_adjustment': rentAdjustment,
+        'source': source,
       };
 
   @override
@@ -1165,10 +1205,9 @@ class CurfewRequest {
       tenantId: json['tenant_id'] as String? ?? '',
       destination: json['destination'] as String? ?? '',
       reason: json['reason'] as String? ?? '',
-      departureTime:
-          DateTime.tryParse(json['departure_time']?.toString() ?? '')
-                  ?.toLocal() ??
-              DateTime.now(),
+      departureTime: DateTime.tryParse(json['departure_time']?.toString() ?? '')
+              ?.toLocal() ??
+          DateTime.now(),
       expectedReturnTime:
           DateTime.tryParse(json['expected_return_time']?.toString() ?? '')
                   ?.toLocal() ??

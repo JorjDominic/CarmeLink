@@ -38,6 +38,8 @@ void main() {
       expect(payment.tenantName, 'Anna Dela Cruz');
       expect(payment.tenantRoom, 'Room 201');
       expect(payment.category, 'rent');
+      expect(payment.isRent, isTrue);
+      expect(payment.isUtility, isFalse);
       expect(payment.paymentMethod, 'GCash');
       expect(payment.receiptPath, 'receipts/pay-001.jpg');
       expect(payment.paidAt, paidDate);
@@ -81,6 +83,26 @@ void main() {
       expect(rejected.isVerified, isFalse);
       expect(rejected.isRejected, isTrue);
       expect(rejected.canSubmitProof, isTrue);
+    });
+
+    test('parses an audited rent override without losing contract rate', () {
+      final payment = Payment.fromJson({
+        'id': 'rent-adjusted',
+        'tenant_id': 'tenant-1',
+        'title': 'October 2026 Rent',
+        'category': 'rent',
+        'amount': 3800,
+        'contract_amount': 3500,
+        'rent_adjustment': 300,
+        'due_date': '2026-10-01',
+        'status': 'upcoming',
+      });
+
+      expect(payment.isRent, isTrue);
+      expect(payment.hasRentOverride, isTrue);
+      expect(payment.contractAmount, 3500);
+      expect(payment.rentAdjustment, 300);
+      expect(payment.amount, 3800);
     });
 
     test('isOverdue correctly evaluates past due dates for unpaid bills', () {

@@ -34,12 +34,23 @@ not mean these additions are implemented. Implementation must proceed one step
 at a time, and **Step 1 must not begin until the project owner says `go` after
 reviewing these Markdown updates**.
 
-1. **Step 1 — Separate rent and utility billing.** Keep contract rent as a
+1. **[✓] Step 1 — Separate rent and utility billing (implemented September 23,
+   2026).** Keep contract rent as a
    fixed, contract-derived charge. Let an authorized owner or caretaker enter
    each variable utility charge (for example, higher electricity usage) and
    its independent due date. Tenant, guardian, and staff views must distinguish
    charge category, amount, due date, balance, and payment allocation. A utility
    change must never modify the fixed rent or rewrite historical charges.
+   **Enhancement completed September 23, 2026:** owner/caretaker users can apply
+   an audited rent increase or decrease to eligible unpaid future rent from an
+   effective date. The contract rate and historical charges remain immutable;
+   the override records old/new rates, reason, actor, time, and per-charge
+   adjustments.
+   **Utility cart enhancement completed September 23, 2026:** staff can prepare
+   multiple utility lines for an individual tenant, selected rooms, or all
+   occupied rooms. Shared bills support equal-per-tenant and equal-per-room
+   allocation, snapshot room/bed occupants, prevent duplicate scope/period
+   billing, and issue every tenant allocation in one atomic transaction.
 2. **Step 2 — Digital tenant onboarding and contract workflow.** Use a QR code
    to open a secure tenant-specific data-entry/onboarding flow; generate a
    versioned PDF from the official contract template that will be supplied;

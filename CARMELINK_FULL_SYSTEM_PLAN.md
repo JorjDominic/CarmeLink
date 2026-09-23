@@ -3240,10 +3240,17 @@ Advanced features such as OCR, geofencing, facial recognition, IoT monitoring, a
 
 This section is the canonical specification for the additions below and
 supersedes any conflicting earlier description. All items are **planned**, not
-implemented. Work proceeds in the numbered order, and Step 1 starts only after
-the project owner reviews the Markdown changes and says `go`.
+implemented unless explicitly marked complete. Work proceeds in the numbered
+order. Step 1 was authorized and implemented on September 23, 2026; Steps 2–5
+remain planned.
 
 ## Step 1 — Separate Rent and Utility Billing
+
+**Status: Implemented September 23, 2026.** The database migration, protected
+staff utility-entry operation, Flutter service/controller integration, separate
+tenant balance summaries, billing-period display, and focused tests are in the
+repository. Deployment of the migration to each target Supabase environment is
+still required as part of that environment's release process.
 
 Rent and utilities are separate financial obligations even when they appear in
 the same account summary.
@@ -3253,12 +3260,27 @@ the same account summary.
 - Rent amount comes from the active contract snapshot and is fixed for the
   applicable contract period. Only an authorized contract amendment or renewal
   may change future rent; it must not rewrite issued rent charges.
+- Owner/caretaker users may record an exceptional rent-rate override for an
+  increase or decrease. It requires a new monthly amount, effective date, and
+  reason and applies only to eligible unpaid future rent charges. The system
+  preserves the contract amount and uses immutable signed adjustment records;
+  it never edits historical rent or payment facts.
 - Utilities are variable charges entered by an authorized owner or caretaker.
   Examples include electricity and water, and an amount may increase because
   actual usage is higher.
 - Every utility charge has its own billing period, amount, due date, notes, and
   audit metadata. Its due date is entered by the owner/caretaker and need not
   match the rent due date.
+- The utility cart supports three scopes: one individual tenant, selected
+  rooms, or all occupied rooms. Selected/all-room source bills may be split
+  equally per active tenant or equally per occupied room. Staff can add several
+  utility lines to a cart and preview the source totals before issuance.
+- Cart issuance is atomic. Each source bill is stored once as a batch item and
+  produces separate tenant charge allocations whose total exactly matches the
+  source amount. Occupant room/bed details are snapshotted so later transfers
+  cannot rewrite historical allocations.
+- Empty rooms and vacant beds are excluded. Duplicate utility billing for the
+  same scope, targets, category, and billing period is rejected.
 - A bill and payment history must label rent and each utility separately. A
   combined account total may be shown only as a summary.
 - Payment allocation is charge-specific and auditable. Partial payment of one
@@ -3285,6 +3307,9 @@ the utility-entry workflow.
 - A tenant can clearly distinguish fixed rent from every utility charge and
   can submit proof against the intended charge(s).
 - Rent remains equal to the active contract snapshot after utility edits.
+- A rent override visibly shows the original contract rate and adjusted rate,
+  and its audit record identifies the old/new rates, reason, effective date,
+  responsible staff account, timestamp, and affected future charges.
 - Overdue state is calculated per charge using its own due date.
 - Existing billing/payment history remains intact through migration.
 

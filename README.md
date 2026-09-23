@@ -12,12 +12,11 @@ Development assignments and completion status are tracked separately in
 [`DEVELOPMENT_PROGRESS.md`](DEVELOPMENT_PROGRESS.md).
 
 > [!IMPORTANT]
-> Additions approved on September 23, 2026 are documented but not yet
-> implemented: separate rent/utility billing, QR-assisted digital contract
-> onboarding and signing, cleaning schedules by bed, advance visitor
-> registration with protected ID capture, and standardized room/bed
-> identifiers. Work begins with separate billing only after the project owner
-> says `go`. See the implementation gate in
+> Additions approved on September 23, 2026 are tracked here. Separate
+> rent/utility billing is implemented. QR-assisted digital contract onboarding
+> and signing, cleaning schedules by bed, advance visitor registration with
+> protected ID capture, and standardized room/bed identifiers remain planned.
+> See the implementation sequence in
 > [`DEVELOPMENT_PROGRESS.md`](DEVELOPMENT_PROGRESS.md) and the complete
 > requirements in
 > [`CARMELINK_FULL_SYSTEM_PLAN.md`](CARMELINK_FULL_SYSTEM_PLAN.md).
@@ -128,10 +127,22 @@ Summarizes room assignment, amount due, gate status, urgent items, the latest ma
 
 Shows the outstanding balance, next due date, and payment history. **Upload proof** starts receipt submission.
 
-Planned Step 1 separates fixed, contract-derived rent from variable utilities.
-Owner/caretaker users will enter utility amounts and utility-specific due dates;
-rent and utilities will remain independently identifiable through billing,
-payment allocation, and history.
+Implemented Step 1 separates fixed, contract-derived rent from variable
+utilities. Owner/caretaker users enter utility type, billing period, amount,
+usage notes, and a utility-specific due date through a protected workflow;
+rent and utilities remain independently identifiable through billing, payment
+allocation, balances, and history.
+
+Authorized staff can also apply a documented rent increase or decrease to
+unpaid future rent from a selected effective date. The original contract rate,
+past charges, payments, responsible staff account, timestamp, and required
+reason remain preserved in the audit history.
+
+Utility creation uses a cart with **Individual tenant**, **Selected rooms**, and
+**All occupied rooms** scopes. Shared room/property bills can be allocated
+equally per active tenant or equally per occupied room. Staff preview multiple
+cart lines and issue them atomically; tenant-level charges remain separate for
+balances, proof submission, and payment verification.
 
 #### Reports
 
