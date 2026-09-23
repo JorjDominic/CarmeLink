@@ -52,12 +52,16 @@ reviewing these Markdown updates**.
    allocation, snapshot room/bed occupants, prevent duplicate scope/period
    billing, and issue every tenant allocation in one atomic transaction.
 2. **Step 2 — Digital tenant onboarding and contract workflow.** Use a QR code
-   to open a secure tenant-specific data-entry/onboarding flow; generate a
-   versioned PDF from the official contract template that will be supplied;
-   support either an uploaded signed copy or an on-screen electronic signature;
-   retain verification and audit history; and let each tenant securely view and
-   download only their own contract. Do not finalize template field mapping
-   until the official contract copy is received.
+   to open a secure tenant-specific data-entry/onboarding flow and generate a
+   versioned PDF based on the photographed official contract supplied by the
+   client. Walk-in students may begin without a guardian present; guardian
+   linking, ID verification, and signature remain independently resumable until
+   the client defines which items block activation. Track tenant/employee
+   identity fields, required photocopies and their three-signature verification,
+   separate lessor/tenant/guardian/optional-witness signatures, document review,
+   and audit history. Keep both signed-copy upload and on-screen signing planned,
+   but do not treat electronic signing as a physical-process replacement until
+   the client confirms it.
 3. **Step 3 — Cleaning schedules by bed.** Add a privacy-conscious module that
    assigns cleaning duties to bed identifiers rather than publicly identifying
    roommates. Tenants can view the schedule relevant to their room/bed and
@@ -80,9 +84,45 @@ The canonical acceptance criteria and data/security notes for these additions
 are in **Approved Additions — September 23, 2026** in
 `CARMELINK_FULL_SYSTEM_PLAN.md`.
 
+### Official-contract review priority — September 23, 2026
+
+The client-supplied three-page lease was reviewed before workflow changes. No
+photographed clause is sufficient authority for an irreversible automated
+penalty, deposit forfeiture, or eviction. Confirmed procedures and unresolved
+policy choices are recorded in the full system plan.
+
+1. [ ] Finish Step 1 UI, migration deployment, and focused rent/utility tests;
+   add electricity/water usage inputs after calculation rules are confirmed.
+2. [ ] Build secure QR/walk-in onboarding and a resumable Draft checklist.
+3. [ ] Add tenant/guardian ID and three-signature photocopy verification.
+4. [ ] Add independent lessor, tenant, guardian, and optional-witness signature
+   states, immutable PDFs, upload/e-sign paths, and owner verification.
+5. [ ] Replace free status editing with prerequisite-aware activation; keep the
+   guardian blocking rule configurable until the client decides it.
+6. [ ] Add versioned policies/addenda for visitors, utilities, employee curfew,
+   rent changes, and enforcement/review rules missing from the lease.
+7. [ ] Enforce the one-calendar-day visitor request procedure, contractual
+   9:00 AM–9:00 PM window, approval, and reception arrival/departure logging.
+8. [ ] Add monthly inspections with three days' written notice, evidence,
+   findings, corrective actions, and follow-up.
+9. [ ] Add a move-in room-condition snapshot if the client approves it.
+10. [ ] Complete restricted disciplinary records before rule-based penalties.
+11. [ ] Add separately allocated penalty/damage charges linked to an approved
+    incident, inspection, or assessment.
+12. [ ] Implement cleaning schedules by bed with private reporting.
+13. [ ] Add approved employee curfew profiles to gate/geofence evaluation.
+14. [ ] Add 30-day move-out notice, final inspection, clearance, and closure.
+15. [ ] Add itemized deposit deductions, 30-day refund tracking, refund proof,
+    and separately approved shortfall charges.
+16. [ ] Add formal termination/eviction cases; never auto-evict from an incident.
+17. [ ] Configure sensitive-record retention after client and legal/privacy
+    review.
+
 1. **Income and expense management** — add owner-only financial records,
    categories, validation, recurring/one-time entries, audit fields, summaries,
-   and RLS. This is the next active implementation priority.
+   and RLS. This remains the leading item in the broader product backlog, but
+   the contract-review sequence above is the controlling priority for the
+   tenant onboarding/lease workstream.
 2. **Persistent notifications and preferences** — generate role-scoped events,
    read/unread state, deep links, per-user delivery settings, and FCM delivery.
    Implement Android first while keeping the token schema, payloads, routing,

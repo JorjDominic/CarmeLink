@@ -16,6 +16,11 @@ Development assignments and completion status are tracked separately in
 > rent/utility billing is implemented. QR-assisted digital contract onboarding
 > and signing, cleaning schedules by bed, advance visitor registration with
 > protected ID capture, and standardized room/bed identifiers remain planned.
+> The client's photographed official lease has now been reviewed. Contract
+> fields, multi-party signatures, document verification, inspections,
+> deposit/move-out handling, disciplinary safeguards, confirmed procedures, and
+> unresolved decisions are documented as requirements only; the review did not
+> change application behavior.
 > See the implementation sequence in
 > [`DEVELOPMENT_PROGRESS.md`](DEVELOPMENT_PROGRESS.md) and the complete
 > requirements in

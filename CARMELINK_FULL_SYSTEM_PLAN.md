@@ -3315,9 +3315,24 @@ the utility-entry workflow.
 
 ## Step 2 — Digital Tenant Onboarding and Contract Workflow
 
-The official Carmelita's Dormitory contract will be supplied separately and is
-the source for the final PDF layout and field mapping. Do not treat a temporary
-developer template as the official agreement.
+The client supplied photographs of the official Carmelita's Girls-Only
+Dormitory Lease Agreement. They guide the next field-mapping pass, but the
+production PDF still requires a clean client-approved source copy. Missing or
+ambiguous policy must not be inferred.
+
+### Contract fields and participants
+
+- Freeze the agreement date; tenant legal name, address, contact number,
+  school/office, student or employee ID and classification; room; lease dates;
+  monthly rent and due day; and security deposit in every generated version.
+- Track lessor, lessee, guardian, and optional-witness signatures independently.
+  Walk-in students may start without a guardian and complete that work later.
+- Keep guardian completion as a configurable activation prerequisite until the
+  client decides whether it applies universally or by age/status.
+- Verify tenant and guardian IDs and physical photocopies, including whether
+  three verification signatures are present. Exact signers/placement stay open.
+- Keep private upload and on-screen signing in scope, but do not claim either
+  replaces a required physical original until the client confirms it.
 
 ### Workflow
 
@@ -3329,6 +3344,8 @@ System presents a QR code containing a secure invitation URL/token reference
 Tenant scans QR and completes required data entry
       ↓
 Staff reviews the submitted data and creates/updates the Draft contract
+      ↓
+Required documents are reviewed; permitted guardian items may remain pending
       ↓
 System generates an immutable, versioned PDF from the official template
       ↓
@@ -3357,6 +3374,10 @@ Verified contract becomes available in the tenant's private contract area
   versions. Storage is private and access uses short-lived authorized links.
 - Retain uploader/signer, timestamps, original filename where applicable,
   media type, size, hash, verification result, and the full audit trail.
+- Version the contract template, rules, penalty schedule, and addenda separately;
+  later edits never rewrite an already signed agreement.
+- Keep IDs and verification copies private. Retention/deletion remains open and
+  must be approved before production rollout.
 
 ### Acceptance criteria
 
@@ -3365,6 +3386,8 @@ Verified contract becomes available in the tenant's private contract area
 - The generated PDF matches the supplied official template and frozen data.
 - Both signing paths preserve an auditable document version.
 - Tenant and staff access tests prove cross-tenant contract access is denied.
+- Walk-in onboarding can be saved and resumed without invented guardian data.
+- Activation shows every satisfied, pending, waived, or unresolved prerequisite.
 
 ## Step 3 — Cleaning Schedules by Bed
 
@@ -3476,3 +3499,112 @@ Only an approved request can be used for arrival/departure logging
   the same canonical labels.
 - Existing active assignments remain linked correctly after an approved data
   migration.
+
+# 57. Official Lease Review — Contract-Derived Modules and Open Decisions
+
+This section records the September 23, 2026 review of the three photographed
+pages supplied by the client. It is a requirements record only and does not
+authorize application or database changes. Procedures stated by the client but
+absent from the lease belong in a versioned rules document or signed addendum.
+
+## Confirmed client procedures
+
+- Walk-in students may begin alone; guardian participation may happen later.
+- Physical ID photocopies are expected to contain three signatures for
+  verification/confirmation, although the exact signers and placement remain
+  open.
+- Visitor requests must be filed no later than the calendar day before the
+  visit even though this procedure is absent from the photographed lease.
+- Rent and utilities are separate obligations with different due dates.
+  Electricity and water are usage-based; exact calculation rules remain open.
+- Owner and caretaker are the probable operational approvers for curfew,
+  inspections, incidents, and charges, subject to a final permission matrix.
+- The witness is optional unless the client later identifies a required case.
+
+## Existing or already-planned modules to extend
+
+### Onboarding, contracts, documents, and signatures
+
+- Add the official contract fields and student/employee classification in Step
+  2, with a resumable guardian-later state for walk-in tenants.
+- Verify tenant/guardian IDs, physical-copy receipt, three-signature count,
+  reviewer, review time, status, remarks, rejection, and resubmission.
+- Track every signer separately and use a prerequisite-aware activation
+  checklist. Unresolved client policy remains configurable, not hard-coded.
+
+### Utilities and payment ledger
+
+- Keep rent, electricity, water, disciplinary penalties, damage charges, and
+  deposit shortfalls independently categorized and allocated.
+- Plan previous/current meter reading, consumption, rate, billing period,
+  reading evidence, calculation, reviewer, and adjustment reason. Do not select
+  a formula until per-tenant/bed/room/shared allocation and rates are confirmed.
+
+### Visitors, curfew, discipline, and cleaning
+
+- Extend visitors with the one-day lead time, contractual 9:00 AM–9:00 PM
+  window, staff approval, reception check-in/out, private ID handling, and
+  incident linkage.
+- Keep 11:00 PM as standard curfew and plan time-bounded employee exceptions
+  approved by owner/caretaker after schedule/evidence rules are confirmed.
+- Base discipline on verified incidents, evidence, tenant response, reviewer,
+  and policy version. Repeat-offense windows, appeals, and staff authority are
+  open; penalties and termination must not be automatic.
+- Extend bed-based cleaning to private rooms, shared pantry, and CR duties. Only
+  create the contractual PHP 500 charge after its warning/review rule is clear.
+
+### Deposit management
+
+- Extend deposits into an itemized ledger: paid amount, proposed/approved
+  deductions, evidence, outstanding obligations, refundable balance, lease end,
+  30-day refund deadline, refund proof, and tenant response/acknowledgment.
+- Costs exceeding the deposit may be proposed separately, but must not become a
+  charge until the client confirms the rule and an authorized reviewer approves.
+
+## New modules or distinct workflows
+
+1. **Monthly inspections:** recurring schedules, room/inspector, three days'
+   written notice and delivery evidence, checklist, private photos, findings,
+   correction tasks, acknowledgment, and follow-up.
+2. **Move-in room condition:** a client-approved fixture/inventory checklist,
+   existing damage, dated evidence, and immutable tenant/staff acknowledgment.
+3. **Move-out and clearance:** 30-day notice, final inspection, key/property
+   return, unpaid-charge check, deposit proposal, refund, and contract/occupancy
+   closure.
+4. **Termination/eviction case:** grounds, linked verified records, evidence,
+   notices, tenant response, authorized decision, settlement, room release, and
+   audit history. An incident alone never causes automatic eviction.
+5. **Policy/addendum management:** version and acknowledge advance-visitor,
+   utility, employee-curfew, rent-change, and enforcement/review procedures that
+   are missing from the lease.
+6. **Retention/privacy configuration:** define access, retention, and deletion
+   for IDs, signatures, contracts, visitor data, inspection media, and evidence.
+
+## Client decisions that remain open
+
+1. When guardian identity/signature is required and whether it blocks activation.
+2. Exact people, placement, and digital equivalent of the three signatures on
+   photocopies.
+3. Whether electronic IDs/signatures replace or supplement physical documents.
+4. Employee curfew times, approval duration, and supporting evidence.
+5. Electricity/water reading, rate, allocation, rounding, shared-usage, and
+   dispute rules.
+6. Active-lease rent changes and required amendment/signatures.
+7. The time window used to count first/repeated offenses.
+8. Final owner/caretaker permissions for fines, confiscation, deductions,
+   inspections, and termination.
+9. Tenant response, review, or appeal rights and deadlines.
+10. Situations, if any, in which a witness becomes required.
+11. Whether to adopt a formal move-in condition document.
+12. Retention/deletion periods for each sensitive record class.
+13. Collection of approved costs exceeding the deposit.
+14. Conditions and authorization required for deposit forfeiture.
+
+## Safety rule for implementation
+
+Until these decisions are approved and versioned, CarmeLink may preserve
+evidence, calculate a proposal, and request authorized review, but must not
+automatically impose an ambiguous fine, forfeit a deposit, create an uncertain
+shortfall, or terminate/evict a tenant. Final contract/addendum language,
+electronic signatures, privacy rules, fines, deductions, and termination should
+receive appropriate Philippine legal/privacy review before production use.
