@@ -10,6 +10,7 @@ import '../../services/auth_service.dart';
 import '../../services/geofence_service.dart';
 import '../../services/guardian_alert_service.dart';
 import '../../services/profile_service.dart';
+import 'package:carmelitas_dormitory_system/views/shared/retention_settings_page.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
@@ -736,6 +737,29 @@ class SettingsPage extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (SessionController.instance.currentUser?.role ==
+                          UserRole.owner ||
+                      SessionController.instance.currentUser?.role ==
+                          UserRole.caretaker) ...[
+                    const Divider(),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.security_outlined),
+                      title: const Text(
+                        'Security & retention',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: const Text(
+                        'Configure sensitive-record retention for client and privacy review.',
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const RetentionSettingsPage(),
+                        ),
+                      ),
+                    ),
+                  ],
                   const Divider(),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
