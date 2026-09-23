@@ -6,6 +6,8 @@ import '../../core/widgets/common_widgets.dart';
 import '../../services/conduct_case_service.dart';
 import '../../services/table_refresh_subscription.dart';
 
+import 'conduct_case_appeal_panel.dart';
+
 String _conductDateTime(DateTime value) {
   final local = value.toLocal();
   final hour = local.hour == 0
@@ -1066,6 +1068,12 @@ class _StaffConductCaseDetailPageState
                     ),
                   ),
                 const SizedBox(height: 20),
+                ConductCaseAppealPanel(
+                  caseId: record.id,
+                  caseStatus: record.status,
+                  staffMode: true,
+                ),
+                const SizedBox(height: 20),
                 SectionTitle(
                   'Audit history',
                   subtitle: '${events.length} events',
@@ -1492,6 +1500,12 @@ class _TenantConductCaseDetailPageState
                       ),
                     ),
                   ),
+                const SizedBox(height: 22),
+                ConductCaseAppealPanel(
+                  caseId: record.id,
+                  caseStatus: record.status,
+                  staffMode: false,
+                ),
                 const SizedBox(height: 22),
                 SectionTitle(
                   'Warnings',
