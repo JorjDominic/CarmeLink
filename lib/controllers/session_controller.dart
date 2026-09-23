@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import '../core/utils/user_error_message.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../services/room_service.dart';
@@ -16,8 +17,11 @@ import 'tenant_controller.dart';
 
 class SessionController extends ChangeNotifier {
   SessionController._();
+
   static final SessionController instance = SessionController._();
+
   final AuthService _authService = SupabaseAuthService();
+
   AppUser? _currentUser;
   bool _loading = true;
   String? _error;
@@ -44,6 +48,7 @@ class SessionController extends ChangeNotifier {
       _passwordRecovery = true;
       _currentUser = null;
     }
+
     _authSubscription ??=
         SupabaseConfig.client.auth.onAuthStateChange.listen((state) async {
       if (state.event == AuthChangeEvent.passwordRecovery) {
@@ -61,20 +66,24 @@ class SessionController extends ChangeNotifier {
         notifyListeners();
       }
     });
+
     try {
       if (!passwordRecoveryRequested) {
         _currentUser = await _authService
             .restoreSession()
             .timeout(const Duration(seconds: 4));
+
         if (_currentUser?.role == UserRole.tenant) {
           unawaited(GeofenceScheduler.instance.start(_currentUser!.id));
         }
       }
     } catch (e) {
       debugPrint('Session restore failed or timed out: $e');
+
       try {
         await _authService.signOut().timeout(const Duration(seconds: 2));
       } catch (_) {}
+
       _currentUser = null;
     } finally {
       _loading = false;
@@ -87,22 +96,28 @@ class SessionController extends ChangeNotifier {
     _error = null;
     _emailAwaitingVerification = null;
     notifyListeners();
+
     try {
       _currentUser = await _authService.signIn(email, password);
       await _syncEmailVerification();
       _justSignedOut = false;
+
       if (_currentUser?.role == UserRole.tenant) {
         unawaited(GeofenceScheduler.instance.start(_currentUser!.id));
       } else {
         GeofenceScheduler.instance.stop();
       }
+
       return true;
     } on EmailVerificationRequiredException catch (e) {
       _emailAwaitingVerification = email.trim().toLowerCase();
       _error = e.message;
       return false;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = userErrorMessage(
+        e,
+        fallback: 'Unable to sign in. Please try again.',
+      );
       return false;
     } finally {
       _loading = false;
@@ -114,22 +129,29 @@ class SessionController extends ChangeNotifier {
     _loading = true;
     _error = null;
     notifyListeners();
+
     try {
       _currentUser = await _authService
           .verifyEmailCode(email, code)
           .timeout(const Duration(seconds: 15));
+
       await _syncEmailVerification();
       _emailAwaitingVerification = null;
       _justSignedOut = false;
+
       if (_currentUser?.role == UserRole.tenant) {
         unawaited(GeofenceScheduler.instance.start(_currentUser!.id));
       }
+
       return true;
     } on TimeoutException {
       _error = 'Verification timed out. Check your connection and try again.';
       return false;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = userErrorMessage(
+        e,
+        fallback: 'Unable to verify. Please try again.',
+      );
       return false;
     } finally {
       _loading = false;
@@ -156,15 +178,18 @@ class SessionController extends ChangeNotifier {
   Future<void> signOut() async {
     GeofenceScheduler.instance.stop();
     await _authService.signOut();
+
     _currentUser = null;
     _error = null;
     _emailAwaitingVerification = null;
     _justSignedOut = true;
+
     TenantController.instance.clear();
     GuardianController.instance.clear();
     OwnerController.instance.clear();
     RoomService.invalidateCache();
     TenantService.invalidateCache();
+
     notifyListeners();
   }
 
