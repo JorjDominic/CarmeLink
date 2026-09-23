@@ -7,6 +7,7 @@ import '../../controllers/session_controller.dart';
 import '../../controllers/tenant_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/visitor_policy.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/announcement_service.dart';
@@ -5541,34 +5542,46 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
   final relation = TextEditingController();
   final purpose = TextEditingController();
   final contact = TextEditingController();
+
   late DateTime schedule;
   late DateTime expectedDepartureAt;
   late final TableRefreshSubscription _subscription;
+
   bool saving = false;
   VisitorRequest? editingRequest;
 
   Future<void> _pickArrival() async {
+    final now = DateTime.now();
+    final firstDate = VisitorPolicy.minimumVisitDate(now: now);
+    final initialDate = schedule.isBefore(firstDate)
+        ? firstDate
+        : VisitorPolicy.dateOnly(schedule);
+
     final date = await showDatePicker(
       context: context,
-      initialDate: schedule,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: firstDate.add(const Duration(days: 365)),
     );
     if (date == null || !mounted) return;
+
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(schedule),
     );
-    if (time == null) return;
+    if (time == null || !mounted) return;
+
     final arrival =
         DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final issue = VisitorPolicy.validateArrival(arrival, now: now);
+    if (issue != null) {
+      showAppSnackBar(context, issue);
+      return;
+    }
+
     setState(() {
       schedule = arrival;
-      expectedDepartureAt = arrival.add(const Duration(hours: 2));
-      if (expectedDepartureAt.day != arrival.day) {
-        expectedDepartureAt =
-            DateTime(arrival.year, arrival.month, arrival.day, 23, 59);
-      }
+      expectedDepartureAt = VisitorPolicy.defaultDeparture(arrival);
     });
   }
 
@@ -5577,11 +5590,23 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
       context: context,
       initialTime: TimeOfDay.fromDateTime(expectedDepartureAt),
     );
-    if (time == null) return;
-    setState(() {
-      expectedDepartureAt = DateTime(
-          schedule.year, schedule.month, schedule.day, time.hour, time.minute);
-    });
+    if (time == null || !mounted) return;
+
+    final departure = DateTime(
+      schedule.year,
+      schedule.month,
+      schedule.day,
+      time.hour,
+      time.minute,
+    );
+
+    final issue = VisitorPolicy.validateDeparture(schedule, departure);
+    if (issue != null) {
+      showAppSnackBar(context, issue);
+      return;
+    }
+
+    setState(() => expectedDepartureAt = departure);
   }
 
   void _edit(VisitorRequest request) {
@@ -5593,7 +5618,7 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
       contact.text = request.contactNumber;
       schedule = request.schedule;
       expectedDepartureAt = request.expectedDepartureAt ??
-          request.schedule.add(const Duration(hours: 2));
+          VisitorPolicy.defaultDeparture(request.schedule);
     });
   }
 
@@ -5604,8 +5629,8 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
       relation.clear();
       purpose.clear();
       contact.clear();
-      schedule = DateTime.now().add(const Duration(days: 1));
-      expectedDepartureAt = schedule.add(const Duration(hours: 2));
+      schedule = VisitorPolicy.defaultArrival();
+      expectedDepartureAt = VisitorPolicy.defaultDeparture(schedule);
     });
   }
 
@@ -5621,21 +5646,25 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
+
                 final events = snapshot.data ?? const <VisitorEvent>[];
                 if (events.isEmpty) {
                   return const Text('No review or presence events yet.');
                 }
+
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: events
-                      .map((event) => ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(event.eventLabel),
-                            subtitle: Text(
-                              '${shortDate(event.occurredAt)} • ${timeText(event.occurredAt)}'
-                              '${event.note?.isNotEmpty == true ? '\n${event.note}' : ''}',
-                            ),
-                          ))
+                      .map(
+                        (event) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(event.eventLabel),
+                          subtitle: Text(
+                            '${shortDate(event.occurredAt)} • ${timeText(event.occurredAt)}'
+                            '${event.note?.isNotEmpty == true ? '\n${event.note}' : ''}',
+                          ),
+                        ),
+                      )
                       .toList(),
                 );
               },
@@ -5653,8 +5682,9 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
   @override
   void initState() {
     super.initState();
-    schedule = DateTime.now().add(const Duration(days: 1));
-    expectedDepartureAt = schedule.add(const Duration(hours: 2));
+    schedule = VisitorPolicy.defaultArrival();
+    expectedDepartureAt = VisitorPolicy.defaultDeparture(schedule);
+
     TenantController.instance.loadVisitors();
     _subscription = TableRefreshSubscription(
       'tenant-visitors',
@@ -5677,13 +5707,33 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
   Widget build(BuildContext context) {
     return PageFrame(
       title: 'Visitor request',
-      subtitle: 'Register an expected visitor',
+      subtitle: 'Advance registration required',
       onRefresh: () => TenantController.instance.loadVisitors(force: true),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            CarmelitaCard(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Submit the request at least one calendar day before the visit. '
+                      'Visiting hours are 9:00 AM–9:00 PM, and visitors must leave on the same day.',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
             Text(
               'VISITOR DETAILS',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -5738,21 +5788,25 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Dormitory policy requires visitors to depart on the same day. Overnight stays are not permitted.',
+                    'Advance registration • 9:00 AM–9:00 PM visiting hours • same-day departure only.',
                   ),
                   const SizedBox(height: 8),
-                  Wrap(spacing: 8, runSpacing: 8, children: [
-                    OutlinedButton.icon(
-                      onPressed: _pickArrival,
-                      icon: const Icon(Icons.event_outlined),
-                      label: const Text('Choose arrival'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _pickDeparture,
-                      icon: const Icon(Icons.schedule_outlined),
-                      label: const Text('Choose departure'),
-                    ),
-                  ]),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _pickArrival,
+                        icon: const Icon(Icons.event_outlined),
+                        label: const Text('Choose arrival'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _pickDeparture,
+                        icon: const Icon(Icons.schedule_outlined),
+                        label: const Text('Choose departure'),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -5773,21 +5827,17 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                           );
                           return;
                         }
-                        if (!schedule.isAfter(DateTime.now())) {
-                          showAppSnackBar(
-                              context, 'Choose a future visit schedule.');
+
+                        final policyError = VisitorPolicy.validateVisit(
+                          schedule: schedule,
+                          expectedDepartureAt: expectedDepartureAt,
+                          now: DateTime.now(),
+                        );
+                        if (policyError != null) {
+                          showAppSnackBar(context, policyError);
                           return;
                         }
-                        if (!expectedDepartureAt.isAfter(schedule) ||
-                            expectedDepartureAt.year != schedule.year ||
-                            expectedDepartureAt.month != schedule.month ||
-                            expectedDepartureAt.day != schedule.day) {
-                          showAppSnackBar(
-                            context,
-                            'Departure must be after arrival on the same day. Overnight stays are not permitted.',
-                          );
-                          return;
-                        }
+
                         setState(() => saving = true);
                         try {
                           final editing = editingRequest;
@@ -5811,6 +5861,7 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                               expectedDepartureAt: expectedDepartureAt,
                             );
                           }
+
                           if (context.mounted) {
                             showAppSnackBar(
                               context,
@@ -5860,9 +5911,11 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
               animation: TenantController.instance,
               builder: (context, _) {
                 final controller = TenantController.instance;
+
                 if (controller.visitorsLoading && controller.visitors.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
                 }
+
                 if (controller.visitorsError != null &&
                     controller.visitors.isEmpty) {
                   return EmptyState(
@@ -5871,6 +5924,7 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                     message: controller.visitorsError!,
                   );
                 }
+
                 if (controller.visitors.isEmpty) {
                   return const EmptyState(
                     icon: Icons.people_outline,
@@ -5878,77 +5932,80 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                     message: 'Submitted requests will appear here.',
                   );
                 }
+
                 return Column(
                   children: controller.visitors
-                      .map((request) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: CarmelitaCard(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          request.visitorName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                          ),
+                      .map(
+                        (request) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: CarmelitaCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        request.visitorName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
-                                      StatusPill(request.statusLabel),
+                                    ),
+                                    StatusPill(request.statusLabel),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(request.purpose),
+                                Text(
+                                  'Arrival: ${shortDate(request.schedule)} • ${timeText(request.schedule)}',
+                                ),
+                                if (request.expectedDepartureAt != null)
+                                  Text(
+                                    'Departure: ${timeText(request.expectedDepartureAt!)}',
+                                  ),
+                                if (request.contactNumber.isNotEmpty)
+                                  Text('Contact: ${request.contactNumber}'),
+                                if (request.reviewNote?.isNotEmpty == true)
+                                  Text('Staff note: ${request.reviewNote}'),
+                                TextButton.icon(
+                                  onPressed: () => _showHistory(request),
+                                  icon: const Icon(Icons.history_rounded),
+                                  label: const Text('View history'),
+                                ),
+                                if (request.isPending) ...[
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    children: [
+                                      OutlinedButton(
+                                        onPressed: () => _edit(request),
+                                        child: const Text('Edit'),
+                                      ),
+                                      OutlinedButton(
+                                        onPressed: () async {
+                                          try {
+                                            await controller
+                                                .cancelVisitor(request);
+                                          } catch (error) {
+                                            if (context.mounted) {
+                                              showAppSnackBar(
+                                                context,
+                                                'Cancellation failed: $error',
+                                              );
+                                            }
+                                          }
+                                        },
+                                        child: const Text('Cancel request'),
+                                      ),
                                     ],
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(request.purpose),
-                                  Text(
-                                    'Arrival: ${shortDate(request.schedule)} • ${timeText(request.schedule)}',
-                                  ),
-                                  if (request.expectedDepartureAt != null)
-                                    Text(
-                                      'Departure: ${timeText(request.expectedDepartureAt!)}',
-                                    ),
-                                  if (request.contactNumber.isNotEmpty)
-                                    Text('Contact: ${request.contactNumber}'),
-                                  if (request.reviewNote?.isNotEmpty == true)
-                                    Text('Staff note: ${request.reviewNote}'),
-                                  TextButton.icon(
-                                    onPressed: () => _showHistory(request),
-                                    icon: const Icon(Icons.history_rounded),
-                                    label: const Text('View history'),
-                                  ),
-                                  if (request.isPending) ...[
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 8,
-                                      children: [
-                                        OutlinedButton(
-                                          onPressed: () => _edit(request),
-                                          child: const Text('Edit'),
-                                        ),
-                                        OutlinedButton(
-                                          onPressed: () async {
-                                            try {
-                                              await controller
-                                                  .cancelVisitor(request);
-                                            } catch (error) {
-                                              if (context.mounted) {
-                                                showAppSnackBar(
-                                                  context,
-                                                  'Cancellation failed: $error',
-                                                );
-                                              }
-                                            }
-                                          },
-                                          child: const Text('Cancel request'),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
                                 ],
-                              ),
+                              ],
                             ),
-                          ))
+                          ),
+                        ),
+                      )
                       .toList(),
                 );
               },
