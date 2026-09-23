@@ -17,6 +17,7 @@ import '../../services/table_refresh_subscription.dart';
 import '../../services/tripwire_geofence_service.dart';
 import '../shared/room_cleaning_pages.dart';
 import '../shared/room_inspection_pages.dart';
+import '../shared/employee_curfew_profile_pages.dart';
 import '../shared/conduct_case_pages.dart';
 import '../widgets/feature_widgets.dart';
 
@@ -4482,6 +4483,8 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const WorkInProgressNotice(),
+              const SizedBox(height: 16),
+              const TenantEmployeeCurfewProfileCard(),
               const SizedBox(height: 16),
               Text(
                 'CURFEW STATUS',

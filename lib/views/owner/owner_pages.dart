@@ -19,6 +19,7 @@ import '../../services/table_refresh_subscription.dart';
 import '../widgets/feature_widgets.dart';
 import '../shared/account_management_page.dart';
 import '../shared/staff_quick_panel.dart';
+import '../shared/employee_curfew_profile_pages.dart';
 import 'floor_plan_page.dart';
 import 'guardian_link_management_page.dart';
 import 'staff_maintenance_page.dart';
@@ -1777,6 +1778,11 @@ const _operationCategories = [
           'Review live tenant presence and boundary',
           Icons.location_on_outlined,
           GeofenceMonitoringPage()),
+      _OperationItem(
+          'Employee curfew profiles',
+          'Manage approved employment-based curfew schedules',
+          Icons.badge_outlined,
+          EmployeeCurfewProfilesPage()),
       _OperationItem('Visitors', 'Manage visitor requests',
           Icons.people_outline, VisitorManagementPage()),
       _OperationItem('Confidential reports', 'Review private reports',
