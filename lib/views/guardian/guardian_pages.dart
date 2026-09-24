@@ -328,24 +328,24 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                     ),
                   ),
                   MutedActionItem(
-                    label: 'Announcements',
-                    detail: 'Read dormitory news',
-                    icon: Icons.campaign_outlined,
+                    label: 'Curfew',
+                    detail: 'Presence and requests',
+                    icon: Icons.schedule_outlined,
                     color: const Color(0xFF7D70A0),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => const GuardianAnnouncementsPage(),
+                        builder: (_) => const GuardianPresenceMonitoringPage(),
                       ),
                     ),
                   ),
                   MutedActionItem(
-                    label: 'Contact info',
-                    detail: 'Office and emergency',
-                    icon: Icons.emergency_outlined,
+                    label: 'Messages',
+                    detail: 'Contact dorm staff',
+                    icon: Icons.chat_bubble_outline,
                     color: const Color(0xFFAA6870),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => const EmergencySafetyAlertsPage(),
+                        builder: (_) => const GuardianMessagesPage(),
                       ),
                     ),
                   ),

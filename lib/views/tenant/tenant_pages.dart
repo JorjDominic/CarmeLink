@@ -339,6 +339,60 @@ class TenantDashboardPage extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
+              const SectionTitle(
+                'Resident tools',
+                subtitle: 'Room care, inspections, conduct and work schedules',
+              ),
+              const SizedBox(height: 10),
+              MutedActionGrid(
+                items: [
+                  MutedActionItem(
+                    label: 'Cleaning',
+                    detail: 'View room schedule',
+                    icon: Icons.cleaning_services_outlined,
+                    color: const Color(0xFF56886B),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TenantCleaningSchedulePage(),
+                      ),
+                    ),
+                  ),
+                  MutedActionItem(
+                    label: 'Inspections',
+                    detail: 'Review room records',
+                    icon: Icons.fact_check_outlined,
+                    color: const Color(0xFF627FA8),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TenantRoomInspectionsPage(),
+                      ),
+                    ),
+                  ),
+                  MutedActionItem(
+                    label: 'Conduct & appeals',
+                    detail: 'Cases and responses',
+                    icon: Icons.gavel_outlined,
+                    color: const Color(0xFFAA6870),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TenantConductCasesPage(),
+                      ),
+                    ),
+                  ),
+                  MutedActionItem(
+                    label: 'Work curfew',
+                    detail: 'Approved work profile',
+                    icon: Icons.badge_outlined,
+                    color: const Color(0xFF7D70A0),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TenantPresencePage(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               SectionTitle(
                 'Latest announcement',
                 trailing: TextButton(
