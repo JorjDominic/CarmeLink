@@ -109,7 +109,10 @@ class SplashPage extends StatelessWidget {
             builder: (context, value, child) => Transform.scale(
                 scale: value, child: Opacity(opacity: value, child: child)),
             child: const Column(mainAxisSize: MainAxisSize.min, children: [
-              CarmelitaLogo(height: 130),
+              Image(
+                  image: AssetImage(AppAssets.logo),
+                  height: 118,
+                  fit: BoxFit.contain),
               SizedBox(height: 20),
               Text(
                 'CarmeLink',
@@ -223,7 +226,8 @@ class WelcomePage extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const CarmelitaLogo(height: 72),
+        const Image(
+            image: AssetImage(AppAssets.logo), height: 80, fit: BoxFit.contain),
         const SizedBox(height: 28),
         Text(
           'Everything you need, without the clutter.',
@@ -361,7 +365,11 @@ class _SignInPageState extends State<SignInPage> {
                       builder: (context, _) => Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Center(child: CarmelitaLogo(height: 132)),
+                            const Center(
+                                child: Image(
+                                    image: AssetImage(AppAssets.logo),
+                                    height: 104,
+                                    fit: BoxFit.contain)),
                             const SizedBox(height: 24),
                             Text(
                               'Sign in',

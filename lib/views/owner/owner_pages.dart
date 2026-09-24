@@ -8,6 +8,7 @@ import '../../controllers/owner_controller.dart';
 import '../../controllers/session_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/visitor_policy.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
@@ -18,6 +19,7 @@ import '../../services/table_refresh_subscription.dart';
 import '../widgets/feature_widgets.dart';
 import '../shared/account_management_page.dart';
 import '../shared/staff_quick_panel.dart';
+import '../shared/employee_curfew_profile_pages.dart';
 import 'floor_plan_page.dart';
 import 'guardian_link_management_page.dart';
 import 'staff_maintenance_page.dart';
@@ -1776,6 +1778,11 @@ const _operationCategories = [
           'Review live tenant presence and boundary',
           Icons.location_on_outlined,
           GeofenceMonitoringPage()),
+      _OperationItem(
+          'Employee curfew profiles',
+          'Manage approved employment-based curfew schedules',
+          Icons.badge_outlined,
+          EmployeeCurfewProfilesPage()),
       _OperationItem('Visitors', 'Manage visitor requests',
           Icons.people_outline, VisitorManagementPage()),
       _OperationItem('Confidential reports', 'Review private reports',
@@ -4610,7 +4617,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Room ${tenant.room} • Bed ${tenant.bedSpace}',
+                                  'Room ${tenant.room} • ${tenant.bedSpace}',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
@@ -4894,6 +4901,27 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
     super.dispose();
   }
 
+  String? _policyIssue(VisitorRequest request) {
+    final departure = request.expectedDepartureAt;
+    if (departure == null) return 'Expected departure time is required.';
+
+    final submittedAt =
+        request.createdAt ?? request.schedule.subtract(const Duration(days: 1));
+
+    return VisitorPolicy.validateVisit(
+      schedule: request.schedule,
+      expectedDepartureAt: departure,
+      now: submittedAt,
+    );
+  }
+
+  String _policySummary(VisitorRequest request) {
+    final issue = _policyIssue(request);
+    return issue == null
+        ? 'Compliant • ${VisitorPolicy.visitingHoursLabel} • advance registration'
+        : 'Needs correction • $issue';
+  }
+
   Future<void> _transition(
     VisitorRequest request,
     String action, {
@@ -4908,6 +4936,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
 
   Future<void> _reject(VisitorRequest request) async {
     final notes = TextEditingController();
+
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -4932,6 +4961,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
                 showAppSnackBar(context, 'Enter a rejection reason.');
                 return;
               }
+
               Navigator.pop(dialogContext);
               await _transition(request, 'reject', note: notes.text);
             },
@@ -4940,6 +4970,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
         ],
       ),
     );
+
     notes.dispose();
   }
 
@@ -4955,22 +4986,26 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
+
                 final events = snapshot.data ?? const <VisitorEvent>[];
                 if (events.isEmpty) {
                   return const Text('No review or presence events yet.');
                 }
+
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: events
-                      .map((event) => ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(event.eventLabel),
-                            subtitle: Text(
-                              '${event.actorName.isEmpty ? 'Authorized user' : event.actorName} • '
-                              '${shortDate(event.occurredAt)} • ${timeText(event.occurredAt)}'
-                              '${event.note?.isNotEmpty == true ? '\n${event.note}' : ''}',
-                            ),
-                          ))
+                      .map(
+                        (event) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(event.eventLabel),
+                          subtitle: Text(
+                            '${event.actorName.isEmpty ? 'Authorized user' : event.actorName} • '
+                            '${shortDate(event.occurredAt)} • ${timeText(event.occurredAt)}'
+                            '${event.note?.isNotEmpty == true ? '\n${event.note}' : ''}',
+                          ),
+                        ),
+                      )
                       .toList(),
                 );
               },
@@ -4989,7 +5024,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
   Widget build(BuildContext context) {
     return PageFrame(
       title: 'Visitor management',
-      subtitle: 'Requests, arrivals, and departures',
+      subtitle: 'Advance requests, approvals, arrivals, and departures',
       onRefresh: () => controller.loadVisitors(force: true),
       child: AnimatedBuilder(
         animation: controller,
@@ -4997,6 +5032,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           if (controller.visitorsLoading && controller.visitors.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
+
           if (controller.visitorsError != null && controller.visitors.isEmpty) {
             return EmptyState(
               icon: Icons.error_outline,
@@ -5004,6 +5040,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
               message: controller.visitorsError!,
             );
           }
+
           if (controller.visitors.isEmpty) {
             return const EmptyState(
               icon: Icons.people_outline,
@@ -5013,114 +5050,157 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           }
 
           return Column(
-            children: controller.visitors
-                .map(
-                  (visitor) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: CarmelitaCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+            children: [
+              CarmelitaCard(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.rule_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Visitor policy: requests are filed at least one calendar day in advance, '
+                        'visiting hours are 9:00 AM–9:00 PM, and visitors leave the same day. '
+                        'Arrival can only be recorded after staff approval.',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...controller.visitors.map(
+                (visitor) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: CarmelitaCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                visitor.visitorName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 17,
+                                ),
+                              ),
+                            ),
+                            StatusPill(visitor.statusLabel),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        InfoRow(
+                          label: 'Relationship',
+                          value: visitor.relationship,
+                        ),
+                        if (visitor.tenantName.isNotEmpty)
+                          InfoRow(
+                            label: 'Resident',
+                            value: visitor.tenantName,
+                          ),
+                        InfoRow(
+                          label: 'Purpose',
+                          value: visitor.purpose,
+                        ),
+                        if (visitor.contactNumber.isNotEmpty)
+                          InfoRow(
+                            label: 'Visitor contact',
+                            value: visitor.contactNumber,
+                          ),
+                        InfoRow(
+                          label: 'Expected arrival',
+                          value:
+                              '${shortDate(visitor.schedule)} • ${timeText(visitor.schedule)}',
+                        ),
+                        if (visitor.expectedDepartureAt != null)
+                          InfoRow(
+                            label: 'Expected departure',
+                            value:
+                                '${shortDate(visitor.expectedDepartureAt!)} • ${timeText(visitor.expectedDepartureAt!)}',
+                          ),
+                        InfoRow(
+                          label: 'Policy check',
+                          value: _policySummary(visitor),
+                        ),
+                        if (visitor.reviewNote?.isNotEmpty == true)
+                          InfoRow(
+                            label: 'Review note',
+                            value: visitor.reviewNote!,
+                          ),
+                        TextButton.icon(
+                          onPressed: () => _showHistory(visitor),
+                          icon: const Icon(Icons.history_rounded),
+                          label: const Text('View history'),
+                        ),
+                        if (visitor.isPending) ...[
+                          if (_policyIssue(visitor) != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                'Approval is disabled until the visit schedule follows visitor policy.',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color:
+                                          Theme.of(context).colorScheme.error,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                            ),
+                          const SizedBox(height: 4),
                           Row(
                             children: [
                               Expanded(
-                                child: Text(
-                                  visitor.visitorName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 17,
-                                  ),
+                                child: OutlinedButton(
+                                  onPressed: () => _reject(visitor),
+                                  child: const Text('Reject'),
                                 ),
                               ),
-                              StatusPill(visitor.statusLabel),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: _policyIssue(visitor) == null
+                                      ? () => _transition(visitor, 'approve')
+                                      : null,
+                                  child: const Text('Approve'),
+                                ),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          InfoRow(
-                            label: 'Relationship',
-                            value: visitor.relationship,
+                        ] else if (visitor.isApproved) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: () =>
+                                  _transition(visitor, 'record_arrival'),
+                              icon: const Icon(Icons.login_rounded),
+                              label: const Text('Record arrival'),
+                            ),
                           ),
-                          if (visitor.tenantName.isNotEmpty)
-                            InfoRow(
-                              label: 'Resident',
-                              value: visitor.tenantName,
+                        ] else if (visitor.hasArrived) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: () =>
+                                  _transition(visitor, 'record_departure'),
+                              icon: const Icon(Icons.logout_rounded),
+                              label: const Text('Record departure'),
                             ),
-                          InfoRow(label: 'Purpose', value: visitor.purpose),
-                          if (visitor.contactNumber.isNotEmpty)
-                            InfoRow(
-                              label: 'Visitor contact',
-                              value: visitor.contactNumber,
-                            ),
-                          InfoRow(
-                            label: 'Expected arrival',
-                            value: '${shortDate(visitor.schedule)} • '
-                                '${timeText(visitor.schedule)}',
                           ),
-                          if (visitor.expectedDepartureAt != null)
-                            InfoRow(
-                              label: 'Expected departure',
-                              value:
-                                  '${shortDate(visitor.expectedDepartureAt!)} • ${timeText(visitor.expectedDepartureAt!)}',
-                            ),
-                          if (visitor.reviewNote?.isNotEmpty == true)
-                            InfoRow(
-                              label: 'Review note',
-                              value: visitor.reviewNote!,
-                            ),
-                          TextButton.icon(
-                            onPressed: () => _showHistory(visitor),
-                            icon: const Icon(Icons.history_rounded),
-                            label: const Text('View history'),
-                          ),
-                          if (visitor.isPending) ...[
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () => _reject(visitor),
-                                    child: const Text('Reject'),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed: () =>
-                                        _transition(visitor, 'approve'),
-                                    child: const Text('Approve'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ] else if (visitor.isApproved) ...[
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton.icon(
-                                onPressed: () =>
-                                    _transition(visitor, 'record_arrival'),
-                                icon: const Icon(Icons.login_rounded),
-                                label: const Text('Record arrival'),
-                              ),
-                            ),
-                          ] else if (visitor.hasArrived) ...[
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton.icon(
-                                onPressed: () =>
-                                    _transition(visitor, 'record_departure'),
-                                icon: const Icon(Icons.logout_rounded),
-                                label: const Text('Record departure'),
-                              ),
-                            ),
-                          ],
                         ],
-                      ),
+                      ],
                     ),
                   ),
-                )
-                .toList(),
+                ),
+              ),
+            ],
           );
         },
       ),

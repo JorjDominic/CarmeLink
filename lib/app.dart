@@ -7,8 +7,10 @@ import 'controllers/session_controller.dart';
 import 'controllers/theme_controller.dart';
 import 'core/constants/app_assets.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/connectivity_banner.dart';
 import 'models/models.dart';
 import 'views/auth/auth_views.dart';
+import 'views/auth/mobile_auth_entry.dart';
 import 'views/caretaker/caretaker_shell.dart';
 import 'views/guardian/guardian_shell.dart';
 import 'views/owner/owner_shell.dart';
@@ -28,6 +30,7 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   final SessionController sessionController = SessionController.instance;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final AppLinks _appLinks = AppLinks();
+
   StreamSubscription<Uri>? _linkSubscription;
   String? _pendingOnboardingToken;
   String? _openedOnboardingToken;
@@ -47,6 +50,7 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     } catch (error) {
       debugPrint('Could not read initial app link: $error');
     }
+
     _linkSubscription = _appLinks.uriLinkStream.listen(
       _handleLink,
       onError: (Object error) => debugPrint('App link error: $error'),
@@ -58,8 +62,10 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
         uri.host.toLowerCase() != 'onboarding') {
       return;
     }
+
     final token = uri.queryParameters['token']?.trim();
     if (token == null || token.isEmpty) return;
+
     _pendingOnboardingToken = token;
     _tryOpenPendingOnboarding();
   }
@@ -68,21 +74,26 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     final token = _pendingOnboardingToken;
     final user = sessionController.currentUser;
     final navigator = _navigatorKey.currentState;
+
     if (token == null ||
         token == _openedOnboardingToken ||
         user?.role != UserRole.tenant ||
         navigator == null) {
       return;
     }
+
     _openedOnboardingToken = token;
     _pendingOnboardingToken = null;
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+
       await navigator.push(
         MaterialPageRoute<void>(
           builder: (_) => OnboardingFormPage(token: token),
         ),
       );
+
       _openedOnboardingToken = null;
     });
   }
@@ -97,8 +108,10 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+
     if (assetsCached) return;
     assetsCached = true;
+
     for (final asset in const [
       AppAssets.logo,
       AppAssets.courtyard,
@@ -126,6 +139,9 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
             overscroll: false,
             physics: const ClampingScrollPhysics(),
           ),
+          builder: (context, child) => ConnectivityBannerHost(
+            child: child ?? const SizedBox.shrink(),
+          ),
           home: _rootForSession(),
         );
       },
@@ -139,14 +155,16 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
         onComplete: sessionController.completePasswordRecovery,
       );
     }
+
     final verificationEmail = sessionController.emailAwaitingVerification;
     if (verificationEmail != null) {
       return EmailVerificationCodePage(email: verificationEmail);
     }
+
     final user = sessionController.currentUser;
     if (user == null) {
-      return AuthFlow(
-        skipIntro: sessionController.justSignedOut,
+      return MobileAuthEntry(
+        skipSplash: sessionController.justSignedOut,
       );
     }
 

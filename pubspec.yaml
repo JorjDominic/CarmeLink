@@ -12,6 +12,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
   image_picker: ^1.2.3
   google_mlkit_text_recognition: ^0.17.1
   supabase_flutter: ^2.17.2
@@ -24,10 +25,12 @@ dependencies:
   url_launcher: ^6.3.2
   qr_flutter: ^4.1.0
   app_links: ^6.4.0
+  connectivity_plus: ^6.1.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
 
@@ -39,6 +42,7 @@ flutter:
     - assets/images/
     - assets/web/brand/
     - assets/web/photos/
+
   fonts:
     - family: GreatVibes
       fonts:
