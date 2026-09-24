@@ -47,6 +47,7 @@ class ContractsPage extends StatefulWidget {
 class _ContractsPageState extends State<ContractsPage> {
   final _search = TextEditingController();
   String _status = 'all';
+  RecordListSort _sort = RecordListSort.newest;
 
   @override
   void initState() {
@@ -74,7 +75,13 @@ class _ContractsPageState extends State<ContractsPage> {
                 contract.tenantName.toLowerCase().contains(query) ||
                 contract.contractNumber.toLowerCase().contains(query);
             return matchesStatus && matchesQuery;
-          }).toList();
+          }).toList()
+            ..sort((a, b) => switch (_sort) {
+                  RecordListSort.oldest => a.startsOn.compareTo(b.startsOn),
+                  RecordListSort.status => a.status.compareTo(b.status),
+                  RecordListSort.title => a.tenantName.compareTo(b.tenantName),
+                  _ => b.startsOn.compareTo(a.startsOn),
+                });
 
           return PageFrame(
             title: 'Contracts',
@@ -111,6 +118,31 @@ class _ContractsPageState extends State<ContractsPage> {
                                   ),
                                 ))
                             .toList(),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: DropdownButton<RecordListSort>(
+                    value: _sort,
+                    underline: const SizedBox.shrink(),
+                    borderRadius: BorderRadius.circular(14),
+                    items: const [
+                      DropdownMenuItem(
+                          value: RecordListSort.newest,
+                          child: Text('Newest first')),
+                      DropdownMenuItem(
+                          value: RecordListSort.oldest,
+                          child: Text('Oldest first')),
+                      DropdownMenuItem(
+                          value: RecordListSort.status,
+                          child: Text('By status')),
+                      DropdownMenuItem(
+                          value: RecordListSort.title,
+                          child: Text('Tenant A-Z')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => _sort = value);
+                    },
                   ),
                 ),
                 const SizedBox(height: 14),

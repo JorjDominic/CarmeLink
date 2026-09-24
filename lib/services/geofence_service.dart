@@ -451,8 +451,8 @@ class GeofenceLocationService {
   }) {
     final time = now ?? DateTime.now();
     final hour = time.hour;
-    final isCurfewHours = (hour >= 22 || hour < 6);
-    final isPreCurfewHours = (hour >= 20 && hour < 22);
+    final isCurfewHours = (hour >= 23 || hour < 6);
+    final isPreCurfewHours = (hour >= 21 && hour < 23);
 
     if (isCurfewHours) {
       final isInside =
@@ -503,10 +503,10 @@ class GeofenceLocationService {
     final time = now ?? DateTime.now();
     final hour = time.hour;
 
-    if (hour >= 22 || hour < 6) {
+    if (hour >= 23 || hour < 6) {
       return const Duration(minutes: 5);
     }
-    if (hour >= 20 && hour < 22) {
+    if (hour >= 21 && hour < 23) {
       return const Duration(minutes: 15);
     }
     return const Duration(minutes: 45);

@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import '../core/constants/official_lease_content.dart';
 import '../models/models.dart';
 
 class GeneratedContractFile {
@@ -215,7 +216,7 @@ class ContractDocumentService {
         child: pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text('CARMELITA\'S DORMITORY',
+            pw.Text("CARMELITA'S GIRLS-ONLY DORMITORY",
                 style:
                     pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
             pw.Text('Contract v$version',
@@ -234,7 +235,7 @@ class ContractDocumentService {
       ),
       build: (_) => [
         pw.SizedBox(height: 24),
-        pw.Text('DORMITORY RENTAL AGREEMENT',
+        pw.Text(OfficialLeaseContent.title.toUpperCase(),
             textAlign: pw.TextAlign.center,
             style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
         pw.SizedBox(height: 8),
@@ -242,7 +243,9 @@ class ContractDocumentService {
             textAlign: pw.TextAlign.center,
             style: const pw.TextStyle(color: PdfColors.grey700)),
         pw.SizedBox(height: 30),
-        _pdfSection('Resident', [
+        _pdfSection('Parties and resident', [
+          _pdfRow('Lessor', OfficialLeaseContent.lessorName),
+          _pdfRow('Dormitory address', OfficialLeaseContent.address),
           _pdfRow('Tenant name', contract.tenantName),
           _pdfRow('Tenant profile ID', contract.tenantId),
         ]),
@@ -252,14 +255,67 @@ class ContractDocumentService {
         ]),
         _pdfSection('Financial terms', [
           _pdfRow('Monthly rent', amount(contract.monthlyRent)),
+          _pdfRow(
+              'Rent due every', 'Day ${contract.billingDueDay} of the month'),
           _pdfRow('Security deposit', amount(contract.securityDeposit)),
+        ]),
+        _pdfBulletSection(
+          'Required documents before move-in',
+          OfficialLeaseContent.requiredDocuments,
+        ),
+        _pdfSection(
+          'Rules, regulations, and stated consequences',
+          OfficialLeaseContent.rules
+              .map((rule) => pw.Padding(
+                    padding: const pw.EdgeInsets.only(bottom: 8),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(rule.title,
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        pw.Text(rule.details),
+                        if (rule.consequence != null)
+                          pw.Text('Penalty/consequence: ${rule.consequence}',
+                              style:
+                                  const pw.TextStyle(color: PdfColors.grey700)),
+                      ],
+                    ),
+                  ))
+              .toList(),
+        ),
+        _pdfBulletSection(
+          'Security deposit conditions',
+          <String>[
+            'Refundable within 30 days after the lease ends, subject to:',
+            ...OfficialLeaseContent.depositConditions,
+          ],
+        ),
+        _pdfBulletSection(
+          'Dormitory rights and inspections',
+          const <String>[
+            'The lessor may inspect rooms monthly to ensure safety and cleanliness.',
+            'Written notice will be given at least three days in advance.',
+            'Tenants must allow access during the scheduled inspection.',
+          ],
+        ),
+        _pdfBulletSection(
+          'Termination and eviction',
+          OfficialLeaseContent.terminationReasons,
+        ),
+        _pdfBulletSection(
+          'Miscellaneous',
+          OfficialLeaseContent.miscellaneous,
+        ),
+        _pdfSection('Contacting the owner', [
+          pw.Text(OfficialLeaseContent.ownerContact),
         ]),
         if (contract.notes?.trim().isNotEmpty == true)
           _pdfSection('Additional notes', [pw.Text(contract.notes!.trim())]),
         pw.SizedBox(height: 22),
         pw.Text(
-          'By signing below, the parties acknowledge that they have reviewed '
-          'and accepted the agreement details recorded above.',
+          'By signing, both parties agree to all terms and understand the '
+          'consequences of violating this agreement.',
           style: const pw.TextStyle(height: 1.5),
         ),
         pw.SizedBox(height: 56),
@@ -322,6 +378,22 @@ class ContractDocumentService {
                   style: const pw.TextStyle(color: PdfColors.grey700))),
           pw.Expanded(child: pw.Text(value)),
         ]),
+      );
+
+  pw.Widget _pdfBulletSection(String title, List<String> items) => _pdfSection(
+        title,
+        items
+            .map((item) => pw.Padding(
+                  padding: const pw.EdgeInsets.only(bottom: 5),
+                  child: pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('-  '),
+                      pw.Expanded(child: pw.Text(item)),
+                    ],
+                  ),
+                ))
+            .toList(),
       );
 
   pw.Widget _signatureLine(String label) => pw.Column(children: [

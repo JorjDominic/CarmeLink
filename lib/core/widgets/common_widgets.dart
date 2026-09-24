@@ -44,6 +44,257 @@ Color mutedAccentForIcon(BuildContext context, IconData icon) {
   return const Color(0xFF627FA8);
 }
 
+enum RecordListScope { active, history }
+
+enum RecordListSort { newest, oldest, status, title }
+
+/// Shared progressive-disclosure controls for operational record lists.
+class RecordListToolbar extends StatelessWidget {
+  const RecordListToolbar({
+    required this.scope,
+    required this.sort,
+    required this.onScopeChanged,
+    required this.onSortChanged,
+    this.activeCount,
+    this.historyCount,
+    this.extra,
+    super.key,
+  });
+
+  final RecordListScope scope;
+  final RecordListSort sort;
+  final ValueChanged<RecordListScope> onScopeChanged;
+  final ValueChanged<RecordListSort> onSortChanged;
+  final int? activeCount;
+  final int? historyCount;
+  final Widget? extra;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final useCompactScope = constraints.maxWidth < 720 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.15;
+          final scopeControl = SegmentedButton<RecordListScope>(
+            segments: [
+              ButtonSegment(
+                value: RecordListScope.active,
+                icon: const Icon(Icons.bolt_outlined),
+                label: Text(
+                  activeCount == null ? 'Active' : 'Active ($activeCount)',
+                ),
+              ),
+              ButtonSegment(
+                value: RecordListScope.history,
+                icon: const Icon(Icons.history_outlined),
+                label: Text(
+                  historyCount == null ? 'History' : 'History ($historyCount)',
+                ),
+              ),
+            ],
+            selected: {scope},
+            onSelectionChanged: (values) => onScopeChanged(values.first),
+          );
+          final sortControl = DropdownButton<RecordListSort>(
+            value: sort,
+            underline: const SizedBox.shrink(),
+            borderRadius: BorderRadius.circular(14),
+            items: const [
+              DropdownMenuItem(
+                value: RecordListSort.newest,
+                child: Text('Newest first'),
+              ),
+              DropdownMenuItem(
+                value: RecordListSort.oldest,
+                child: Text('Oldest first'),
+              ),
+              DropdownMenuItem(
+                value: RecordListSort.status,
+                child: Text('By status'),
+              ),
+              DropdownMenuItem(
+                value: RecordListSort.title,
+                child: Text('A-Z'),
+              ),
+            ],
+            onChanged: (value) {
+              if (value != null) onSortChanged(value);
+            },
+          );
+          final sortBox = Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.sort_rounded, size: 18),
+                const SizedBox(width: 6),
+                sortControl,
+              ],
+            ),
+          );
+          final children = [scopeControl, if (extra != null) extra!, sortBox];
+          if (useCompactScope) {
+            return Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ChoiceChip(
+                  visualDensity: VisualDensity.compact,
+                  selected: scope == RecordListScope.active,
+                  label: Text(
+                      activeCount == null ? 'Active' : 'Active ($activeCount)'),
+                  onSelected: (_) => onScopeChanged(RecordListScope.active),
+                ),
+                ChoiceChip(
+                  visualDensity: VisualDensity.compact,
+                  selected: scope == RecordListScope.history,
+                  label: Text(historyCount == null
+                      ? 'History'
+                      : 'History ($historyCount)'),
+                  onSelected: (_) => onScopeChanged(RecordListScope.history),
+                ),
+                if (extra != null) extra!,
+                PopupMenuButton<RecordListSort>(
+                  tooltip: 'Sort records',
+                  initialValue: sort,
+                  onSelected: onSortChanged,
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                        value: RecordListSort.newest,
+                        child: Text('Newest first')),
+                    PopupMenuItem(
+                        value: RecordListSort.oldest,
+                        child: Text('Oldest first')),
+                    PopupMenuItem(
+                        value: RecordListSort.status, child: Text('By status')),
+                    PopupMenuItem(
+                        value: RecordListSort.title, child: Text('A-Z')),
+                  ],
+                  child: Chip(
+                    visualDensity: VisualDensity.compact,
+                    avatar: const Icon(Icons.sort_rounded, size: 17),
+                    label: Text(switch (sort) {
+                      RecordListSort.oldest => 'Oldest',
+                      RecordListSort.status => 'Status',
+                      RecordListSort.title => 'A-Z',
+                      _ => 'Newest',
+                    }),
+                  ),
+                ),
+              ],
+            );
+          }
+          return constraints.maxWidth < 600
+              ? Wrap(spacing: 10, runSpacing: 10, children: children)
+              : Row(children: [
+                  scopeControl,
+                  const Spacer(),
+                  if (extra != null) ...[extra!, const SizedBox(width: 10)],
+                  sortBox,
+                ]);
+        },
+      );
+}
+
+/// Keeps explanatory text available without letting it dominate repeat visits.
+class CollapsibleInfoCard extends StatelessWidget {
+  const CollapsibleInfoCard({
+    required this.title,
+    required this.body,
+    this.icon = Icons.info_outline_rounded,
+    this.initiallyExpanded = false,
+    super.key,
+  });
+
+  final String title;
+  final String body;
+  final IconData icon;
+  final bool initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) => CarmelitaCard(
+        padding: EdgeInsets.zero,
+        child: ExpansionTile(
+          initiallyExpanded: initiallyExpanded,
+          leading: Icon(icon),
+          title:
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          children: [SizedBox(width: double.infinity, child: Text(body))],
+        ),
+      );
+}
+
+/// Renders a bounded first page and progressively reveals older records.
+class PagedRecordList extends StatefulWidget {
+  const PagedRecordList({
+    required this.children,
+    this.pageSize = 6,
+    super.key,
+  });
+
+  final List<Widget> children;
+  final int pageSize;
+
+  @override
+  State<PagedRecordList> createState() => _PagedRecordListState();
+}
+
+class _PagedRecordListState extends State<PagedRecordList> {
+  late int visibleCount = widget.pageSize;
+
+  @override
+  void didUpdateWidget(covariant PagedRecordList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.children.length != widget.children.length) {
+      visibleCount = widget.pageSize;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final count = visibleCount.clamp(0, widget.children.length);
+    final hasMore = count < widget.children.length;
+    return Column(
+      children: [
+        ...widget.children.take(count),
+        if (hasMore || count > widget.pageSize)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              children: [
+                if (hasMore)
+                  OutlinedButton.icon(
+                    onPressed: () => setState(() => visibleCount =
+                        (visibleCount + widget.pageSize)
+                            .clamp(0, widget.children.length)),
+                    icon: const Icon(Icons.expand_more),
+                    label: Text(
+                      'Show more (${widget.children.length - count} remaining)',
+                    ),
+                  ),
+                if (count > widget.pageSize)
+                  TextButton.icon(
+                    onPressed: () =>
+                        setState(() => visibleCount = widget.pageSize),
+                    icon: const Icon(Icons.expand_less),
+                    label: const Text('Show fewer'),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class MessageDeliveryMeta extends StatelessWidget {
   const MessageDeliveryMeta({
     required this.message,
@@ -136,13 +387,19 @@ class MutedDashboardGrid extends StatelessWidget {
       LayoutBuilder(builder: (context, constraints) {
         final textScale = MediaQuery.textScalerOf(context).scale(1);
         final scaledText = textScale > 1.15;
+        final compactTriple = compact &&
+            items.length == 3 &&
+            constraints.maxWidth >= 285 &&
+            !scaledText;
         final columns = denseFourColumn
             ? constraints.maxWidth < 400
                 ? items.length.clamp(1, 2)
                 : items.length.clamp(1, 4)
-            : constraints.maxWidth < 600
-                ? (constraints.maxWidth < 320 ? 1 : 2)
-                : items.length.clamp(2, 4);
+            : compactTriple
+                ? 3
+                : constraints.maxWidth < 600
+                    ? (constraints.maxWidth < 320 ? 1 : 2)
+                    : items.length.clamp(2, 4);
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -152,7 +409,7 @@ class MutedDashboardGrid extends StatelessWidget {
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
             mainAxisExtent:
-                compact ? 114 + ((textScale - 1).clamp(0, 1) * 60) : null,
+                compact ? 100 + ((textScale - 1).clamp(0, 1) * 72) : null,
             childAspectRatio: compact
                 ? (scaledText ? 1.05 : 1.25)
                 : denseFourColumn && constraints.maxWidth < 500
@@ -167,7 +424,7 @@ class MutedDashboardGrid extends StatelessWidget {
               onTap: item.onTap,
               borderRadius: BorderRadius.circular(16),
               child: Container(
-                padding: EdgeInsets.all(compact ? 8 : 10),
+                padding: EdgeInsets.all(compactTriple ? 6 : (compact ? 7 : 10)),
                 decoration: BoxDecoration(
                   color: item.color.withValues(alpha: .035),
                   border: Border.all(color: item.color.withValues(alpha: .10)),
@@ -177,12 +434,14 @@ class MutedDashboardGrid extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                          padding: EdgeInsets.all(compact ? 5 : 7),
+                          padding: EdgeInsets.all(
+                              compactTriple ? 3 : (compact ? 4 : 7)),
                           decoration: BoxDecoration(
                               color: item.color.withValues(alpha: .09),
                               borderRadius: BorderRadius.circular(9)),
                           child: Icon(item.icon,
-                              color: item.color, size: compact ? 18 : 19)),
+                              color: item.color,
+                              size: compactTriple ? 15 : (compact ? 17 : 19))),
                       const Spacer(),
                       Text(item.value,
                           maxLines: 1,
@@ -193,7 +452,9 @@ class MutedDashboardGrid extends StatelessWidget {
                               ?.copyWith(
                                   color: item.color,
                                   fontWeight: FontWeight.w900,
-                                  fontSize: compact ? 19 : 17)),
+                                  fontSize: compactTriple
+                                      ? 17
+                                      : (compact ? 19 : 17))),
                       const SizedBox(height: 2),
                       Text(item.label,
                           maxLines: 1,
@@ -202,7 +463,8 @@ class MutedDashboardGrid extends StatelessWidget {
                               .textTheme
                               .titleSmall
                               ?.copyWith(
-                                  fontSize: compact ? 12 : 10,
+                                  fontSize:
+                                      compactTriple ? 10 : (compact ? 12 : 10),
                                   fontWeight: FontWeight.w800)),
                       Text(item.detail,
                           maxLines: 1,
@@ -210,7 +472,10 @@ class MutedDashboardGrid extends StatelessWidget {
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall
-                              ?.copyWith(fontSize: compact ? 11 : 9)),
+                              ?.copyWith(
+                                  fontSize: compactTriple
+                                      ? 8.5
+                                      : (compact ? 11 : 9))),
                     ]),
               ),
             );
@@ -330,6 +595,7 @@ class PageFrame extends StatelessWidget {
     final isStaff =
         currentRole == UserRole.owner || currentRole == UserRole.caretaker;
     final ownerOperationalPage = isStaff && title != 'Dashboard';
+    final compactHeader = MediaQuery.sizeOf(context).width < 500;
     final canShowNotifications =
         SessionController.instance.currentUser != null &&
             title.toLowerCase() != 'notifications';
@@ -341,7 +607,7 @@ class PageFrame extends StatelessWidget {
         title != 'Operations' &&
         title != 'Profile' &&
         title != 'Notifications';
-    final pageChild = ownerSection
+    final basePageChild = ownerSection
         ? Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -363,6 +629,16 @@ class PageFrame extends StatelessWidget {
             ],
           )
         : child;
+    final pageChild = compactHeader && subtitle != null && !ownerSection
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 12),
+              basePageChild,
+            ],
+          )
+        : basePageChild;
 
     void openNotifications() => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const _GlobalNotificationsPage()),
@@ -402,7 +678,7 @@ class PageFrame extends StatelessWidget {
         extendBody: navScope != null,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          toolbarHeight: isStaff ? 64 : 72,
+          toolbarHeight: compactHeader ? 58 : (isStaff ? 64 : 72),
           leadingWidth: isStaff ? 60 : 68,
           leading: Padding(
             padding: const EdgeInsets.only(left: 12),
@@ -437,13 +713,17 @@ class PageFrame extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontFamily: useScriptTitle ? 'GreatVibes' : null,
-                      fontSize: useScriptTitle ? 30 : null,
-                      fontWeight:
-                          useScriptTitle ? FontWeight.w600 : FontWeight.w700,
+                      fontFamily: useScriptTitle && !compactHeader
+                          ? 'GreatVibes'
+                          : null,
+                      fontSize:
+                          compactHeader ? 20 : (useScriptTitle ? 30 : null),
+                      fontWeight: useScriptTitle && !compactHeader
+                          ? FontWeight.w600
+                          : FontWeight.w700,
                     ),
               ),
-              if (subtitle != null && !ownerOperationalPage)
+              if (subtitle != null && !ownerOperationalPage && !compactHeader)
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
                   child: Text(
@@ -457,8 +737,8 @@ class PageFrame extends StatelessWidget {
           ),
           actions: [
             ...?actions,
-            if (canShowMessages) messageButton,
-            if (canShowNotifications) notificationButton,
+            if (canShowMessages && !compactHeader) messageButton,
+            if (canShowNotifications && !compactHeader) notificationButton,
             const SizedBox(width: 10),
           ],
         ),

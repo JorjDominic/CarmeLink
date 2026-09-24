@@ -59,11 +59,11 @@ void main() {
 
       // Account summary headers
       expect(find.text('ACCOUNT SUMMARY'), findsOneWidget);
-      expect(find.text('Outstanding'), findsOneWidget);
-      expect(find.text('Next due date'), findsOneWidget);
+      expect(find.text('Total outstanding'), findsOneWidget);
+      expect(find.text('Next due'), findsOneWidget);
 
       // Overdue indicator in summary
-      expect(find.text('1 overdue bill'), findsOneWidget);
+      expect(find.text('1 overdue'), findsOneWidget);
 
       // Filter chips with dynamic counts
       expect(find.text('All (3)'), findsOneWidget);

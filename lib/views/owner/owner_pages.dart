@@ -4883,6 +4883,8 @@ class VisitorManagementPage extends StatefulWidget {
 class _VisitorManagementPageState extends State<VisitorManagementPage> {
   final controller = OwnerController.instance;
   late final TableRefreshSubscription _subscription;
+  RecordListScope scope = RecordListScope.active;
+  RecordListSort sort = RecordListSort.newest;
 
   @override
   void initState() {
@@ -5029,6 +5031,22 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
+          final activeVisitors = controller.visitors
+              .where((item) =>
+                  item.isPending || item.isApproved || item.hasArrived)
+              .toList();
+          final historyVisitors = controller.visitors
+              .where((item) =>
+                  item.isRejected || item.isCancelled || item.isCompleted)
+              .toList();
+          final visible = List<VisitorRequest>.from(
+            scope == RecordListScope.active ? activeVisitors : historyVisitors,
+          )..sort((a, b) => switch (sort) {
+                RecordListSort.oldest => a.schedule.compareTo(b.schedule),
+                RecordListSort.status => a.status.compareTo(b.status),
+                RecordListSort.title => a.visitorName.compareTo(b.visitorName),
+                _ => b.schedule.compareTo(a.schedule),
+              });
           if (controller.visitorsLoading && controller.visitors.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -5038,14 +5056,6 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
               icon: Icons.error_outline,
               title: 'Unable to load visitor requests',
               message: controller.visitorsError!,
-            );
-          }
-
-          if (controller.visitors.isEmpty) {
-            return const EmptyState(
-              icon: Icons.people_outline,
-              title: 'No visitor requests',
-              message: 'Tenant visitor requests will appear here.',
             );
           }
 
@@ -5071,134 +5081,160 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              ...controller.visitors.map(
-                (visitor) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: CarmelitaCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                visitor.visitorName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 17,
-                                ),
-                              ),
-                            ),
-                            StatusPill(visitor.statusLabel),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        InfoRow(
-                          label: 'Relationship',
-                          value: visitor.relationship,
-                        ),
-                        if (visitor.tenantName.isNotEmpty)
-                          InfoRow(
-                            label: 'Resident',
-                            value: visitor.tenantName,
-                          ),
-                        InfoRow(
-                          label: 'Purpose',
-                          value: visitor.purpose,
-                        ),
-                        if (visitor.contactNumber.isNotEmpty)
-                          InfoRow(
-                            label: 'Visitor contact',
-                            value: visitor.contactNumber,
-                          ),
-                        InfoRow(
-                          label: 'Expected arrival',
-                          value:
-                              '${shortDate(visitor.schedule)} • ${timeText(visitor.schedule)}',
-                        ),
-                        if (visitor.expectedDepartureAt != null)
-                          InfoRow(
-                            label: 'Expected departure',
-                            value:
-                                '${shortDate(visitor.expectedDepartureAt!)} • ${timeText(visitor.expectedDepartureAt!)}',
-                          ),
-                        InfoRow(
-                          label: 'Policy check',
-                          value: _policySummary(visitor),
-                        ),
-                        if (visitor.reviewNote?.isNotEmpty == true)
-                          InfoRow(
-                            label: 'Review note',
-                            value: visitor.reviewNote!,
-                          ),
-                        TextButton.icon(
-                          onPressed: () => _showHistory(visitor),
-                          icon: const Icon(Icons.history_rounded),
-                          label: const Text('View history'),
-                        ),
-                        if (visitor.isPending) ...[
-                          if (_policyIssue(visitor) != null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Text(
-                                'Approval is disabled until the visit schedule follows visitor policy.',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color:
-                                          Theme.of(context).colorScheme.error,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                            ),
-                          const SizedBox(height: 4),
-                          Row(
+              RecordListToolbar(
+                scope: scope,
+                sort: sort,
+                activeCount: activeVisitors.length,
+                historyCount: historyVisitors.length,
+                onScopeChanged: (value) => setState(() => scope = value),
+                onSortChanged: (value) => setState(() => sort = value),
+              ),
+              const SizedBox(height: 12),
+              if (visible.isEmpty)
+                EmptyState(
+                  icon: Icons.people_outline,
+                  title: scope == RecordListScope.active
+                      ? 'No active visitor requests'
+                      : 'No visitor history',
+                  message: scope == RecordListScope.active
+                      ? 'Pending and approved visitor requests appear here.'
+                      : 'Completed, rejected, and cancelled visits appear here.',
+                ),
+              PagedRecordList(
+                key: ValueKey('staff-visitors-$scope-$sort'),
+                children: visible
+                    .map(
+                      (visitor) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: CarmelitaCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => _reject(visitor),
-                                  child: const Text('Reject'),
-                                ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      visitor.visitorName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 17,
+                                      ),
+                                    ),
+                                  ),
+                                  StatusPill(visitor.statusLabel),
+                                ],
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: FilledButton(
-                                  onPressed: _policyIssue(visitor) == null
-                                      ? () => _transition(visitor, 'approve')
-                                      : null,
-                                  child: const Text('Approve'),
-                                ),
+                              const SizedBox(height: 8),
+                              InfoRow(
+                                label: 'Relationship',
+                                value: visitor.relationship,
                               ),
+                              if (visitor.tenantName.isNotEmpty)
+                                InfoRow(
+                                  label: 'Resident',
+                                  value: visitor.tenantName,
+                                ),
+                              InfoRow(
+                                label: 'Purpose',
+                                value: visitor.purpose,
+                              ),
+                              if (visitor.contactNumber.isNotEmpty)
+                                InfoRow(
+                                  label: 'Visitor contact',
+                                  value: visitor.contactNumber,
+                                ),
+                              InfoRow(
+                                label: 'Expected arrival',
+                                value:
+                                    '${shortDate(visitor.schedule)} • ${timeText(visitor.schedule)}',
+                              ),
+                              if (visitor.expectedDepartureAt != null)
+                                InfoRow(
+                                  label: 'Expected departure',
+                                  value:
+                                      '${shortDate(visitor.expectedDepartureAt!)} • ${timeText(visitor.expectedDepartureAt!)}',
+                                ),
+                              InfoRow(
+                                label: 'Policy check',
+                                value: _policySummary(visitor),
+                              ),
+                              if (visitor.reviewNote?.isNotEmpty == true)
+                                InfoRow(
+                                  label: 'Review note',
+                                  value: visitor.reviewNote!,
+                                ),
+                              TextButton.icon(
+                                onPressed: () => _showHistory(visitor),
+                                icon: const Icon(Icons.history_rounded),
+                                label: const Text('View history'),
+                              ),
+                              if (visitor.isPending) ...[
+                                if (_policyIssue(visitor) != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Text(
+                                      'Approval is disabled until the visit schedule follows visitor policy.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .error,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () => _reject(visitor),
+                                        child: const Text('Reject'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: FilledButton(
+                                        onPressed: _policyIssue(visitor) == null
+                                            ? () =>
+                                                _transition(visitor, 'approve')
+                                            : null,
+                                        child: const Text('Approve'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ] else if (visitor.isApproved) ...[
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.icon(
+                                    onPressed: () =>
+                                        _transition(visitor, 'record_arrival'),
+                                    icon: const Icon(Icons.login_rounded),
+                                    label: const Text('Record arrival'),
+                                  ),
+                                ),
+                              ] else if (visitor.hasArrived) ...[
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.icon(
+                                    onPressed: () => _transition(
+                                        visitor, 'record_departure'),
+                                    icon: const Icon(Icons.logout_rounded),
+                                    label: const Text('Record departure'),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
-                        ] else if (visitor.isApproved) ...[
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: () =>
-                                  _transition(visitor, 'record_arrival'),
-                              icon: const Icon(Icons.login_rounded),
-                              label: const Text('Record arrival'),
-                            ),
-                          ),
-                        ] else if (visitor.hasArrived) ...[
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: () =>
-                                  _transition(visitor, 'record_departure'),
-                              icon: const Icon(Icons.logout_rounded),
-                              label: const Text('Record departure'),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
             ],
           );

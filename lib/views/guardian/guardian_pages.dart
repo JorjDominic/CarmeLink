@@ -215,6 +215,7 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
               ),
               const SizedBox(height: 10),
               MutedDashboardGrid(
+                compact: true,
                 items: [
                   MutedDashboardItem(
                     label: 'Curfew',

@@ -66,7 +66,9 @@ void main() {
       expect(unavailEvent.notes, contains('permission denied'));
     });
 
-    test('GateEvent.fromRow and timeText correctly convert UTC timestamps to local time', () {
+    test(
+        'GateEvent.fromRow and timeText correctly convert UTC timestamps to local time',
+        () {
       const utcIsoString = '2026-09-22T01:36:34.000Z';
       final row = {
         'id': 'ge-utc-1',
@@ -322,7 +324,7 @@ void main() {
     });
 
     test('uses preCurfew polling 1 hour prior to curfew', () {
-      // 9:30 PM (21:30) is 30 mins before 10:00 PM curfew
+      // 9:30 PM (21:30) is within the two-hour pre-curfew window.
       final preCurfewTime = DateTime(2026, 9, 18, 21, 30);
       final intensity = GeofenceService.determineIntensity(
         now: preCurfewTime,
@@ -331,6 +333,19 @@ void main() {
       expect(intensity, CheckpointIntensity.preCurfew);
       expect(GeofenceService.intervalForIntensity(intensity),
           const Duration(minutes: 2));
+
+      // Quiet hours begin at 10:00 PM, but contract curfew begins at 11:00 PM.
+      final duringQuietHours = GeofenceService.determineIntensity(
+        now: DateTime(2026, 9, 18, 22, 30),
+        currentGateStatus: 'IN',
+      );
+      expect(duringQuietHours, CheckpointIntensity.preCurfew);
+
+      final atCurfew = GeofenceService.determineIntensity(
+        now: DateTime(2026, 9, 18, 23),
+        currentGateStatus: 'IN',
+      );
+      expect(atCurfew, CheckpointIntensity.curfewSleep);
     });
 
     test('uses standard daytime polling during normal daytime hours', () {
