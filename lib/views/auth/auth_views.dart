@@ -391,14 +391,12 @@ class _SignInPageState extends State<SignInPage> {
                                 controller: email,
                                 keyboardType: TextInputType.emailAddress,
                                 decoration: const InputDecoration(
-                                    labelText: 'Email address',
                                     prefixIcon: Icon(Icons.mail_outline))),
                             const SizedBox(height: 14),
                             TextField(
                                 controller: password,
                                 obscureText: !_passwordVisible,
                                 decoration: InputDecoration(
-                                    labelText: 'Password',
                                     prefixIcon: const Icon(Icons.lock_outline),
                                     suffixIcon: IconButton(
                                       tooltip: _passwordVisible

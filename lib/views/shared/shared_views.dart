@@ -810,13 +810,22 @@ class SettingsPage extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () {
-                  SessionController.instance.signOut();
+                onPressed: () async {
+                  try {
+                    await SessionController.instance.signOut();
+                    if (!context.mounted) return;
 
-                  Navigator.of(
-                    context,
-                    rootNavigator: true,
-                  ).popUntil((route) => route.isFirst);
+                    Navigator.of(
+                      context,
+                      rootNavigator: true,
+                    ).popUntil((route) => route.isFirst);
+                  } catch (_) {
+                    if (!context.mounted) return;
+                    showAppSnackBar(
+                      context,
+                      'Sign-out failed. Please retry.',
+                    );
+                  }
                 },
                 icon: const Icon(Icons.logout_rounded),
                 label: const Text('Sign out'),
