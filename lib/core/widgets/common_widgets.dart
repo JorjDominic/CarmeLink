@@ -5,6 +5,7 @@ import '../../models/models.dart';
 import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
 import '../responsive/breakpoints.dart';
+import '../runtime/app_surface.dart';
 import '../theme/app_theme.dart';
 import 'adaptive_shell.dart';
 
@@ -324,6 +325,8 @@ class PageFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final navScope = CarmelitaNavScope.maybeOf(context);
+    final webPortal = CarmeLinkSurfaceScope.isWebPortal(context);
+    final showMobileMenu = !webPortal && navScope != null;
     final canPop = Navigator.of(context).canPop();
     final extraBottom = navScope == null ? 24.0 : 132.0;
     final currentRole = SessionController.instance.currentUser?.role;
@@ -399,35 +402,47 @@ class PageFrame extends StatelessWidget {
     return _PageEntrance(
       enabled: !canPop,
       child: Scaffold(
-        extendBody: navScope != null,
+        extendBody: navScope != null && !webPortal,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
+          backgroundColor: Theme.of(context).appBarTheme.backgroundColor ??
+              Theme.of(context).scaffoldBackgroundColor,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
           toolbarHeight: isStaff ? 64 : 72,
-          leadingWidth: isStaff ? 60 : 68,
-          leading: Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: IconButton(
-              tooltip: navScope != null
-                  ? 'Menu'
-                  : canPop
-                      ? 'Back'
-                      : 'Menu',
-              onPressed: () {
-                if (navScope != null) {
-                  navScope.openMenu();
-                } else if (onBack != null) {
-                  onBack!();
-                } else if (canPop) {
-                  Navigator.of(context).maybePop();
-                }
-              },
-              icon: Icon(
-                navScope != null
-                    ? Icons.menu_rounded
-                    : Icons.arrow_back_ios_new_rounded,
-              ),
-            ),
-          ),
+          automaticallyImplyLeading: false,
+          leadingWidth: showMobileMenu || onBack != null || canPop
+              ? (isStaff ? 60 : 68)
+              : 0,
+          leading: showMobileMenu
+              ? Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: IconButton(
+                    key: const Key('mobile-hamburger-menu'),
+                    tooltip: 'Open navigation',
+                    onPressed: navScope.openMenu,
+                    icon: const Icon(Icons.menu_rounded),
+                  ),
+                )
+              : (onBack != null || canPop)
+                  ? Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: IconButton(
+                        tooltip: 'Back',
+                        onPressed: () {
+                          if (onBack != null) {
+                            onBack!();
+                          } else {
+                            Navigator.of(context).maybePop();
+                          }
+                        },
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                        ),
+                      ),
+                    )
+                  : null,
           titleSpacing: 4,
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

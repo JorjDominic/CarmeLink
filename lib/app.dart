@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'controllers/session_controller.dart';
 import 'controllers/theme_controller.dart';
 import 'core/constants/app_assets.dart';
+import 'core/runtime/app_surface.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/connectivity_banner.dart';
 import 'models/models.dart';
@@ -14,9 +15,9 @@ import 'views/auth/mobile_auth_entry.dart';
 import 'views/caretaker/caretaker_shell.dart';
 import 'views/guardian/guardian_shell.dart';
 import 'views/owner/owner_shell.dart';
-import 'views/tenant/tenant_shell.dart';
-import 'views/tenant/onboarding_form_page.dart';
 import 'views/shared/shared_views.dart';
+import 'views/tenant/onboarding_form_page.dart';
+import 'views/tenant/tenant_shell.dart';
 
 class CarmelitaBootstrap extends StatefulWidget {
   const CarmelitaBootstrap({super.key});
@@ -32,28 +33,37 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   final AppLinks _appLinks = AppLinks();
 
   StreamSubscription<Uri>? _linkSubscription;
+
   String? _pendingOnboardingToken;
   String? _openedOnboardingToken;
+
   bool assetsCached = false;
 
   @override
   void initState() {
     super.initState();
+
     sessionController.addListener(_tryOpenPendingOnboarding);
+
     _listenForLinks();
   }
 
   Future<void> _listenForLinks() async {
     try {
       final initialLink = await _appLinks.getInitialLink();
-      if (initialLink != null) _handleLink(initialLink);
+
+      if (initialLink != null) {
+        _handleLink(initialLink);
+      }
     } catch (error) {
       debugPrint('Could not read initial app link: $error');
     }
 
     _linkSubscription = _appLinks.uriLinkStream.listen(
       _handleLink,
-      onError: (Object error) => debugPrint('App link error: $error'),
+      onError: (Object error) {
+        debugPrint('App link error: $error');
+      },
     );
   }
 
@@ -64,9 +74,13 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     }
 
     final token = uri.queryParameters['token']?.trim();
-    if (token == null || token.isEmpty) return;
+
+    if (token == null || token.isEmpty) {
+      return;
+    }
 
     _pendingOnboardingToken = token;
+
     _tryOpenPendingOnboarding();
   }
 
@@ -86,11 +100,15 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     _pendingOnboardingToken = null;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       await navigator.push(
         MaterialPageRoute<void>(
-          builder: (_) => OnboardingFormPage(token: token),
+          builder: (_) => OnboardingFormPage(
+            token: token,
+          ),
         ),
       );
 
@@ -101,7 +119,9 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   @override
   void dispose() {
     sessionController.removeListener(_tryOpenPendingOnboarding);
+
     _linkSubscription?.cancel();
+
     super.dispose();
   }
 
@@ -109,7 +129,10 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    if (assetsCached) return;
+    if (assetsCached) {
+      return;
+    }
+
     assetsCached = true;
 
     for (final asset in const [
@@ -119,14 +142,20 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
       AppAssets.exterior,
       AppAssets.dormOverview,
     ]) {
-      precacheImage(AssetImage(asset), context);
+      precacheImage(
+        AssetImage(asset),
+        context,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([themeController, sessionController]),
+      animation: Listenable.merge([
+        themeController,
+        sessionController,
+      ]),
       builder: (context, _) {
         return MaterialApp(
           navigatorKey: _navigatorKey,
@@ -135,13 +164,27 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
           themeMode: themeController.themeMode,
+          themeAnimationDuration: const Duration(milliseconds: 220),
+          themeAnimationCurve: Curves.easeOutCubic,
           scrollBehavior: const ScrollBehavior().copyWith(
             overscroll: false,
             physics: const ClampingScrollPhysics(),
           ),
-          builder: (context, child) => ConnectivityBannerHost(
-            child: child ?? const SizedBox.shrink(),
+
+          // Keep one MaterialApp builder only.
+          //
+          // Mobile app surface tells AdaptiveShell that this is still the
+          // mobile application even when lib/main.dart is previewed in Chrome.
+          //
+          // ConnectivityBannerHost remains inside the same builder so the
+          // offline/online status layer continues to work.
+          builder: (context, child) => CarmeLinkSurfaceScope(
+            surface: CarmeLinkAppSurface.mobileApp,
+            child: ConnectivityBannerHost(
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
+
           home: _rootForSession(),
         );
       },
@@ -157,11 +200,15 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     }
 
     final verificationEmail = sessionController.emailAwaitingVerification;
+
     if (verificationEmail != null) {
-      return EmailVerificationCodePage(email: verificationEmail);
+      return EmailVerificationCodePage(
+        email: verificationEmail,
+      );
     }
 
     final user = sessionController.currentUser;
+
     if (user == null) {
       return MobileAuthEntry(
         skipSplash: sessionController.justSignedOut,
@@ -171,10 +218,13 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     switch (user.role) {
       case UserRole.tenant:
         return const TenantShell();
+
       case UserRole.guardian:
         return const GuardianShell();
+
       case UserRole.caretaker:
         return const CaretakerShell();
+
       case UserRole.owner:
         return const OwnerShell();
     }
