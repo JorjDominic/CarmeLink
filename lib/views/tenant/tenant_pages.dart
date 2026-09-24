@@ -4598,7 +4598,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                   ? Icons.directions_walk_outlined
                   : Icons.location_disabled_outlined);
           final lastEventText = controller.lastGateEventAt != null
-              ? 'Recorded ${shortDate(controller.lastGateEventAt!)} at ${timeText(controller.lastGateEventAt!)} • Automatic GPS tripwire'
+              ? 'Recorded ${shortDate(controller.lastGateEventAt!)} at ${timeText(controller.lastGateEventAt!)}'
               : (isUnavailable
                   ? 'No automatic boundary event is available yet'
                   : 'Automatic tripwire monitoring');
