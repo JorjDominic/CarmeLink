@@ -14,8 +14,11 @@ import 'views/auth/auth_views.dart';
 import 'views/auth/mobile_auth_entry.dart';
 import 'views/caretaker/caretaker_shell.dart';
 import 'views/guardian/guardian_shell.dart';
+import 'views/guardian/guardian_pages.dart';
 import 'views/owner/owner_shell.dart';
+import 'views/owner/owner_pages.dart';
 import 'views/tenant/tenant_shell.dart';
+import 'views/tenant/tenant_pages.dart';
 import 'views/tenant/onboarding_form_page.dart';
 import 'views/shared/shared_views.dart';
 
@@ -50,7 +53,22 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
 
   void _openNotificationDestination(Map<String, dynamic> data) {
     final navigator = _navigatorKey.currentState;
-    if (navigator == null || sessionController.currentUser == null) return;
+    final user = sessionController.currentUser;
+    if (navigator == null || user == null) return;
+
+    if (data['route_type'] == 'conversation') {
+      final Widget destination = switch (user.role) {
+        UserRole.tenant => const TenantMessagesPage(),
+        UserRole.guardian => const GuardianMessagesPage(),
+        UserRole.owner || UserRole.caretaker => OwnerMessagingPage(
+            initialConversationId: data['route_id'] as String?,
+          ),
+      };
+      navigator.push(
+        MaterialPageRoute<void>(builder: (_) => destination),
+      );
+      return;
+    }
     navigator.push(
       MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
     );

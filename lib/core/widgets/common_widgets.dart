@@ -713,14 +713,12 @@ class PageFrame extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontFamily: useScriptTitle && !compactHeader
-                          ? 'GreatVibes'
-                          : null,
-                      fontSize:
-                          compactHeader ? 20 : (useScriptTitle ? 30 : null),
-                      fontWeight: useScriptTitle && !compactHeader
-                          ? FontWeight.w600
-                          : FontWeight.w700,
+                      fontFamily: useScriptTitle ? 'GreatVibes' : null,
+                      fontSize: compactHeader
+                          ? (useScriptTitle ? 25 : 20)
+                          : (useScriptTitle ? 30 : null),
+                      fontWeight:
+                          useScriptTitle ? FontWeight.w600 : FontWeight.w700,
                     ),
               ),
               if (subtitle != null && !ownerOperationalPage && !compactHeader)
@@ -737,9 +735,9 @@ class PageFrame extends StatelessWidget {
           ),
           actions: [
             ...?actions,
-            if (canShowMessages && !compactHeader) messageButton,
-            if (canShowNotifications && !compactHeader) notificationButton,
-            const SizedBox(width: 10),
+            if (canShowMessages) messageButton,
+            if (canShowNotifications) notificationButton,
+            SizedBox(width: compactHeader ? 2 : 10),
           ],
         ),
         floatingActionButton: resolvedFloatingActionButton,

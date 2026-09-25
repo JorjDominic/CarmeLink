@@ -273,7 +273,24 @@ class MessagingService {
         .select(_messageColumns)
         .single();
 
+    unawaited(_notifyMessage(client, inserted['id'] as String));
+
     return ChatMessage.fromRow(inserted);
+  }
+
+  Future<void> _notifyMessage(
+    SupabaseClient client,
+    String messageId,
+  ) async {
+    try {
+      final response = await client.functions.invoke(
+        'notify-message',
+        body: {'message_id': messageId},
+      );
+      debugPrint('Message notification dispatch: ${response.data}');
+    } catch (error) {
+      debugPrint('Message saved but push dispatch failed: $error');
+    }
   }
 
   /// Marks all incoming unread messages in a conversation as read.

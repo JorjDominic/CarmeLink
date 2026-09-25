@@ -36,6 +36,7 @@ class PushNotificationService {
   Map<String, dynamic>? _pendingOpen;
   bool _initialized = false;
   bool _available = false;
+  String? activeConversationId;
 
   Stream<Map<String, dynamic>> get openedNotifications =>
       _openedController.stream;
@@ -180,6 +181,10 @@ class PushNotificationService {
   }
 
   Future<void> _showForegroundMessage(RemoteMessage message) async {
+    if (message.data['route_type'] == 'conversation' &&
+        message.data['route_id'] == activeConversationId) {
+      return;
+    }
     final notification = message.notification;
     if (notification == null) return;
     await _local.show(

@@ -64,24 +64,29 @@ message lifecycle, local foreground presentation, token refresh/revocation,
 notification-tap routing, an RLS-protected device-token/notification schema,
 and the protected `send-fcm-notification` Edge Function are implemented. The
 Android debug APK builds successfully. Production delivery remains open until
-the Google service-account credentials are stored as Supabase secrets and a
-physical-device send is verified. iOS remains open pending its Firebase plist,
+the physical-device delivery matrix is verified. The Google service-account
+credentials are stored as protected Supabase secrets. Messages is the first
+connected module: after a message is persisted, a protected Edge Function
+derives its authorized recipients, creates their notification rows, and sends a
+data-minimized push that excludes the message text. Taps target the conversation,
+and foreground alerts are suppressed while that conversation is open. iOS
+remains open pending its Firebase plist,
 APNs key, Apple capabilities/signing, Codemagic build, and physical-iPhone test.
 Firebase Analytics was intentionally not added; the Firebase foundation remains
 compatible with adding it later.
 
-- [ ] Add and configure the Flutter/Firebase messaging dependencies without
+- [x] Add and configure the Flutter/Firebase messaging dependencies without
   exposing Firebase, APNs, or server credentials in the client repository.
-- [ ] Configure the Android Firebase application, notification permission for
+- [x] Configure the Android Firebase application, notification permission for
   supported Android versions, manifest/service requirements, notification
   channel, icons, and foreground/background/terminated handlers.
 - [ ] Configure the iOS Firebase application, Push Notifications and Background
   Modes capabilities, APNs authentication in Firebase, permission prompts, and
   foreground/background/terminated handlers.
-- [ ] Add protected per-user/per-device FCM token registration, token refresh,
+- [x] Add protected per-user/per-device FCM token registration, token refresh,
   revocation on sign-out/account switch, last-seen metadata, platform metadata,
   RLS, and cleanup of invalid tokens.
-- [ ] Connect persisted role-scoped notification events to server-side FCM
+- [x] Connect persisted role-scoped message notification events to server-side FCM
   delivery; keep payloads data-minimized and make the database notification row
   the source of truth.
 - [ ] Implement notification tap/deep-link routing to authorized records after

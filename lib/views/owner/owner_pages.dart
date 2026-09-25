@@ -6551,7 +6551,9 @@ class _AnnouncementComposerSheetState
 }
 
 class OwnerMessagingPage extends StatefulWidget {
-  const OwnerMessagingPage({super.key});
+  const OwnerMessagingPage({super.key, this.initialConversationId});
+
+  final String? initialConversationId;
 
   @override
   State<OwnerMessagingPage> createState() => _OwnerMessagingPageState();
@@ -6563,8 +6565,13 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      MessagingController.instance.loadConversations();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final conversationId = widget.initialConversationId;
+      if (conversationId == null || conversationId.isEmpty) {
+        await MessagingController.instance.loadConversations();
+      } else {
+        await MessagingController.instance.openConversationById(conversationId);
+      }
     });
   }
 

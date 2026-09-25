@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
 import '../services/messaging_service.dart';
+import '../services/push_notification_service.dart';
 import 'session_controller.dart';
 
 class MessagingController extends ChangeNotifier {
@@ -204,6 +205,17 @@ class MessagingController extends ChangeNotifier {
     }
   }
 
+  Future<bool> openConversationById(String conversationId) async {
+    await loadConversations();
+    for (final conversation in _conversations) {
+      if (conversation.id == conversationId) {
+        await openConversation(conversation);
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Loads inbox conversations for Owner and Caretaker.
   Future<void> loadConversations({bool force = false}) async {
     if (_loadingConversations && !force) return;
@@ -320,6 +332,7 @@ class MessagingController extends ChangeNotifier {
 
   void _subscribeToActiveConversation(String conversationId) {
     _disposeActiveChannel();
+    PushNotificationService.instance.activeConversationId = conversationId;
     _activeMessageChannel = _service.subscribeToConversation(
       conversationId: conversationId,
       onMessageReceived: (incoming) {
@@ -399,6 +412,7 @@ class MessagingController extends ChangeNotifier {
 
   void closeActiveConversation() {
     _disposeActiveChannel();
+    PushNotificationService.instance.activeConversationId = null;
     _activeConversation = null;
     _activeMessages = [];
     notifyListeners();
@@ -406,6 +420,7 @@ class MessagingController extends ChangeNotifier {
 
   void clear() {
     _disposeActiveChannel();
+    PushNotificationService.instance.activeConversationId = null;
     if (_inboxChannel != null) {
       _service.disposeChannel(_inboxChannel);
       _inboxChannel = null;
