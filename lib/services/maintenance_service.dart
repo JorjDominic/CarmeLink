@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
+import 'app_notification_service.dart';
 import 'secure_media_service.dart';
 
 class MaintenanceService {
@@ -72,6 +74,7 @@ class MaintenanceService {
     var report = _fromRow(row);
 
     if (photoBytes == null) {
+      _notifySubmitted(report);
       return report;
     }
 
@@ -97,6 +100,7 @@ class MaintenanceService {
 
       report = _fromRow(updatedRow);
 
+      _notifySubmitted(report);
       return report;
     } catch (_) {
       if (uploadedPath != null) {
@@ -115,6 +119,15 @@ class MaintenanceService {
 
       rethrow;
     }
+  }
+
+  void _notifySubmitted(MaintenanceReport report) {
+    unawaited(AppNotificationService.instance.notifyMaintenanceSubmitted(
+      reportId: report.id,
+      location: report.location,
+      category: report.category,
+      description: report.description,
+    ));
   }
 
   Future<MaintenanceReport> updateReport({

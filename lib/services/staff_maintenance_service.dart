@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import 'app_notification_service.dart';
 
 const maintenanceStatusLabels = <String, String>{
   'pending': 'Pending',
@@ -22,6 +25,7 @@ List<String> allowedMaintenanceStatuses(String status) => switch (status) {
 class StaffMaintenanceReport {
   StaffMaintenanceReport.fromRow(Map<String, dynamic> row)
       : id = row['id'] as String,
+        tenantId = row['tenant_id'] as String? ?? '',
         tenantName = (row['tenant'] as Map?)?['full_name'] as String? ??
             'Tenant unavailable',
         category = row['category'] as String,
@@ -41,6 +45,7 @@ class StaffMaintenanceReport {
 
   const StaffMaintenanceReport({
     required this.id,
+    this.tenantId = '',
     required this.tenantName,
     required this.category,
     required this.description,
@@ -55,6 +60,7 @@ class StaffMaintenanceReport {
   });
 
   final String id;
+  final String tenantId;
   final String tenantName;
   final String category;
   final String description;
@@ -85,6 +91,7 @@ class StaffMaintenanceReport {
 
   StaffMaintenanceReport copyWith({
     String? id,
+    String? tenantId,
     String? tenantName,
     String? category,
     String? description,
@@ -99,6 +106,7 @@ class StaffMaintenanceReport {
   }) {
     return StaffMaintenanceReport(
       id: id ?? this.id,
+      tenantId: tenantId ?? this.tenantId,
       tenantName: tenantName ?? this.tenantName,
       category: category ?? this.category,
       description: description ?? this.description,
@@ -122,7 +130,7 @@ class StaffMaintenanceService {
   SupabaseClient get _client => _clientOverride ?? SupabaseConfig.client;
 
   static const _columns =
-      'id, category, description, location, urgency, status, photo_path, '
+      'id, tenant_id, category, description, location, urgency, status, photo_path, '
       'staff_notes, updated_at, created_at, resolved_at, '
       'tenant:profiles!maintenance_reports_tenant_id_fkey(full_name)';
 
@@ -204,6 +212,15 @@ class StaffMaintenanceService {
         'p_notes': notes.trim(),
       },
     );
+    if (report.tenantId.isNotEmpty && status != report.status) {
+      unawaited(AppNotificationService.instance.notifyMaintenanceStatusChanged(
+        tenantId: report.tenantId,
+        reportId: report.id,
+        category: report.category,
+        status: maintenanceStatusLabels[status] ?? status,
+        notes: notes,
+      ));
+    }
   }
 }
 

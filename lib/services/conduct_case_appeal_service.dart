@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import 'app_notification_service.dart';
 
 class ConductCaseAppealRecord {
   const ConductCaseAppealRecord({
@@ -87,7 +90,14 @@ class ConductCaseAppealService {
         'p_supporting_information': supportingInformation.trim(),
       },
     );
-    return result as String;
+    final appealId = result as String;
+    final tenantName =
+        _client.auth.currentUser?.userMetadata?['full_name']?.toString().trim();
+    unawaited(AppNotificationService.instance.notifyConductAppealSubmitted(
+      caseId: caseId,
+      tenantName: tenantName?.isNotEmpty == true ? tenantName! : 'A tenant',
+    ));
+    return appealId;
   }
 
   Future<void> withdrawAppeal(
@@ -128,6 +138,11 @@ class ConductCaseAppealService {
         'p_decision_notes': notes.trim(),
       },
     );
+    unawaited(AppNotificationService.instance.notifyConductAppealResolved(
+      tenantId: appeal.tenantId,
+      caseId: appeal.caseId,
+      decision: decision,
+    ));
   }
 }
 

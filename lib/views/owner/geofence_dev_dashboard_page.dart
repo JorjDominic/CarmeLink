@@ -53,6 +53,10 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
   @override
   void initState() {
     super.initState();
+    _latController.text =
+        GeofenceLocationService.activeCenterLatitude.toStringAsFixed(6);
+    _lngController.text =
+        GeofenceLocationService.activeCenterLongitude.toStringAsFixed(6);
     _evaluateTestPoint();
   }
 
@@ -93,8 +97,8 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
     final centerDist = Geolocator.distanceBetween(
       lat,
       lng,
-      GeofenceLocationService.carmelitaLatitude,
-      GeofenceLocationService.carmelitaLongitude,
+      GeofenceLocationService.activeCenterLatitude,
+      GeofenceLocationService.activeCenterLongitude,
     );
 
     setState(() {
@@ -156,8 +160,8 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
       avgLat /= activePolygon.length;
       avgLng /= activePolygon.length;
     } else {
-      avgLat = GeofenceLocationService.carmelitaLatitude;
-      avgLng = GeofenceLocationService.carmelitaLongitude;
+      avgLat = GeofenceLocationService.activeCenterLatitude;
+      avgLng = GeofenceLocationService.activeCenterLongitude;
     }
 
     return RoleGuard(

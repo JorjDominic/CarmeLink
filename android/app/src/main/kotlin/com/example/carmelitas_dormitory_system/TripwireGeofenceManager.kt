@@ -53,7 +53,9 @@ class TripwireGeofenceManager(private val context: Context) {
             WorkManager.getInstance(context).enqueueUniqueWork(
                 "carmelink-tripwire-sync",
                 ExistingWorkPolicy.APPEND_OR_REPLACE,
-                OneTimeWorkRequestBuilder<TripwireSyncWorker>().build(),
+                OneTimeWorkRequestBuilder<TripwireSyncWorker>()
+                    .setConstraints(TripwireSyncWorker.constraints)
+                    .build(),
             )
         }
     }
@@ -114,15 +116,26 @@ class TripwireGeofenceManager(private val context: Context) {
         }
         editor.apply()
 
+        // The low-power hardware geofence (Wi-Fi/cell-based) on Android needs
+        // at least 100 m to fire reliably.  The on-device polygon in the
+        // Flutter layer makes the final IN/OUT decision — this larger circle
+        // only wakes the BroadcastReceiver so the polygon can be evaluated.
+        val wakeUpRadius = radiusMeters.coerceAtLeast(100f)
         val geofence = Geofence.Builder()
             .setRequestId(REGION_ID)
-            .setCircularRegion(latitude, longitude, radiusMeters)
+            .setCircularRegion(latitude, longitude, wakeUpRadius)
             .setExpirationDuration(Geofence.NEVER_EXPIRE)
             .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT)
-            .setNotificationResponsiveness(60_000)
+            // 30 s is the minimum Android enforces; keeps the responsiveness
+            // window small so the BroadcastReceiver fires promptly.
+            .setNotificationResponsiveness(30_000)
             .build()
         val request = GeofencingRequest.Builder()
-            .setInitialTrigger(0)
+            // INITIAL_TRIGGER_ENTER tells Play Services to immediately report
+            // whether the device is already inside when monitoring starts.
+            // Without this the first EXIT event after a cold-start is often
+            // skipped, causing the native queue to miss the student leaving.
+            .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER or GeofencingRequest.INITIAL_TRIGGER_EXIT)
             .addGeofence(geofence)
             .build()
 

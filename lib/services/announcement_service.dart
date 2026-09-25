@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import 'app_notification_service.dart';
 
 class AnnouncementRecord {
   const AnnouncementRecord({
@@ -128,8 +130,7 @@ class AnnouncementService {
 
     invalidateCache();
 
-    // FCM Notification Hook: Ready for Firebase Cloud Messaging integration
-    await _dispatchFCMNotificationIfConfigured(inserted);
+    await _dispatchNotification(inserted);
   }
 
   Future<void> updateAnnouncement({
@@ -162,22 +163,22 @@ class AnnouncementService {
     await _client.from('announcements').delete().eq('id', id);
   }
 
-  /// Extensible FCM Notification Hook
-  ///
-  /// When Firebase Cloud Messaging (FCM) is enabled:
-  /// 1. Broadcasts to FCM topic (e.g. `topics/announcements_all`, `topics/announcements_tenants`)
-  /// 2. Or invokes a Supabase Edge Function to dispatch push notifications to device tokens
-  /// 3. Marks `fcm_sent = true` once delivered
-  Future<void> _dispatchFCMNotificationIfConfigured(
-      Map<String, dynamic> record) async {
+  Future<void> _dispatchNotification(Map<String, dynamic> record) async {
     try {
-      // Integration point for FCM:
-      // final audience = record['audience'];
-      // final title = record['title'];
-      // final body = record['body'];
-      // e.g. await FirebaseMessagingService.sendTopicNotification(topic: audience, title: title, body: body);
-    } catch (_) {
-      // Silently ignore notification dispatch errors so database record remains intact
+      final sent = await AppNotificationService.instance.notifyNewAnnouncement(
+        title: record['title'] as String,
+        body: record['body'] as String,
+        audience: record['audience'] as String? ?? 'all',
+        announcementId: record['id'] as String,
+      );
+      if (sent) {
+        await _client
+            .from('announcements')
+            .update({'fcm_sent': true}).eq('id', record['id'] as String);
+      }
+    } catch (error) {
+      // The announcement remains available in-app even if push delivery fails.
+      debugPrint('Announcement notification dispatch failed: $error');
     }
   }
 }

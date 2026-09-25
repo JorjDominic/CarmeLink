@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import 'app_notification_service.dart';
 
 class ConductTenantOption {
   const ConductTenantOption({
@@ -291,6 +293,16 @@ class ConductCaseService {
         'p_expected_updated_at': record.updatedAt.toUtc().toIso8601String(),
       },
     );
+
+    final tenantId = record.tenantId;
+    if (tenantId != null && tenantId.isNotEmpty) {
+      unawaited(AppNotificationService.instance.notifyConductCaseFiled(
+        tenantId: tenantId,
+        caseId: record.id,
+        title: record.title,
+        severity: record.category,
+      ));
+    }
   }
 
   Future<void> submitResponse({
@@ -318,6 +330,16 @@ class ConductCaseService {
         'p_message': message.trim(),
       },
     );
+
+    final tenantId = record.tenantId;
+    if (tenantId != null && tenantId.isNotEmpty) {
+      unawaited(AppNotificationService.instance.notifyConductCaseFiled(
+        tenantId: tenantId,
+        caseId: record.id,
+        title: 'Formal Warning Issued',
+        severity: 'Warning',
+      ));
+    }
   }
 
   Future<void> setReviewStatus({

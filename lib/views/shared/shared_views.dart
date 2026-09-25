@@ -10,41 +10,134 @@ import '../../services/auth_service.dart';
 import '../../services/geofence_service.dart';
 import '../../services/guardian_alert_service.dart';
 import '../../services/profile_service.dart';
+import '../../services/app_notification_service.dart';
 import 'package:carmelitas_dormitory_system/views/shared/retention_settings_page.dart';
 
-class NotificationsPage extends StatelessWidget {
+class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
+
+  @override
+  State<NotificationsPage> createState() => _NotificationsPageState();
+}
+
+class _NotificationsPageState extends State<NotificationsPage> {
+  final _service = AppNotificationService.instance;
+
+  IconData _iconForType(String type) => switch (type.toLowerCase()) {
+        'announcement' => Icons.campaign_outlined,
+        'payment' => Icons.payments_outlined,
+        'maintenance' => Icons.build_outlined,
+        'curfew' => Icons.schedule_outlined,
+        'visitor' => Icons.group_outlined,
+        'gate' => Icons.sensor_door_outlined,
+        'safety' => Icons.warning_amber_rounded,
+        'message' => Icons.chat_bubble_outline,
+        'onboarding' => Icons.assignment_ind_outlined,
+        _ => Icons.notifications_outlined,
+      };
+
+  Color _colorForType(BuildContext context, String type) {
+    final theme = Theme.of(context);
+    return switch (type.toLowerCase()) {
+      'announcement' => Colors.purple,
+      'payment' => Colors.teal,
+      'maintenance' => Colors.orange,
+      'curfew' || 'safety' => Colors.redAccent,
+      'visitor' => Colors.blue,
+      'gate' => Colors.indigo,
+      _ => theme.colorScheme.primary,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
-    final ranked = <AppNotification>[];
-    if (ranked.isEmpty) {
-      return const PageFrame(
-        title: 'Notifications',
-        subtitle: 'Persistent notifications are not connected yet',
-        child: EmptyState(
-          icon: Icons.notifications_none_rounded,
-          title: 'No notification service',
-          message: 'Updates remain available in their source modules.',
-        ),
-      );
-    }
-    return PageFrame(
-      title: 'Notifications',
-      subtitle: 'Updates ranked by urgency',
-      child: CarmelitaCard(
-          child: Column(
-              children: ranked
-                  .map((n) => TimelineTile(
-                        icon: n.type == 'Payment'
-                            ? Icons.payments_outlined
-                            : n.type == 'Presence' || n.type == 'Geofence'
-                                ? Icons.sensor_door_outlined
-                                : Icons.build_outlined,
-                        title: n.title,
-                        subtitle:
-                            '${n.body}\n${shortDate(n.time)} • ${timeText(n.time)}',
-                      ))
-                  .toList())),
+    return StreamBuilder<List<AppNotificationItem>>(
+      stream: _service.streamMyNotifications(),
+      builder: (context, snapshot) {
+        final notifications = snapshot.data ?? [];
+        final hasUnread = notifications.any((n) => !n.isRead);
+
+        return PageFrame(
+          title: 'Notifications',
+          subtitle: hasUnread
+              ? 'You have unread updates'
+              : 'All updates and security alerts',
+          actions: hasUnread
+              ? [
+                  TextButton.icon(
+                    onPressed: () => _service.markAllAsRead(),
+                    icon: const Icon(Icons.done_all_rounded, size: 18),
+                    label: const Text('Mark all read'),
+                  ),
+                ]
+              : null,
+          child: notifications.isEmpty
+              ? const EmptyState(
+                  icon: Icons.notifications_none_rounded,
+                  title: 'No notifications yet',
+                  message:
+                      'You are all caught up! Push announcements, payment receipts, and curfew alerts will appear here.',
+                )
+              : CarmelitaCard(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: notifications.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final item = notifications[index];
+                      final iconColor =
+                          _colorForType(context, item.notificationType);
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: iconColor.withValues(alpha: 0.12),
+                          foregroundColor: iconColor,
+                          child: Icon(
+                            _iconForType(item.notificationType),
+                            size: 20,
+                          ),
+                        ),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                item.title,
+                                style: TextStyle(
+                                  fontWeight: item.isRead
+                                      ? FontWeight.w500
+                                      : FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            if (!item.isRead)
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                          ],
+                        ),
+                        subtitle: Text(
+                          '${item.body}\n${shortDate(item.createdAt)} • ${timeText(item.createdAt)}',
+                          style: TextStyle(
+                            color: item.isRead ? Colors.grey.shade600 : null,
+                          ),
+                        ),
+                        isThreeLine: true,
+                        onTap: () {
+                          if (!item.isRead) {
+                            _service.markAsRead(item.id);
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+        );
+      },
     );
   }
 }

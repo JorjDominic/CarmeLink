@@ -10,14 +10,18 @@ import 'core/runtime/app_surface.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/connectivity_banner.dart';
 import 'models/models.dart';
+import 'services/push_notification_service.dart';
 import 'views/auth/auth_views.dart';
 import 'views/auth/mobile_auth_entry.dart';
 import 'views/caretaker/caretaker_shell.dart';
 import 'views/guardian/guardian_shell.dart';
+import 'views/guardian/guardian_pages.dart';
 import 'views/owner/owner_shell.dart';
-import 'views/shared/shared_views.dart';
-import 'views/tenant/onboarding_form_page.dart';
+import 'views/owner/owner_pages.dart';
 import 'views/tenant/tenant_shell.dart';
+import 'views/tenant/tenant_pages.dart';
+import 'views/tenant/onboarding_form_page.dart';
+import 'views/shared/shared_views.dart';
 
 class CarmelitaBootstrap extends StatefulWidget {
   const CarmelitaBootstrap({super.key});
@@ -33,7 +37,7 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   final AppLinks _appLinks = AppLinks();
 
   StreamSubscription<Uri>? _linkSubscription;
-
+  StreamSubscription<Map<String, dynamic>>? _notificationSubscription;
   String? _pendingOnboardingToken;
   String? _openedOnboardingToken;
 
@@ -46,6 +50,32 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     sessionController.addListener(_tryOpenPendingOnboarding);
 
     _listenForLinks();
+    _notificationSubscription = PushNotificationService
+        .instance.openedNotifications
+        .listen(_openNotificationDestination);
+  }
+
+  void _openNotificationDestination(Map<String, dynamic> data) {
+    final navigator = _navigatorKey.currentState;
+    final user = sessionController.currentUser;
+    if (navigator == null || user == null) return;
+
+    if (data['route_type'] == 'conversation') {
+      final Widget destination = switch (user.role) {
+        UserRole.tenant => const TenantMessagesPage(),
+        UserRole.guardian => const GuardianMessagesPage(),
+        UserRole.owner || UserRole.caretaker => OwnerMessagingPage(
+            initialConversationId: data['route_id'] as String?,
+          ),
+      };
+      navigator.push(
+        MaterialPageRoute<void>(builder: (_) => destination),
+      );
+      return;
+    }
+    navigator.push(
+      MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
+    );
   }
 
   Future<void> _listenForLinks() async {
@@ -121,7 +151,7 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     sessionController.removeListener(_tryOpenPendingOnboarding);
 
     _linkSubscription?.cancel();
-
+    _notificationSubscription?.cancel();
     super.dispose();
   }
 
@@ -135,18 +165,9 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
 
     assetsCached = true;
 
-    for (final asset in const [
-      AppAssets.logo,
-      AppAssets.courtyard,
-      AppAssets.room,
-      AppAssets.exterior,
-      AppAssets.dormOverview,
-    ]) {
-      precacheImage(
-        AssetImage(asset),
-        context,
-      );
-    }
+    // Feature photos are decoded by the screens that use them instead of
+    // occupying the image cache before the user's role is known.
+    precacheImage(const AssetImage(AppAssets.logo), context);
   }
 
   @override

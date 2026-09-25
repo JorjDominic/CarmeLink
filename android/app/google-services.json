@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "954198563146",
+    "firebase_url": "https://logindb-9011c-default-rtdb.firebaseio.com",
+    "project_id": "logindb-9011c",
+    "storage_bucket": "logindb-9011c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:954198563146:android:ce405bf43038022cb8c9b3",
+        "android_client_info": {
+          "package_name": "com.carmelita.carmelink"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBAbe5VH0zLcSDXwO7ca6J4gWXH1avQlH0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

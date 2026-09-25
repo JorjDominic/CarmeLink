@@ -7,11 +7,13 @@ import '../../controllers/session_controller.dart';
 import '../../controllers/tenant_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/official_lease_content.dart';
 import '../../core/utils/visitor_policy.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/announcement_service.dart';
 import '../../services/geofence_service.dart';
+import '../../services/geofence_scheduler.dart';
 import '../../services/receipt_ocr_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/tripwire_geofence_service.dart';
@@ -146,6 +148,7 @@ class TenantDashboardPage extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               MutedDashboardGrid(
+                compact: true,
                 items: [
                   MutedDashboardItem(
                     label: 'Rent balance',
@@ -775,6 +778,7 @@ class PaymentsPage extends StatefulWidget {
 class _PaymentsPageState extends State<PaymentsPage> {
   late final TableRefreshSubscription _subscription;
   String _selectedFilter = 'all';
+  RecordListSort _paymentSort = RecordListSort.newest;
 
   @override
   void initState() {
@@ -841,12 +845,19 @@ class _PaymentsPageState extends State<PaymentsPage> {
           final verifiedPayments = c.verifiedPayments;
           final overdueCount = c.overduePayments.length;
 
-          final displayedPayments = switch (_selectedFilter) {
-            'due' => duePayments,
-            'pending' => pendingPayments,
-            'verified' => verifiedPayments,
-            _ => allPayments,
-          };
+          final displayedPayments = List<Payment>.from(
+            switch (_selectedFilter) {
+              'due' => duePayments,
+              'pending' => pendingPayments,
+              'verified' => verifiedPayments,
+              _ => allPayments,
+            },
+          )..sort((a, b) => switch (_paymentSort) {
+                RecordListSort.oldest => a.dueDate.compareTo(b.dueDate),
+                RecordListSort.status => a.status.compareTo(b.status),
+                RecordListSort.title => a.label.compareTo(b.label),
+                _ => b.dueDate.compareTo(a.dueDate),
+              });
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -861,88 +872,127 @@ class _PaymentsPageState extends State<PaymentsPage> {
                     ),
               ),
               const SizedBox(height: 8),
-              MutedDashboardGrid(
-                compact: true,
-                items: [
-                  MutedDashboardItem(
-                    label: 'Rent balance',
-                    value: money(c.outstandingRent),
-                    detail: 'Fixed by your contract',
-                    icon: Icons.home_work_outlined,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  MutedDashboardItem(
-                    label: 'Utility balance',
-                    value: money(c.outstandingUtilities),
-                    detail: 'Based on recorded usage',
-                    icon: Icons.bolt_outlined,
-                    color: const Color(0xFFD97706),
-                  ),
-                  MutedDashboardItem(
-                    label: 'Outstanding',
-                    value: money(c.outstandingBalance),
-                    detail: overdueCount > 0
-                        ? '$overdueCount overdue bill${overdueCount > 1 ? 's' : ''}'
-                        : (c.outstandingBalance > 0
-                            ? '${duePayments.length} unpaid bill${duePayments.length > 1 ? 's' : ''}'
-                            : 'All clear'),
-                    icon: Icons.account_balance_wallet_outlined,
-                    color: overdueCount > 0
-                        ? const Color(0xFFDC2626)
-                        : (c.outstandingBalance > 0
-                            ? const Color(0xFFAA8A45)
-                            : const Color(0xFF56886B)),
-                  ),
-                  MutedDashboardItem(
-                    label: 'Next due date',
-                    value:
-                        nextDue != null ? shortDate(nextDue.dueDate) : 'None',
-                    detail: nextDue != null
-                        ? (nextDue.isOverdue ? 'Overdue bill!' : nextDue.label)
-                        : 'No pending bills',
-                    icon: Icons.event_outlined,
-                    color: nextDue?.isOverdue == true
-                        ? const Color(0xFFDC2626)
-                        : const Color(0xFF627FA8),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
+              CarmelitaCard(
+                emphasis: true,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    FilterChip(
-                      selected: _selectedFilter == 'all',
-                      label: Text('All (${allPayments.length})'),
-                      onSelected: (_) =>
-                          setState(() => _selectedFilter = 'all'),
+                    Row(children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        margin: const EdgeInsets.only(right: 9),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: .11),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.account_balance_wallet_outlined,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Total outstanding',
+                                style: Theme.of(context).textTheme.bodySmall),
+                            Text(
+                              money(c.outstandingBalance),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.w900),
+                            ),
+                          ],
+                        ),
+                      ),
+                      StatusPill(overdueCount > 0
+                          ? '$overdueCount overdue'
+                          : 'Up to date'),
+                    ]),
+                    const Divider(height: 14),
+                    _CompactPaymentSummaryRow(
+                      label: 'Rent / Utilities',
+                      value:
+                          '${money(c.outstandingRent)} / ${money(c.outstandingUtilities)}',
+                      icon: Icons.receipt_long_outlined,
                     ),
-                    const SizedBox(width: 8),
-                    FilterChip(
-                      selected: _selectedFilter == 'due',
-                      label: Text('Due (${duePayments.length})'),
-                      onSelected: (_) =>
-                          setState(() => _selectedFilter = 'due'),
-                    ),
-                    const SizedBox(width: 8),
-                    FilterChip(
-                      selected: _selectedFilter == 'pending',
-                      label: Text('Pending (${pendingPayments.length})'),
-                      onSelected: (_) =>
-                          setState(() => _selectedFilter = 'pending'),
-                    ),
-                    const SizedBox(width: 8),
-                    FilterChip(
-                      selected: _selectedFilter == 'verified',
-                      label: Text('Verified (${verifiedPayments.length})'),
-                      onSelected: (_) =>
-                          setState(() => _selectedFilter = 'verified'),
+                    const SizedBox(height: 6),
+                    _CompactPaymentSummaryRow(
+                      label: 'Next due',
+                      value: nextDue == null
+                          ? 'No pending bills'
+                          : '${shortDate(nextDue.dueDate)} - ${nextDue.label}',
+                      icon: Icons.event_outlined,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilterChip(
+                    selected: _selectedFilter == 'all',
+                    label: Text('All (${allPayments.length})'),
+                    onSelected: (_) => setState(() => _selectedFilter = 'all'),
+                  ),
+                  FilterChip(
+                    selected: _selectedFilter == 'due',
+                    label: Text('Due (${duePayments.length})'),
+                    onSelected: (_) => setState(() => _selectedFilter = 'due'),
+                  ),
+                  FilterChip(
+                    selected: _selectedFilter == 'pending',
+                    label: Text('Pending (${pendingPayments.length})'),
+                    onSelected: (_) =>
+                        setState(() => _selectedFilter = 'pending'),
+                  ),
+                  FilterChip(
+                    selected: _selectedFilter == 'verified',
+                    label: Text('Verified (${verifiedPayments.length})'),
+                    onSelected: (_) =>
+                        setState(() => _selectedFilter = 'verified'),
+                  ),
+                  PopupMenuButton<RecordListSort>(
+                    tooltip: 'Sort payment records',
+                    initialValue: _paymentSort,
+                    onSelected: (value) => setState(() => _paymentSort = value),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                          value: RecordListSort.newest,
+                          child: Text('Newest first')),
+                      PopupMenuItem(
+                          value: RecordListSort.oldest,
+                          child: Text('Oldest first')),
+                      PopupMenuItem(
+                          value: RecordListSort.status,
+                          child: Text('By status')),
+                      PopupMenuItem(
+                          value: RecordListSort.title, child: Text('Type A-Z')),
+                    ],
+                    child: Chip(
+                      visualDensity: VisualDensity.compact,
+                      avatar: const Icon(Icons.sort_rounded, size: 17),
+                      label: Text(switch (_paymentSort) {
+                        RecordListSort.oldest => 'Oldest',
+                        RecordListSort.status => 'Status',
+                        RecordListSort.title => 'Type',
+                        _ => 'Newest',
+                      }),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               SectionTitle(
                 'Payment records',
                 trailing: c.paymentsLoading
@@ -963,11 +1013,60 @@ class _PaymentsPageState extends State<PaymentsPage> {
                       : 'No $_selectedFilter payments found.',
                 )
               else
-                ...displayedPayments.map((p) => _TenantPaymentCard(payment: p)),
+                PagedRecordList(
+                  key: ValueKey('payments-$_selectedFilter-$_paymentSort'),
+                  children: displayedPayments
+                      .map((p) => _TenantPaymentCard(payment: p))
+                      .toList(),
+                ),
             ],
           );
         },
       ),
+    );
+  }
+}
+
+class _CompactPaymentSummaryRow extends StatelessWidget {
+  const _CompactPaymentSummaryRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    return Row(
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: .10),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 15, color: color),
+        ),
+        const SizedBox(width: 9),
+        SizedBox(
+          width: 95,
+          child: Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -2021,7 +2120,7 @@ class TenantReportsHubPage extends StatelessWidget {
 
     return PageFrame(
       title: 'Reports',
-      subtitle: 'Maintenance and confidential concerns',
+      subtitle: 'Submit and track every report in one place',
       onRefresh: () async {
         await Future.wait([
           controller.loadMaintenance(force: true),
@@ -2029,11 +2128,7 @@ class TenantReportsHubPage extends StatelessWidget {
         ]);
       },
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const SubmitMaintenancePage(),
-          ),
-        ),
+        onPressed: () => _showReportTypePicker(context),
         icon: const Icon(Icons.add),
         label: const Text('Report issue'),
       ),
@@ -2181,6 +2276,20 @@ class TenantReportsHubPage extends StatelessWidget {
               const SizedBox(height: 12),
               _hub(
                 context,
+                'Missed cleaning duty',
+                'Privately report cleaning non-compliance and view responses.',
+                Icons.cleaning_services_outlined,
+                const Color(0xFF56886B),
+                const TenantCleaningSchedulePage(),
+              ),
+              const SizedBox(height: 24),
+              const SectionTitle(
+                'Related records',
+                subtitle: 'Records published by dormitory management',
+              ),
+              const SizedBox(height: 10),
+              _hub(
+                context,
                 'Conduct & cases',
                 'View conduct records published to you and submit responses.',
                 Icons.gavel_outlined,
@@ -2216,6 +2325,75 @@ class TenantReportsHubPage extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+
+  void _showReportTypePicker(BuildContext context) {
+    final navigator = Navigator.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'What would you like to report?',
+              style: Theme.of(sheetContext).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            _reportTypeTile(
+              sheetContext,
+              title: 'Maintenance issue',
+              subtitle: 'Room, fixture, utility, or property problem',
+              icon: Icons.build_outlined,
+              page: const SubmitMaintenancePage(),
+              navigator: navigator,
+            ),
+            _reportTypeTile(
+              sheetContext,
+              title: 'Confidential concern',
+              subtitle: 'Safety, rules, or roommate concern',
+              icon: Icons.shield_outlined,
+              page: const ConfidentialConcernPage(),
+              navigator: navigator,
+            ),
+            _reportTypeTile(
+              sheetContext,
+              title: 'Missed cleaning duty',
+              subtitle: 'Private cleaning non-compliance report',
+              icon: Icons.cleaning_services_outlined,
+              page: const TenantCleaningSchedulePage(),
+              navigator: navigator,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _reportTypeTile(
+    BuildContext sheetContext, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Widget page,
+    required NavigatorState navigator,
+  }) {
+    return ListTile(
+      leading: CircleAvatar(child: Icon(icon)),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () {
+        Navigator.of(sheetContext).pop();
+        navigator.push(
+          MaterialPageRoute(builder: (_) => page),
+        );
+      },
     );
   }
 
@@ -2276,9 +2454,10 @@ class MaintenanceReportsPage extends StatefulWidget {
 class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
   final controller = TenantController.instance;
   late final TableRefreshSubscription subscription;
-  String _selectedFilter = 'All';
+  String _selectedFilter = 'Active';
 
   static const List<String> _filters = [
+    'Active',
     'All',
     'Pending',
     'In Progress',
@@ -2776,6 +2955,8 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
           final cancelledCount = reports.where((r) => r.isCancelled).length;
 
           final filteredReports = switch (_selectedFilter) {
+            'Active' =>
+              reports.where((r) => !r.isResolved && !r.isCancelled).toList(),
             'Pending' => reports.where((r) => r.isPending).toList(),
             'In Progress' =>
               reports.where((r) => r.isAssigned || r.isInProgress).toList(),
@@ -2860,6 +3041,7 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
                   children: _filters.map((filter) {
                     final isSelected = _selectedFilter == filter;
                     final count = switch (filter) {
+                      'Active' => openCount,
                       'Pending' => pendingCount,
                       'In Progress' => inProgressCount,
                       'Resolved' => resolvedCount,
@@ -4398,6 +4580,12 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
   TableRefreshSubscription? _subscription;
   Map<String, dynamic> _monitoringStatus = const {'registered': false};
   bool _monitoringStatusLoading = false;
+  RecordListScope requestScope = RecordListScope.active;
+  RecordListSort requestSort = RecordListSort.newest;
+  bool showAllPresenceRecords = false;
+
+  // Background permission state for automatic crossing detection.
+  bool? _hasBackgroundPermission; // null = checking
 
   @override
   void initState() {
@@ -4407,6 +4595,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
         TenantController.instance.loadCurfewRequests();
         TenantController.instance.loadGateEvents();
         _loadMonitoringStatus(sync: true);
+        _checkBackgroundPermission();
       }
     });
     _subscription = TableRefreshSubscription(
@@ -4419,6 +4608,29 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
         }
       },
     );
+  }
+
+  Future<void> _checkBackgroundPermission() async {
+    final has = await GeofenceLocationService.hasBackgroundPermission();
+    if (!mounted) return;
+    setState(() => _hasBackgroundPermission = has);
+  }
+
+  Future<void> _requestBackgroundPermission() async {
+    final granted = await GeofenceLocationService.requestBackgroundPermission();
+    if (!mounted) return;
+    setState(() => _hasBackgroundPermission = granted);
+    if (granted) {
+      // Re-register the native tripwire now that background permission exists.
+      final uid = SessionController.instance.currentUser?.id;
+      if (uid != null) {
+        await GeofenceScheduler.instance.start(uid);
+      }
+      _loadMonitoringStatus(sync: true);
+    } else {
+      // User declined — direct them to App Settings to change it manually.
+      GeofenceLocationService.openAppSettings();
+    }
   }
 
   Future<void> _loadMonitoringStatus({bool sync = false}) async {
@@ -4506,6 +4718,25 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
           final error = controller.curfewError;
 
           final events = controller.gateEvents;
+          final activeRequests = requests
+              .where((item) => item.isPending || item.isApproved)
+              .toList();
+          final historyRequests = requests
+              .where((item) => !item.isPending && !item.isApproved)
+              .toList();
+          final visibleRequests = List<CurfewRequest>.from(
+            requestScope == RecordListScope.active
+                ? activeRequests
+                : historyRequests,
+          )..sort((a, b) => switch (requestSort) {
+                RecordListSort.oldest =>
+                  a.departureTime.compareTo(b.departureTime),
+                RecordListSort.status => a.status.compareTo(b.status),
+                RecordListSort.title => a.destination.compareTo(b.destination),
+                _ => b.departureTime.compareTo(a.departureTime),
+              });
+          final visibleEvents =
+              showAllPresenceRecords ? events : events.take(5).toList();
           final monitoringActive = _monitoringStatus['registered'] == true;
           final pendingTransitions =
               (_monitoringStatus['pendingCount'] as num?)?.toInt() ?? 0;
@@ -4528,7 +4759,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                   ? Icons.directions_walk_outlined
                   : Icons.location_disabled_outlined);
           final lastEventText = controller.lastGateEventAt != null
-              ? 'Recorded ${shortDate(controller.lastGateEventAt!)} at ${timeText(controller.lastGateEventAt!)} • Automatic GPS tripwire'
+              ? 'Recorded ${shortDate(controller.lastGateEventAt!)} at ${timeText(controller.lastGateEventAt!)}'
               : (isUnavailable
                   ? 'No automatic boundary event is available yet'
                   : 'Automatic tripwire monitoring');
@@ -4742,6 +4973,63 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                   ),
                 ),
               ),
+              // ── Background permission banner ──────────────────────────
+              if (_hasBackgroundPermission == false) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF39C12).withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFF39C12).withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.location_off_outlined,
+                          color: Color(0xFFF39C12)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Background location needed for automatic logging',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFB7770D),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Crossings are only logged automatically when CarmeLink can read your location in the background. '
+                              'Tap below and choose "Allow all the time" (Android) or "Always" (iOS).',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                            const SizedBox(height: 8),
+                            FilledButton.icon(
+                              onPressed: _requestBackgroundPermission,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFFF39C12),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              icon: const Icon(Icons.location_on_outlined,
+                                  size: 14),
+                              label: const Text(
+                                'Enable Background Access',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               if (!monitoringActive) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -4897,6 +5185,15 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                 ),
               ),
               const SizedBox(height: 8),
+              RecordListToolbar(
+                scope: requestScope,
+                sort: requestSort,
+                activeCount: activeRequests.length,
+                historyCount: historyRequests.length,
+                onScopeChanged: (value) => setState(() => requestScope = value),
+                onSortChanged: (value) => setState(() => requestSort = value),
+              ),
+              const SizedBox(height: 10),
               if (loading && requests.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24),
@@ -4926,7 +5223,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                     ),
                   ),
                 )
-              else if (requests.isEmpty)
+              else if (visibleRequests.isEmpty)
                 SizedBox(
                   width: double.infinity,
                   child: CarmelitaCard(
@@ -4945,17 +5242,20 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                           ),
                         ),
                         const SizedBox(width: 14),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'No exception requests',
-                                style: TextStyle(fontWeight: FontWeight.w700),
+                                requestScope == RecordListScope.active
+                                    ? 'No active exception requests'
+                                    : 'No request history',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700),
                               ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Standard curfew is 10:00 PM. Tap "New request" for late return or overnight leave.',
+                              const SizedBox(height: 2),
+                              const Text(
+                                'Standard curfew is 11:00 PM. Employee schedules may vary. Tap "New request" for late return or overnight leave.',
                                 style: TextStyle(fontSize: 13),
                               ),
                             ],
@@ -4966,11 +5266,14 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                   ),
                 )
               else
-                ...requests.map(
-                  (r) => _CurfewRequestCard(
-                    request: r,
-                    onCancel: () => _confirmCancel(r),
-                  ),
+                PagedRecordList(
+                  key: ValueKey('curfew-$requestScope-$requestSort'),
+                  children: visibleRequests
+                      .map((r) => _CurfewRequestCard(
+                            request: r,
+                            onCancel: () => _confirmCancel(r),
+                          ))
+                      .toList(),
                 ),
               const SizedBox(height: 22),
               const SectionTitle('Recent presence records'),
@@ -4986,7 +5289,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                   ),
                 )
               else
-                ...events.map(
+                ...visibleEvents.map(
                   (e) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: SizedBox(
@@ -5017,6 +5320,20 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                         ),
                       ),
                     ),
+                  ),
+                ),
+              if (events.length > 5)
+                Align(
+                  alignment: Alignment.center,
+                  child: TextButton.icon(
+                    onPressed: () => setState(
+                        () => showAllPresenceRecords = !showAllPresenceRecords),
+                    icon: Icon(showAllPresenceRecords
+                        ? Icons.expand_less
+                        : Icons.expand_more),
+                    label: Text(showAllPresenceRecords
+                        ? 'Hide older records'
+                        : 'Show all ${events.length} records'),
                   ),
                 ),
             ],
@@ -5688,6 +6005,8 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
 
   bool saving = false;
   VisitorRequest? editingRequest;
+  RecordListScope visitorScope = RecordListScope.active;
+  RecordListSort visitorSort = RecordListSort.newest;
 
   Future<void> _pickArrival() async {
     final now = DateTime.now();
@@ -6041,15 +6360,29 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
               ),
             ],
             const SizedBox(height: 24),
-            const SectionTitle(
-              'Request history',
-              subtitle: 'Live approval and visit status',
-            ),
-            const SizedBox(height: 10),
             AnimatedBuilder(
               animation: TenantController.instance,
               builder: (context, _) {
                 final controller = TenantController.instance;
+                final activeRequests = controller.visitors
+                    .where((item) =>
+                        item.isPending || item.isApproved || item.hasArrived)
+                    .toList();
+                final historyRequests = controller.visitors
+                    .where((item) =>
+                        item.isRejected || item.isCancelled || item.isCompleted)
+                    .toList();
+                final visible = List<VisitorRequest>.from(
+                  visitorScope == RecordListScope.active
+                      ? activeRequests
+                      : historyRequests,
+                )..sort((a, b) => switch (visitorSort) {
+                      RecordListSort.oldest => a.schedule.compareTo(b.schedule),
+                      RecordListSort.status => a.status.compareTo(b.status),
+                      RecordListSort.title =>
+                        a.visitorName.compareTo(b.visitorName),
+                      _ => b.schedule.compareTo(a.schedule),
+                    });
 
                 if (controller.visitorsLoading && controller.visitors.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
@@ -6064,88 +6397,107 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                   );
                 }
 
-                if (controller.visitors.isEmpty) {
-                  return const EmptyState(
-                    icon: Icons.people_outline,
-                    title: 'No visitor requests',
-                    message: 'Submitted requests will appear here.',
-                  );
-                }
-
                 return Column(
-                  children: controller.visitors
-                      .map(
-                        (request) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: CarmelitaCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RecordListToolbar(
+                      scope: visitorScope,
+                      sort: visitorSort,
+                      activeCount: activeRequests.length,
+                      historyCount: historyRequests.length,
+                      onScopeChanged: (value) =>
+                          setState(() => visitorScope = value),
+                      onSortChanged: (value) =>
+                          setState(() => visitorSort = value),
+                    ),
+                    const SizedBox(height: 10),
+                    if (visible.isEmpty)
+                      EmptyState(
+                        icon: Icons.people_outline,
+                        title: visitorScope == RecordListScope.active
+                            ? 'No active visitor requests'
+                            : 'No visitor history',
+                        message: visitorScope == RecordListScope.active
+                            ? 'Pending and approved visits appear here.'
+                            : 'Completed, rejected, and cancelled visits appear here.',
+                      ),
+                    PagedRecordList(
+                      key: ValueKey('visitors-$visitorScope-$visitorSort'),
+                      children: visible
+                          .map(
+                            (request) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: CarmelitaCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                      child: Text(
-                                        request.visitorName,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            request.visitorName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        StatusPill(request.statusLabel),
+                                      ],
                                     ),
-                                    StatusPill(request.statusLabel),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(request.purpose),
-                                Text(
-                                  'Arrival: ${shortDate(request.schedule)} • ${timeText(request.schedule)}',
-                                ),
-                                if (request.expectedDepartureAt != null)
-                                  Text(
-                                    'Departure: ${timeText(request.expectedDepartureAt!)}',
-                                  ),
-                                if (request.contactNumber.isNotEmpty)
-                                  Text('Contact: ${request.contactNumber}'),
-                                if (request.reviewNote?.isNotEmpty == true)
-                                  Text('Staff note: ${request.reviewNote}'),
-                                TextButton.icon(
-                                  onPressed: () => _showHistory(request),
-                                  icon: const Icon(Icons.history_rounded),
-                                  label: const Text('View history'),
-                                ),
-                                if (request.isPending) ...[
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 8,
-                                    children: [
-                                      OutlinedButton(
-                                        onPressed: () => _edit(request),
-                                        child: const Text('Edit'),
+                                    const SizedBox(height: 6),
+                                    Text(request.purpose),
+                                    Text(
+                                      'Arrival: ${shortDate(request.schedule)} • ${timeText(request.schedule)}',
+                                    ),
+                                    if (request.expectedDepartureAt != null)
+                                      Text(
+                                        'Departure: ${timeText(request.expectedDepartureAt!)}',
                                       ),
-                                      OutlinedButton(
-                                        onPressed: () async {
-                                          try {
-                                            await controller
-                                                .cancelVisitor(request);
-                                          } catch (error) {
-                                            if (context.mounted) {
-                                              showAppSnackBar(
-                                                context,
-                                                'Cancellation failed: $error',
-                                              );
-                                            }
-                                          }
-                                        },
-                                        child: const Text('Cancel request'),
+                                    if (request.contactNumber.isNotEmpty)
+                                      Text('Contact: ${request.contactNumber}'),
+                                    if (request.reviewNote?.isNotEmpty == true)
+                                      Text('Staff note: ${request.reviewNote}'),
+                                    TextButton.icon(
+                                      onPressed: () => _showHistory(request),
+                                      icon: const Icon(Icons.history_rounded),
+                                      label: const Text('View history'),
+                                    ),
+                                    if (request.isPending) ...[
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 8,
+                                        children: [
+                                          OutlinedButton(
+                                            onPressed: () => _edit(request),
+                                            child: const Text('Edit'),
+                                          ),
+                                          OutlinedButton(
+                                            onPressed: () async {
+                                              try {
+                                                await controller
+                                                    .cancelVisitor(request);
+                                              } catch (error) {
+                                                if (context.mounted) {
+                                                  showAppSnackBar(
+                                                    context,
+                                                    'Cancellation failed: $error',
+                                                  );
+                                                }
+                                              }
+                                            },
+                                            child: const Text('Cancel request'),
+                                          ),
+                                        ],
                                       ),
                                     ],
-                                  ),
-                                ],
-                              ],
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      )
-                      .toList(),
+                          )
+                          .toList(),
+                    ),
+                  ],
                 );
               },
             ),
@@ -6168,6 +6520,8 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
   String category = 'Safety concern';
   final details = TextEditingController();
   bool saving = false;
+  RecordListScope concernScope = RecordListScope.active;
+  RecordListSort concernSort = RecordListSort.newest;
 
   @override
   void initState() {
@@ -6183,6 +6537,17 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
 
   @override
   Widget build(BuildContext context) {
+    final concerns = TenantController.instance.concerns;
+    final activeConcerns = concerns.where((item) => !item.isResolved).toList();
+    final historyConcerns = concerns.where((item) => item.isResolved).toList();
+    final visibleConcerns = List<ConcernReport>.from(
+      concernScope == RecordListScope.active ? activeConcerns : historyConcerns,
+    )..sort((a, b) => switch (concernSort) {
+          RecordListSort.oldest => a.createdAt.compareTo(b.createdAt),
+          RecordListSort.status => a.status.compareTo(b.status),
+          RecordListSort.title => a.category.compareTo(b.category),
+          _ => b.createdAt.compareTo(a.createdAt),
+        });
     return PageFrame(
       title: 'Confidential concern',
       subtitle: 'Safety, rules, or roommate concerns',
@@ -6300,29 +6665,51 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                     : const Text('Submit confidential report'),
               ),
             ),
-            if (TenantController.instance.concerns.isNotEmpty) ...[
+            if (concerns.isNotEmpty) ...[
               const SizedBox(height: 24),
               const SectionTitle('Submitted concerns'),
               const SizedBox(height: 10),
-              ...TenantController.instance.concerns.map(
-                (report) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: CarmelitaCard(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    child: TimelineTile(
-                      compact: true,
-                      icon: Icons.shield_outlined,
-                      color: const Color(0xFF7D70A0),
-                      title: report.category,
-                      subtitle:
-                          '${report.summary}\n${shortDate(report.createdAt)}',
-                      trailing: StatusPill(report.status),
-                    ),
-                  ),
+              RecordListToolbar(
+                scope: concernScope,
+                sort: concernSort,
+                activeCount: activeConcerns.length,
+                historyCount: historyConcerns.length,
+                onScopeChanged: (value) => setState(() => concernScope = value),
+                onSortChanged: (value) => setState(() => concernSort = value),
+              ),
+              const SizedBox(height: 10),
+              if (visibleConcerns.isEmpty)
+                EmptyState(
+                  icon: Icons.shield_outlined,
+                  title: concernScope == RecordListScope.active
+                      ? 'No active concerns'
+                      : 'No resolved concern history',
+                  message: 'Your submitted records remain private.',
                 ),
+              PagedRecordList(
+                key: ValueKey('concerns-$concernScope-$concernSort'),
+                children: visibleConcerns
+                    .map(
+                      (report) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: CarmelitaCard(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          child: TimelineTile(
+                            compact: true,
+                            icon: Icons.shield_outlined,
+                            color: const Color(0xFF7D70A0),
+                            title: report.category,
+                            subtitle:
+                                '${report.summary}\n${shortDate(report.createdAt)}',
+                            trailing: StatusPill(report.status),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
             ],
           ],
@@ -6332,48 +6719,126 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
   }
 }
 
-class RulesPoliciesPage extends StatelessWidget {
+class RulesPoliciesPage extends StatefulWidget {
   const RulesPoliciesPage({super.key});
+
   @override
-  Widget build(BuildContext context) => const PageFrame(
-      title: 'Rules & policies',
-      subtitle: 'Dormitory guidelines and procedures',
-      child: Column(children: [
-        _PolicyCard(
-            title: 'Curfew & geofencing',
-            icon: Icons.schedule_outlined,
+  State<RulesPoliciesPage> createState() => _RulesPoliciesPageState();
+}
+
+class _RulesPoliciesPageState extends State<RulesPoliciesPage> {
+  final search = TextEditingController();
+
+  @override
+  void dispose() {
+    search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = search.text.trim().toLowerCase();
+    final matches = OfficialLeaseContent.rules.where((rule) =>
+        rule.title.toLowerCase().contains(query) ||
+        rule.details.toLowerCase().contains(query) ||
+        (rule.consequence?.toLowerCase().contains(query) ?? false));
+    return PageFrame(
+        title: 'Rules & policies',
+        subtitle: 'Categorized clauses from the official lease',
+        child: Column(children: [
+          TextField(
+            controller: search,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: 'Search rules or penalties',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        search.clear();
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.close),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const CollapsibleInfoCard(
+            title: 'Official lease identity',
+            icon: Icons.description_outlined,
             body:
-                'Automated GPS geofencing records dormitory arrival and departure for curfew monitoring and resident safety. Keep location access enabled.'),
-        SizedBox(height: 12),
-        _PolicyCard(
-            title: 'Payments',
-            icon: Icons.payments_outlined,
-            body:
-                'Submit payments according to the agreed schedule. Uploaded proof remains pending until verified.'),
-        SizedBox(height: 12),
-        _PolicyCard(
-            title: 'Safety and community',
-            icon: Icons.shield_outlined,
-            body:
-                'Maintain a safe, respectful environment. Register any visitors in advance through the visitor request tool.'),
-      ]));
+                '${OfficialLeaseContent.title}\nLessor: ${OfficialLeaseContent.lessorName}\nDormitory: ${OfficialLeaseContent.address}',
+          ),
+          const SizedBox(height: 12),
+          if (query.isNotEmpty) ...[
+            if (matches.isEmpty)
+              const EmptyState(
+                icon: Icons.search_off_outlined,
+                title: 'No matching policy',
+                message: 'Try a rule name, activity, or penalty amount.',
+              )
+            else
+              ...matches.map((rule) => _textCategory(
+                    rule.title,
+                    Icons.policy_outlined,
+                    '${rule.details}\nPenalty/consequence: ${rule.consequence}',
+                  )),
+          ] else ...[
+            _ruleCategory('Visitors and curfew', Icons.schedule_outlined,
+                const ['Visitors', 'Curfew', 'Noise and quiet hours']),
+            _ruleCategory('Room and cleanliness',
+                Icons.cleaning_services_outlined, const [
+              'Private-room cleanliness',
+              'Shared pantry and comfort rooms',
+              'Maintenance of fixtures'
+            ]),
+            _ruleCategory('Safety and prohibited activities',
+                Icons.shield_outlined, const [
+              'Girls-only policy',
+              'No pets',
+              'No cooking inside rooms',
+              'No smoking',
+              'No subleasing or unauthorized occupants'
+            ]),
+            _ruleCategory('Conduct and respect', Icons.groups_outlined,
+                const ['Respect for staff and co-tenants']),
+            _ruleCategory('Inspections', Icons.fact_check_outlined,
+                const ['Monthly room checks']),
+            _textCategory(
+                'Payments and security deposit',
+                Icons.savings_outlined,
+                'The security deposit is refundable within 30 days after the lease ends, subject to:\n${OfficialLeaseContent.depositConditions.map((item) => '- $item').join('\n')}'),
+            _textCategory('Termination and eviction', Icons.gavel_outlined,
+                'The lessor may terminate the lease immediately for:\n${OfficialLeaseContent.terminationReasons.map((item) => '- $item').join('\n')}'),
+            _textCategory(
+                'Other lease conditions',
+                Icons.policy_outlined,
+                OfficialLeaseContent.miscellaneous
+                    .map((item) => '- $item')
+                    .join('\n')),
+            _textCategory('Contact and emergencies', Icons.emergency_outlined,
+                OfficialLeaseContent.ownerContact),
+          ],
+        ]));
+  }
+
+  static Widget _ruleCategory(
+      String title, IconData icon, List<String> ruleTitles) {
+    final rules = OfficialLeaseContent.rules
+        .where((rule) => ruleTitles.contains(rule.title))
+        .map((rule) =>
+            '${rule.title}\n${rule.details}\nPenalty/consequence: ${rule.consequence}')
+        .join('\n\n');
+    return _textCategory(title, icon, rules);
+  }
+
+  static Widget _textCategory(String title, IconData icon, String body) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: CollapsibleInfoCard(title: title, icon: icon, body: body),
+      );
 }
 
 typedef DormitoryRulesPage = RulesPoliciesPage;
-
-class _PolicyCard extends StatelessWidget {
-  const _PolicyCard(
-      {required this.title, required this.icon, required this.body});
-  final String title;
-  final IconData icon;
-  final String body;
-  @override
-  Widget build(BuildContext context) => CarmelitaCard(
-      child: ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: CircleAvatar(child: Icon(icon)),
-          title:
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-          subtitle: Padding(
-              padding: const EdgeInsets.only(top: 6), child: Text(body))));
-}

@@ -18,6 +18,24 @@ String _inspectionDateTime(DateTime value) {
   return '${local.month}/${local.day}/${local.year} • $hour:$minute $amPm';
 }
 
+List<RoomInspectionRecord> _visibleInspections(
+  List<RoomInspectionRecord> source,
+  RecordListScope scope,
+  RecordListSort sort,
+) {
+  final values = source.where((item) {
+    final active = item.status == 'scheduled' || item.status == 'in_progress';
+    return scope == RecordListScope.active ? active : !active;
+  }).toList();
+  values.sort((a, b) => switch (sort) {
+        RecordListSort.oldest => a.scheduledAt.compareTo(b.scheduledAt),
+        RecordListSort.status => a.status.compareTo(b.status),
+        RecordListSort.title => a.inspectionType.compareTo(b.inspectionType),
+        _ => b.scheduledAt.compareTo(a.scheduledAt),
+      });
+  return values;
+}
+
 class StaffRoomInspectionsPage extends StatefulWidget {
   const StaffRoomInspectionsPage({
     required this.roomId,
@@ -39,6 +57,8 @@ class _StaffRoomInspectionsPageState extends State<StaffRoomInspectionsPage> {
   List<RoomInspectionRecord> inspections = const [];
   bool loading = true;
   String? errorMessage;
+  RecordListScope scope = RecordListScope.active;
+  RecordListSort sort = RecordListSort.newest;
 
   @override
   void initState() {
@@ -271,6 +291,7 @@ class _StaffRoomInspectionsPageState extends State<StaffRoomInspectionsPage> {
           (item) => item.status == 'scheduled' || item.status == 'in_progress',
         )
         .length;
+    final visible = _visibleInspections(inspections, scope, sort);
 
     return PageFrame(
       title: 'Room ${widget.roomNumber} inspections',
@@ -297,88 +318,93 @@ class _StaffRoomInspectionsPageState extends State<StaffRoomInspectionsPage> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CarmelitaCard(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.fact_check_outlined),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Monthly inspections publish a written room notice at least three days ahead. Findings, evidence, corrective actions, and follow-ups stay in this inspection record and do not automatically create penalties or charges.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
+                const CollapsibleInfoCard(
+                  title: 'How room inspections work',
+                  icon: Icons.fact_check_outlined,
+                  body:
+                      'Monthly inspections publish a written room notice at least three days ahead. Findings, evidence, corrective actions, and follow-ups stay in this inspection record and do not automatically create penalties or charges.',
                 ),
                 if (errorMessage != null) ...[
                   const SizedBox(height: 12),
                   CarmelitaCard(child: Text(errorMessage!)),
                 ],
                 const SizedBox(height: 22),
-                const SectionTitle(
-                  'Inspection history',
-                  subtitle: 'Monthly checks and their follow-ups',
+                RecordListToolbar(
+                  scope: scope,
+                  sort: sort,
+                  activeCount: active,
+                  historyCount: inspections.length - active,
+                  onScopeChanged: (value) => setState(() => scope = value),
+                  onSortChanged: (value) => setState(() => sort = value),
                 ),
                 const SizedBox(height: 10),
-                if (inspections.isEmpty)
-                  const EmptyState(
+                if (visible.isEmpty)
+                  EmptyState(
                     icon: Icons.fact_check_outlined,
-                    title: 'No inspections yet',
-                    message:
-                        'Schedule the first monthly room inspection when ready.',
+                    title: scope == RecordListScope.active
+                        ? 'No active inspections'
+                        : 'No inspection history',
+                    message: scope == RecordListScope.active
+                        ? 'Schedule the next monthly room inspection when ready.'
+                        : 'Completed and cancelled inspections appear here.',
                   )
                 else
-                  ...inspections.map(
-                    (inspection) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: CarmelitaCard(
-                        onTap: () => _open(inspection),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    inspectionTypeLabel(
-                                      inspection.inspectionType,
-                                    ),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 16,
-                                    ),
+                  PagedRecordList(
+                    key: ValueKey('staff-inspections-$scope-$sort'),
+                    children: visible
+                        .map(
+                          (inspection) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: CarmelitaCard(
+                              onTap: () => _open(inspection),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          inspectionTypeLabel(
+                                            inspection.inspectionType,
+                                          ),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                      StatusPill(
+                                        inspectionStatusLabel(
+                                            inspection.status),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                StatusPill(
-                                  inspectionStatusLabel(inspection.status),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _inspectionDateTime(inspection.scheduledAt),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              inspection.noticeText,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            if (inspection.summary.trim().isNotEmpty) ...[
-                              const Divider(height: 22),
-                              Text(
-                                inspection.summary,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    _inspectionDateTime(inspection.scheduledAt),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    inspection.noticeText,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  if (inspection.summary.trim().isNotEmpty) ...[
+                                    const Divider(height: 22),
+                                    Text(
+                                      inspection.summary,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ],
                               ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
               ],
             ),
@@ -1120,6 +1146,8 @@ class _TenantRoomInspectionsPageState extends State<TenantRoomInspectionsPage> {
   Map<String, List<RoomInspectionFinding>> findingsByInspection = const {};
   bool loading = true;
   String? errorMessage;
+  RecordListScope scope = RecordListScope.active;
+  RecordListSort sort = RecordListSort.newest;
 
   @override
   void initState() {
@@ -1176,6 +1204,11 @@ class _TenantRoomInspectionsPageState extends State<TenantRoomInspectionsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final active = inspections
+        .where((item) =>
+            item.status == 'scheduled' || item.status == 'in_progress')
+        .length;
+    final visible = _visibleInspections(inspections, scope, sort);
     return PageFrame(
       title: 'Room inspections',
       subtitle: 'Inspection notices, findings, and follow-up',
@@ -1195,145 +1228,151 @@ class _TenantRoomInspectionsPageState extends State<TenantRoomInspectionsPage> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CarmelitaCard(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.notifications_active_outlined),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Published inspection notices for your currently assigned room appear here. Evidence photos remain restricted to authorized staff.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
+                const CollapsibleInfoCard(
+                  title: 'About inspection notices',
+                  icon: Icons.notifications_active_outlined,
+                  body:
+                      'Published inspection notices for your currently assigned room appear here. Evidence photos remain restricted to authorized staff.',
                 ),
                 if (errorMessage != null) ...[
                   const SizedBox(height: 12),
                   CarmelitaCard(child: Text(errorMessage!)),
                 ],
                 const SizedBox(height: 22),
-                if (inspections.isEmpty)
-                  const EmptyState(
+                RecordListToolbar(
+                  scope: scope,
+                  sort: sort,
+                  activeCount: active,
+                  historyCount: inspections.length - active,
+                  onScopeChanged: (value) => setState(() => scope = value),
+                  onSortChanged: (value) => setState(() => sort = value),
+                ),
+                const SizedBox(height: 10),
+                if (visible.isEmpty)
+                  EmptyState(
                     icon: Icons.fact_check_outlined,
-                    title: 'No room inspection notices',
-                    message:
-                        'Published inspection notices for your room will appear here.',
+                    title: scope == RecordListScope.active
+                        ? 'No active inspection notices'
+                        : 'No inspection history',
+                    message: scope == RecordListScope.active
+                        ? 'Published inspection notices for your room will appear here.'
+                        : 'Completed and cancelled inspections appear here.',
                   )
                 else
-                  ...inspections.map((inspection) {
-                    final findings =
-                        findingsByInspection[inspection.id] ?? const [];
+                  PagedRecordList(
+                    key: ValueKey('tenant-inspections-$scope-$sort'),
+                    children: visible.map((inspection) {
+                      final findings =
+                          findingsByInspection[inspection.id] ?? const [];
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: CarmelitaCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    inspectionTypeLabel(
-                                      inspection.inspectionType,
-                                    ),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 17,
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: CarmelitaCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      inspectionTypeLabel(
+                                        inspection.inspectionType,
+                                      ),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 17,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                StatusPill(
-                                  inspectionStatusLabel(inspection.status),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _inspectionDateTime(inspection.scheduledAt),
-                            ),
-                            const Divider(height: 24),
-                            Text(
-                              'WRITTEN NOTICE',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(fontWeight: FontWeight.w800),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(inspection.noticeText),
-                            if (inspection.summary.trim().isNotEmpty) ...[
-                              const Divider(height: 24),
-                              Text(
-                                'Inspection summary: ${inspection.summary}',
+                                  StatusPill(
+                                    inspectionStatusLabel(inspection.status),
+                                  ),
+                                ],
                               ),
-                            ],
-                            if (inspection.cancellationReason
-                                .trim()
-                                .isNotEmpty) ...[
-                              const Divider(height: 24),
+                              const SizedBox(height: 6),
                               Text(
-                                'Cancelled: ${inspection.cancellationReason}',
+                                _inspectionDateTime(inspection.scheduledAt),
                               ),
-                            ],
-                            if (findings.isNotEmpty) ...[
                               const Divider(height: 24),
                               Text(
-                                'FINDINGS',
+                                'WRITTEN NOTICE',
                                 style: Theme.of(context)
                                     .textTheme
                                     .labelSmall
                                     ?.copyWith(fontWeight: FontWeight.w800),
                               ),
-                              const SizedBox(height: 8),
-                              ...findings.map(
-                                (finding) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              finding.locationLabel,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w700,
+                              const SizedBox(height: 6),
+                              Text(inspection.noticeText),
+                              if (inspection.summary.trim().isNotEmpty) ...[
+                                const Divider(height: 24),
+                                Text(
+                                  'Inspection summary: ${inspection.summary}',
+                                ),
+                              ],
+                              if (inspection.cancellationReason
+                                  .trim()
+                                  .isNotEmpty) ...[
+                                const Divider(height: 24),
+                                Text(
+                                  'Cancelled: ${inspection.cancellationReason}',
+                                ),
+                              ],
+                              if (findings.isNotEmpty) ...[
+                                const Divider(height: 24),
+                                Text(
+                                  'FINDINGS',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                ),
+                                const SizedBox(height: 8),
+                                ...findings.map(
+                                  (finding) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                finding.locationLabel,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                          StatusPill(
-                                            findingStatusLabel(
-                                              finding.status,
+                                            StatusPill(
+                                              findingStatusLabel(
+                                                finding.status,
+                                              ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(finding.description),
-                                      if (finding.correctiveAction
-                                          .trim()
-                                          .isNotEmpty)
-                                        Text(
-                                          'Corrective action: ${finding.correctiveAction}',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall,
+                                          ],
                                         ),
-                                    ],
+                                        const SizedBox(height: 3),
+                                        Text(finding.description),
+                                        if (finding.correctiveAction
+                                            .trim()
+                                            .isNotEmpty)
+                                          Text(
+                                            'Corrective action: ${finding.correctiveAction}',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall,
+                                          ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                    );
-                  }),
+                      );
+                    }).toList(),
+                  ),
               ],
             ),
     );

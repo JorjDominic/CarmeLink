@@ -1,10 +1,13 @@
 package com.example.carmelitas_dormitory_system
 
 import android.content.Context
+import androidx.work.Constraints
+import androidx.work.NetworkType
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
@@ -14,6 +17,13 @@ import java.util.TimeZone
 
 /** Uploads minimized tripwire events without launching the application UI. */
 class TripwireSyncWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
+    companion object {
+        /** WorkManager Constraints that enforce a network connection before running. */
+        val constraints: Constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+    }
+
     private val prefs = context.getSharedPreferences(
         TripwireGeofenceManager.PREFS,
         Context.MODE_PRIVATE,
@@ -36,26 +46,64 @@ class TripwireSyncWorker(context: Context, params: WorkerParameters) : Worker(co
             val age = System.currentTimeMillis() - event.optLong("observed_at")
             if (age > 24L * 60L * 60L * 1000L) continue
 
-            var response = send(baseUrl, apiKey, accessToken, event)
-            if (response == HttpURLConnection.HTTP_UNAUTHORIZED) {
-                accessToken = refreshSession(baseUrl, apiKey) ?: run {
+            val response: Pair<Int, String>
+            try {
+                var r = send(baseUrl, apiKey, accessToken, event)
+                if (r.first == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                    accessToken = refreshSession(baseUrl, apiKey) ?: run {
+                        for (pending in index until queue.length()) remaining.put(queue.get(pending))
+                        persist(remaining)
+                        return Result.retry()
+                    }
+                    r = send(baseUrl, apiKey, accessToken, event)
+                }
+                response = r
+            } catch (e: IOException) {
+                // Network became unavailable mid-flight (e.g. Wi-Fi→mobile
+                // handoff at the dorm gate).  Keep all remaining events and
+                // let WorkManager retry when connectivity is restored.
+                for (pending in index until queue.length()) remaining.put(queue.get(pending))
+                persist(remaining)
+                return Result.retry()
+            }
+
+            if (response.first !in 200..299) {
+                for (pending in index until queue.length()) remaining.put(queue.get(pending))
+                persist(remaining)
+                return if (response.first in 400..499) Result.failure() else Result.retry()
+            }
+
+            val eventId = response.second.trim().removeSurrounding("\"")
+            if (eventId.isNotBlank()) {
+                val notificationResponse = try {
+                    post(
+                        "$baseUrl/functions/v1/notify-geofence",
+                        apiKey,
+                        accessToken,
+                        JSONObject().put("event_id", eventId),
+                    ).first
+                } catch (_: IOException) {
                     for (pending in index until queue.length()) remaining.put(queue.get(pending))
                     persist(remaining)
                     return Result.retry()
                 }
-                response = send(baseUrl, apiKey, accessToken, event)
-            }
-            if (response !in 200..299) {
-                for (pending in index until queue.length()) remaining.put(queue.get(pending))
-                persist(remaining)
-                return if (response in 400..499) Result.failure() else Result.retry()
+                if (notificationResponse !in 200..299) {
+                    for (pending in index until queue.length()) remaining.put(queue.get(pending))
+                    persist(remaining)
+                    return if (notificationResponse in 400..499) Result.failure() else Result.retry()
+                }
             }
         }
         persist(remaining)
         return Result.success()
     }
 
-    private fun send(baseUrl: String, apiKey: String, token: String, event: JSONObject): Int {
+    private fun send(
+        baseUrl: String,
+        apiKey: String,
+        token: String,
+        event: JSONObject,
+    ): Pair<Int, String> {
         val body = JSONObject()
             .put("p_direction", event.getString("direction"))
             .put("p_observed_at", isoTimestamp(event.getLong("observed_at")))
@@ -65,17 +113,21 @@ class TripwireSyncWorker(context: Context, params: WorkerParameters) : Worker(co
             apiKey,
             token,
             body,
-        ).first
+        )
     }
 
     private fun refreshSession(baseUrl: String, apiKey: String): String? {
         val refreshToken = prefs.getString("refresh_token", null) ?: return null
-        val (code, payload) = post(
-            "$baseUrl/auth/v1/token?grant_type=refresh_token",
-            apiKey,
-            null,
-            JSONObject().put("refresh_token", refreshToken),
-        )
+        val (code, payload) = try {
+            post(
+                "$baseUrl/auth/v1/token?grant_type=refresh_token",
+                apiKey,
+                null,
+                JSONObject().put("refresh_token", refreshToken),
+            )
+        } catch (_: IOException) {
+            return null
+        }
         if (code !in 200..299) return null
         val json = JSONObject(payload)
         val access = json.optString("access_token").takeIf { it.isNotBlank() } ?: return null
@@ -84,6 +136,12 @@ class TripwireSyncWorker(context: Context, params: WorkerParameters) : Worker(co
         return access
     }
 
+    /**
+     * Executes an HTTP POST and returns (statusCode, body).
+     *
+     * @throws IOException if the connection fails (no network, DNS failure,
+     *   timeout, etc.).  Callers must handle this and return [Result.retry].
+     */
     private fun post(
         target: String,
         apiKey: String,

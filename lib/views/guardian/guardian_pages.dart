@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../controllers/guardian_controller.dart';
 import '../../controllers/messaging_controller.dart';
 import '../../controllers/session_controller.dart';
@@ -9,7 +8,6 @@ import '../../models/models.dart';
 import '../../services/announcement_service.dart';
 import '../../services/guardian_alert_service.dart';
 import '../../services/table_refresh_subscription.dart';
-import '../../services/usage_stats_service.dart';
 
 class GuardianDashboardPage extends StatefulWidget {
   const GuardianDashboardPage({super.key});
@@ -215,6 +213,7 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
               ),
               const SizedBox(height: 10),
               MutedDashboardGrid(
+                compact: true,
                 items: [
                   MutedDashboardItem(
                     label: 'Curfew',
@@ -1825,93 +1824,18 @@ class _CurfewFilterChip extends StatelessWidget {
 typedef GuardianCurfewOverviewPage = GuardianPresenceMonitoringPage;
 typedef GuardianCurfewRequestsPage = GuardianPresenceMonitoringPage;
 
-class GuardianActivityPage extends StatefulWidget {
+class GuardianActivityPage extends StatelessWidget {
   const GuardianActivityPage({super.key});
-
-  @override
-  State<GuardianActivityPage> createState() => _GuardianActivityPageState();
-}
-
-typedef GuardianGateActivityPage = GuardianActivityPage;
-
-class _GuardianActivityPageState extends State<GuardianActivityPage>
-    with WidgetsBindingObserver {
-  bool loading = true;
-  bool hasPermission = false;
-  String? error;
-  List<AppUsageStat> usage = const [];
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    loadUsage();
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) loadUsage();
-  }
-
-  Future<void> loadUsage() async {
-    if (!UsageStatsService.isSupported) {
-      if (mounted) setState(() => loading = false);
-      return;
-    }
-    try {
-      final allowed = await UsageStatsService.hasPermission();
-      final result = allowed
-          ? await UsageStatsService.getTodayUsage()
-          : const <AppUsageStat>[];
-      if (!mounted) return;
-      setState(() {
-        hasPermission = allowed;
-        usage = result;
-        error = null;
-        loading = false;
-      });
-    } on PlatformException catch (exception) {
-      if (!mounted) return;
-      setState(() {
-        error = exception.message ?? 'Could not load app activity.';
-        loading = false;
-      });
-    }
-  }
-
-  String durationText(Duration value) {
-    final hours = value.inHours;
-    final minutes = value.inMinutes.remainder(60);
-    if (hours == 0) return '${minutes < 1 ? 1 : minutes} min';
-    return minutes == 0 ? '$hours hr' : '$hours hr $minutes min';
-  }
 
   @override
   Widget build(BuildContext context) => PageFrame(
         title: 'Activity',
-        subtitle: 'Today\'s device usage and recent presence events',
-        actions: [
-          IconButton(
-            tooltip: 'Refresh activity',
-            onPressed: loading ? null : loadUsage,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
+        subtitle: 'Recent verified presence events',
+        onRefresh: () =>
+            GuardianController.instance.loadGateEvents(force: true),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionTitle('Device app activity',
-                subtitle:
-                    'Foreground usage recorded on this Android device today'),
-            const SizedBox(height: 10),
-            _usageCard(),
-            const SizedBox(height: 24),
             const SectionTitle('Recent presence records',
                 subtitle: 'Verified perimeter crossings'),
             const SizedBox(height: 10),
@@ -1919,77 +1843,9 @@ class _GuardianActivityPageState extends State<GuardianActivityPage>
           ],
         ),
       );
-
-  Widget _usageCard() {
-    if (!UsageStatsService.isSupported) {
-      return const CarmelitaCard(
-          child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.phone_android_outlined),
-        title: Text('Available on Android'),
-        subtitle:
-            Text('Device app activity is not available on this platform.'),
-      ));
-    }
-    if (loading) {
-      return const CarmelitaCard(
-          child: Center(child: CircularProgressIndicator()));
-    }
-    if (!hasPermission) {
-      return CarmelitaCard(
-          child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.admin_panel_settings_outlined),
-            title: Text('Usage access is required'),
-            subtitle: Text(
-                'Allow Carmelita\'s Dormitory to read app usage in Android settings.'),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: UsageStatsService.openPermissionSettings,
-            icon: const Icon(Icons.settings_outlined),
-            label: const Text('Open usage access settings'),
-          ),
-        ],
-      ));
-    }
-    if (error != null) {
-      return CarmelitaCard(
-          child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: const Icon(Icons.error_outline),
-        title: const Text('Could not load app activity'),
-        subtitle: Text(error!),
-        trailing:
-            IconButton(onPressed: loadUsage, icon: const Icon(Icons.refresh)),
-      ));
-    }
-    if (usage.isEmpty) {
-      return const CarmelitaCard(
-          child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.hourglass_empty_rounded),
-        title: Text('No app activity recorded today'),
-      ));
-    }
-    return CarmelitaCard(
-        child: Column(
-      children: usage
-          .take(20)
-          .map((stat) => TimelineTile(
-                icon: Icons.apps_rounded,
-                title: stat.appName,
-                subtitle: stat.packageName,
-                trailing: Text(durationText(stat.foregroundTime),
-                    style: const TextStyle(fontWeight: FontWeight.w800)),
-              ))
-          .toList(),
-    ));
-  }
 }
+
+typedef GuardianGateActivityPage = GuardianActivityPage;
 
 class _GuardianPresenceRecords extends StatelessWidget {
   const _GuardianPresenceRecords();

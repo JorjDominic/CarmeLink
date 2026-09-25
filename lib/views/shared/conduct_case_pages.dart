@@ -20,6 +20,24 @@ String _conductDateTime(DateTime value) {
   return '${local.month}/${local.day}/${local.year} • $hour:$minute $amPm';
 }
 
+List<ConductCaseRecord> _visibleCases(
+  List<ConductCaseRecord> source,
+  RecordListScope scope,
+  RecordListSort sort,
+) {
+  final values = source.where((item) {
+    final active = !conductCaseIsClosed(item.status);
+    return scope == RecordListScope.active ? active : !active;
+  }).toList();
+  values.sort((a, b) => switch (sort) {
+        RecordListSort.oldest => a.incidentAt.compareTo(b.incidentAt),
+        RecordListSort.status => a.status.compareTo(b.status),
+        RecordListSort.title => a.title.compareTo(b.title),
+        _ => b.incidentAt.compareTo(a.incidentAt),
+      });
+  return values;
+}
+
 class StaffConductCasesPage extends StatefulWidget {
   const StaffConductCasesPage({super.key});
 
@@ -34,6 +52,8 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
   List<ConductTenantOption> tenants = const [];
   bool loading = true;
   String? errorMessage;
+  RecordListScope scope = RecordListScope.active;
+  RecordListSort sort = RecordListSort.newest;
 
   @override
   void initState() {
@@ -347,6 +367,7 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
   Widget build(BuildContext context) {
     final active =
         cases.where((record) => !conductCaseIsClosed(record.status)).length;
+    final visible = _visibleCases(cases, scope, sort);
 
     return PageFrame(
       title: 'Conduct & cases',
@@ -373,83 +394,94 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CarmelitaCard(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.gavel_outlined),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Cases document incidents, responses, warnings, and review history. The system does not determine guilt, create charges, or automatically terminate a tenancy.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
+                const CollapsibleInfoCard(
+                  title: 'How conduct cases work',
+                  icon: Icons.gavel_outlined,
+                  body:
+                      'Cases document incidents, responses, warnings, and review history. The system does not determine guilt, create charges, or automatically terminate a tenancy.',
                 ),
                 if (errorMessage != null) ...[
                   const SizedBox(height: 12),
                   CarmelitaCard(child: Text(errorMessage!)),
                 ],
                 const SizedBox(height: 22),
-                if (cases.isEmpty)
-                  const EmptyState(
+                RecordListToolbar(
+                  scope: scope,
+                  sort: sort,
+                  activeCount: active,
+                  historyCount: cases.length - active,
+                  onScopeChanged: (value) => setState(() => scope = value),
+                  onSortChanged: (value) => setState(() => sort = value),
+                ),
+                const SizedBox(height: 10),
+                if (visible.isEmpty)
+                  EmptyState(
                     icon: Icons.fact_check_outlined,
-                    title: 'No conduct cases',
-                    message:
-                        'Restricted conduct cases created by authorized staff will appear here.',
+                    title: scope == RecordListScope.active
+                        ? 'No active conduct cases'
+                        : 'No closed-case history',
+                    message: scope == RecordListScope.active
+                        ? 'Restricted conduct cases created by authorized staff will appear here.'
+                        : 'Closed cases remain available here for audit history.',
                   )
                 else
-                  ...cases.map(
-                    (record) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: CarmelitaCard(
-                        onTap: () => _open(record),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    record.title,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 17,
-                                    ),
+                  PagedRecordList(
+                    key: ValueKey('staff-cases-$scope-$sort'),
+                    children: visible
+                        .map(
+                          (record) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: CarmelitaCard(
+                              onTap: () => _open(record),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          record.title,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 17,
+                                          ),
+                                        ),
+                                      ),
+                                      StatusPill(
+                                        conductStatusLabel(record.status),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                StatusPill(
-                                  conductStatusLabel(record.status),
-                                ),
-                              ],
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    record.tenantName ?? 'Tenant',
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    '${conductCategoryLabel(record.category)} • ${_conductDateTime(record.incidentAt)}',
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    record.description,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Recorded cases for this tenant: ${_repeatCount(record)}',
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 5),
-                            Text(
-                              record.tenantName ?? 'Tenant',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 5),
-                            Text(
-                              '${conductCategoryLabel(record.category)} • ${_conductDateTime(record.incidentAt)}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              record.description,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Recorded cases for this tenant: ${_repeatCount(record)}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                          ),
+                        )
+                        .toList(),
                   ),
               ],
             ),
@@ -1127,6 +1159,8 @@ class _TenantConductCasesPageState extends State<TenantConductCasesPage> {
   List<ConductCaseRecord> cases = const [];
   bool loading = true;
   String? errorMessage;
+  RecordListScope scope = RecordListScope.active;
+  RecordListSort sort = RecordListSort.newest;
 
   @override
   void initState() {
@@ -1187,6 +1221,9 @@ class _TenantConductCasesPageState extends State<TenantConductCasesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final active =
+        cases.where((record) => !conductCaseIsClosed(record.status)).length;
+    final visible = _visibleCases(cases, scope, sort);
     return PageFrame(
       title: 'Conduct & cases',
       subtitle: 'Your published conduct records and responses',
@@ -1206,73 +1243,82 @@ class _TenantConductCasesPageState extends State<TenantConductCasesPage> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CarmelitaCard(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.privacy_tip_outlined),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Only conduct cases published to your account appear here. Confidential reporter/source identities and staff-only evidence are not exposed.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
+                const CollapsibleInfoCard(
+                  title: 'Privacy and visibility',
+                  icon: Icons.privacy_tip_outlined,
+                  body:
+                      'Only conduct cases published to your account appear here. Confidential reporter/source identities and staff-only evidence are not exposed.',
                 ),
                 if (errorMessage != null) ...[
                   const SizedBox(height: 12),
                   CarmelitaCard(child: Text(errorMessage!)),
                 ],
                 const SizedBox(height: 22),
-                if (cases.isEmpty)
-                  const EmptyState(
+                RecordListToolbar(
+                  scope: scope,
+                  sort: sort,
+                  activeCount: active,
+                  historyCount: cases.length - active,
+                  onScopeChanged: (value) => setState(() => scope = value),
+                  onSortChanged: (value) => setState(() => sort = value),
+                ),
+                const SizedBox(height: 10),
+                if (visible.isEmpty)
+                  EmptyState(
                     icon: Icons.fact_check_outlined,
-                    title: 'No published conduct cases',
-                    message:
-                        'Any applicable conduct case published for your response will appear here.',
+                    title: scope == RecordListScope.active
+                        ? 'No active published cases'
+                        : 'No closed-case history',
+                    message: scope == RecordListScope.active
+                        ? 'Any applicable conduct case published for your response will appear here.'
+                        : 'Closed cases remain available here for your records.',
                   )
                 else
-                  ...cases.map(
-                    (record) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: CarmelitaCard(
-                        onTap: () => _open(record),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    record.title,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 17,
-                                    ),
+                  PagedRecordList(
+                    key: ValueKey('tenant-cases-$scope-$sort'),
+                    children: visible
+                        .map(
+                          (record) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: CarmelitaCard(
+                              onTap: () => _open(record),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          record.title,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 17,
+                                          ),
+                                        ),
+                                      ),
+                                      StatusPill(
+                                        conductStatusLabel(record.status),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                StatusPill(
-                                  conductStatusLabel(record.status),
-                                ),
-                              ],
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${conductCategoryLabel(record.category)} • ${_conductDateTime(record.incidentAt)}',
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    record.description,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              '${conductCategoryLabel(record.category)} • ${_conductDateTime(record.incidentAt)}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              record.description,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                          ),
+                        )
+                        .toList(),
                   ),
               ],
             ),

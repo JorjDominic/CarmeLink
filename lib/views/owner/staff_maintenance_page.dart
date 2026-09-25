@@ -20,7 +20,7 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
   final TextEditingController _searchController = TextEditingController();
 
   String _searchQuery = '';
-  String _selectedStatus = 'all';
+  String _selectedStatus = 'open';
   String _selectedUrgency = 'all';
   bool _showFloorPlan = false;
 

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../controllers/messaging_controller.dart';
 import '../../controllers/owner_controller.dart';
@@ -12,6 +13,8 @@ import '../../core/utils/visitor_policy.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
+import '../../services/boundary_config_service.dart';
+import '../../services/geofence_service.dart';
 import '../../services/payment_service.dart';
 import '../../services/tenant_service.dart';
 import '../../services/announcement_service.dart';
@@ -30,6 +33,8 @@ import 'geofence_dev_dashboard_page.dart';
 import 'contracts_page.dart';
 import 'tenant_onboarding_flow.dart';
 import 'utility_charge_cart_dialog.dart';
+import '../../services/dormitory_report_service.dart';
+import '../shared/conduct_case_pages.dart';
 
 /// Filters existing Supabase-backed directory entries; no client-side
 /// tenant records are created or mutated here.
@@ -1424,6 +1429,8 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
     'Room inspections',
     'Conduct & cases',
     'Payments',
+    'Report management',
+    'Floor plan',
   };
   String query = '';
 
@@ -1672,8 +1679,8 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
     switch (item.title) {
       case 'Payments':
         return 'Payments (${controller.pendingPaymentProofs})';
-      case 'Maintenance':
-        return 'Maintenance (${controller.openMaintenance})';
+      case 'Report management':
+        return 'Reports (${controller.openMaintenance})';
       case 'Visitors':
         return 'Visitors (${controller.pendingVisitors})';
       default:
@@ -1786,6 +1793,11 @@ const _operationCategories = [
           'Open a room to review inspection notices and findings',
           Icons.fact_check_outlined,
           RoomMonitoringPage()),
+      _OperationItem(
+          'Report management',
+          'Maintenance, confidential, and cleaning reports',
+          Icons.assignment_outlined,
+          ReportManagementPage()),
     ],
   ),
   _OperationCategory(
@@ -1833,7 +1845,7 @@ const _operationCategories = [
       _OperationItem('Contracts', 'Create contracts and track renewals',
           Icons.event_busy_outlined, ContractsPage(),
           ownerOnly: true),
-      _OperationItem('Reports & analytics', 'View detailed reports',
+      _OperationItem('Analytics', 'View operational metrics and trends',
           Icons.analytics_outlined, ReportsAnalyticsPage(),
           ownerOnly: true),
     ],
@@ -4342,6 +4354,83 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
   }
 }
 
+class ReportManagementPage extends StatelessWidget {
+  const ReportManagementPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isOwner =
+        SessionController.instance.currentUser?.role == UserRole.owner;
+
+    return PageFrame(
+      title: 'Report management',
+      subtitle: 'Review reporting workflows from one place',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionTitle(
+            'Reporting queues',
+            subtitle: 'Access remains limited by staff role and report type',
+          ),
+          const SizedBox(height: 12),
+          _reportQueue(
+            context,
+            title: 'Maintenance reports',
+            subtitle: 'Triage repair requests, assignments, and resolutions.',
+            icon: Icons.build_outlined,
+            color: const Color(0xFFB47A52),
+            page: const MaintenanceManagementPage(),
+          ),
+          if (isOwner) ...[
+            const SizedBox(height: 12),
+            _reportQueue(
+              context,
+              title: 'Confidential reports',
+              subtitle:
+                  'Review restricted safety, rules, and roommate concerns.',
+              icon: Icons.shield_outlined,
+              color: const Color(0xFF7D70A0),
+              page: const ConfidentialReportsPage(),
+            ),
+          ],
+          const SizedBox(height: 12),
+          _reportQueue(
+            context,
+            title: 'Cleaning compliance reports',
+            subtitle: 'Select a room to review private missed-duty reports.',
+            icon: Icons.cleaning_services_outlined,
+            color: const Color(0xFF56886B),
+            page: const RoomMonitoringPage(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reportQueue(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required Widget page,
+  }) {
+    return CarmelitaCard(
+      onTap: () => _ownerPush(context, page),
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: CircleAvatar(
+          backgroundColor: color.withValues(alpha: .12),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right_rounded),
+      ),
+    );
+  }
+}
+
 class MaintenanceManagementPage extends StatelessWidget {
   const MaintenanceManagementPage({super.key});
 
@@ -4373,18 +4462,28 @@ class GeofenceMonitoringPage extends StatefulWidget {
 
 class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
   String _presenceFilter = 'all';
+  bool _showTestPanel = false;
 
   @override
   void initState() {
     super.initState();
     OwnerController.instance.loadGateEvents();
     OwnerController.instance.loadTenants();
+    const BoundaryConfigService().loadActiveConfig();
   }
 
   void _openManualLogDialog({TenantDirectoryEntry? preselected}) {
     showDialog(
       context: context,
       builder: (_) => _StaffManualLogDialog(preselectedTenant: preselected),
+    );
+  }
+
+  void _openBoundaryEditor() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _EditBoundaryDialog(),
     );
   }
 
@@ -4413,6 +4512,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
               : () {
                   controller.loadGateEvents(force: true);
                   controller.loadTenants(force: true);
+                  const BoundaryConfigService().loadActiveConfig();
                 },
         ),
         PopupMenuButton<String>(
@@ -4427,10 +4527,32 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
               );
             } else if (value == 'staff_log') {
               _openManualLogDialog();
+            } else if (value == 'edit_boundary') {
+              _openBoundaryEditor();
+            } else if (value == 'test_panel') {
+              setState(() => _showTestPanel = !_showTestPanel);
             }
           },
           itemBuilder: (_) => [
-            if (isOwner)
+            if (isOwner) ...[
+              const PopupMenuItem(
+                value: 'edit_boundary',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.tune_rounded),
+                  title: Text('Edit Boundary Config'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'test_panel',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.science_outlined),
+                  title: Text('Location Test Panel'),
+                ),
+              ),
               const PopupMenuItem(
                 value: 'dev_dashboard',
                 child: ListTile(
@@ -4440,6 +4562,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                   title: Text('Perimeter Visualizer'),
                 ),
               ),
+            ],
             const PopupMenuItem(
               value: 'staff_log',
               child: ListTile(
@@ -4474,6 +4597,11 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
             children: [
               const WorkInProgressNotice(),
               const SizedBox(height: 16),
+              // ── Owner-only Location Test Panel ───────────────────────
+              if (isOwner && _showTestPanel) ...[
+                _LocationTestPanel(tenants: allTenants),
+                const SizedBox(height: 16),
+              ],
               AdaptiveGrid(
                 children: [
                   MetricCard(
@@ -4912,6 +5040,1115 @@ typedef GateMonitoringPage = GeofenceMonitoringPage;
 typedef CurfewMonitoringPage = GeofenceMonitoringPage;
 typedef CurfewRequestReviewPage = GeofenceMonitoringPage;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Location Test Panel — evaluates arbitrary coordinates against the active
+// boundary configuration without writing any coordinate data to the database.
+// The "Simulate Crossing" action fires the real gate_events / notification
+// pipeline using the evaluated IN/OUT direction.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LocationTestPanel extends StatefulWidget {
+  const _LocationTestPanel({required this.tenants});
+
+  final List<TenantDirectoryEntry> tenants;
+
+  @override
+  State<_LocationTestPanel> createState() => _LocationTestPanelState();
+}
+
+class _LocationTestPanelState extends State<_LocationTestPanel> {
+  final _latCtrl = TextEditingController();
+  final _lngCtrl = TextEditingController();
+
+  bool _evaluating = false;
+  bool _simulating = false;
+  bool _fetchingGps = false;
+
+  // Live evaluation result — null until Evaluate is tapped.
+  String? _evalDirection;   // 'IN' or 'OUT'
+  double? _evalDistMeters;  // metres from nearest edge
+
+  TenantDirectoryEntry? _selectedTenant;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.tenants.isNotEmpty) _selectedTenant = widget.tenants.first;
+    _latCtrl.addListener(_clearResult);
+    _lngCtrl.addListener(_clearResult);
+  }
+
+  @override
+  void dispose() {
+    _latCtrl.dispose();
+    _lngCtrl.dispose();
+    super.dispose();
+  }
+
+  void _clearResult() => setState(() {
+        _evalDirection = null;
+        _evalDistMeters = null;
+      });
+
+  double? get _lat => double.tryParse(_latCtrl.text.trim());
+  double? get _lng => double.tryParse(_lngCtrl.text.trim());
+
+  Future<void> _fetchGps() async {
+    setState(() => _fetchingGps = true);
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission not granted.')),
+          );
+        }
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      _latCtrl.text = pos.latitude.toStringAsFixed(8);
+      _lngCtrl.text = pos.longitude.toStringAsFixed(8);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('GPS error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _fetchingGps = false);
+    }
+  }
+
+  void _setPreset(double lat, double lng, String label) {
+    _latCtrl.text = lat.toStringAsFixed(8);
+    _lngCtrl.text = lng.toStringAsFixed(8);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Preset loaded: $label'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  Future<void> _evaluate() async {
+    final lat = _lat;
+    final lng = _lng;
+    if (lat == null || lng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter valid latitude and longitude.')),
+      );
+      return;
+    }
+    setState(() => _evaluating = true);
+    try {
+      final result = GeofenceLocationService.evaluateCoordinates(
+        latitude: lat,
+        longitude: lng,
+      );
+      final dist = _distToEdge(lat, lng);
+      setState(() {
+        _evalDirection = result.direction;
+        _evalDistMeters = dist;
+      });
+    } finally {
+      if (mounted) setState(() => _evaluating = false);
+    }
+  }
+
+  /// Approximate distance from point to the polygon centroid edge.
+  double _distToEdge(double lat, double lng) {
+    final polygon = GeofenceLocationService.activePolygon;
+    if (polygon.isEmpty) return 0;
+    // Use centroid distance as a rough indication.
+    double sumLat = 0, sumLng = 0;
+    for (final p in polygon) {
+      sumLat += p.latitude;
+      sumLng += p.longitude;
+    }
+    final cLat = sumLat / polygon.length;
+    final cLng = sumLng / polygon.length;
+    final dist = Geolocator.distanceBetween(lat, lng, cLat, cLng);
+    return dist;
+  }
+
+  Future<void> _simulate() async {
+    final lat = _lat;
+    final lng = _lng;
+    final tenant = _selectedTenant;
+    if (lat == null || lng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter coordinates first.')),
+      );
+      return;
+    }
+    if (tenant == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a tenant to simulate for.')),
+      );
+      return;
+    }
+
+    // Evaluate direction for the entered coordinates.
+    final result = GeofenceLocationService.evaluateCoordinates(
+      latitude: lat,
+      longitude: lng,
+    );
+    final direction = result.direction ?? 'OUT';
+
+    setState(() => _simulating = true);
+    try {
+      await OwnerController.instance.recordStaffManualLog(
+        tenantId: tenant.id,
+        direction: direction,
+        notes: 'Location test simulation from owner panel '
+            '($direction at ${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)})',
+        tenantName: tenant.name,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Simulated $direction crossing recorded for ${tenant.name}',
+            ),
+          ),
+        );
+        setState(() {
+          _evalDirection = direction;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Simulation failed: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _simulating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isIn = _evalDirection == 'IN';
+    final hasResult = _evalDirection != null;
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: scheme.outlineVariant,
+          style: BorderStyle.solid,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        color: scheme.surfaceContainerLow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+            child: Row(
+              children: [
+                Icon(Icons.science_outlined, size: 18, color: scheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Location Test Panel',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: scheme.primary,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        'Owner only • no coordinates stored',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 20, indent: 14, endIndent: 14),
+
+          // Coordinate inputs
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _latCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Latitude',
+                      hintText: '14.949402',
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      isDense: true,
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _lngCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Longitude',
+                      hintText: '120.884676',
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      isDense: true,
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Preset + GPS buttons
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                ActionChip(
+                  avatar: _fetchingGps
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.my_location_rounded, size: 14),
+                  label: const Text('My GPS'),
+                  onPressed: _fetchingGps ? null : _fetchGps,
+                  visualDensity: VisualDensity.compact,
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.home_outlined, size: 14),
+                  label: const Text('Dorm Center'),
+                  onPressed: () => _setPreset(
+                    GeofenceLocationService.carmelitaLatitude,
+                    GeofenceLocationService.carmelitaLongitude,
+                    'Dorm Center',
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.directions_walk_rounded, size: 14),
+                  label: const Text('50 m Outside'),
+                  onPressed: () => _setPreset(
+                    GeofenceLocationService.carmelitaLatitude + 0.00045,
+                    GeofenceLocationService.carmelitaLongitude,
+                    '50 m Outside (north)',
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.location_on_outlined, size: 14),
+                  label: const Text('Active Center'),
+                  onPressed: () {
+                    final poly = GeofenceLocationService.activePolygon;
+                    if (poly.isEmpty) return;
+                    double sLat = 0, sLng = 0;
+                    for (final p in poly) {
+                      sLat += p.latitude;
+                      sLng += p.longitude;
+                    }
+                    _setPreset(
+                      sLat / poly.length,
+                      sLng / poly.length,
+                      'Active polygon centroid',
+                    );
+                  },
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Evaluate button + result (Wrap prevents right-side overflow)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: _evaluating ? null : _evaluate,
+                  icon: _evaluating
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.search_rounded, size: 16),
+                  label: const Text('Evaluate'),
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                if (hasResult)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isIn
+                          ? const Color(0xFF56886B).withValues(alpha: 0.15)
+                          : const Color(0xFFB03A2E).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isIn
+                            ? const Color(0xFF56886B)
+                            : const Color(0xFFB03A2E),
+                      ),
+                    ),
+                    child: Wrap(
+                      spacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Icon(
+                          isIn ? Icons.home_rounded : Icons.directions_walk_rounded,
+                          size: 14,
+                          color: isIn
+                              ? const Color(0xFF56886B)
+                              : const Color(0xFFB03A2E),
+                        ),
+                        Text(
+                          _evalDirection!,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isIn
+                                ? const Color(0xFF56886B)
+                                : const Color(0xFFB03A2E),
+                            fontSize: 13,
+                          ),
+                        ),
+                        if (_evalDistMeters != null)
+                          Text(
+                            '≈ ${_evalDistMeters!.toStringAsFixed(0)} m from centroid',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Simulate Crossing section
+          const Divider(height: 20, indent: 14, endIndent: 14),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Simulate Crossing',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Creates a real gate_events record for the selected tenant '
+                  'using the evaluated direction — useful for testing push '
+                  'notifications and curfew alerts end-to-end.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 340;
+                    if (isNarrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          DropdownButtonFormField<TenantDirectoryEntry>(
+                            initialValue: _selectedTenant,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Tenant',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              isDense: true,
+                            ),
+                            items: widget.tenants.map((t) {
+                              return DropdownMenuItem(
+                                value: t,
+                                child: Text(
+                                  '${t.name} (Rm ${t.room})',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) =>
+                                setState(() => _selectedTenant = val),
+                          ),
+                          const SizedBox(height: 8),
+                          FilledButton.icon(
+                            onPressed: _simulating ? null : _simulate,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF627FA8),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            icon: _simulating
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.play_circle_outline, size: 16),
+                            label: const Text('Simulate'),
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<TenantDirectoryEntry>(
+                            initialValue: _selectedTenant,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Tenant',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              isDense: true,
+                            ),
+                            items: widget.tenants.map((t) {
+                              return DropdownMenuItem(
+                                value: t,
+                                child: Text(
+                                  '${t.name} (Rm ${t.room})',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) =>
+                                setState(() => _selectedTenant = val),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        FilledButton.icon(
+                          onPressed: _simulating ? null : _simulate,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF627FA8),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: _simulating
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.play_circle_outline, size: 16),
+                          label: const Text('Simulate'),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Boundary Editor Dialog — lets owners update the active dorm boundary saved
+// in Supabase.  Changes take effect immediately in the in-memory geofence
+// state; the native tripwire is re-registered on the next app resume.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _EditBoundaryDialog extends StatefulWidget {
+  const _EditBoundaryDialog();
+
+  @override
+  State<_EditBoundaryDialog> createState() => _EditBoundaryDialogState();
+}
+
+class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
+  final _service = const BoundaryConfigService();
+
+  final _latCtrl = TextEditingController();
+  final _lngCtrl = TextEditingController();
+  final _radiusCtrl = TextEditingController();
+  final _bufferCtrl = TextEditingController();
+
+  // 4 Polygon corner coordinate controllers
+  final _p1LatCtrl = TextEditingController();
+  final _p1LngCtrl = TextEditingController();
+  final _p2LatCtrl = TextEditingController();
+  final _p2LngCtrl = TextEditingController();
+  final _p3LatCtrl = TextEditingController();
+  final _p3LngCtrl = TextEditingController();
+  final _p4LatCtrl = TextEditingController();
+  final _p4LngCtrl = TextEditingController();
+
+  String _mode = 'polygon';
+  bool _loading = true;
+  bool _saving = false;
+  bool _fetchingGps = false;
+
+  BoundarySnapshot? _current;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrent();
+  }
+
+  @override
+  void dispose() {
+    _latCtrl.dispose();
+    _lngCtrl.dispose();
+    _radiusCtrl.dispose();
+    _bufferCtrl.dispose();
+    _p1LatCtrl.dispose();
+    _p1LngCtrl.dispose();
+    _p2LatCtrl.dispose();
+    _p2LngCtrl.dispose();
+    _p3LatCtrl.dispose();
+    _p3LngCtrl.dispose();
+    _p4LatCtrl.dispose();
+    _p4LngCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadCurrent() async {
+    setState(() => _loading = true);
+    try {
+      final row = await _service.loadActiveConfig();
+      if (row != null) {
+        final snap = BoundaryConfigService.configFromRow(row);
+        _current = snap;
+        _latCtrl.text = snap.centerLat.toStringAsFixed(8);
+        _lngCtrl.text = snap.centerLng.toStringAsFixed(8);
+        _radiusCtrl.text = snap.radiusMeters.toStringAsFixed(1);
+        _bufferCtrl.text = snap.edgeBufferMeters.toStringAsFixed(1);
+        _mode = snap.boundaryMode;
+        _populatePolygonCorners(snap.polygonPoints);
+      } else {
+        // Fallback to compiled-in defaults
+        _latCtrl.text =
+            GeofenceLocationService.carmelitaLatitude.toStringAsFixed(8);
+        _lngCtrl.text =
+            GeofenceLocationService.carmelitaLongitude.toStringAsFixed(8);
+        _radiusCtrl.text =
+            GeofenceLocationService.geofenceRadiusMeters.toStringAsFixed(1);
+        _bufferCtrl.text =
+            GeofenceLocationService.debounceBufferMeters.toStringAsFixed(1);
+        _mode = 'polygon';
+        _populatePolygonCorners(GeofenceLocationService.productionDormitoryPolygon);
+      }
+    } catch (_) {
+      // If load fails, show defaults
+      _latCtrl.text =
+          GeofenceLocationService.carmelitaLatitude.toStringAsFixed(8);
+      _lngCtrl.text =
+          GeofenceLocationService.carmelitaLongitude.toStringAsFixed(8);
+      _radiusCtrl.text =
+          GeofenceLocationService.geofenceRadiusMeters.toStringAsFixed(1);
+      _bufferCtrl.text =
+          GeofenceLocationService.debounceBufferMeters.toStringAsFixed(1);
+      _populatePolygonCorners(GeofenceLocationService.productionDormitoryPolygon);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _populatePolygonCorners(List<LatLngPoint> points) {
+    final list = points.isNotEmpty
+        ? points
+        : GeofenceLocationService.productionDormitoryPolygon;
+    if (list.isNotEmpty) {
+      _p1LatCtrl.text = list[0].latitude.toStringAsFixed(8);
+      _p1LngCtrl.text = list[0].longitude.toStringAsFixed(8);
+    }
+    if (list.length > 1) {
+      _p2LatCtrl.text = list[1].latitude.toStringAsFixed(8);
+      _p2LngCtrl.text = list[1].longitude.toStringAsFixed(8);
+    }
+    if (list.length > 2) {
+      _p3LatCtrl.text = list[2].latitude.toStringAsFixed(8);
+      _p3LngCtrl.text = list[2].longitude.toStringAsFixed(8);
+    }
+    if (list.length > 3) {
+      _p4LatCtrl.text = list[3].latitude.toStringAsFixed(8);
+      _p4LngCtrl.text = list[3].longitude.toStringAsFixed(8);
+    }
+  }
+
+  void _autoCalculateCorners() {
+    final lat = double.tryParse(_latCtrl.text.trim());
+    final lng = double.tryParse(_lngCtrl.text.trim());
+    final radius = double.tryParse(_radiusCtrl.text.trim()) ?? 50.0;
+    if (lat == null || lng == null) return;
+    final r = radius / 111000;
+    _p1LatCtrl.text = (lat + r).toStringAsFixed(8);
+    _p1LngCtrl.text = (lng + r).toStringAsFixed(8);
+    _p2LatCtrl.text = (lat - r).toStringAsFixed(8);
+    _p2LngCtrl.text = (lng + r).toStringAsFixed(8);
+    _p3LatCtrl.text = (lat - r).toStringAsFixed(8);
+    _p3LngCtrl.text = (lng - r).toStringAsFixed(8);
+    _p4LatCtrl.text = (lat + r).toStringAsFixed(8);
+    _p4LngCtrl.text = (lng - r).toStringAsFixed(8);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Auto-calculated 4 corners around center.'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  Future<void> _captureGps() async {
+    setState(() => _fetchingGps = true);
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission not granted.')),
+          );
+        }
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      if (mounted) {
+        _latCtrl.text = pos.latitude.toStringAsFixed(8);
+        _lngCtrl.text = pos.longitude.toStringAsFixed(8);
+        _autoCalculateCorners();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Center and 4 corners set to your GPS: '
+              '${pos.latitude.toStringAsFixed(5)}, '
+              '${pos.longitude.toStringAsFixed(5)}',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('GPS error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _fetchingGps = false);
+    }
+  }
+
+  Future<void> _save() async {
+    final lat = double.tryParse(_latCtrl.text.trim());
+    final lng = double.tryParse(_lngCtrl.text.trim());
+    final radius = double.tryParse(_radiusCtrl.text.trim());
+    final buffer = double.tryParse(_bufferCtrl.text.trim());
+
+    if (lat == null || lng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter valid latitude and longitude.')),
+      );
+      return;
+    }
+    if (radius != null && radius < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Radius must be at least 10 metres.')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      List<LatLngPoint>? newPolygon;
+      if (_mode == 'polygon') {
+        final p1Lat = double.tryParse(_p1LatCtrl.text.trim());
+        final p1Lng = double.tryParse(_p1LngCtrl.text.trim());
+        final p2Lat = double.tryParse(_p2LatCtrl.text.trim());
+        final p2Lng = double.tryParse(_p2LngCtrl.text.trim());
+        final p3Lat = double.tryParse(_p3LatCtrl.text.trim());
+        final p3Lng = double.tryParse(_p3LngCtrl.text.trim());
+        final p4Lat = double.tryParse(_p4LatCtrl.text.trim());
+        final p4Lng = double.tryParse(_p4LngCtrl.text.trim());
+
+        if (p1Lat != null && p1Lng != null &&
+            p2Lat != null && p2Lng != null &&
+            p3Lat != null && p3Lng != null &&
+            p4Lat != null && p4Lng != null) {
+          newPolygon = [
+            LatLngPoint(p1Lat, p1Lng),
+            LatLngPoint(p2Lat, p2Lng),
+            LatLngPoint(p3Lat, p3Lng),
+            LatLngPoint(p4Lat, p4Lng),
+          ];
+        } else {
+          final r = (radius ?? _current?.radiusMeters ?? 50.0) / 111000;
+          newPolygon = [
+            LatLngPoint(lat + r, lng + r),
+            LatLngPoint(lat - r, lng + r),
+            LatLngPoint(lat - r, lng - r),
+            LatLngPoint(lat + r, lng - r),
+          ];
+        }
+      }
+
+      await _service.updateConfig(
+        centerLat: lat,
+        centerLng: lng,
+        radiusMeters: radius,
+        edgeBufferMeters: buffer,
+        boundaryMode: _mode,
+        polygonPoints: newPolygon,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Boundary configuration saved and applied.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _buildCornerRow(String label, TextEditingController latCtrl, TextEditingController lngCtrl) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: latCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Lat',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    isDense: true,
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextField(
+                  controller: lngCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Lng',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    isDense: true,
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.tune_rounded, size: 20),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Edit Boundary Configuration',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      content: _loading
+          ? const SizedBox(
+              width: 260,
+              height: 120,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Info banner
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primaryContainer
+                            .withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Changes take effect immediately for all users. '
+                        'You can fine-tune all 4 corner coordinates of the polygon below, '
+                        'or auto-calculate them from the center & radius.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Center coordinates
+                    const Text(
+                      'Boundary Center',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _latCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Latitude',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                              signed: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _lngCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Longitude',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                              signed: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _fetchingGps ? null : _captureGps,
+                        icon: _fetchingGps
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.my_location_rounded, size: 16),
+                        label: const Text('Use My Current GPS Location'),
+                        style: OutlinedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Radius and buffer
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _radiusCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Radius (m)',
+                              helperText: 'Wake-up circle',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _bufferCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Edge Buffer (m)',
+                              helperText: 'Debounce zone',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Boundary mode
+                    const Text(
+                      'Detection Mode',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const SizedBox(height: 6),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(
+                          value: 'polygon',
+                          label: Text('Polygon'),
+                          icon: Icon(Icons.polyline_outlined),
+                        ),
+                        ButtonSegment(
+                          value: 'circle',
+                          label: Text('Circle'),
+                          icon: Icon(Icons.radio_button_unchecked_rounded),
+                        ),
+                      ],
+                      selected: {_mode},
+                      onSelectionChanged: (s) =>
+                          setState(() => _mode = s.first),
+                    ),
+                    if (_mode == 'polygon') ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Polygon 4 Corners',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: _autoCalculateCorners,
+                            icon: const Icon(Icons.sync_rounded, size: 14),
+                            label: const Text('Auto-fit from Center', style: TextStyle(fontSize: 12)),
+                            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      _buildCornerRow('Corner 1 (NE / East)', _p1LatCtrl, _p1LngCtrl),
+                      _buildCornerRow('Corner 2 (SE / South)', _p2LatCtrl, _p2LngCtrl),
+                      _buildCornerRow('Corner 3 (SW / West)', _p3LatCtrl, _p3LngCtrl),
+                      _buildCornerRow('Corner 4 (NW / North)', _p4LatCtrl, _p4LngCtrl),
+                    ],
+
+                    // Updated at
+                    if (_current?.updatedAt != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'Last saved: ${_current!.updatedAt!.toLocal()}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton.icon(
+          onPressed: _saving || _loading ? null : _save,
+          icon: _saving
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.save_rounded, size: 16),
+          label: const Text('Save & Apply'),
+        ),
+      ],
+    );
+  }
+}
+
 class VisitorManagementPage extends StatefulWidget {
   const VisitorManagementPage({super.key});
 
@@ -4922,6 +6159,8 @@ class VisitorManagementPage extends StatefulWidget {
 class _VisitorManagementPageState extends State<VisitorManagementPage> {
   final controller = OwnerController.instance;
   late final TableRefreshSubscription _subscription;
+  RecordListScope scope = RecordListScope.active;
+  RecordListSort sort = RecordListSort.newest;
 
   @override
   void initState() {
@@ -5068,6 +6307,22 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
+          final activeVisitors = controller.visitors
+              .where((item) =>
+                  item.isPending || item.isApproved || item.hasArrived)
+              .toList();
+          final historyVisitors = controller.visitors
+              .where((item) =>
+                  item.isRejected || item.isCancelled || item.isCompleted)
+              .toList();
+          final visible = List<VisitorRequest>.from(
+            scope == RecordListScope.active ? activeVisitors : historyVisitors,
+          )..sort((a, b) => switch (sort) {
+                RecordListSort.oldest => a.schedule.compareTo(b.schedule),
+                RecordListSort.status => a.status.compareTo(b.status),
+                RecordListSort.title => a.visitorName.compareTo(b.visitorName),
+                _ => b.schedule.compareTo(a.schedule),
+              });
           if (controller.visitorsLoading && controller.visitors.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -5077,14 +6332,6 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
               icon: Icons.error_outline,
               title: 'Unable to load visitor requests',
               message: controller.visitorsError!,
-            );
-          }
-
-          if (controller.visitors.isEmpty) {
-            return const EmptyState(
-              icon: Icons.people_outline,
-              title: 'No visitor requests',
-              message: 'Tenant visitor requests will appear here.',
             );
           }
 
@@ -5110,134 +6357,160 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              ...controller.visitors.map(
-                (visitor) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: CarmelitaCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                visitor.visitorName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 17,
-                                ),
-                              ),
-                            ),
-                            StatusPill(visitor.statusLabel),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        InfoRow(
-                          label: 'Relationship',
-                          value: visitor.relationship,
-                        ),
-                        if (visitor.tenantName.isNotEmpty)
-                          InfoRow(
-                            label: 'Resident',
-                            value: visitor.tenantName,
-                          ),
-                        InfoRow(
-                          label: 'Purpose',
-                          value: visitor.purpose,
-                        ),
-                        if (visitor.contactNumber.isNotEmpty)
-                          InfoRow(
-                            label: 'Visitor contact',
-                            value: visitor.contactNumber,
-                          ),
-                        InfoRow(
-                          label: 'Expected arrival',
-                          value:
-                              '${shortDate(visitor.schedule)} • ${timeText(visitor.schedule)}',
-                        ),
-                        if (visitor.expectedDepartureAt != null)
-                          InfoRow(
-                            label: 'Expected departure',
-                            value:
-                                '${shortDate(visitor.expectedDepartureAt!)} • ${timeText(visitor.expectedDepartureAt!)}',
-                          ),
-                        InfoRow(
-                          label: 'Policy check',
-                          value: _policySummary(visitor),
-                        ),
-                        if (visitor.reviewNote?.isNotEmpty == true)
-                          InfoRow(
-                            label: 'Review note',
-                            value: visitor.reviewNote!,
-                          ),
-                        TextButton.icon(
-                          onPressed: () => _showHistory(visitor),
-                          icon: const Icon(Icons.history_rounded),
-                          label: const Text('View history'),
-                        ),
-                        if (visitor.isPending) ...[
-                          if (_policyIssue(visitor) != null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Text(
-                                'Approval is disabled until the visit schedule follows visitor policy.',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color:
-                                          Theme.of(context).colorScheme.error,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                            ),
-                          const SizedBox(height: 4),
-                          Row(
+              RecordListToolbar(
+                scope: scope,
+                sort: sort,
+                activeCount: activeVisitors.length,
+                historyCount: historyVisitors.length,
+                onScopeChanged: (value) => setState(() => scope = value),
+                onSortChanged: (value) => setState(() => sort = value),
+              ),
+              const SizedBox(height: 12),
+              if (visible.isEmpty)
+                EmptyState(
+                  icon: Icons.people_outline,
+                  title: scope == RecordListScope.active
+                      ? 'No active visitor requests'
+                      : 'No visitor history',
+                  message: scope == RecordListScope.active
+                      ? 'Pending and approved visitor requests appear here.'
+                      : 'Completed, rejected, and cancelled visits appear here.',
+                ),
+              PagedRecordList(
+                key: ValueKey('staff-visitors-$scope-$sort'),
+                children: visible
+                    .map(
+                      (visitor) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: CarmelitaCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => _reject(visitor),
-                                  child: const Text('Reject'),
-                                ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      visitor.visitorName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 17,
+                                      ),
+                                    ),
+                                  ),
+                                  StatusPill(visitor.statusLabel),
+                                ],
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: FilledButton(
-                                  onPressed: _policyIssue(visitor) == null
-                                      ? () => _transition(visitor, 'approve')
-                                      : null,
-                                  child: const Text('Approve'),
-                                ),
+                              const SizedBox(height: 8),
+                              InfoRow(
+                                label: 'Relationship',
+                                value: visitor.relationship,
                               ),
+                              if (visitor.tenantName.isNotEmpty)
+                                InfoRow(
+                                  label: 'Resident',
+                                  value: visitor.tenantName,
+                                ),
+                              InfoRow(
+                                label: 'Purpose',
+                                value: visitor.purpose,
+                              ),
+                              if (visitor.contactNumber.isNotEmpty)
+                                InfoRow(
+                                  label: 'Visitor contact',
+                                  value: visitor.contactNumber,
+                                ),
+                              InfoRow(
+                                label: 'Expected arrival',
+                                value:
+                                    '${shortDate(visitor.schedule)} • ${timeText(visitor.schedule)}',
+                              ),
+                              if (visitor.expectedDepartureAt != null)
+                                InfoRow(
+                                  label: 'Expected departure',
+                                  value:
+                                      '${shortDate(visitor.expectedDepartureAt!)} • ${timeText(visitor.expectedDepartureAt!)}',
+                                ),
+                              InfoRow(
+                                label: 'Policy check',
+                                value: _policySummary(visitor),
+                              ),
+                              if (visitor.reviewNote?.isNotEmpty == true)
+                                InfoRow(
+                                  label: 'Review note',
+                                  value: visitor.reviewNote!,
+                                ),
+                              TextButton.icon(
+                                onPressed: () => _showHistory(visitor),
+                                icon: const Icon(Icons.history_rounded),
+                                label: const Text('View history'),
+                              ),
+                              if (visitor.isPending) ...[
+                                if (_policyIssue(visitor) != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Text(
+                                      'Approval is disabled until the visit schedule follows visitor policy.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .error,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () => _reject(visitor),
+                                        child: const Text('Reject'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: FilledButton(
+                                        onPressed: _policyIssue(visitor) == null
+                                            ? () =>
+                                                _transition(visitor, 'approve')
+                                            : null,
+                                        child: const Text('Approve'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ] else if (visitor.isApproved) ...[
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.icon(
+                                    onPressed: () =>
+                                        _transition(visitor, 'record_arrival'),
+                                    icon: const Icon(Icons.login_rounded),
+                                    label: const Text('Record arrival'),
+                                  ),
+                                ),
+                              ] else if (visitor.hasArrived) ...[
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.icon(
+                                    onPressed: () => _transition(
+                                        visitor, 'record_departure'),
+                                    icon: const Icon(Icons.logout_rounded),
+                                    label: const Text('Record departure'),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
-                        ] else if (visitor.isApproved) ...[
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: () =>
-                                  _transition(visitor, 'record_arrival'),
-                              icon: const Icon(Icons.login_rounded),
-                              label: const Text('Record arrival'),
-                            ),
-                          ),
-                        ] else if (visitor.hasArrived) ...[
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: () =>
-                                  _transition(visitor, 'record_departure'),
-                              icon: const Icon(Icons.logout_rounded),
-                              label: const Text('Record departure'),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
             ],
           );
@@ -6473,7 +7746,9 @@ class _AnnouncementComposerSheetState
 }
 
 class OwnerMessagingPage extends StatefulWidget {
-  const OwnerMessagingPage({super.key});
+  const OwnerMessagingPage({super.key, this.initialConversationId});
+
+  final String? initialConversationId;
 
   @override
   State<OwnerMessagingPage> createState() => _OwnerMessagingPageState();
@@ -6485,8 +7760,13 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      MessagingController.instance.loadConversations();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final conversationId = widget.initialConversationId;
+      if (conversationId == null || conversationId.isEmpty) {
+        await MessagingController.instance.loadConversations();
+      } else {
+        await MessagingController.instance.openConversationById(conversationId);
+      }
     });
   }
 
@@ -6875,91 +8155,406 @@ class ContractExpiryAlertsPage extends StatelessWidget {
 
 class ExpenseIncomeSummaryPage extends StatelessWidget {
   const ExpenseIncomeSummaryPage({super.key});
+
+  static const _service = DormitoryReportService();
+
   @override
-  Widget build(BuildContext context) => const PageFrame(
-        title: 'Expense & income summary',
-        subtitle: 'August 2026 monthly snapshot',
-        child: Column(children: [
-          AdaptiveGrid(children: [
-            MetricCard(
-                label: 'Collected rent',
-                value: '₱17,500',
-                detail: '5 recorded payments',
-                icon: Icons.savings_outlined),
-            MetricCard(
-                label: 'Outstanding',
-                value: '₱7,900',
-                detail: 'Rent and utilities',
-                icon: Icons.pending_actions_outlined),
-            MetricCard(
-                label: 'Penalties',
-                value: '₱350',
-                detail: 'Recorded this month',
-                icon: Icons.receipt_long_outlined),
-          ]),
-          SizedBox(height: 14),
-          CarmelitaCard(
-              child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.cloud_off_outlined),
-                  title: Text('Backend data required'),
-                  subtitle: Text(
-                      'Totals are illustrative until payment and expense ledgers are persisted.'))),
-        ]),
-      );
+  Widget build(BuildContext context) {
+    final controller = OwnerController.instance;
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final payments = controller.payments;
+        double totalPaid = 0;
+        double totalPending = 0;
+        double totalDue = 0;
+        int paidCount = 0;
+        int pendingCount = 0;
+        int dueCount = 0;
+
+        for (final p in payments) {
+          final s = p.status.toLowerCase();
+          if (s == 'verified' || s == 'paid') {
+            totalPaid += p.amount;
+            paidCount++;
+          } else if (s.contains('pending')) {
+            totalPending += p.amount;
+            pendingCount++;
+          } else {
+            totalDue += p.amount;
+            dueCount++;
+          }
+        }
+
+        final rentPaid = payments
+            .where((p) => p.category.toLowerCase() == 'rent' && (p.status.toLowerCase() == 'verified' || p.status.toLowerCase() == 'paid'))
+            .fold<double>(0, (sum, p) => sum + p.amount);
+
+        final utilityPaid = payments
+            .where((p) => p.category.toLowerCase() != 'rent' && (p.status.toLowerCase() == 'verified' || p.status.toLowerCase() == 'paid'))
+            .fold<double>(0, (sum, p) => sum + p.amount);
+
+        return PageFrame(
+          title: 'Expense & income summary',
+          subtitle: 'Operational financial snapshot',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AdaptiveGrid(children: [
+                MetricCard(
+                  label: 'Verified Collections',
+                  value: '₱${totalPaid.toStringAsFixed(2)}',
+                  detail: '$paidCount verified payments',
+                  icon: Icons.savings_outlined,
+                ),
+                MetricCard(
+                  label: 'Pending Verification',
+                  value: '₱${totalPending.toStringAsFixed(2)}',
+                  detail: '$pendingCount receipts awaiting review',
+                  icon: Icons.pending_actions_outlined,
+                ),
+                MetricCard(
+                  label: 'Outstanding Dues',
+                  value: '₱${totalDue.toStringAsFixed(2)}',
+                  detail: '$dueCount unpaid bills',
+                  icon: Icons.receipt_long_outlined,
+                ),
+              ]),
+              const SizedBox(height: 14),
+
+              // Export PDF Card
+              CarmelitaCard(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.teal.withValues(alpha: 0.12),
+                        foregroundColor: Colors.teal,
+                        child: const Icon(Icons.picture_as_pdf_outlined, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Financial & Rent Statement',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Official revenue, dues, and payment ledger',
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        tooltip: 'Export Statement (PDF)',
+                        icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.teal),
+                        onPressed: () {
+                          _service.openReportPreview(
+                            context,
+                            title: 'Financial & Rent Collection Statement',
+                            fileName: 'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                            documentBuilder: () => _service.generateFinancialReportPdf(),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Category Breakdown Card
+              CarmelitaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('COLLECTIONS BY CATEGORY',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Rent Collections', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                              const SizedBox(height: 4),
+                              Text('₱${rentPaid.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Utility Collections', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                              const SizedBox(height: 4),
+                              Text('₱${utilityPaid.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class DisciplinaryRecordsPage extends StatelessWidget {
   const DisciplinaryRecordsPage({super.key});
+
   @override
-  Widget build(BuildContext context) => const PageFrame(
+  Widget build(BuildContext context) => PageFrame(
         title: 'Disciplinary records',
         subtitle: 'Verified violations and issued notices by tenant',
-        child: EmptyState(
-            icon: Icons.gavel_outlined,
-            title: 'No disciplinary records',
-            message:
-                'Backend storage and links to confidential reports are not connected yet.'),
+        child: Column(
+          children: [
+            CarmelitaCard(
+              child: Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: const Icon(Icons.gavel_outlined, color: Color(0xFF6B1D2F)),
+                  title: const Text('Resident Conduct & Violation Cases'),
+                  subtitle: const Text('Hearings, official warnings, and disciplinary records'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const StaffConductCasesPage(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       );
 }
 
-class ReportsAnalyticsPage extends StatelessWidget {
+class ReportsAnalyticsPage extends StatefulWidget {
   const ReportsAnalyticsPage({super.key});
+
   @override
-  Widget build(BuildContext context) => const PageFrame(
-        title: 'Reports & analytics',
-        subtitle: 'Operational drill-downs',
-        child: Column(children: [
-          AdaptiveGrid(children: [
-            MetricCard(
-                label: 'Occupancy',
-                value: '75%',
-                detail: '30 of 40 beds',
-                icon: Icons.bed_outlined),
-            MetricCard(
-                label: 'Payment compliance',
-                value: '67%',
-                detail: 'Current sample records',
-                icon: Icons.payments_outlined),
-            MetricCard(
-                label: 'Open maintenance',
-                value: '2',
-                detail: '1 medium • 1 low',
-                icon: Icons.build_outlined),
-            MetricCard(
-                label: 'Geofence coverage',
-                value: '100%',
-                detail: '50m perimeter monitoring',
-                icon: Icons.location_on_outlined),
-          ]),
-          SizedBox(height: 14),
-          CarmelitaCard(
-              child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.cloud_off_outlined),
-                  title: Text('Backend data required'),
-                  subtitle: Text(
-                      'Date filters, historical trends, and exports need persisted operational data.'))),
-        ]),
-      );
+  State<ReportsAnalyticsPage> createState() => _ReportsAnalyticsPageState();
+}
+
+class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
+  final _reportService = const DormitoryReportService();
+
+  Widget _buildReportCard({
+    required BuildContext context,
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color color,
+    required String fileName,
+    required Future<Uint8List> Function() documentBuilder,
+  }) {
+    return CarmelitaCard(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: color.withValues(alpha: 0.12),
+              foregroundColor: color,
+              child: Icon(icon, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    description,
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            IconButton(
+              tooltip: 'Export PDF',
+              icon: Icon(Icons.picture_as_pdf_outlined, color: color),
+              onPressed: () {
+                _reportService.openReportPreview(
+                  context,
+                  title: title,
+                  fileName: fileName,
+                  documentBuilder: documentBuilder,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = OwnerController.instance;
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final rooms = controller.rooms;
+        final totalCapacity = rooms.fold<int>(0, (sum, r) => sum + r.capacity);
+        final totalOccupied = rooms.fold<int>(0, (sum, r) => sum + r.occupied);
+        final occupancyRate = totalCapacity > 0 ? (totalOccupied / totalCapacity * 100) : 0.0;
+
+        final payments = controller.payments;
+        final verifiedCount = payments.where((p) => p.status.toLowerCase() == 'verified' || p.status.toLowerCase() == 'paid').length;
+        final paymentCompliance = payments.isNotEmpty ? (verifiedCount / payments.length * 100) : 100.0;
+
+        final maintenance = controller.staffMaintenanceReports;
+        final openMaintenance = maintenance.where((m) => m.isOpen).length;
+        final highPriority = maintenance.where((m) => m.isOpen && m.isHighUrgency).length;
+
+        final gateEvents = controller.gateEvents;
+        final flaggedCurfew = gateEvents.where((e) => e.status == 'Flagged').length;
+
+        return PageFrame(
+          title: 'Reports & Analytics',
+          subtitle: 'Operational intelligence and official PDF exports',
+          actions: [
+            IconButton(
+              tooltip: 'Executive Overview (PDF)',
+              icon: const Icon(Icons.summarize_outlined),
+              onPressed: () {
+                _reportService.openReportPreview(
+                  context,
+                  title: 'Executive Performance Overview',
+                  fileName: 'carmelitas_executive_overview_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                  documentBuilder: () => _reportService.generateExecutiveOverviewPdf(),
+                );
+              },
+            ),
+          ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Live Operational Metrics
+              AdaptiveGrid(children: [
+                MetricCard(
+                  label: 'Bed Occupancy',
+                  value: '${occupancyRate.toStringAsFixed(0)}%',
+                  detail: '$totalOccupied of $totalCapacity beds filled',
+                  icon: Icons.bed_outlined,
+                ),
+                MetricCard(
+                  label: 'Payment Compliance',
+                  value: '${paymentCompliance.toStringAsFixed(0)}%',
+                  detail: '$verifiedCount of ${payments.length} verified',
+                  icon: Icons.payments_outlined,
+                ),
+                MetricCard(
+                  label: 'Open Maintenance',
+                  value: '$openMaintenance',
+                  detail: '$highPriority high priority',
+                  icon: Icons.build_outlined,
+                ),
+                MetricCard(
+                  label: 'Curfew & Gate Security',
+                  value: '${gateEvents.length}',
+                  detail: '$flaggedCurfew flagged after-hours',
+                  icon: Icons.security_outlined,
+                ),
+              ]),
+              const SizedBox(height: 20),
+
+              // Exportable Reports Hub Section Header
+              const SectionTitle('Official PDF Reports & Data Exports'),
+              const SizedBox(height: 10),
+
+              // Report 1: Financial & Rent Statement
+              _buildReportCard(
+                context: context,
+                title: 'Financial & Rent Collection Statement',
+                description: 'Complete breakdown of rent, utility billing, verified receipts, and outstanding dues.',
+                icon: Icons.account_balance_wallet_outlined,
+                color: Colors.teal,
+                fileName: 'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () => _reportService.generateFinancialReportPdf(),
+              ),
+              const SizedBox(height: 10),
+
+              // Report 2: Occupancy & Tenant Roster
+              _buildReportCard(
+                context: context,
+                title: 'Dormitory Occupancy & Tenant Roster',
+                description: 'Full room-by-room census, 40-bed vacancy breakdown, and active resident directory.',
+                icon: Icons.meeting_room_outlined,
+                color: Colors.indigo,
+                fileName: 'carmelitas_occupancy_roster_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () => _reportService.generateOccupancyRosterPdf(),
+              ),
+              const SizedBox(height: 10),
+
+              // Report 3: Maintenance & Work Orders
+              _buildReportCard(
+                context: context,
+                title: 'Facility Maintenance & Work Orders Log',
+                description: 'Operational summary of active repairs, urgency levels, technician notes, and resolutions.',
+                icon: Icons.handyman_outlined,
+                color: Colors.orange,
+                fileName: 'carmelitas_maintenance_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () => _reportService.generateMaintenanceReportPdf(),
+              ),
+              const SizedBox(height: 10),
+
+              // Report 4: Curfew & Security Log
+              _buildReportCard(
+                context: context,
+                title: 'Security, Gate & Curfew Audit Log',
+                description: 'Gate crossings, geofence tripwire logs, curfew flags, and approved overnight passes.',
+                icon: Icons.schedule_outlined,
+                color: Colors.purple,
+                fileName: 'carmelitas_curfew_security_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () => _reportService.generateCurfewGateReportPdf(),
+              ),
+              const SizedBox(height: 10),
+
+              // Report 5: Executive Consolidated Report
+              _buildReportCard(
+                context: context,
+                title: 'Consolidated Executive Overview',
+                description: 'Comprehensive high-level summary combining finance, occupancy, security, and repairs.',
+                icon: Icons.analytics_outlined,
+                color: const Color(0xFF6B1D2F),
+                fileName: 'carmelitas_executive_summary_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () => _reportService.generateExecutiveOverviewPdf(),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }

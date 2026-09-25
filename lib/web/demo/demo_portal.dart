@@ -105,7 +105,7 @@ class _DemoPortalState extends State<DemoPortal> {
             const Padding(padding: EdgeInsets.fromLTRB(24, 18, 12, 6),
               child: Text('OWNER', style: TextStyle(color: WebPalette.muted,
                 letterSpacing: 1, fontSize: 10, fontWeight: FontWeight.w800))),
-            nav('reports', 'Reports & analytics', Icons.analytics_outlined),
+            nav('reports', 'Analytics', Icons.analytics_outlined),
           ],
           const SizedBox(height: 20),
         ])),
@@ -375,7 +375,7 @@ class _Reports extends StatelessWidget {
     builder: (context, _) {
       final occupancy = store.capacity == 0 ? 0.0 : store.occupancy / store.capacity;
       return ListView(padding: const EdgeInsets.all(28), children: [
-        const Text('Reports & analytics', style: TextStyle(fontSize: 32,
+        const Text('Analytics', style: TextStyle(fontSize: 32,
           fontWeight: FontWeight.w800, color: WebPalette.ink)),
         const SizedBox(height: 7),
         const Text('Calculated from the current in-memory demo records.',

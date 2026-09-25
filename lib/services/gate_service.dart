@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -99,11 +102,12 @@ class GateService {
     required String status,
     required String checkpointType,
   }) async {
-    await _client.rpc('record_tenant_geofence_check', params: {
+    final eventId = await _client.rpc('record_tenant_geofence_check', params: {
       'p_direction': direction,
       'p_status': status,
       'p_checkpoint_type': checkpointType,
     });
+    _dispatchGeofenceNotification(eventId);
   }
 
   /// Synchronizes one native tripwire transition captured while Flutter may
@@ -118,11 +122,13 @@ class GateService {
       throw ArgumentError.value(direction, 'direction', 'Must be IN or OUT');
     }
     invalidateCache();
-    await _client.rpc('record_tenant_geofence_transition', params: {
+    final eventId =
+        await _client.rpc('record_tenant_geofence_transition', params: {
       'p_direction': direction,
       'p_observed_at': observedAt.toUtc().toIso8601String(),
       'p_client_event_id': clientEventId,
     });
+    _dispatchGeofenceNotification(eventId);
   }
 
   /// Persists only minimized presence state for bounded offline recovery.
@@ -187,10 +193,28 @@ class GateService {
   }) async {
     invalidateCache();
 
-    await _client.rpc('record_staff_manual_log', params: {
+    final eventId = await _client.rpc('record_staff_manual_log', params: {
       'p_tenant_id': tenantId,
       'p_direction': direction,
       'p_notes': notes.trim(),
     });
+    _dispatchGeofenceNotification(eventId);
+  }
+
+  void _dispatchGeofenceNotification(dynamic eventId) {
+    if (eventId is! String || eventId.isEmpty) return;
+    unawaited(_notifyGeofenceEvent(eventId));
+  }
+
+  Future<void> _notifyGeofenceEvent(String eventId) async {
+    try {
+      final response = await _client.functions.invoke(
+        'notify-geofence',
+        body: {'event_id': eventId},
+      );
+      debugPrint('Geofence notification dispatch: ${response.data}');
+    } catch (error) {
+      debugPrint('Gate event saved but notification dispatch failed: $error');
+    }
   }
 }

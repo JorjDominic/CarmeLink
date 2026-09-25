@@ -29,6 +29,8 @@ class _StaffRoomCleaningPageState extends State<StaffRoomCleaningPage> {
   List<CleaningNoncomplianceReport> reports = const [];
   bool loading = true;
   String? errorMessage;
+  RecordListScope reportScope = RecordListScope.active;
+  RecordListSort reportSort = RecordListSort.newest;
 
   @override
   void initState() {
@@ -309,6 +311,21 @@ class _StaffRoomCleaningPageState extends State<StaffRoomCleaningPage> {
 
   @override
   Widget build(BuildContext context) {
+    final activeReports = reports
+        .where((item) => item.status == 'open' || item.status == 'reviewing')
+        .toList();
+    final historyReports = reports
+        .where((item) => item.status != 'open' && item.status != 'reviewing')
+        .toList();
+    final visibleReports = List<CleaningNoncomplianceReport>.from(
+      reportScope == RecordListScope.active ? activeReports : historyReports,
+    )..sort((a, b) => switch (reportSort) {
+          RecordListSort.oldest => a.createdAt.compareTo(b.createdAt),
+          RecordListSort.status => a.status.compareTo(b.status),
+          RecordListSort.title =>
+            a.reportedBedLabel.compareTo(b.reportedBedLabel),
+          _ => b.createdAt.compareTo(a.createdAt),
+        });
     return PageFrame(
       title: 'Room ${widget.roomNumber} cleaning',
       subtitle: 'Bed-based schedule and restricted compliance reports',
@@ -431,60 +448,81 @@ class _StaffRoomCleaningPageState extends State<StaffRoomCleaningPage> {
                       '${reports.where((r) => r.status == 'open' || r.status == 'reviewing').length} active • ${reports.length} total',
                 ),
                 const SizedBox(height: 10),
-                if (reports.isEmpty)
-                  const EmptyState(
+                RecordListToolbar(
+                  scope: reportScope,
+                  sort: reportSort,
+                  activeCount: activeReports.length,
+                  historyCount: historyReports.length,
+                  onScopeChanged: (value) =>
+                      setState(() => reportScope = value),
+                  onSortChanged: (value) => setState(() => reportSort = value),
+                ),
+                const SizedBox(height: 10),
+                if (visibleReports.isEmpty)
+                  EmptyState(
                     icon: Icons.verified_outlined,
-                    title: 'No cleaning reports',
-                    message:
-                        'Private tenant non-compliance reports will appear here.',
+                    title: reportScope == RecordListScope.active
+                        ? 'No active cleaning reports'
+                        : 'No cleaning report history',
+                    message: reportScope == RecordListScope.active
+                        ? 'Private tenant non-compliance reports will appear here.'
+                        : 'Resolved and dismissed reports remain available here.',
                   )
                 else
-                  ...reports.map(
-                    (report) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: CarmelitaCard(
-                        onTap: () => _reviewReport(report),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    report.reportedBedLabel,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 16,
-                                    ),
+                  PagedRecordList(
+                    key: ValueKey('staff-cleaning-$reportScope-$reportSort'),
+                    children: visibleReports
+                        .map(
+                          (report) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: CarmelitaCard(
+                              onTap: () => _reviewReport(report),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          report.reportedBedLabel,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                      StatusPill(
+                                        cleaningReportStatusLabel(
+                                            report.status),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                StatusPill(
-                                  cleaningReportStatusLabel(report.status),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Reporter: ${report.reporterName ?? 'Tenant'}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              report.description,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (report.staffNotes.trim().isNotEmpty) ...[
-                              const Divider(height: 24),
-                              Text(
-                                'Staff notes: ${report.staffNotes}',
-                                style: Theme.of(context).textTheme.bodySmall,
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Reporter: ${report.reporterName ?? 'Tenant'}',
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    report.description,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (report.staffNotes.trim().isNotEmpty) ...[
+                                    const Divider(height: 24),
+                                    Text(
+                                      'Staff notes: ${report.staffNotes}',
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ],
                               ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
               ],
             ),
@@ -746,7 +784,7 @@ class _TenantCleaningSchedulePageState
   }
 }
 
-class _TenantCleaningBody extends StatelessWidget {
+class _TenantCleaningBody extends StatefulWidget {
   const _TenantCleaningBody({
     required this.data,
     required this.errorMessage,
@@ -756,7 +794,17 @@ class _TenantCleaningBody extends StatelessWidget {
   final String? errorMessage;
 
   @override
+  State<_TenantCleaningBody> createState() => _TenantCleaningBodyState();
+}
+
+class _TenantCleaningBodyState extends State<_TenantCleaningBody> {
+  RecordListScope reportScope = RecordListScope.active;
+  RecordListSort reportSort = RecordListSort.newest;
+
+  @override
   Widget build(BuildContext context) {
+    final data = widget.data;
+    final errorMessage = widget.errorMessage;
     final grouped = <String, List<CleaningScheduleRecord>>{};
     for (final item in data.schedules) {
       grouped.putIfAbsent(item.bedSpaceId, () => []).add(item);
@@ -764,6 +812,21 @@ class _TenantCleaningBody extends StatelessWidget {
     for (final items in grouped.values) {
       items.sort((a, b) => a.weekday.compareTo(b.weekday));
     }
+    final activeReports = data.reports
+        .where((item) => item.status == 'open' || item.status == 'reviewing')
+        .toList();
+    final historyReports = data.reports
+        .where((item) => item.status != 'open' && item.status != 'reviewing')
+        .toList();
+    final visibleReports = List<CleaningNoncomplianceReport>.from(
+      reportScope == RecordListScope.active ? activeReports : historyReports,
+    )..sort((a, b) => switch (reportSort) {
+          RecordListSort.oldest => a.createdAt.compareTo(b.createdAt),
+          RecordListSort.status => a.status.compareTo(b.status),
+          RecordListSort.title =>
+            a.reportedBedLabel.compareTo(b.reportedBedLabel),
+          _ => b.createdAt.compareTo(a.createdAt),
+        });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -785,7 +848,7 @@ class _TenantCleaningBody extends StatelessWidget {
         ),
         if (errorMessage != null) ...[
           const SizedBox(height: 12),
-          CarmelitaCard(child: Text(errorMessage!)),
+          CarmelitaCard(child: Text(errorMessage)),
         ],
         const SizedBox(height: 22),
         const SectionTitle(
@@ -863,49 +926,66 @@ class _TenantCleaningBody extends StatelessWidget {
           subtitle: '${data.reports.length} submitted',
         ),
         const SizedBox(height: 10),
-        if (data.reports.isEmpty)
-          const EmptyState(
+        RecordListToolbar(
+          scope: reportScope,
+          sort: reportSort,
+          activeCount: activeReports.length,
+          historyCount: historyReports.length,
+          onScopeChanged: (value) => setState(() => reportScope = value),
+          onSortChanged: (value) => setState(() => reportSort = value),
+        ),
+        const SizedBox(height: 10),
+        if (visibleReports.isEmpty)
+          EmptyState(
             icon: Icons.verified_user_outlined,
-            title: 'No reports submitted',
-            message:
-                'Reports about missed cleaning duties remain private from roommates.',
+            title: reportScope == RecordListScope.active
+                ? 'No active reports'
+                : 'No report history',
+            message: reportScope == RecordListScope.active
+                ? 'Reports about missed cleaning duties remain private from roommates.'
+                : 'Resolved and dismissed reports remain available here.',
           )
         else
-          ...data.reports.map(
-            (report) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: CarmelitaCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            report.reportedBedLabel,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                            ),
+          PagedRecordList(
+            key: ValueKey('tenant-cleaning-$reportScope-$reportSort'),
+            children: visibleReports
+                .map(
+                  (report) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: CarmelitaCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  report.reportedBedLabel,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              StatusPill(
+                                cleaningReportStatusLabel(report.status),
+                              ),
+                            ],
                           ),
-                        ),
-                        StatusPill(
-                          cleaningReportStatusLabel(report.status),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(report.description),
-                    if (report.staffNotes.trim().isNotEmpty) ...[
-                      const Divider(height: 24),
-                      Text(
-                        'Staff response: ${report.staffNotes}',
-                        style: Theme.of(context).textTheme.bodySmall,
+                          const SizedBox(height: 8),
+                          Text(report.description),
+                          if (report.staffNotes.trim().isNotEmpty) ...[
+                            const Divider(height: 24),
+                            Text(
+                              'Staff response: ${report.staffNotes}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ],
                       ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
+                    ),
+                  ),
+                )
+                .toList(),
           ),
       ],
     );
