@@ -31,6 +31,8 @@ import 'geofence_dev_dashboard_page.dart';
 import 'contracts_page.dart';
 import 'tenant_onboarding_flow.dart';
 import 'utility_charge_cart_dialog.dart';
+import '../../services/dormitory_report_service.dart';
+import '../shared/conduct_case_pages.dart';
 
 /// Filters existing Supabase-backed directory entries; no client-side
 /// tenant records are created or mutated here.
@@ -8111,91 +8113,407 @@ class ContractExpiryAlertsPage extends StatelessWidget {
 
 class ExpenseIncomeSummaryPage extends StatelessWidget {
   const ExpenseIncomeSummaryPage({super.key});
+
+  static const _service = DormitoryReportService();
+
   @override
-  Widget build(BuildContext context) => const PageFrame(
-        title: 'Expense & income summary',
-        subtitle: 'August 2026 monthly snapshot',
-        child: Column(children: [
-          AdaptiveGrid(children: [
-            MetricCard(
-                label: 'Collected rent',
-                value: '₱17,500',
-                detail: '5 recorded payments',
-                icon: Icons.savings_outlined),
-            MetricCard(
-                label: 'Outstanding',
-                value: '₱7,900',
-                detail: 'Rent and utilities',
-                icon: Icons.pending_actions_outlined),
-            MetricCard(
-                label: 'Penalties',
-                value: '₱350',
-                detail: 'Recorded this month',
-                icon: Icons.receipt_long_outlined),
-          ]),
-          SizedBox(height: 14),
-          CarmelitaCard(
-              child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.cloud_off_outlined),
-                  title: Text('Backend data required'),
-                  subtitle: Text(
-                      'Totals are illustrative until payment and expense ledgers are persisted.'))),
-        ]),
-      );
+  Widget build(BuildContext context) {
+    final controller = OwnerController.instance;
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final payments = controller.payments;
+        double totalPaid = 0;
+        double totalPending = 0;
+        double totalDue = 0;
+        int paidCount = 0;
+        int pendingCount = 0;
+        int dueCount = 0;
+
+        for (final p in payments) {
+          final s = p.status.toLowerCase();
+          if (s == 'verified' || s == 'paid') {
+            totalPaid += p.amount;
+            paidCount++;
+          } else if (s.contains('pending')) {
+            totalPending += p.amount;
+            pendingCount++;
+          } else {
+            totalDue += p.amount;
+            dueCount++;
+          }
+        }
+
+        final rentPaid = payments
+            .where((p) => p.category.toLowerCase() == 'rent' && (p.status.toLowerCase() == 'verified' || p.status.toLowerCase() == 'paid'))
+            .fold<double>(0, (sum, p) => sum + p.amount);
+
+        final utilityPaid = payments
+            .where((p) => p.category.toLowerCase() != 'rent' && (p.status.toLowerCase() == 'verified' || p.status.toLowerCase() == 'paid'))
+            .fold<double>(0, (sum, p) => sum + p.amount);
+
+        return PageFrame(
+          title: 'Expense & income summary',
+          subtitle: 'Operational financial snapshot',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AdaptiveGrid(children: [
+                MetricCard(
+                  label: 'Verified Collections',
+                  value: '₱${totalPaid.toStringAsFixed(2)}',
+                  detail: '$paidCount verified payments',
+                  icon: Icons.savings_outlined,
+                ),
+                MetricCard(
+                  label: 'Pending Verification',
+                  value: '₱${totalPending.toStringAsFixed(2)}',
+                  detail: '$pendingCount receipts awaiting review',
+                  icon: Icons.pending_actions_outlined,
+                ),
+                MetricCard(
+                  label: 'Outstanding Dues',
+                  value: '₱${totalDue.toStringAsFixed(2)}',
+                  detail: '$dueCount unpaid bills',
+                  icon: Icons.receipt_long_outlined,
+                ),
+              ]),
+              const SizedBox(height: 14),
+
+              // Export PDF Card
+              CarmelitaCard(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.teal.withValues(alpha: 0.12),
+                        foregroundColor: Colors.teal,
+                        child: const Icon(Icons.picture_as_pdf_outlined, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Financial & Rent Statement',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Official revenue, dues, and payment ledger',
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        tooltip: 'Export Statement (PDF)',
+                        icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.teal),
+                        onPressed: () {
+                          _service.openReportPreview(
+                            context,
+                            title: 'Financial & Rent Collection Statement',
+                            fileName: 'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                            documentBuilder: () => _service.generateFinancialReportPdf(),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Category Breakdown Card
+              CarmelitaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('COLLECTIONS BY CATEGORY',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Rent Collections', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                              const SizedBox(height: 4),
+                              Text('₱${rentPaid.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Utility Collections', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                              const SizedBox(height: 4),
+                              Text('₱${utilityPaid.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class DisciplinaryRecordsPage extends StatelessWidget {
   const DisciplinaryRecordsPage({super.key});
+
   @override
-  Widget build(BuildContext context) => const PageFrame(
+  Widget build(BuildContext context) => PageFrame(
         title: 'Disciplinary records',
         subtitle: 'Verified violations and issued notices by tenant',
-        child: EmptyState(
-            icon: Icons.gavel_outlined,
-            title: 'No disciplinary records',
-            message:
-                'Backend storage and links to confidential reports are not connected yet.'),
+        child: Column(
+          children: [
+            CarmelitaCard(
+              child: Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: const Icon(Icons.gavel_outlined, color: Color(0xFF6B1D2F)),
+                  title: const Text('Resident Conduct & Violation Cases'),
+                  subtitle: const Text('Hearings, official warnings, and disciplinary records'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const StaffConductCasesPage(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       );
 }
 
-class ReportsAnalyticsPage extends StatelessWidget {
+class ReportsAnalyticsPage extends StatefulWidget {
   const ReportsAnalyticsPage({super.key});
+
   @override
-  Widget build(BuildContext context) => const PageFrame(
-        title: 'Analytics',
-        subtitle: 'Operational drill-downs',
-        child: Column(children: [
-          AdaptiveGrid(children: [
-            MetricCard(
-                label: 'Occupancy',
-                value: '75%',
-                detail: '30 of 40 beds',
-                icon: Icons.bed_outlined),
-            MetricCard(
-                label: 'Payment compliance',
-                value: '67%',
-                detail: 'Current sample records',
-                icon: Icons.payments_outlined),
-            MetricCard(
-                label: 'Open maintenance',
-                value: '2',
-                detail: '1 medium • 1 low',
-                icon: Icons.build_outlined),
-            MetricCard(
-                label: 'Geofence coverage',
-                value: '100%',
-                detail: '50m perimeter monitoring',
-                icon: Icons.location_on_outlined),
-          ]),
-          SizedBox(height: 14),
-          CarmelitaCard(
-              child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.cloud_off_outlined),
-                  title: Text('Backend data required'),
-                  subtitle: Text(
-                      'Date filters, historical trends, and exports need persisted operational data.'))),
-        ]),
-      );
+  State<ReportsAnalyticsPage> createState() => _ReportsAnalyticsPageState();
 }
+
+class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
+  final _reportService = const DormitoryReportService();
+
+  Widget _buildReportCard({
+    required BuildContext context,
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color color,
+    required String fileName,
+    required Future<Uint8List> Function() documentBuilder,
+  }) {
+    return CarmelitaCard(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: color.withValues(alpha: 0.12),
+              foregroundColor: color,
+              child: Icon(icon, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    description,
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            IconButton(
+              tooltip: 'Export PDF',
+              icon: Icon(Icons.picture_as_pdf_outlined, color: color),
+              onPressed: () {
+                _reportService.openReportPreview(
+                  context,
+                  title: title,
+                  fileName: fileName,
+                  documentBuilder: documentBuilder,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = OwnerController.instance;
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final rooms = controller.rooms;
+        final totalCapacity = rooms.fold<int>(0, (sum, r) => sum + r.capacity);
+        final totalOccupied = rooms.fold<int>(0, (sum, r) => sum + r.occupied);
+        final occupancyRate = totalCapacity > 0 ? (totalOccupied / totalCapacity * 100) : 0.0;
+
+        final payments = controller.payments;
+        final verifiedCount = payments.where((p) => p.status.toLowerCase() == 'verified' || p.status.toLowerCase() == 'paid').length;
+        final paymentCompliance = payments.isNotEmpty ? (verifiedCount / payments.length * 100) : 100.0;
+
+        final maintenance = controller.staffMaintenanceReports;
+        final openMaintenance = maintenance.where((m) => m.isOpen).length;
+        final highPriority = maintenance.where((m) => m.isOpen && m.isHighUrgency).length;
+
+        final gateEvents = controller.gateEvents;
+        final flaggedCurfew = gateEvents.where((e) => e.status == 'Flagged').length;
+
+        return PageFrame(
+          title: 'Reports & Analytics',
+          subtitle: 'Operational intelligence and official PDF exports',
+          actions: [
+            IconButton(
+              tooltip: 'Executive Overview (PDF)',
+              icon: const Icon(Icons.summarize_outlined),
+              onPressed: () {
+                _reportService.openReportPreview(
+                  context,
+                  title: 'Executive Performance Overview',
+                  fileName: 'carmelitas_executive_overview_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                  documentBuilder: () => _reportService.generateExecutiveOverviewPdf(),
+                );
+              },
+            ),
+          ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Live Operational Metrics
+              AdaptiveGrid(children: [
+                MetricCard(
+                  label: 'Bed Occupancy',
+                  value: '${occupancyRate.toStringAsFixed(0)}%',
+                  detail: '$totalOccupied of $totalCapacity beds filled',
+                  icon: Icons.bed_outlined,
+                ),
+                MetricCard(
+                  label: 'Payment Compliance',
+                  value: '${paymentCompliance.toStringAsFixed(0)}%',
+                  detail: '$verifiedCount of ${payments.length} verified',
+                  icon: Icons.payments_outlined,
+                ),
+                MetricCard(
+                  label: 'Open Maintenance',
+                  value: '$openMaintenance',
+                  detail: '$highPriority high priority',
+                  icon: Icons.build_outlined,
+                ),
+                MetricCard(
+                  label: 'Curfew & Gate Security',
+                  value: '${gateEvents.length}',
+                  detail: '$flaggedCurfew flagged after-hours',
+                  icon: Icons.security_outlined,
+                ),
+              ]),
+              const SizedBox(height: 20),
+
+              // Exportable Reports Hub Section Header
+              const SectionTitle('Official PDF Reports & Data Exports'),
+              const SizedBox(height: 10),
+
+              // Report 1: Financial & Rent Statement
+              _buildReportCard(
+                context: context,
+                title: 'Financial & Rent Collection Statement',
+                description: 'Complete breakdown of rent, utility billing, verified receipts, and outstanding dues.',
+                icon: Icons.account_balance_wallet_outlined,
+                color: Colors.teal,
+                fileName: 'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () => _reportService.generateFinancialReportPdf(),
+              ),
+              const SizedBox(height: 10),
+
+              // Report 2: Occupancy & Tenant Roster
+              _buildReportCard(
+                context: context,
+                title: 'Dormitory Occupancy & Tenant Roster',
+                description: 'Full room-by-room census, 40-bed vacancy breakdown, and active resident directory.',
+                icon: Icons.meeting_room_outlined,
+                color: Colors.indigo,
+                fileName: 'carmelitas_occupancy_roster_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () => _reportService.generateOccupancyRosterPdf(),
+              ),
+              const SizedBox(height: 10),
+
+              // Report 3: Maintenance & Work Orders
+              _buildReportCard(
+                context: context,
+                title: 'Facility Maintenance & Work Orders Log',
+                description: 'Operational summary of active repairs, urgency levels, technician notes, and resolutions.',
+                icon: Icons.handyman_outlined,
+                color: Colors.orange,
+                fileName: 'carmelitas_maintenance_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () => _reportService.generateMaintenanceReportPdf(),
+              ),
+              const SizedBox(height: 10),
+
+              // Report 4: Curfew & Security Log
+              _buildReportCard(
+                context: context,
+                title: 'Security, Gate & Curfew Audit Log',
+                description: 'Gate crossings, geofence tripwire logs, curfew flags, and approved overnight passes.',
+                icon: Icons.schedule_outlined,
+                color: Colors.purple,
+                fileName: 'carmelitas_curfew_security_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () => _reportService.generateCurfewGateReportPdf(),
+              ),
+              const SizedBox(height: 10),
+
+              // Report 5: Executive Consolidated Report
+              _buildReportCard(
+                context: context,
+                title: 'Consolidated Executive Overview',
+                description: 'Comprehensive high-level summary combining finance, occupancy, security, and repairs.',
+                icon: Icons.analytics_outlined,
+                color: const Color(0xFF6B1D2F),
+                fileName: 'carmelitas_executive_summary_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () => _reportService.generateExecutiveOverviewPdf(),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+

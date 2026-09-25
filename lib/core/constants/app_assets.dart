@@ -3,8 +3,5 @@ class AppAssets {
   static const String dormOverview = 'assets/images/dorm_overview.jpg';
   static const String room = 'assets/images/room.jpg';
   static const String courtyard = 'assets/images/courtyard.jpg';
-  static const String bedspacePoster = 'assets/images/bedspace_poster.jpg';
-  static const String reservationPoster =
-      'assets/images/reservation_poster.jpg';
   static const String exterior = 'assets/images/exterior.jpg';
 }

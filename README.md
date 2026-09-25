@@ -1,5 +1,7 @@
 # CarmeLink
 
+> Current implementation status and known gaps are tracked in [`STATUS.md`](STATUS.md). Treat it as the canonical status source; longer planning/audit documents are supporting references.
+
 Production domain: `https://carmelitasdormitory.site`
 
 CarmeLink is a cross-platform Flutter dormitory-management app for Carmelita's
@@ -483,7 +485,6 @@ lib/
 ├── app.dart                 # Bootstrap, theme, and role routing
 ├── controllers/             # Session, theme, and role state
 ├── core/                    # Constants, responsive layout, theme, widgets
-├── data/mock_data.dart      # Local demonstration records
 ├── models/models.dart       # Models and enums
 ├── services/                # Mock authentication and usage statistics
 └── views/

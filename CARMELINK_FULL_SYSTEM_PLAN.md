@@ -1176,7 +1176,7 @@ Recommended visible fields:
 - Event status
 - Recent activity history
 
-The current page also contains a device-usage demonstration view. If retained, it should be justified by the study scope and privacy requirements; otherwise it can be removed to keep guardian monitoring focused on dormitory-related activity.
+The guardian activity page is limited to dormitory presence records. It does not inspect or display application usage from the resident's device.
 
 ---
 
@@ -2126,7 +2126,6 @@ lib/
 │   └── widgets/
 │
 ├── data/
-│   └── mock_data.dart
 │
 ├── models/
 │   └── models.dart
@@ -2136,7 +2135,6 @@ lib/
 │   ├── auth_service.dart
 │   ├── guardian_link_service.dart
 │   ├── profile_service.dart
-│   └── usage_stats_service.dart
 │
 └── views/
     ├── auth/

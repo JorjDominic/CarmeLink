@@ -144,15 +144,9 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     if (assetsCached) return;
     assetsCached = true;
 
-    for (final asset in const [
-      AppAssets.logo,
-      AppAssets.courtyard,
-      AppAssets.room,
-      AppAssets.exterior,
-      AppAssets.dormOverview,
-    ]) {
-      precacheImage(AssetImage(asset), context);
-    }
+    // Feature photos are decoded by the screens that use them instead of
+    // occupying the image cache before the user's role is known.
+    precacheImage(const AssetImage(AppAssets.logo), context);
   }
 
   @override
