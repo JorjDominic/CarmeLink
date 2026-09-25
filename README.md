@@ -103,6 +103,39 @@ CarmeLink selects a workspace after sign-in. Compact screens use bottom navigati
 Cards, shortcuts, and action buttons open the supporting pages described below.
 Messages and Notifications are also available from the role menu with consistent outlined navigation icons.
 
+### Module simplification direction
+
+CarmeLink groups related workflows behind a smaller number of recognizable
+destinations. This consolidation applies to navigation and overview pages only;
+permissions, audit trails, status transitions, and database records remain
+separate where workflows have different security or business rules.
+
+- **Reporting** — maintenance, confidential concerns, and missed cleaning-duty
+  reports. This consolidated entry point is implemented.
+- **Rooms & Facilities** — rooms/beds, floor plan, cleaning, inspections, and
+  maintenance locations.
+- **Access & Curfew** — presence, gate activity, geofencing, manual logs,
+  curfew exceptions, and employee schedules.
+- **Tenant Management** — directory, tenant profile, room assignment, guardian
+  links, emergency contacts, onboarding, and contract status.
+- **Billing & Payments** — rent and utility charges, payment submission and
+  review, invoices, cash payments, and income/expenses. Contracts remain the
+  separate source of tenancy terms.
+- **Onboarding & Accounts** — invitations/QR, identity, documents, signers,
+  guardian linking, activation, and account access.
+- **Communication Center** — messages, announcements, emergency alerts,
+  notifications, and contacts.
+- **Conduct & Cases** — incidents, warnings, responses, appeals, repeat
+  history, and termination recommendations.
+- **Profile & Settings** — profile, security, notification preferences,
+  permissions/device binding, appearance, help, and feedback.
+- **Analytics** — operational metrics and trends, kept separate from report
+  submission and review.
+
+The planned order is Rooms & Facilities, Access & Curfew, Tenant Management,
+Billing & Payments, Onboarding & Accounts, Communication Center, and Profile &
+Settings.
+
 ## Authentication pages
 
 ### Splash
@@ -157,7 +190,9 @@ balances, proof submission, and payment verification.
 
 #### Reports
 
-Combines maintenance and confidential reporting. It summarizes report counts, shows recent maintenance progress, and links to both reporting workflows.
+Combines maintenance, confidential-concern, and missed cleaning-duty reporting.
+It summarizes report activity, shows recent maintenance progress, and provides
+one report-type chooser that routes to each focused workflow.
 
 #### Gate & curfew
 
@@ -286,8 +321,8 @@ Provides a searchable tenant directory. Selecting a tenant opens their full reco
 
 Is the compact staff control center. Instead of presenting every tool in one long list, it groups related work into four searchable management areas:
 
-- **Property** — rooms, the interactive floor plan, and maintenance
-- **Tenants & Safety** — curfew, visitors, confidential reports, and disciplinary records; the tenant directory remains a primary navigation destination
+- **Property** — rooms, the interactive floor plan, and Report Management
+- **Tenants & Safety** — curfew, visitors, and disciplinary records; the tenant directory remains a primary navigation destination
 - **Finance & Contracts** — payment review, live contract CRUD, income and expenses, and analytics
 - **Communication** — announcements, messages, and important contacts
 
@@ -347,7 +382,7 @@ Lists receipt submissions awaiting verification. Staff compare OCR-extracted ten
 
 Shows collected rent, outstanding balances, and penalties for the current monthly snapshot. Full financial data requires a backend.
 
-#### Reports & analytics
+#### Analytics
 
 Summarizes occupancy, payment compliance, open maintenance, and curfew flags. Detailed analytics require backend integration.
 

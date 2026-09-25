@@ -163,6 +163,31 @@ integration portions of Priorities 6, 10–11, and 14–16. Each developer shoul
 use a separate feature branch and avoid editing the same migration or workflow
 files simultaneously.
 
+### Navigation simplification roadmap
+
+The application should consolidate navigation and presentation without merging
+security boundaries, audit histories, status lifecycles, or database records.
+The target is about five primary tenant destinations and no more than six staff
+management areas; individual workflows remain available as focused subpages.
+
+| Consolidated module | Workflows presented together | Status / boundary |
+|---|---|---|
+| Reporting | Maintenance, confidential concerns, and missed cleaning-duty reports | [✓] Unified tenant entry point and staff report-management entry implemented; underlying records and permissions remain separate |
+| Rooms & Facilities | Rooms/beds, floor plan, cleaning, inspections, and maintenance locations | [ ] Planned; inspection findings remain distinct from repair tasks and charges |
+| Access & Curfew | Presence, gate history, geofencing, manual logs, curfew requests/exceptions, and employee schedules | [ ] Planned; gate events and curfew approvals remain separate audited records |
+| Tenant Management | Directory, tenant details, room assignment, guardian links, emergency contacts, onboarding, and contract status | [ ] Planned as one tenant profile with focused sections |
+| Billing & Payments | Charges, rent/utilities, payment submission/review, cash payments, invoices, and income/expenses | [ ] Planned; contracts and each financial ledger/category remain distinct |
+| Onboarding & Accounts | Invitations/QR, identity, documents, signers, guardian linking, activation, and access | [ ] Planned; authorization and activation gates remain server-controlled |
+| Communication Center | Messages, announcements, emergency alerts, notifications, and contacts | [ ] Planned; notification preferences stay in Settings |
+| Conduct & Cases | Incidents, warnings, responses, appeals, repeat history, and termination recommendations | [ ] Partially consolidated; cases must not directly create charges or terminate tenancy |
+| Profile & Settings | Profile, security, notification preferences, permissions, device binding, appearance, and feedback | [ ] Planned |
+| Analytics | Occupancy, finance, maintenance, and operational trends | [✓] Renamed from Reports & Analytics so it is not confused with report submission and review |
+
+Recommended navigation work order: Rooms & Facilities; Access & Curfew; Tenant
+Management; Billing & Payments; Onboarding & Accounts; Communication Center;
+then Profile & Settings. Consolidation changes should remove duplicate top-level
+entries while retaining deep links to the original focused workflows.
+
 ### Merge rules that remain mandatory
 
 - Merge policy/addendum screens into Contracts and Rules & Policies, but keep
@@ -590,7 +615,9 @@ page exists but its important backend workflow is unfinished.
 - [✓] **My Room** — assigned room, bed, roommates, capacity, and utilities with live database sync and real-time refresh.
 - [✓] **Payments** — charges, outstanding balance, due dates, filter chips, overdue badges, receipt inspection, and payment history.
 - [✓] **Upload Payment Proof** — payment destination instructions, 5MB receipt attachment with interactive zoom, on-device OCR auto-capture, and live submission.
-- [✓] **Reports Hub** — live maintenance and confidential-report summaries with pull-to-refresh and active issue alerts.
+- [✓] **Reports Hub** — unified access to live maintenance, confidential, and
+  missed cleaning-duty reporting; includes a report-type chooser, focused
+  workflows, pull-to-refresh, and active issue alerts.
 - [✓] **Maintenance Reports** — live tenant-owned reports with status filters (All, Pending, In Progress, Resolved, Cancelled), interactive details sheet, photo zoom, caretaker notes, and cancellation for pending reports.
 - [✓] **Submit Maintenance** — validated category, urgency guidance, description, assigned room context, and photo attachment with 5MB validation.
   - **Cloudinary Integration** — authenticated uploads, optimized derivatives, RLS-authorized access, and offloaded Supabase media storage.

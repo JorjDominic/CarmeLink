@@ -32,10 +32,28 @@ void main() {
       expect(find.text('Confidential'), findsOneWidget);
       expect(find.text('Maintenance reports'), findsOneWidget);
       expect(find.text('Confidential concern'), findsOneWidget);
+      expect(find.text('Missed cleaning duty'), findsOneWidget);
       expect(find.text('Report issue'), findsOneWidget);
     });
 
-    testWidgets('displays active maintenance issue preview when pending report exists', (tester) async {
+    testWidgets('report action offers all three reporting workflows',
+        (tester) async {
+      TenantController.instance.setMaintenanceForTesting([]);
+
+      await tester.pumpWidget(buildTestable(const TenantReportsHubPage()));
+      await tester.pump();
+      await tester.tap(find.text('Report issue'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('What would you like to report?'), findsOneWidget);
+      expect(find.text('Maintenance issue'), findsOneWidget);
+      expect(find.text('Confidential concern'), findsWidgets);
+      expect(find.text('Missed cleaning duty'), findsWidgets);
+    });
+
+    testWidgets(
+        'displays active maintenance issue preview when pending report exists',
+        (tester) async {
       TenantController.instance.setMaintenanceForTesting([
         MaintenanceReport(
           id: 'mr-test-1',
@@ -53,12 +71,14 @@ void main() {
 
       expect(find.text('ACTIVE MAINTENANCE ISSUE'), findsOneWidget);
       expect(find.text('Plumbing • Room 204'), findsOneWidget);
-      expect(find.text('Sink leaking water onto the cabinet floor'), findsOneWidget);
+      expect(find.text('Sink leaking water onto the cabinet floor'),
+          findsOneWidget);
     });
   });
 
   group('MaintenanceReportsPage Widget Test', () {
-    testWidgets('renders filter chips and empty state when no reports exist', (tester) async {
+    testWidgets('renders filter chips and empty state when no reports exist',
+        (tester) async {
       TenantController.instance.setMaintenanceForTesting([]);
 
       await tester.pumpWidget(buildTestable(const MaintenanceReportsPage()));
@@ -77,7 +97,8 @@ void main() {
 
       // Verify empty state
       expect(
-        find.text('No maintenance reports yet. Use Report issue to submit one.'),
+        find.text(
+            'No maintenance reports yet. Use Report issue to submit one.'),
         findsOneWidget,
       );
 
@@ -85,7 +106,8 @@ void main() {
       expect(find.text('Report issue'), findsOneWidget);
     });
 
-    testWidgets('renders report card and opens details sheet on tap', (tester) async {
+    testWidgets('renders report card and opens details sheet on tap',
+        (tester) async {
       TenantController.instance.setMaintenanceForTesting([
         MaintenanceReport(
           id: 'mr-detail-1',
@@ -120,4 +142,3 @@ void main() {
     });
   });
 }
-

@@ -1414,7 +1414,11 @@ class OperationsHubPage extends StatefulWidget {
 
 class _OperationsHubPageState extends State<OperationsHubPage> {
   final searchController = TextEditingController();
-  final Set<String> _quickAccess = {'Payments', 'Maintenance', 'Floor plan'};
+  final Set<String> _quickAccess = {
+    'Payments',
+    'Report management',
+    'Floor plan'
+  };
   String query = '';
 
   bool get _isCaretaker =>
@@ -1661,8 +1665,8 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
     switch (item.title) {
       case 'Payments':
         return 'Payments (${controller.pendingPaymentProofs})';
-      case 'Maintenance':
-        return 'Maintenance (${controller.openMaintenance})';
+      case 'Report management':
+        return 'Reports (${controller.openMaintenance})';
       case 'Visitors':
         return 'Visitors (${controller.pendingVisitors})';
       default:
@@ -1763,8 +1767,11 @@ const _operationCategories = [
           RoomMonitoringPage()),
       _OperationItem('Floor plan', 'Explore the interactive room map',
           Icons.map_outlined, AdminFloorPlanPage()),
-      _OperationItem('Maintenance', 'Manage repair requests',
-          Icons.build_outlined, MaintenanceManagementPage()),
+      _OperationItem(
+          'Report management',
+          'Maintenance, confidential, and cleaning reports',
+          Icons.assignment_outlined,
+          ReportManagementPage()),
     ],
   ),
   _OperationCategory(
@@ -1785,9 +1792,6 @@ const _operationCategories = [
           EmployeeCurfewProfilesPage()),
       _OperationItem('Visitors', 'Manage visitor requests',
           Icons.people_outline, VisitorManagementPage()),
-      _OperationItem('Confidential reports', 'Review private reports',
-          Icons.shield_outlined, ConfidentialReportsPage(),
-          ownerOnly: true),
       _OperationItem('Disciplinary records', 'Manage violations',
           Icons.gavel_outlined, DisciplinaryRecordsPage(),
           ownerOnly: true),
@@ -1807,7 +1811,7 @@ const _operationCategories = [
       _OperationItem('Contracts', 'Create contracts and track renewals',
           Icons.event_busy_outlined, ContractsPage(),
           ownerOnly: true),
-      _OperationItem('Reports & analytics', 'View detailed reports',
+      _OperationItem('Analytics', 'View operational metrics and trends',
           Icons.analytics_outlined, ReportsAnalyticsPage(),
           ownerOnly: true),
     ],
@@ -4298,6 +4302,83 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class ReportManagementPage extends StatelessWidget {
+  const ReportManagementPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isOwner =
+        SessionController.instance.currentUser?.role == UserRole.owner;
+
+    return PageFrame(
+      title: 'Report management',
+      subtitle: 'Review reporting workflows from one place',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionTitle(
+            'Reporting queues',
+            subtitle: 'Access remains limited by staff role and report type',
+          ),
+          const SizedBox(height: 12),
+          _reportQueue(
+            context,
+            title: 'Maintenance reports',
+            subtitle: 'Triage repair requests, assignments, and resolutions.',
+            icon: Icons.build_outlined,
+            color: const Color(0xFFB47A52),
+            page: const MaintenanceManagementPage(),
+          ),
+          if (isOwner) ...[
+            const SizedBox(height: 12),
+            _reportQueue(
+              context,
+              title: 'Confidential reports',
+              subtitle:
+                  'Review restricted safety, rules, and roommate concerns.',
+              icon: Icons.shield_outlined,
+              color: const Color(0xFF7D70A0),
+              page: const ConfidentialReportsPage(),
+            ),
+          ],
+          const SizedBox(height: 12),
+          _reportQueue(
+            context,
+            title: 'Cleaning compliance reports',
+            subtitle: 'Select a room to review private missed-duty reports.',
+            icon: Icons.cleaning_services_outlined,
+            color: const Color(0xFF56886B),
+            page: const RoomMonitoringPage(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reportQueue(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required Widget page,
+  }) {
+    return CarmelitaCard(
+      onTap: () => _ownerPush(context, page),
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: CircleAvatar(
+          backgroundColor: color.withValues(alpha: .12),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right_rounded),
       ),
     );
   }
@@ -6924,7 +7005,7 @@ class ReportsAnalyticsPage extends StatelessWidget {
   const ReportsAnalyticsPage({super.key});
   @override
   Widget build(BuildContext context) => const PageFrame(
-        title: 'Reports & analytics',
+        title: 'Analytics',
         subtitle: 'Operational drill-downs',
         child: Column(children: [
           AdaptiveGrid(children: [

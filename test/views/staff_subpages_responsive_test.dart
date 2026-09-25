@@ -20,7 +20,7 @@ void main() {
     'emergency contacts': const EmergencyContactsPage(),
     'income and expenses': const ExpenseIncomeSummaryPage(),
     'discipline': const DisciplinaryRecordsPage(),
-    'reports and analytics': const ReportsAnalyticsPage(),
+    'analytics': const ReportsAnalyticsPage(),
   };
 
   for (final entry in pages.entries) {

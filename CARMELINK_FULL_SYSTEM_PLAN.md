@@ -794,7 +794,9 @@ allowing contracts to change without corrupting historical financial records.
 
 **Primary owner: Developer 2.**
 
-The tenant Reports section combines maintenance and private concern reporting.
+The tenant Reports section is the unified entry point for maintenance,
+confidential concerns, and private missed cleaning-duty reporting. Its shared
+navigation does not merge the three record types or their authorization rules.
 
 ## Reports Dashboard
 
@@ -803,6 +805,8 @@ The tenant Reports section combines maintenance and private concern reporting.
 - High-priority requests
 - Recent status changes
 - Confidential concern access
+- Missed cleaning-duty reporting and history
+- One report-type chooser that routes to the appropriate focused form
 
 ---
 
@@ -3643,6 +3647,52 @@ lifecycle; inspection finding versus maintenance task; incident decision versus
 financial charge; deposit versus ordinary payments; visitor request versus gate
 event; cleaning assignment versus private report; and rent versus utilities,
 penalties, and damages.
+
+## Navigation and module simplification roadmap
+
+CarmeLink should simplify how users discover work by merging related navigation
+and overview pages, not by forcing unrelated records into shared tables. The
+target is approximately five primary tenant destinations and six or fewer staff
+management areas. Each consolidated module acts as an umbrella with focused
+subpages, role-aware queues, and deep links.
+
+1. **Reporting (implemented navigation consolidation):** one tenant Reports hub
+   and one staff Report Management entry lead to maintenance, confidential, and
+   missed cleaning-duty workflows. Confidential access and reporter privacy
+   remain independently enforced. Operational Reports & Analytics is renamed
+   Analytics.
+2. **Rooms & Facilities:** present rooms/beds, occupancy, floor plan, cleaning,
+   inspections, and maintenance locations together. Do not merge an inspection
+   finding with a repair task, case, or charge.
+3. **Access & Curfew:** present current presence, gate history, geofencing,
+   manual logs, curfew requests/exceptions, and employee schedules together.
+   Keep gate events, curfew approvals, and device/geofence evidence distinct.
+4. **Tenant Management:** give staff one tenant record with Overview, Room,
+   Contacts, Contract, Billing, and Activity sections. Account identity,
+   guardian relationships, occupancy, and contracts remain separate records.
+5. **Billing & Payments:** group charges, fixed rent, variable utilities,
+   payment submission/review, cash payments, invoices, and income/expenses.
+   Preserve separate allocation, ledger, audit, and authorization rules; keep
+   Contract Management as the source of tenancy terms.
+6. **Onboarding & Accounts:** group invitations/QR, identity details, required
+   documents, signers, guardian linking, activation, and account access into one
+   prerequisite-aware workflow. Activation stays server-controlled.
+7. **Communication Center:** group messages, announcements, emergency alerts,
+   notifications, and contacts. Personal notification preferences remain in
+   Settings.
+8. **Conduct & Cases:** group incidents, evidence, warnings, responses, appeals,
+   repeat history, and termination recommendations. A case may request an
+   authorized downstream action but cannot directly charge or evict a tenant.
+9. **Profile & Settings:** group personal information, password/security,
+   notification preferences, permissions/device binding, appearance, help, and
+   feedback.
+10. **Analytics:** keep operational metrics and trends separate from report
+    submission and report-review workflows.
+
+Recommended implementation order after Reporting is Rooms & Facilities, Access
+& Curfew, Tenant Management, Billing & Payments, Onboarding & Accounts,
+Communication Center, then Profile & Settings. Each change must remove duplicate
+top-level destinations without removing role guards or direct record links.
 
 ## Client decisions that remain open
 
