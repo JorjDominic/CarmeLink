@@ -21,8 +21,8 @@ void main() {
     expect(find.text('At a glance'), findsOneWidget);
 
     // Verify the bottom quick access card exists
-    final contactFinder = find.text('Contact info');
-    expect(contactFinder, findsOneWidget);
+    final messagesFinder = find.text('Messages');
+    expect(messagesFinder, findsOneWidget);
 
     // Verify SingleChildScrollView exists and is scrollable
     final scrollFinder = find.byType(SingleChildScrollView);
@@ -33,7 +33,6 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify widget handles drag and scroll physics without exceptions
-    expect(contactFinder, findsOneWidget);
+    expect(messagesFinder, findsOneWidget);
   });
 }
-

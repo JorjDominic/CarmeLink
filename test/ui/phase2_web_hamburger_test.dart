@@ -57,10 +57,7 @@ void main() {
           File('lib/core/widgets/adaptive_shell.dart').readAsStringSync();
 
       expect(
-        source.contains(
-          '''body: webPortal
-            ? desktopWeb''',
-        ),
+        RegExp(r'body:\s*webPortal\s*\?\s*desktopWeb').hasMatch(source),
         isTrue,
       );
       expect(source.contains(': Stack('), isTrue);
