@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../controllers/messaging_controller.dart';
 import '../../controllers/owner_controller.dart';
@@ -12,6 +13,8 @@ import '../../core/utils/visitor_policy.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
+import '../../services/boundary_config_service.dart';
+import '../../services/geofence_service.dart';
 import '../../services/payment_service.dart';
 import '../../services/tenant_service.dart';
 import '../../services/announcement_service.dart';
@@ -4415,18 +4418,28 @@ class GeofenceMonitoringPage extends StatefulWidget {
 
 class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
   String _presenceFilter = 'all';
+  bool _showTestPanel = false;
 
   @override
   void initState() {
     super.initState();
     OwnerController.instance.loadGateEvents();
     OwnerController.instance.loadTenants();
+    const BoundaryConfigService().loadActiveConfig();
   }
 
   void _openManualLogDialog({TenantDirectoryEntry? preselected}) {
     showDialog(
       context: context,
       builder: (_) => _StaffManualLogDialog(preselectedTenant: preselected),
+    );
+  }
+
+  void _openBoundaryEditor() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _EditBoundaryDialog(),
     );
   }
 
@@ -4455,6 +4468,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
               : () {
                   controller.loadGateEvents(force: true);
                   controller.loadTenants(force: true);
+                  const BoundaryConfigService().loadActiveConfig();
                 },
         ),
         PopupMenuButton<String>(
@@ -4469,10 +4483,32 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
               );
             } else if (value == 'staff_log') {
               _openManualLogDialog();
+            } else if (value == 'edit_boundary') {
+              _openBoundaryEditor();
+            } else if (value == 'test_panel') {
+              setState(() => _showTestPanel = !_showTestPanel);
             }
           },
           itemBuilder: (_) => [
-            if (isOwner)
+            if (isOwner) ...[
+              const PopupMenuItem(
+                value: 'edit_boundary',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.tune_rounded),
+                  title: Text('Edit Boundary Config'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'test_panel',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.science_outlined),
+                  title: Text('Location Test Panel'),
+                ),
+              ),
               const PopupMenuItem(
                 value: 'dev_dashboard',
                 child: ListTile(
@@ -4482,6 +4518,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                   title: Text('Perimeter Visualizer'),
                 ),
               ),
+            ],
             const PopupMenuItem(
               value: 'staff_log',
               child: ListTile(
@@ -4516,6 +4553,11 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
             children: [
               const WorkInProgressNotice(),
               const SizedBox(height: 16),
+              // ── Owner-only Location Test Panel ───────────────────────
+              if (isOwner && _showTestPanel) ...[
+                _LocationTestPanel(tenants: allTenants),
+                const SizedBox(height: 16),
+              ],
               AdaptiveGrid(
                 children: [
                   MetricCard(
@@ -4953,6 +4995,907 @@ class _StaffManualLogDialogState extends State<_StaffManualLogDialog> {
 typedef GateMonitoringPage = GeofenceMonitoringPage;
 typedef CurfewMonitoringPage = GeofenceMonitoringPage;
 typedef CurfewRequestReviewPage = GeofenceMonitoringPage;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Location Test Panel — evaluates arbitrary coordinates against the active
+// boundary configuration without writing any coordinate data to the database.
+// The "Simulate Crossing" action fires the real gate_events / notification
+// pipeline using the evaluated IN/OUT direction.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LocationTestPanel extends StatefulWidget {
+  const _LocationTestPanel({required this.tenants});
+
+  final List<TenantDirectoryEntry> tenants;
+
+  @override
+  State<_LocationTestPanel> createState() => _LocationTestPanelState();
+}
+
+class _LocationTestPanelState extends State<_LocationTestPanel> {
+  final _latCtrl = TextEditingController();
+  final _lngCtrl = TextEditingController();
+
+  bool _evaluating = false;
+  bool _simulating = false;
+  bool _fetchingGps = false;
+
+  // Live evaluation result — null until Evaluate is tapped.
+  String? _evalDirection;   // 'IN' or 'OUT'
+  double? _evalDistMeters;  // metres from nearest edge
+
+  TenantDirectoryEntry? _selectedTenant;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.tenants.isNotEmpty) _selectedTenant = widget.tenants.first;
+    _latCtrl.addListener(_clearResult);
+    _lngCtrl.addListener(_clearResult);
+  }
+
+  @override
+  void dispose() {
+    _latCtrl.dispose();
+    _lngCtrl.dispose();
+    super.dispose();
+  }
+
+  void _clearResult() => setState(() {
+        _evalDirection = null;
+        _evalDistMeters = null;
+      });
+
+  double? get _lat => double.tryParse(_latCtrl.text.trim());
+  double? get _lng => double.tryParse(_lngCtrl.text.trim());
+
+  Future<void> _fetchGps() async {
+    setState(() => _fetchingGps = true);
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission not granted.')),
+          );
+        }
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      _latCtrl.text = pos.latitude.toStringAsFixed(8);
+      _lngCtrl.text = pos.longitude.toStringAsFixed(8);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('GPS error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _fetchingGps = false);
+    }
+  }
+
+  void _setPreset(double lat, double lng, String label) {
+    _latCtrl.text = lat.toStringAsFixed(8);
+    _lngCtrl.text = lng.toStringAsFixed(8);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Preset loaded: $label'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  Future<void> _evaluate() async {
+    final lat = _lat;
+    final lng = _lng;
+    if (lat == null || lng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter valid latitude and longitude.')),
+      );
+      return;
+    }
+    setState(() => _evaluating = true);
+    try {
+      final result = GeofenceLocationService.evaluateCoordinates(
+        latitude: lat,
+        longitude: lng,
+      );
+      final dist = _distToEdge(lat, lng);
+      setState(() {
+        _evalDirection = result.direction;
+        _evalDistMeters = dist;
+      });
+    } finally {
+      if (mounted) setState(() => _evaluating = false);
+    }
+  }
+
+  /// Approximate distance from point to the polygon centroid edge.
+  double _distToEdge(double lat, double lng) {
+    final polygon = GeofenceLocationService.activePolygon;
+    if (polygon.isEmpty) return 0;
+    // Use centroid distance as a rough indication.
+    double sumLat = 0, sumLng = 0;
+    for (final p in polygon) {
+      sumLat += p.latitude;
+      sumLng += p.longitude;
+    }
+    final cLat = sumLat / polygon.length;
+    final cLng = sumLng / polygon.length;
+    final dist = Geolocator.distanceBetween(lat, lng, cLat, cLng);
+    return dist;
+  }
+
+  Future<void> _simulate() async {
+    final lat = _lat;
+    final lng = _lng;
+    final tenant = _selectedTenant;
+    if (lat == null || lng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter coordinates first.')),
+      );
+      return;
+    }
+    if (tenant == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a tenant to simulate for.')),
+      );
+      return;
+    }
+
+    // Evaluate direction for the entered coordinates.
+    final result = GeofenceLocationService.evaluateCoordinates(
+      latitude: lat,
+      longitude: lng,
+    );
+    final direction = result.direction ?? 'OUT';
+
+    setState(() => _simulating = true);
+    try {
+      await OwnerController.instance.recordStaffManualLog(
+        tenantId: tenant.id,
+        direction: direction,
+        notes: 'Location test simulation from owner panel '
+            '($direction at ${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)})',
+        tenantName: tenant.name,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Simulated $direction crossing recorded for ${tenant.name}',
+            ),
+          ),
+        );
+        setState(() {
+          _evalDirection = direction;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Simulation failed: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _simulating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isIn = _evalDirection == 'IN';
+    final hasResult = _evalDirection != null;
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: scheme.outlineVariant,
+          style: BorderStyle.solid,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        color: scheme.surfaceContainerLow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+            child: Row(
+              children: [
+                Icon(Icons.science_outlined, size: 18, color: scheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Location Test Panel',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: scheme.primary,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Owner only • no coordinates stored',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 20, indent: 14, endIndent: 14),
+
+          // Coordinate inputs
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _latCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Latitude',
+                      hintText: '14.949402',
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      isDense: true,
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _lngCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Longitude',
+                      hintText: '120.884676',
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      isDense: true,
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Preset + GPS buttons
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                ActionChip(
+                  avatar: _fetchingGps
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.my_location_rounded, size: 14),
+                  label: const Text('My GPS'),
+                  onPressed: _fetchingGps ? null : _fetchGps,
+                  visualDensity: VisualDensity.compact,
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.home_outlined, size: 14),
+                  label: const Text('Dorm Center'),
+                  onPressed: () => _setPreset(
+                    GeofenceLocationService.carmelitaLatitude,
+                    GeofenceLocationService.carmelitaLongitude,
+                    'Dorm Center',
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.directions_walk_rounded, size: 14),
+                  label: const Text('50 m Outside'),
+                  onPressed: () => _setPreset(
+                    GeofenceLocationService.carmelitaLatitude + 0.00045,
+                    GeofenceLocationService.carmelitaLongitude,
+                    '50 m Outside (north)',
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.location_on_outlined, size: 14),
+                  label: const Text('Active Center'),
+                  onPressed: () {
+                    final poly = GeofenceLocationService.activePolygon;
+                    if (poly.isEmpty) return;
+                    double sLat = 0, sLng = 0;
+                    for (final p in poly) {
+                      sLat += p.latitude;
+                      sLng += p.longitude;
+                    }
+                    _setPreset(
+                      sLat / poly.length,
+                      sLng / poly.length,
+                      'Active polygon centroid',
+                    );
+                  },
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Evaluate button + result
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: _evaluating ? null : _evaluate,
+                  icon: _evaluating
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.search_rounded, size: 16),
+                  label: const Text('Evaluate'),
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                if (hasResult) ...[
+                  const SizedBox(width: 12),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isIn
+                          ? const Color(0xFF56886B).withValues(alpha: 0.15)
+                          : const Color(0xFFB03A2E).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isIn
+                            ? const Color(0xFF56886B)
+                            : const Color(0xFFB03A2E),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isIn ? Icons.home_rounded : Icons.directions_walk_rounded,
+                          size: 14,
+                          color: isIn
+                              ? const Color(0xFF56886B)
+                              : const Color(0xFFB03A2E),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _evalDirection!,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isIn
+                                ? const Color(0xFF56886B)
+                                : const Color(0xFFB03A2E),
+                            fontSize: 13,
+                          ),
+                        ),
+                        if (_evalDistMeters != null) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '≈ ${_evalDistMeters!.toStringAsFixed(0)} m from centroid',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // Simulate Crossing section
+          const Divider(height: 20, indent: 14, endIndent: 14),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Simulate Crossing',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Creates a real gate_events record for the selected tenant '
+                  'using the evaluated direction — useful for testing push '
+                  'notifications and curfew alerts end-to-end.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<TenantDirectoryEntry>(
+                        initialValue: _selectedTenant,
+                        decoration: const InputDecoration(
+                          labelText: 'Tenant',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          isDense: true,
+                        ),
+                        items: widget.tenants.map((t) {
+                          return DropdownMenuItem(
+                            value: t,
+                            child: Text('${t.name} (Rm ${t.room})'),
+                          );
+                        }).toList(),
+                        onChanged: (val) =>
+                            setState(() => _selectedTenant = val),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    FilledButton.icon(
+                      onPressed: _simulating ? null : _simulate,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF627FA8),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      icon: _simulating
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.play_circle_outline, size: 16),
+                      label: const Text('Simulate'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Boundary Editor Dialog — lets owners update the active dorm boundary saved
+// in Supabase.  Changes take effect immediately in the in-memory geofence
+// state; the native tripwire is re-registered on the next app resume.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _EditBoundaryDialog extends StatefulWidget {
+  const _EditBoundaryDialog();
+
+  @override
+  State<_EditBoundaryDialog> createState() => _EditBoundaryDialogState();
+}
+
+class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
+  final _service = const BoundaryConfigService();
+
+  final _latCtrl = TextEditingController();
+  final _lngCtrl = TextEditingController();
+  final _radiusCtrl = TextEditingController();
+  final _bufferCtrl = TextEditingController();
+
+  String _mode = 'polygon';
+  bool _loading = true;
+  bool _saving = false;
+  bool _fetchingGps = false;
+
+  BoundarySnapshot? _current;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrent();
+  }
+
+  @override
+  void dispose() {
+    _latCtrl.dispose();
+    _lngCtrl.dispose();
+    _radiusCtrl.dispose();
+    _bufferCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadCurrent() async {
+    setState(() => _loading = true);
+    try {
+      final row = await _service.loadActiveConfig();
+      if (row != null) {
+        final snap = BoundaryConfigService.configFromRow(row);
+        _current = snap;
+        _latCtrl.text = snap.centerLat.toStringAsFixed(8);
+        _lngCtrl.text = snap.centerLng.toStringAsFixed(8);
+        _radiusCtrl.text = snap.radiusMeters.toStringAsFixed(1);
+        _bufferCtrl.text = snap.edgeBufferMeters.toStringAsFixed(1);
+        _mode = snap.boundaryMode;
+      } else {
+        // Fallback to compiled-in defaults
+        _latCtrl.text =
+            GeofenceLocationService.carmelitaLatitude.toStringAsFixed(8);
+        _lngCtrl.text =
+            GeofenceLocationService.carmelitaLongitude.toStringAsFixed(8);
+        _radiusCtrl.text =
+            GeofenceLocationService.geofenceRadiusMeters.toStringAsFixed(1);
+        _bufferCtrl.text =
+            GeofenceLocationService.debounceBufferMeters.toStringAsFixed(1);
+        _mode = 'polygon';
+      }
+    } catch (_) {
+      // If load fails, show empty fields with defaults pre-filled.
+      _latCtrl.text =
+          GeofenceLocationService.carmelitaLatitude.toStringAsFixed(8);
+      _lngCtrl.text =
+          GeofenceLocationService.carmelitaLongitude.toStringAsFixed(8);
+      _radiusCtrl.text =
+          GeofenceLocationService.geofenceRadiusMeters.toStringAsFixed(1);
+      _bufferCtrl.text =
+          GeofenceLocationService.debounceBufferMeters.toStringAsFixed(1);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _captureGps() async {
+    setState(() => _fetchingGps = true);
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission not granted.')),
+          );
+        }
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      if (mounted) {
+        _latCtrl.text = pos.latitude.toStringAsFixed(8);
+        _lngCtrl.text = pos.longitude.toStringAsFixed(8);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Center set to your GPS: '
+              '${pos.latitude.toStringAsFixed(5)}, '
+              '${pos.longitude.toStringAsFixed(5)}',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('GPS error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _fetchingGps = false);
+    }
+  }
+
+  Future<void> _save() async {
+    final lat = double.tryParse(_latCtrl.text.trim());
+    final lng = double.tryParse(_lngCtrl.text.trim());
+    final radius = double.tryParse(_radiusCtrl.text.trim());
+    final buffer = double.tryParse(_bufferCtrl.text.trim());
+
+    if (lat == null || lng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter valid latitude and longitude.')),
+      );
+      return;
+    }
+    if (radius != null && radius < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Radius must be at least 10 metres.')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      // If the user changed center coordinates but kept polygon mode,
+      // auto-generate a square boundary around the new center so the polygon
+      // matches the new location (using the current or entered radius).
+      List<LatLngPoint>? newPolygon;
+      if (_mode == 'polygon') {
+        final r = (radius ?? _current?.radiusMeters ?? 50.0) / 111000;
+        newPolygon = [
+          LatLngPoint(lat + r, lng + r), // NE
+          LatLngPoint(lat - r, lng + r), // SE
+          LatLngPoint(lat - r, lng - r), // SW
+          LatLngPoint(lat + r, lng - r), // NW
+        ];
+      }
+
+      await _service.updateConfig(
+        centerLat: lat,
+        centerLng: lng,
+        radiusMeters: radius,
+        edgeBufferMeters: buffer,
+        boundaryMode: _mode,
+        polygonPoints: newPolygon,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Boundary configuration saved and applied.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.tune_rounded, size: 20),
+          SizedBox(width: 8),
+          Text('Edit Boundary Configuration'),
+        ],
+      ),
+      content: _loading
+          ? const SizedBox(
+              width: 300,
+              height: 120,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : SizedBox(
+              width: 360,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Info banner
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primaryContainer
+                            .withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Changes take effect immediately for all users. '
+                        'The polygon is auto-generated as a square around the '
+                        'center when in Polygon mode. '
+                        'Use the Perimeter Visualizer to fine-tune corner points.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Center coordinates
+                    const Text(
+                      'Boundary Center',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _latCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Latitude',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                              signed: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _lngCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Longitude',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                              signed: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _fetchingGps ? null : _captureGps,
+                        icon: _fetchingGps
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.my_location_rounded, size: 16),
+                        label: const Text('Use My Current GPS Location'),
+                        style: OutlinedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Radius and buffer
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _radiusCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Radius (m)',
+                              helperText: 'Wake-up circle',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _bufferCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Edge Buffer (m)',
+                              helperText: 'Debounce zone',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Boundary mode
+                    const Text(
+                      'Detection Mode',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const SizedBox(height: 6),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(
+                          value: 'polygon',
+                          label: Text('Polygon'),
+                          icon: Icon(Icons.polyline_outlined),
+                        ),
+                        ButtonSegment(
+                          value: 'circle',
+                          label: Text('Circle'),
+                          icon: Icon(Icons.radio_button_unchecked_rounded),
+                        ),
+                      ],
+                      selected: {_mode},
+                      onSelectionChanged: (s) =>
+                          setState(() => _mode = s.first),
+                    ),
+                    if (_mode == 'polygon') ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'The polygon will be auto-generated as a square around '
+                        'the center using the radius you entered above. '
+                        'Use the Perimeter Visualizer for custom corner editing.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+
+                    // Updated at
+                    if (_current?.updatedAt != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'Last saved: ${_current!.updatedAt!.toLocal()}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton.icon(
+          onPressed: _saving || _loading ? null : _save,
+          icon: _saving
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.save_rounded, size: 16),
+          label: const Text('Save & Apply'),
+        ),
+      ],
+    );
+  }
+}
 
 class VisitorManagementPage extends StatefulWidget {
   const VisitorManagementPage({super.key});

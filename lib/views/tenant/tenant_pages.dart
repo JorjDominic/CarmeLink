@@ -13,6 +13,7 @@ import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/announcement_service.dart';
 import '../../services/geofence_service.dart';
+import '../../services/geofence_scheduler.dart';
 import '../../services/receipt_ocr_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/tripwire_geofence_service.dart';
@@ -4529,6 +4530,9 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
   RecordListSort requestSort = RecordListSort.newest;
   bool showAllPresenceRecords = false;
 
+  // Background permission state for automatic crossing detection.
+  bool? _hasBackgroundPermission; // null = checking
+
   @override
   void initState() {
     super.initState();
@@ -4537,6 +4541,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
         TenantController.instance.loadCurfewRequests();
         TenantController.instance.loadGateEvents();
         _loadMonitoringStatus(sync: true);
+        _checkBackgroundPermission();
       }
     });
     _subscription = TableRefreshSubscription(
@@ -4549,6 +4554,29 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
         }
       },
     );
+  }
+
+  Future<void> _checkBackgroundPermission() async {
+    final has = await GeofenceLocationService.hasBackgroundPermission();
+    if (!mounted) return;
+    setState(() => _hasBackgroundPermission = has);
+  }
+
+  Future<void> _requestBackgroundPermission() async {
+    final granted = await GeofenceLocationService.requestBackgroundPermission();
+    if (!mounted) return;
+    setState(() => _hasBackgroundPermission = granted);
+    if (granted) {
+      // Re-register the native tripwire now that background permission exists.
+      final uid = SessionController.instance.currentUser?.id;
+      if (uid != null) {
+        await GeofenceScheduler.instance.start(uid);
+      }
+      _loadMonitoringStatus(sync: true);
+    } else {
+      // User declined — direct them to App Settings to change it manually.
+      GeofenceLocationService.openAppSettings();
+    }
   }
 
   Future<void> _loadMonitoringStatus({bool sync = false}) async {
@@ -4891,6 +4919,63 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                   ),
                 ),
               ),
+              // ── Background permission banner ──────────────────────────
+              if (_hasBackgroundPermission == false) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF39C12).withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFF39C12).withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.location_off_outlined,
+                          color: Color(0xFFF39C12)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Background location needed for automatic logging',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFB7770D),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Crossings are only logged automatically when CarmeLink can read your location in the background. '
+                              'Tap below and choose "Allow all the time" (Android) or "Always" (iOS).',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                            const SizedBox(height: 8),
+                            FilledButton.icon(
+                              onPressed: _requestBackgroundPermission,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFFF39C12),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              icon: const Icon(Icons.location_on_outlined,
+                                  size: 14),
+                              label: const Text(
+                                'Enable Background Access',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               if (!monitoringActive) ...[
                 const SizedBox(height: 12),
                 Container(

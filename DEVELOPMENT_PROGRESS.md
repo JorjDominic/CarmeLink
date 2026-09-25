@@ -69,7 +69,11 @@ credentials are stored as protected Supabase secrets. Messages is the first
 connected module: after a message is persisted, a protected Edge Function
 derives its authorized recipients, creates their notification rows, and sends a
 data-minimized push that excludes the message text. Taps target the conversation,
-and foreground alerts are suppressed while that conversation is open. iOS
+and foreground alerts are suppressed while that conversation is open.
+Geofence notifications are also connected for meaningful IN/OUT transitions,
+curfew flags, native background transitions, and staff manual logs. They notify
+management and linked guardians (plus the tenant for a manual log), suppress
+unchanged repeated checks, and never include coordinates or raw distance. iOS
 remains open pending its Firebase plist,
 APNs key, Apple capabilities/signing, Codemagic build, and physical-iPhone test.
 Firebase Analytics was intentionally not added; the Firebase foundation remains

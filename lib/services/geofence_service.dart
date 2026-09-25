@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 export 'package:geolocator/geolocator.dart' show LocationPermission;
 
@@ -108,9 +110,17 @@ class GeofenceLocationService {
 
   /// Boundary evaluation mode: true for polygon (default), false for circular fallback.
   static bool usePolygonBoundary = true;
+  static double? _remoteCenterLatitude;
+  static double? _remoteCenterLongitude;
   static List<LatLngPoint>? _remotePolygon;
   static double? _remoteRadiusMeters;
   static double _remoteEdgeBufferMeters = debounceBufferMeters;
+
+  static double get activeCenterLatitude =>
+      _remoteCenterLatitude ?? carmelitaLatitude;
+
+  static double get activeCenterLongitude =>
+      _remoteCenterLongitude ?? carmelitaLongitude;
 
   // In-memory test override fields (strictly volatile, never written to DB or storage)
   static List<LatLngPoint>? _testPolygonOverride;
@@ -147,6 +157,10 @@ class GeofenceLocationService {
   /// Applies the active server-owned boundary without retaining tenant location.
   static void applyBoundaryConfiguration(Map<String, dynamic> row) {
     usePolygonBoundary = row['boundary_mode'] != 'circle';
+    final centerLat = row['center_latitude'];
+    if (centerLat is num) _remoteCenterLatitude = centerLat.toDouble();
+    final centerLng = row['center_longitude'];
+    if (centerLng is num) _remoteCenterLongitude = centerLng.toDouble();
     final radius = row['radius_meters'];
     if (radius is num && radius > 0) _remoteRadiusMeters = radius.toDouble();
     final buffer = row['edge_buffer_meters'];
@@ -298,8 +312,8 @@ class GeofenceLocationService {
       final distance = Geolocator.distanceBetween(
         lat,
         lng,
-        carmelitaLatitude,
-        carmelitaLongitude,
+        activeCenterLatitude,
+        activeCenterLongitude,
       );
 
       if (previousDirection == 'IN') {
@@ -549,6 +563,48 @@ class GeofenceLocationService {
       return perm;
     } catch (_) {
       return LocationPermission.denied;
+    }
+  }
+
+  /// Returns true when background ("Always" / "Allow all the time") location
+  /// permission is granted. The native Android geofence BroadcastReceiver and
+  /// iOS region-monitoring delegate require this permission level to fire while
+  /// CarmeLink is suspended or killed.
+  static Future<bool> hasBackgroundPermission() async {
+    if (kIsWeb) return false;
+    try {
+      final status = await Permission.locationAlways.status;
+      return status.isGranted;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Requests background location ("Allow all the time" on Android,
+  /// "Always" on iOS). Must be called after foreground ("While In Use")
+  /// permission is already granted — the OS rejects background requests
+  /// made before foreground permission exists.
+  ///
+  /// Returns `true` when the OS grants the permission, `false` otherwise.
+  /// If the permission has been permanently denied the caller should direct
+  /// the user to [openAppSettings] so they can change it manually.
+  static Future<bool> requestBackgroundPermission() async {
+    if (kIsWeb) return false;
+    try {
+      // Ensure foreground permission is already in place.
+      var foreground = await Geolocator.checkPermission();
+      if (foreground == LocationPermission.denied) {
+        foreground = await Geolocator.requestPermission();
+      }
+      if (foreground == LocationPermission.denied ||
+          foreground == LocationPermission.deniedForever) {
+        return false;
+      }
+
+      final status = await Permission.locationAlways.request();
+      return status.isGranted;
+    } catch (_) {
+      return false;
     }
   }
 }
