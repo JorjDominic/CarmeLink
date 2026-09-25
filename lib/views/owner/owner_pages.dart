@@ -23,6 +23,8 @@ import '../widgets/feature_widgets.dart';
 import '../shared/account_management_page.dart';
 import '../shared/staff_quick_panel.dart';
 import '../shared/employee_curfew_profile_pages.dart';
+import '../shared/conduct_case_pages.dart';
+import '../shared/retention_settings_page.dart';
 import 'floor_plan_page.dart';
 import 'guardian_link_management_page.dart';
 import 'staff_maintenance_page.dart';
@@ -652,6 +654,7 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
 
     return PageFrame(
       title: 'Tenants',
+      maxWidth: 1400,
       subtitle: kIsWeb
           ? 'Search and manage tenant records'
           : 'Search and view tenant records',
@@ -1420,9 +1423,14 @@ class OperationsHubPage extends StatefulWidget {
 class _OperationsHubPageState extends State<OperationsHubPage> {
   final searchController = TextEditingController();
   final Set<String> _quickAccess = {
+    'Visitors',
+    'Maintenance',
+    'Cleaning schedules',
+    'Room inspections',
+    'Conduct & cases',
     'Payments',
     'Report management',
-    'Floor plan'
+    'Floor plan',
   };
   String query = '';
 
@@ -1468,6 +1476,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
 
     return PageFrame(
       title: 'Operations',
+      maxWidth: 1400,
       subtitle: 'CarmeLink',
       child: AnimatedBuilder(
         animation: controller,
@@ -1772,6 +1781,18 @@ const _operationCategories = [
           RoomMonitoringPage()),
       _OperationItem('Floor plan', 'Explore the interactive room map',
           Icons.map_outlined, AdminFloorPlanPage()),
+      _OperationItem('Maintenance', 'Manage repair requests',
+          Icons.build_outlined, MaintenanceManagementPage()),
+      _OperationItem(
+          'Cleaning schedules',
+          'Open a room to manage bed cleaning schedules',
+          Icons.cleaning_services_outlined,
+          RoomMonitoringPage()),
+      _OperationItem(
+          'Room inspections',
+          'Open a room to review inspection notices and findings',
+          Icons.fact_check_outlined,
+          RoomMonitoringPage()),
       _OperationItem(
           'Report management',
           'Maintenance, confidential, and cleaning reports',
@@ -1797,6 +1818,14 @@ const _operationCategories = [
           EmployeeCurfewProfilesPage()),
       _OperationItem('Visitors', 'Manage visitor requests',
           Icons.people_outline, VisitorManagementPage()),
+      _OperationItem(
+          'Conduct & cases',
+          'Review incidents, responses, warnings and appeals',
+          Icons.gavel_outlined,
+          StaffConductCasesPage()),
+      _OperationItem('Confidential reports', 'Review private reports',
+          Icons.shield_outlined, ConfidentialReportsPage(),
+          ownerOnly: true),
       _OperationItem('Disciplinary records', 'Manage violations',
           Icons.gavel_outlined, DisciplinaryRecordsPage(),
           ownerOnly: true),
@@ -1819,6 +1848,19 @@ const _operationCategories = [
       _OperationItem('Analytics', 'View operational metrics and trends',
           Icons.analytics_outlined, ReportsAnalyticsPage(),
           ownerOnly: true),
+    ],
+  ),
+  _OperationCategory(
+    'Administration',
+    'Privacy, security and operational configuration',
+    Icons.admin_panel_settings_outlined,
+    Color(0xFF7D70A0),
+    [
+      _OperationItem(
+          'Security & retention',
+          'Review sensitive-record retention settings',
+          Icons.security_outlined,
+          RetentionSettingsPage()),
     ],
   ),
   _OperationCategory(
@@ -8516,4 +8558,3 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
     );
   }
 }
-

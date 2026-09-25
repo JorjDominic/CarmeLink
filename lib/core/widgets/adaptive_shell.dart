@@ -1,12 +1,10 @@
-import 'dart:ui';
-
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
 import '../../views/shared/shared_views.dart';
 import 'common_widgets.dart';
+
+import '../runtime/app_surface.dart';
 
 class AppDestination {
   const AppDestination({
@@ -33,7 +31,7 @@ class CarmelitaNavScope extends InheritedWidget {
     super.key,
   });
 
-  final VoidCallback openMenu;
+  final Future<void> Function() openMenu;
   final VoidCallback? openMessages;
   final ValueChanged<int> selectIndex;
 
@@ -90,11 +88,91 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     setState(() => index = value);
   }
 
-  void _openMenu() {
+  Future<void> _openMenu() async {
+    final webPortal = CarmeLinkSurfaceScope.isWebPortal(context);
+    final menuDestinations = webPortal
+        ? [...widget.destinations, ...widget.webDestinations]
+        : widget.destinations;
+
+    if (webPortal) {
+      await showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: 'Close navigation',
+        barrierColor: Colors.black.withValues(alpha: .26),
+        transitionDuration: const Duration(milliseconds: 360),
+        pageBuilder: (dialogContext, animation, secondaryAnimation) {
+          final width = MediaQuery.sizeOf(dialogContext).width;
+          final drawerWidth = width < 420 ? width - 24 : 372.0;
+
+          return SafeArea(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: drawerWidth,
+                  child: Material(
+                    color: Theme.of(dialogContext).colorScheme.surface,
+                    elevation: 16,
+                    clipBehavior: Clip.antiAlias,
+                    borderRadius: BorderRadius.circular(24),
+                    child: SingleChildScrollView(
+                      child: _RoleMenu(
+                        roleLabel: widget.roleLabel,
+                        destinations: menuDestinations,
+                        currentIndex: index,
+                        onOpenMessages: () {
+                          Navigator.of(dialogContext).pop();
+                          _openMessages();
+                        },
+                        onSelect: (value) {
+                          Navigator.of(dialogContext).pop();
+                          _select(value);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        transitionBuilder: (context, animation, secondaryAnimation, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutBack,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOut,
+            ),
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(-1.06, 0),
+                end: Offset.zero,
+              ).animate(curved),
+              child: RotationTransition(
+                turns: Tween<double>(
+                  begin: -.025,
+                  end: 0,
+                ).animate(curved),
+                alignment: Alignment.centerLeft,
+                child: child,
+              ),
+            ),
+          );
+        },
+      );
+      return;
+    }
+
     final useSidePanel = MediaQuery.sizeOf(context).width >= 780;
 
     if (useSidePanel) {
-      showDialog<void>(
+      await showDialog<void>(
         context: context,
         barrierColor: Colors.black.withValues(alpha: .28),
         builder: (dialogContext) {
@@ -102,17 +180,16 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
             alignment: Alignment.centerLeft,
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Material(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(28),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: SizedBox(
-                  width: 360,
+              child: SizedBox(
+                width: 360,
+                child: Material(
+                  color: Theme.of(dialogContext).colorScheme.surface,
+                  elevation: 16,
+                  clipBehavior: Clip.antiAlias,
+                  borderRadius: BorderRadius.circular(24),
                   child: _RoleMenu(
                     roleLabel: widget.roleLabel,
-                    destinations: widget.destinations,
+                    destinations: menuDestinations,
                     currentIndex: index,
                     onOpenMessages: () {
                       Navigator.of(dialogContext).pop();
@@ -132,7 +209,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       return;
     }
 
-    showModalBottomSheet<void>(
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -145,16 +222,17 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
           expand: false,
           builder: (context, scrollController) {
             return Material(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(30),
-              ),
+              color: Theme.of(sheetContext).colorScheme.surface,
+              elevation: 16,
               clipBehavior: Clip.antiAlias,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
               child: SingleChildScrollView(
                 controller: scrollController,
                 child: _RoleMenu(
                   roleLabel: widget.roleLabel,
-                  destinations: widget.destinations,
+                  destinations: menuDestinations,
                   currentIndex: index,
                   onOpenMessages: () {
                     Navigator.of(sheetContext).pop();
@@ -184,8 +262,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     AdaptiveRoleShell.activeMessagePage = widget.messagePage;
     // Mobile keeps the original tab count, even when the browser is resized
     // after selecting a desktop-only management destination.
-    final desktopWeb = kIsWeb && MediaQuery.sizeOf(context).width >= 1024;
-    final activeDestinations = desktopWeb
+    final webPortal = CarmeLinkSurfaceScope.isWebPortal(context);
+    final desktopWeb = webPortal && MediaQuery.sizeOf(context).width >= 1200;
+    final activeDestinations = webPortal
         ? [...widget.destinations, ...widget.webDestinations]
         : widget.destinations;
     final activeIndex = index < activeDestinations.length ? index : 0;
@@ -202,30 +281,171 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       openMessages: _openMessages,
       selectIndex: _select,
       child: Scaffold(
-        extendBody: !desktopWeb,
-        body: desktopWeb
-            ? Row(
+        extendBody: !webPortal,
+        body: webPortal
+            ? desktopWeb
+                ? Row(
+                    children: [
+                      _WebStaffSidebar(
+                        roleLabel: widget.roleLabel,
+                        destinations: activeDestinations,
+                        mainDestinationCount: widget.destinations.length,
+                        selectedIndex: activeIndex,
+                        onSelected: _select,
+                        onOpenMessages: _openMessages,
+                      ),
+                      const VerticalDivider(width: 1),
+                      Expanded(child: page),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      _CompactWebNavigationBar(
+                        roleLabel: widget.roleLabel,
+                        onMenu: _openMenu,
+                      ),
+                      Expanded(child: page),
+                    ],
+                  )
+            : Stack(
+                fit: StackFit.expand,
                 children: [
-                  _WebStaffSidebar(
-                    roleLabel: widget.roleLabel,
-                    destinations: activeDestinations,
-                    mainDestinationCount: widget.destinations.length,
-                    selectedIndex: activeIndex,
-                    onSelected: _select,
-                    onOpenMessages: _openMessages,
+                  page,
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _FloatingIslandNavigation(
+                      destinations: widget.destinations,
+                      selectedIndex: activeIndex,
+                      onSelected: _select,
+                    ),
                   ),
-                  const VerticalDivider(width: 1),
-                  Expanded(child: page),
                 ],
-              )
-            : page,
-        bottomNavigationBar: desktopWeb
-            ? null
-            : _FloatingIslandNavigation(
-                destinations: widget.destinations,
-                selectedIndex: activeIndex,
-                onSelected: _select,
               ),
+        bottomNavigationBar: null,
+      ),
+    );
+  }
+}
+
+class _CompactWebNavigationBar extends StatefulWidget {
+  const _CompactWebNavigationBar({
+    required this.roleLabel,
+    required this.onMenu,
+  });
+
+  final String roleLabel;
+  final Future<void> Function() onMenu;
+
+  @override
+  State<_CompactWebNavigationBar> createState() =>
+      _CompactWebNavigationBarState();
+}
+
+class _CompactWebNavigationBarState extends State<_CompactWebNavigationBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _menuController;
+  bool _menuOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _menuController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+      reverseDuration: const Duration(milliseconds: 260),
+    );
+  }
+
+  Future<void> _toggleMenu() async {
+    if (_menuOpen) return;
+
+    setState(() => _menuOpen = true);
+    await _menuController.forward();
+
+    try {
+      await widget.onMenu();
+    } finally {
+      if (!mounted) return;
+      await _menuController.reverse();
+      if (mounted) {
+        setState(() => _menuOpen = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _menuController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Material(
+      key: const Key('compact-web-navigation-bar'),
+      color: scheme.surface,
+      elevation: 0,
+      child: SafeArea(
+        bottom: false,
+        child: Container(
+          height: 58,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: theme.dividerColor),
+            ),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                key: const Key('web-responsive-hamburger'),
+                tooltip: _menuOpen ? 'Close navigation' : 'Open navigation',
+                onPressed: _menuOpen ? null : _toggleMenu,
+                icon: AnimatedIcon(
+                  icon: AnimatedIcons.menu_close,
+                  progress: CurvedAnimation(
+                    parent: _menuController,
+                    curve: Curves.easeInOutCubic,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'CarmeLink',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: theme.dividerColor),
+                ),
+                child: Text(
+                  widget.roleLabel,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -417,7 +637,9 @@ class _FloatingIslandNavigation extends StatelessWidget {
     final width = MediaQuery.sizeOf(context).width;
     final horizontalInset = width < 350 ? 8.0 : 14.0;
     final maxWidth = width >= 700 ? 560.0 : width - (horizontalInset * 2);
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
 
     return SafeArea(
       top: false,
@@ -429,67 +651,47 @@ class _FloatingIslandNavigation extends StatelessWidget {
       ),
       child: Center(
         heightFactor: 1,
-        child: SizedBox(
+        child: Container(
           width: maxWidth,
           height: 68,
-          child: ClipRRect(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 7,
+          ),
+          decoration: BoxDecoration(
+            color: scheme.surface,
             borderRadius: const BorderRadius.all(
               Radius.circular(30),
             ),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(
-                sigmaX: 7,
-                sigmaY: 7,
+            border: Border.all(color: theme.dividerColor),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(
+                  alpha: dark ? .22 : .10,
+                ),
+                blurRadius: 26,
+                offset: const Offset(0, 12),
               ),
-              child: Container(
-                width: maxWidth,
-                height: 68,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: dark
-                      ? const Color(0xFF221E1A).withValues(alpha: .94)
-                      : Colors.white.withValues(alpha: .94),
-                  borderRadius: const BorderRadius.all(
-                    Radius.circular(30),
-                  ),
-                  border: Border.all(
-                    color:
-                        Theme.of(context).dividerColor.withValues(alpha: .90),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: dark ? .22 : .09,
-                      ),
-                      blurRadius: 28,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: List.generate(
-                    destinations.length,
-                    (navIndex) {
-                      final item = destinations[navIndex];
-                      final selected = navIndex == selectedIndex;
+            ],
+          ),
+          child: Row(
+            children: List.generate(
+              destinations.length,
+              (navIndex) {
+                final item = destinations[navIndex];
+                final selected = navIndex == selectedIndex;
 
-                      return Expanded(
-                        child: _IslandItem(
-                          label: item.label,
-                          icon: item.icon,
-                          selectedIcon: item.selectedIcon,
-                          selected: selected,
-                          isWorkInProgress: item.isWorkInProgress,
-                          onTap: () => onSelected(navIndex),
-                        ),
-                      );
-                    },
+                return Expanded(
+                  child: _IslandItem(
+                    label: item.label,
+                    icon: item.icon,
+                    selectedIcon: item.selectedIcon,
+                    selected: selected,
+                    isWorkInProgress: item.isWorkInProgress,
+                    onTap: () => onSelected(navIndex),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ),

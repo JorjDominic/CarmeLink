@@ -6,6 +6,8 @@ import '../../views/owner/contracts_page.dart';
 import '../../views/owner/owner_pages.dart';
 import '../../views/owner/room_monitoring_page.dart';
 import '../../views/shared/conduct_case_pages.dart';
+import '../../views/shared/employee_curfew_profile_pages.dart';
+import '../../views/shared/retention_settings_page.dart';
 import '../theme/web_theme.dart';
 import 'widgets/staff_overview_card.dart';
 
@@ -227,9 +229,41 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                           ),
                           OutlinedButton.icon(
                             onPressed: () =>
+                                _open(const VisitorManagementPage()),
+                            icon: const Icon(Icons.people_outline, size: 18),
+                            label: const Text('Visitors'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => _open(const RoomMonitoringPage()),
+                            icon: const Icon(
+                              Icons.cleaning_services_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Cleaning schedules'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => _open(const RoomMonitoringPage()),
+                            icon:
+                                const Icon(Icons.fact_check_outlined, size: 18),
+                            label: const Text('Room inspections'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () =>
                                 _open(const StaffConductCasesPage()),
                             icon: const Icon(Icons.gavel_outlined, size: 18),
                             label: const Text('Conduct & cases'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                _open(const EmployeeCurfewProfilesPage()),
+                            icon: const Icon(Icons.badge_outlined, size: 18),
+                            label: const Text('Employee curfew'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                _open(const RetentionSettingsPage()),
+                            icon: const Icon(Icons.security_outlined, size: 18),
+                            label: const Text('Security & retention'),
                           ),
                         ]),
                       ],

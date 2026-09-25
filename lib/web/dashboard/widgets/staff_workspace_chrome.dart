@@ -25,7 +25,7 @@ class StaffWorkspaceChrome extends StatelessWidget {
     final spacious = width >= 900;
 
     return Scaffold(
-      backgroundColor: WebPalette.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -35,9 +35,11 @@ class StaffWorkspaceChrome extends StatelessWidget {
                 horizontal: spacious ? 26 : 12,
                 vertical: spacious ? 15 : 9,
               ),
-              decoration: const BoxDecoration(
-                color: WebPalette.surface,
-                border: Border(bottom: BorderSide(color: WebPalette.border)),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                border: Border(
+                  bottom: BorderSide(color: Theme.of(context).dividerColor),
+                ),
               ),
               child: Row(
                 children: [

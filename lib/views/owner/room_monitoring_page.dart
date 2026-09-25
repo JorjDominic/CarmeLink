@@ -266,8 +266,9 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
 
     return PageFrame(
       title: 'Room monitoring',
+      maxWidth: 1400,
       subtitle: _viewMode == RoomViewMode.list
-          ? 'Live rooms, bed spaces, occupancy, and availability'
+          ? 'Rooms, occupancy, cleaning schedules and inspections'
           : 'Interactive building layout, occupancy, and room status',
       onRefresh: () => _loadRooms(showSpinner: currentRooms == null),
       actions: [

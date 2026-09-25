@@ -10,6 +10,9 @@ import '../../views/owner/owner_pages.dart';
 import '../../views/owner/room_monitoring_page.dart';
 import '../../views/shared/account_management_page.dart';
 import '../../views/shared/shared_views.dart';
+import '../../views/shared/conduct_case_pages.dart';
+import '../../views/shared/employee_curfew_profile_pages.dart';
+import '../../views/shared/retention_settings_page.dart';
 import 'staff_overview_page.dart';
 
 /// A browser-only destination composition. Every management destination is
@@ -67,6 +70,42 @@ abstract final class StaffWebDestinations {
           icon: Icons.manage_accounts_outlined,
           selectedIcon: Icons.manage_accounts,
           page: AccountManagementPage(),
+        ),
+        const AppDestination(
+          label: 'Cleaning',
+          icon: Icons.cleaning_services_outlined,
+          selectedIcon: Icons.cleaning_services,
+          page: RoomMonitoringPage(),
+        ),
+        const AppDestination(
+          label: 'Inspections',
+          icon: Icons.fact_check_outlined,
+          selectedIcon: Icons.fact_check,
+          page: RoomMonitoringPage(),
+        ),
+        const AppDestination(
+          label: 'Visitors',
+          icon: Icons.people_outline,
+          selectedIcon: Icons.people,
+          page: VisitorManagementPage(),
+        ),
+        const AppDestination(
+          label: 'Conduct & cases',
+          icon: Icons.gavel_outlined,
+          selectedIcon: Icons.gavel,
+          page: StaffConductCasesPage(),
+        ),
+        const AppDestination(
+          label: 'Employee curfew',
+          icon: Icons.badge_outlined,
+          selectedIcon: Icons.badge,
+          page: EmployeeCurfewProfilesPage(),
+        ),
+        const AppDestination(
+          label: 'Security & retention',
+          icon: Icons.security_outlined,
+          selectedIcon: Icons.security,
+          page: RetentionSettingsPage(),
         ),
         if (role == UserRole.owner) ...[
           const AppDestination(

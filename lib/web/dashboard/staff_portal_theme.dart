@@ -1,36 +1,44 @@
 import 'package:flutter/material.dart';
 
-import '../theme/web_theme.dart';
-
-/// Strictly scoped to the staff web workspace. Uses the EXACT existing palette
-/// and inherited font family, without changing global or mobile ThemeData.
+/// Staff workspace styling that follows the active ThemeData.
+/// It intentionally avoids forcing the old light-only web palette so
+/// Light, Dark, and System remain visually consistent.
 abstract final class StaffPortalTheme {
   static ThemeData from(ThemeData base) {
-    const rounded = OutlineInputBorder(
-      borderRadius: BorderRadius.all(Radius.circular(12)),
-      borderSide: BorderSide(color: WebPalette.border),
+    final scheme = base.colorScheme;
+    final border = base.dividerColor;
+
+    final rounded = OutlineInputBorder(
+      borderRadius: const BorderRadius.all(Radius.circular(12)),
+      borderSide: BorderSide(color: border),
     );
-    const focused = OutlineInputBorder(
-      borderRadius: BorderRadius.all(Radius.circular(12)),
-      borderSide: BorderSide(color: WebPalette.plum, width: 1.6),
+    final focused = OutlineInputBorder(
+      borderRadius: const BorderRadius.all(Radius.circular(12)),
+      borderSide: BorderSide(color: scheme.primary, width: 1.6),
     );
+
     return base.copyWith(
-      inputDecorationTheme: const InputDecorationTheme(
+      inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: WebPalette.surface,
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        fillColor: scheme.surface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
         border: rounded,
         enabledBorder: rounded,
         focusedBorder: focused,
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
-          borderSide: BorderSide(color: WebPalette.danger),
+          borderRadius: const BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: scheme.error),
         ),
-        labelStyle: TextStyle(color: WebPalette.muted),
-        hintStyle: TextStyle(color: WebPalette.muted),
+        labelStyle: TextStyle(color: scheme.onSurfaceVariant),
+        hintStyle: TextStyle(color: scheme.onSurfaceVariant),
       ),
-      dataTableTheme: const DataTableThemeData(
-        headingRowColor: WidgetStatePropertyAll(WebPalette.cream),
+      dataTableTheme: DataTableThemeData(
+        headingRowColor: WidgetStatePropertyAll(
+          scheme.surfaceContainerLow,
+        ),
         dataRowMinHeight: 54,
         dataRowMaxHeight: 66,
         headingRowHeight: 48,
@@ -38,56 +46,65 @@ abstract final class StaffPortalTheme {
         horizontalMargin: 18,
         columnSpacing: 22,
         headingTextStyle: TextStyle(
-          color: WebPalette.plum,
+          color: scheme.primary,
           fontSize: 12,
           fontWeight: FontWeight.w800,
         ),
-        dataTextStyle: TextStyle(color: WebPalette.ink, fontSize: 13),
+        dataTextStyle: TextStyle(
+          color: scheme.onSurface,
+          fontSize: 13,
+        ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: WebPalette.surface,
+        backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: WebPalette.border),
+          side: BorderSide(color: border),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
-        backgroundColor: WebPalette.sand,
-        selectedColor: WebPalette.cream,
-        side: const BorderSide(color: WebPalette.border),
+        backgroundColor: scheme.surfaceContainerLow,
+        selectedColor: scheme.primaryContainer,
+        side: BorderSide(color: border),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
-        labelStyle: const TextStyle(color: WebPalette.ink, fontSize: 12),
+        labelStyle: TextStyle(
+          color: scheme.onSurface,
+          fontSize: 12,
+        ),
       ),
-      listTileTheme: const ListTileThemeData(
-        iconColor: WebPalette.plum,
-        textColor: WebPalette.ink,
-        contentPadding: EdgeInsets.symmetric(horizontal: 14),
+      listTileTheme: ListTileThemeData(
+        iconColor: scheme.primary,
+        textColor: scheme.onSurface,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14),
       ),
       popupMenuTheme: PopupMenuThemeData(
-        color: WebPalette.surface,
+        color: scheme.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(13),
-          side: const BorderSide(color: WebPalette.border),
+          side: BorderSide(color: border),
         ),
       ),
       tooltipTheme: TooltipThemeData(
-        textStyle: const TextStyle(color: WebPalette.surface, fontSize: 12),
+        textStyle: TextStyle(
+          color: scheme.onInverseSurface,
+          fontSize: 12,
+        ),
         decoration: BoxDecoration(
-          color: WebPalette.ink,
+          color: scheme.inverseSurface,
           borderRadius: BorderRadius.circular(9),
         ),
       ),
-      snackBarTheme: const SnackBarThemeData(
+      snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: WebPalette.ink,
-        contentTextStyle: TextStyle(color: WebPalette.surface),
+        backgroundColor: scheme.inverseSurface,
+        contentTextStyle: TextStyle(color: scheme.onInverseSurface),
       ),
-      dividerTheme: const DividerThemeData(
-        color: WebPalette.border,
+      dividerTheme: DividerThemeData(
+        color: border,
         thickness: .7,
       ),
     );

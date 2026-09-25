@@ -6,6 +6,8 @@ import '../landing/landing_page.dart';
 import '../theme/web_theme.dart';
 import 'web_routes.dart';
 
+import '../../core/runtime/app_surface.dart';
+
 /// Separate Flutter web application. Does not alter the mobile app's routing.
 class CarmeLinkWebApp extends StatelessWidget {
   const CarmeLinkWebApp({super.key, this.authReady = true});
@@ -17,6 +19,10 @@ class CarmeLinkWebApp extends StatelessWidget {
     return MaterialApp(
       title: 'CarmeLink | Carmelita Dormitory',
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => CarmeLinkSurfaceScope(
+        surface: CarmeLinkAppSurface.webPortal,
+        child: child ?? const SizedBox.shrink(),
+      ),
       theme: WebTheme.light(),
       initialRoute: SessionController.isPasswordRecoveryUri(Uri.base)
           ? WebRoutes.resetPassword
