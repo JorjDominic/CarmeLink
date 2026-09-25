@@ -63,6 +63,8 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>CarmeLink requires camera access to capture photos of maintenance issues and payment receipts.</string>

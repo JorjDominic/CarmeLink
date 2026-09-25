@@ -9,6 +9,7 @@ import 'core/constants/app_assets.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/connectivity_banner.dart';
 import 'models/models.dart';
+import 'services/push_notification_service.dart';
 import 'views/auth/auth_views.dart';
 import 'views/auth/mobile_auth_entry.dart';
 import 'views/caretaker/caretaker_shell.dart';
@@ -32,6 +33,7 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   final AppLinks _appLinks = AppLinks();
 
   StreamSubscription<Uri>? _linkSubscription;
+  StreamSubscription<Map<String, dynamic>>? _notificationSubscription;
   String? _pendingOnboardingToken;
   String? _openedOnboardingToken;
   bool assetsCached = false;
@@ -41,6 +43,17 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     super.initState();
     sessionController.addListener(_tryOpenPendingOnboarding);
     _listenForLinks();
+    _notificationSubscription = PushNotificationService
+        .instance.openedNotifications
+        .listen(_openNotificationDestination);
+  }
+
+  void _openNotificationDestination(Map<String, dynamic> data) {
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null || sessionController.currentUser == null) return;
+    navigator.push(
+      MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
+    );
   }
 
   Future<void> _listenForLinks() async {
@@ -102,6 +115,7 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   void dispose() {
     sessionController.removeListener(_tryOpenPendingOnboarding);
     _linkSubscription?.cancel();
+    _notificationSubscription?.cancel();
     super.dispose();
   }
 

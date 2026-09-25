@@ -9,6 +9,7 @@ import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../services/room_service.dart';
 import '../services/geofence_scheduler.dart';
+import '../services/push_notification_service.dart';
 import '../services/tenant_service.dart';
 import 'guardian_controller.dart';
 import 'messaging_controller.dart';
@@ -76,6 +77,11 @@ class SessionController extends ChangeNotifier {
         if (_currentUser?.role == UserRole.tenant) {
           unawaited(GeofenceScheduler.instance.start(_currentUser!.id));
         }
+        if (_currentUser != null) {
+          unawaited(
+            PushNotificationService.instance.registerForUser(_currentUser!.id),
+          );
+        }
       }
     } catch (e) {
       debugPrint('Session restore failed or timed out: $e');
@@ -106,6 +112,11 @@ class SessionController extends ChangeNotifier {
         unawaited(GeofenceScheduler.instance.start(_currentUser!.id));
       } else {
         GeofenceScheduler.instance.stop();
+      }
+      if (_currentUser != null) {
+        unawaited(
+          PushNotificationService.instance.registerForUser(_currentUser!.id),
+        );
       }
 
       return true;
@@ -142,6 +153,11 @@ class SessionController extends ChangeNotifier {
       if (_currentUser?.role == UserRole.tenant) {
         unawaited(GeofenceScheduler.instance.start(_currentUser!.id));
       }
+      if (_currentUser != null) {
+        unawaited(
+          PushNotificationService.instance.registerForUser(_currentUser!.id),
+        );
+      }
 
       return true;
     } on TimeoutException {
@@ -177,6 +193,7 @@ class SessionController extends ChangeNotifier {
 
   Future<void> signOut() async {
     GeofenceScheduler.instance.stop();
+    await PushNotificationService.instance.revokeCurrentToken();
     await _authService.signOut();
 
     _currentUser = null;

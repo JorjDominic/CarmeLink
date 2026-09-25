@@ -1,6 +1,6 @@
 # CarmeLink Development Progress
 
-Last updated: September 23, 2026
+Last updated: September 25, 2026
 
 This file tracks development separately from the README. Page ownership is
 divided between two developers to reduce merge conflicts.
@@ -25,6 +25,115 @@ targets; a feature is not release-complete until its platform-specific behavior
 has either been validated on both or is explicitly tracked as blocked.
 
 ## Immediate agenda
+
+### September 25, 2026 — Today's implementation agenda
+
+Today's work resumes the tenant-onboarding workstream and prioritizes physical
+mobile validation. Complete the items in the following order so defects found
+in platform services are resolved before the onboarding release candidate is
+declared ready. A checkbox may be marked complete only after its stated tests
+pass; Android success does not imply iOS success.
+
+#### 1. Geofencing testing and fixes
+
+- [ ] Run the existing automated geofence, scheduler, polygon, hysteresis,
+  retry/backoff, deduplication, and session-cleanup tests; record and fix every
+  regression before physical-device testing.
+- [ ] Validate foreground, background, app-resume, force-close/relaunch, device
+  restart, and power-management behavior on a physical Android device.
+- [ ] Validate the equivalent lifecycle on a physical iPhone, including iOS
+  location authorization changes and background restrictions.
+- [ ] Test daytime, pre-curfew, active-curfew, and curfew-sleep rescheduling and
+  confirm that only one scheduled checker is active.
+- [ ] Exercise denied/permanently-denied permission, disabled GPS, timeout,
+  poor signal, offline queueing, restored connectivity, and restored-location
+  recovery paths.
+- [ ] Perform an on-site walk across every polygon edge in both directions;
+  compare expected transitions with persisted gate events and confirm that the
+  hysteresis band prevents boundary chatter.
+- [ ] Fix all reproducible defects without persisting raw coordinates, weakening
+  role isolation, or generating duplicate IN/OUT events.
+- [ ] Re-run automated tests plus the Android/iOS physical-device matrix and
+  document any platform limitation that cannot be fixed today.
+
+#### 2. Firebase Cloud Messaging for Android and iOS
+
+Implementation update — September 25, 2026: FlutterFire initialization, Android
+Firebase registration, permission handling, foreground/background/terminated
+message lifecycle, local foreground presentation, token refresh/revocation,
+notification-tap routing, an RLS-protected device-token/notification schema,
+and the protected `send-fcm-notification` Edge Function are implemented. The
+Android debug APK builds successfully. Production delivery remains open until
+the Google service-account credentials are stored as Supabase secrets and a
+physical-device send is verified. iOS remains open pending its Firebase plist,
+APNs key, Apple capabilities/signing, Codemagic build, and physical-iPhone test.
+Firebase Analytics was intentionally not added; the Firebase foundation remains
+compatible with adding it later.
+
+- [ ] Add and configure the Flutter/Firebase messaging dependencies without
+  exposing Firebase, APNs, or server credentials in the client repository.
+- [ ] Configure the Android Firebase application, notification permission for
+  supported Android versions, manifest/service requirements, notification
+  channel, icons, and foreground/background/terminated handlers.
+- [ ] Configure the iOS Firebase application, Push Notifications and Background
+  Modes capabilities, APNs authentication in Firebase, permission prompts, and
+  foreground/background/terminated handlers.
+- [ ] Add protected per-user/per-device FCM token registration, token refresh,
+  revocation on sign-out/account switch, last-seen metadata, platform metadata,
+  RLS, and cleanup of invalid tokens.
+- [ ] Connect persisted role-scoped notification events to server-side FCM
+  delivery; keep payloads data-minimized and make the database notification row
+  the source of truth.
+- [ ] Implement notification tap/deep-link routing to authorized records after
+  cold start, warm start, and authenticated session restoration.
+- [ ] Respect per-user delivery preferences while allowing policy-approved
+  mandatory safety notifications; define foreground presentation and duplicate
+  suppression behavior.
+- [ ] Test delivery, token rotation, preference enforcement, deep links, denied
+  permission, sign-out, and account switching on physical Android and iPhone
+  devices. Record delivery failures without logging sensitive payload content.
+
+#### 3. Complete and optimize the tenant onboarding workflow
+
+- [ ] Audit the current invitation/QR, authentication, profile form, contract,
+  requirement, signer, document, activation, billing, room/bed, guardian,
+  trusted-device, and permission steps against the canonical workflow below.
+- [ ] Provide one resumable onboarding checklist with a clear current step,
+  completed/pending/rejected states, role ownership, next action, and safe return
+  after sign-in, deep link, app restart, or temporary failure.
+- [ ] Remove duplicate entry points and dead ends; route owners, caretakers, and
+  tenants to the same server-derived onboarding state while showing only actions
+  authorized for their role.
+- [ ] Optimize network loading by avoiding duplicate reads, refreshing only
+  affected records, preserving entered form data, and providing explicit
+  loading, empty, error, retry, offline, and submission-in-progress states.
+- [ ] Complete invitation expiry/revocation, email verification, permanent
+  password, profile validation, required documents, independent signers,
+  signed-copy review, activation prerequisites, and audit history. SMS remains
+  explicitly blocked until a provider is approved.
+- [ ] Verify that activation is enforced server-side, makes financial terms
+  immutable, generates the correct deposit/rent charges once, and cannot be
+  bypassed by client navigation or repeated submissions.
+- [ ] Complete the post-activation handoff to initial payment, room/bed
+  assignment, guardian linking when required, trusted-device setup, and required
+  permissions without conflating their underlying records.
+- [ ] Add unit, widget, integration, multi-account RLS, offline/retry, QR/deep
+  link, and duplicate-submission tests; validate the full happy path and recovery
+  paths on Android and iOS.
+
+#### Definition of done for today's agenda
+
+- [ ] `flutter analyze` reports no issues and the complete Flutter test suite
+  passes after all fixes.
+- [ ] Geofencing has recorded Android and iOS physical-device results, including
+  the on-site boundary walk or a clearly documented external blocker.
+- [ ] FCM sends and opens authorized test notifications on both physical Android
+  and iPhone devices in foreground, background, and terminated states.
+- [ ] A newly invited tenant can resume and complete every currently approved
+  onboarding prerequisite without staff/client bypasses or duplicate financial
+  records.
+- [ ] Update this progress file with actual results, remaining blockers, test
+  counts, and platform/device evidence before closing the workday.
 
 ### Approved additions — implementation gate
 
@@ -323,8 +432,8 @@ release checks.
    tenant onboarding/lease workstream.
 2. **Persistent notifications and preferences** — generate role-scoped events,
    read/unread state, deep links, per-user delivery settings, and FCM delivery.
-   Implement Android first while keeping the token schema, payloads, routing,
-   and Flutter handlers compatible with iOS/APNs from the start.
+   Android and iOS/APNs implementation and physical-device validation are both
+   included in the September 25 immediate agenda.
 3. **Disciplinary records** — restricted incident, notice, evidence, and history
    workflow.
 4. **Live reports and analytics** — derive owner metrics from the completed
@@ -333,11 +442,11 @@ release checks.
    registration, revocation, audit history, and background checks.
 
 > [!IMPORTANT]
-> **Account creation and the complete tenant onboarding workflow are deferred,
-> not cancelled.** They depend on the group web app and remain a release-critical
-> integration. Do not remove their schema, security rules, or documented flow.
-> Resume them when the web implementation is available; they are intentionally
-> excluded from the immediate agenda above.
+> **The complete tenant onboarding workflow was resumed on September 25, 2026.**
+> Mobile implementation, optimization, and validation are part of today's
+> immediate agenda. Integration points that still depend on the group web app
+> remain tracked dependencies; they do not justify removing the existing schema,
+> security rules, resumable mobile workflow, or documented release checks.
 
 The planned contracts module must synchronize through separate contract,
 billing-charge, and payment-transaction records. Verified payment amounts and
@@ -388,7 +497,7 @@ privacy, and notification behavior are implemented correctly.
 - [ ] Produce signed Android App Bundle and iOS archive/TestFlight builds from the same release candidate.
 - [ ] Complete any applicable Google Play closed-testing requirement before applying for production access.
 
-### Account creation → contract — IMPORTANT, DEFERRED
+### Account creation → contract — ACTIVE SEPTEMBER 25 WORKSTREAM
 
 After an authorized owner or caretaker creates a **tenant** account, no
 verification message is sent automatically. When the tenant attempts to sign
