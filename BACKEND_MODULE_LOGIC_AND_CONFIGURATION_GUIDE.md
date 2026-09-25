@@ -41,7 +41,7 @@ Use this section before the module reference when preparing a demonstration, def
 | Issue | Evidence in the current repository | Why it matters | Required decision/action |
 |---|---|---|---|
 | Boundary-editing backend is missing | `BoundaryConfigService` calls `update_dorm_boundary_config`, but `202609250002_boundary_config_editable.sql` is zero bytes and no repository migration defines the RPC. | Editing will fail unless an unreproducible function was created manually in production. It also conflicts with any paper claim that the boundary is hardcoded or has no admin editor. | Choose one design: implement and migrate an authorized, validated owner/staff RPC; or remove/disable the editing client and document the boundary as deployment-managed. Make the paper match the chosen implementation. |
-| Announcement push hook is a no-op | `AnnouncementService._dispatchFCMNotificationIfConfigured` contains comments only. A separate `AppNotificationService.notifyNewAnnouncement` implementation exists, but the owner announcement creation call does not automatically route through it. | The announcement saves successfully while users receive no push, creating a silent live-demo failure. | After insert, explicitly call the notification service/Edge Function with correct audience fan-out, or remove the push claim from the demo and documentation. Test in-app and device delivery separately. |
+| Announcement push needs staging proof | Announcement creation now routes through `AppNotificationService.notifyNewAnnouncement` and marks `fcm_sent` only after the Edge Function accepts the request. | Repository wiring is complete, but deployed secrets, recipient rows, and physical-device delivery are not proven locally. | Deploy the functions and test tenant, guardian, and all-resident audiences on staging devices. |
 | Retention configuration has no executor in this repository | Settings and audit events exist, but no scheduled deletion/anonymization task was found. | A saved retention duration does not dispose of data. Claiming automated disposal would overstate the implementation. | Describe enforcement as future work unless a separately deployed scheduled job can be evidenced. If such a job exists, document its location, schedule, authorization, target tables, dry-run/recovery behavior, and logs. |
 
 ### Tier 2 — standard backend due diligence
@@ -275,7 +275,7 @@ Access is centralized by `can_access_conversation`: participants, relevant guard
 
 ## 13. Announcements and notifications
 
-`AnnouncementService` lists visible announcements and allows staff to create, update, pin, and delete records. It keeps a 30-second in-memory cache by audience. Its internal FCM hook is currently a documented **stub**: creating an announcement does not itself send push or set `fcm_sent`. Announcement push must be initiated through `AppNotificationService.notifyNewAnnouncement` (or the stub must be implemented). The database announcement remains the durable record either way.
+`AnnouncementService` lists visible announcements and allows staff to create, update, pin, and delete records. It keeps a 30-second in-memory cache by audience. Creating an announcement invokes `AppNotificationService.notifyNewAnnouncement`; the authorized Edge Function creates recipient notification rows and attempts FCM delivery. The service records `fcm_sent` only after the function accepts the request. The database announcement remains the durable record if push delivery is unavailable.
 
 `AppNotificationService` provides typed helper methods for announcements, maintenance, payments, utility bills, visitors, curfew, conduct, appeals, and inspections. It invokes `send-fcm-notification`, which validates the actor/recipient relationship, inserts an `app_notifications` row, sends to active `push_device_tokens`, revokes invalid tokens, and records delivery information.
 
@@ -591,7 +591,7 @@ The remote scripts may require environment variables or test credentials. Read t
 8. **Timezone mismatch.** Curfew and visitor rules must consistently use `timestamptz` with Asia/Manila business interpretation.
 9. **Preview/demo entry point deployed.** A convincing UI may run entirely from local demo data.
 10. **Retention settings without an executor.** Policies can be saved and audited while old records are never actually purged.
-11. **Announcement push assumed to be automatic.** The announcement service's FCM hook is currently a no-op; use the notification service or implement the hook.
+11. **Announcement push assumed to be production-proven.** Automatic dispatch is implemented, but staging secrets, audience fan-out, and physical-device delivery still require verification.
 12. **Guardian alert assumed to be a backend feature.** Guardian alert state is process-local and informational only.
 13. **Boundary editing RPC missing from migrations.** The client calls `update_dorm_boundary_config`, but the intended migration file is empty and no repository SQL defines the function.
 

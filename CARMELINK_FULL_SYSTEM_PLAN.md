@@ -4,20 +4,22 @@
 
 CarmeLink is a role-based dormitory management platform for Carmelita's Dormitory. It is designed to centralize tenant records, guardian relationships, room and bed assignments, payments, maintenance, curfew and gate monitoring, visitor requests, announcements, messaging, safety reports, contracts, and administrative reporting in one system.
 
-## Current Production-Readiness Snapshot — September 19, 2026
+## Current Production-Readiness Snapshot — September 25, 2026
 
-- **Primary tracked completion metric — production readiness:** approximately 70%
-- **Secondary implementation reference — functional prototype:** approximately 89%
+- **Functional prototype:** approximately 92%
+- **Demo/staging deployability:** approximately 76%
+- **Android production readiness:** approximately 58%
+- **Full Android+iOS production readiness:** approximately 42%
 
 The primary estimate credits only connected workflows proportionally; UI-only pages do
 not count as complete. Remaining work is concentrated in
-notifications/preferences, finance,
-discipline, analytics, native device binding/background location, feedback persistence,
-and final multi-account security/offline validation.
+notification preferences and secondary event hooks, release security, native device
+binding/background validation, feedback persistence, iOS Firebase/APNs, and final
+multi-account security/offline validation.
 
 The current project already uses one shared Flutter codebase and one Supabase backend so every role works with the same protected data source rather than separate databases. Android and iOS are equal production mobile targets. Android may be implemented and validated first, but architecture, schemas, payloads, navigation, and acceptance criteria must remain iOS-compatible.
 
-> **Implementation status (September 20, 2026):** The repository has live Supabase authentication and role protection, accounts, rooms/assignments, guardian links, contract-to-billing synchronization, payments, maintenance, curfew/presence records, visitor requests and arrival/departure history, announcements, real-time messaging, confidential-report workflows, and owner contract CRUD. Notifications, finance, discipline, analytics, native device binding, and production hardening remain incomplete.
+> **Implementation status (September 25, 2026):** The repository has Supabase-backed role workflows for accounts, rooms, contracts/onboarding, billing/payments, maintenance, curfew/presence, visitors, announcements, messaging, confidential reports, cleaning, inspections, conduct/appeals, and reports. Core notification hooks and Android handlers are implemented, but live delivery, preferences, several secondary module events, iOS configuration, native device binding, and production hardening remain incomplete or unverified.
 
 ---
 

@@ -154,7 +154,7 @@ Status meanings:
 - **Input:** Optional announcement category filter.
 - **Workflow:** Open Announcements and browse pinned/recent notices intended for tenants or everyone.
 - **Result:** Matching announcements appear in priority/date order.
-- **State:** **Working.** Push notification for a new announcement is not working automatically yet.
+- **State:** **Implemented, needs live proof.** Creation dispatches an audience-targeted notification, but staging and physical-device delivery remain unverified.
 
 ### Message dormitory staff
 
@@ -289,7 +289,7 @@ Status meanings:
 - **Input:** Optional category filter.
 - **Workflow:** Open Announcements.
 - **Result:** Guardian/all-audience notices appear.
-- **State:** **Working; automatic announcement push remains incomplete.**
+- **State:** **Implemented; automatic announcement push requires staging/device verification.**
 
 ### Message staff
 
@@ -560,6 +560,8 @@ Caretakers use many of the same operational screens as owners. Actions that requ
 
 ### Usable but still needs live or physical-device proof
 
+Passing local tests does not prove every workflow against the deployed backend. The following require a configured staging project, authorized test accounts, deployed functions/secrets, or physical devices.
+
 - Email/recovery delivery
 - RLS and private Storage isolation
 - Realtime updates
@@ -572,7 +574,7 @@ Caretakers use many of the same operational screens as owners. Actions that requ
 ### Incomplete or placeholder
 
 - Boundary editing
-- Announcement push-on-create
+- Announcement push deployment and physical-device verification
 - One obsolete notification shortcut/page
 - Persistent notification preferences
 - Guardian personal alert scheduling

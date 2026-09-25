@@ -14,21 +14,13 @@ Development assignments and completion status are tracked separately in
 [`DEVELOPMENT_PROGRESS.md`](DEVELOPMENT_PROGRESS.md).
 
 > [!IMPORTANT]
-> Additions approved on September 23, 2026 are tracked here. Separate
-> rent/utility billing is implemented. QR-assisted digital contract onboarding
-> and signing, cleaning schedules by bed, advance visitor registration with
-> protected ID capture, and standardized room/bed identifiers remain planned.
-> The client's photographed official lease has now been reviewed. Contract
-> fields, multi-party signatures, document verification, inspections,
-> deposit/move-out handling, disciplinary safeguards, confirmed procedures, and
-> unresolved decisions are documented as requirements only; the review did not
-> change application behavior.
-> QR onboarding, required identity/photocopy verification, independent signer
-> states, and prerequisite-aware activation are now implemented in the current
-> app changes, and their database migrations are deployed. The detailed
-> new-tenant run-through is documented in `DEVELOPMENT_PROGRESS.md` under
-> **Canonical new-tenant workflow**. Physical-device and authenticated
-> multi-account security testing remain required before release.
+> The current repository is a strong functional prototype, not a verified
+> production deployment. Core Supabase-backed role workflows, onboarding,
+> billing, maintenance, visitors, curfew, communication, cleaning, inspections,
+> conduct, reports, and core notification dispatch are implemented. Remote
+> migration/RLS parity, deployed secrets/functions, release signing, physical
+> FCM/geofence testing, and iOS Firebase/APNs remain release requirements.
+> Passing local tests does not prove every workflow against the live backend.
 > See the implementation sequence in
 > [`DEVELOPMENT_PROGRESS.md`](DEVELOPMENT_PROGRESS.md) and the complete
 > requirements in
@@ -289,7 +281,7 @@ Provides the linked tenant's identity, contact, and room-assignment details.
 
 #### Gate activity
 
-Shows daily device usage and detailed, verified gate events.
+Shows dormitory gate presence and detailed, verified gate events. The app does not inspect installed applications or device-usage history.
 
 #### Payment status
 
@@ -486,7 +478,7 @@ lib/
 ├── controllers/             # Session, theme, and role state
 ├── core/                    # Constants, responsive layout, theme, widgets
 ├── models/models.dart       # Models and enums
-├── services/                # Mock authentication and usage statistics
+├── services/                # Supabase-backed domain and platform services
 └── views/
     ├── auth/                # Entry and recovery pages
     ├── guardian/            # Guardian shell and pages
@@ -667,11 +659,22 @@ For implementation details, see the official [Supabase user invitation guide](ht
 
 - Authentication uses Supabase Auth. Role routing is based on a protected
   profile record rather than email text or client metadata.
-- Core operational records now primarily use Supabase; remaining placeholder
-  pages identify their incomplete backend state explicitly.
-- OCR, geofencing, biometrics, and device binding are simulated product workflows pending production integrations.
-- Photo and receipt attachments currently use Supabase Storage buckets, with a planned upgrade path to Cloudinary for media CDN delivery, dynamic WebP compression (`f_auto,q_auto`), and on-the-fly thumbnail generation.
-- Finance, discipline, and analytics still contain incomplete backend areas;
-  contract CRUD is live.
+- Core operational records use Supabase-backed services/RPCs; explicit
+  placeholders remain for trusted-device binding, feedback submission, and the
+  emergency-contact Call action.
+- Receipt OCR uses on-device text recognition and remains a suggestion rather
+  than authoritative payment evidence.
+- Foreground geofencing and native circular tripwires exist, but polygon/circle
+  semantics and physical background behavior remain under validation.
+- Secure media paths support protected Supabase Storage and Cloudinary-backed
+  references where configured.
+- Core notification events are wired for messages, announcements, gate events,
+  payments/utilities, maintenance, visitors, curfew, conduct/appeals, and
+  inspection completion. Secondary module hooks, preferences, and live device
+  delivery are incomplete or unverified.
+- Current local verification: `flutter analyze` passes and all 410 tests pass.
 
-Before release, connect secured backend services, enforce server-side role permissions, add persistent uploads and messaging, test device permissions, and replace demo records with validated live data.
+Before release, synchronize migrations to clean staging, complete the negative
+role/RLS/Storage matrix, deploy and verify Edge Function secrets, configure
+signed Android/iOS builds, test physical devices, secure native token storage,
+and establish monitoring, backup/restore, rollback, and incident procedures.

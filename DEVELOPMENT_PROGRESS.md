@@ -7,20 +7,15 @@ divided between two developers to reduce merge conflicts.
 
 ## Current production-readiness assessment
 
-**Production readiness: approximately 70%.** This is the primary completion
-metric for the project. It weights live persistence, authorization, validation,
-testing, deployment readiness, and role-complete workflows more heavily than
-screens that exist only as UI.
+Current estimates are **92% functional prototype**, **76% demo/staging
+deployability**, **58% Android production readiness**, and **42% full
+Android+iOS production readiness**. These estimates distinguish locally passing
+code from remote deployment proof and physical-device validation.
 
-The functional prototype is roughly 89% complete, but that figure is retained
-only as a secondary implementation reference and is not the tracked completion
-percentage.
-
-Major remaining areas are persisted notifications/preferences, finance/expenses,
-discipline, analytics, native tenant device
-binding/background location, feedback persistence, real-device geofencing
-testing, geofence check-timer testing, and final multi-account security/offline
-testing outside the visitor workflow. Android and iOS are both production mobile
+Major remaining areas are notification preferences and secondary event hooks,
+native tenant device binding/background location, feedback persistence,
+release signing/security, real-device FCM and geofencing testing, remote
+migration/RLS verification, and operational readiness. Android and iOS are both production mobile
 targets; a feature is not release-complete until its platform-specific behavior
 has either been validated on both or is explicitly tracked as blocked.
 
@@ -65,8 +60,10 @@ notification-tap routing, an RLS-protected device-token/notification schema,
 and the protected `send-fcm-notification` Edge Function are implemented. The
 Android debug APK builds successfully. Production delivery remains open until
 the physical-device delivery matrix is verified. The Google service-account
-credentials are stored as protected Supabase secrets. Messages is the first
-connected module: after a message is persisted, a protected Edge Function
+credentials must be stored as protected Supabase secrets in each deployment.
+Messages, gate events, announcements, payments/utilities, maintenance, visitors,
+curfew, conduct/appeals, and inspection completion have connected dispatch paths.
+After a message is persisted, a protected Edge Function
 derives its authorized recipients, creates their notification rows, and sends a
 data-minimized push that excludes the message text. Taps target the conversation,
 and foreground alerts are suppressed while that conversation is open.

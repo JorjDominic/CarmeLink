@@ -9,8 +9,10 @@
 
 | Target | Current estimate | Verdict |
 |---|---:|---|
-| Functional prototype/demo | **85–90%** | Strong prototype; primary dormitory workflows can be demonstrated. |
-| Production code readiness | **50–60%** | Core architecture is credible, but several release/security/operational gaps remain. |
+| Functional prototype/demo | **92%** | Strong prototype; primary dormitory workflows are implemented, with visible placeholders clearly tracked. |
+| Demo/staging deployability | **76%** | Local checks pass, but migrations, functions, secrets, and multi-role remote workflows still need staging proof. |
+| Android production readiness | **58%** | Core Android code exists; release signing, secure token storage, physical FCM/geofence tests, and operational controls remain. |
+| Full Android+iOS production readiness | **42%** | iOS Firebase/APNs/signing and autonomous background-delivery evidence remain incomplete. |
 | Verified production deployment | **Not established** | Remote migrations, RLS, Realtime, secrets, Storage policies, device delivery, and production signing were not verifiable from local source alone. |
 
 These percentages are evidence-based ranges, not story-point completion. Prototype scoring emphasizes demonstrable workflows. Production scoring gives greater weight to security, negative authorization tests, release configuration, failure recovery, privacy, and deployed infrastructure.
@@ -23,7 +25,7 @@ These percentages are evidence-based ranges, not story-point completion. Prototy
 - Tenant/staff maintenance, visitors, curfew requests, gate events, messaging, confidential concerns, cleaning, inspections, conduct cases, appeals, and retention settings have database-backed service layers.
 - RLS, server RPCs, triggers, audit/history tables, protected Storage, Realtime, Cloudinary, and FCM infrastructure are represented in migrations/functions.
 - Android native background geofence queuing and WorkManager synchronization are implemented.
-- The project passes `flutter analyze` and all **381** local tests.
+- The project passes `flutter analyze` and all **410** local tests.
 - A debug Android APK builds successfully.
 - The prior app-usage tracking feature and permission were fully removed.
 - Unreachable mock data, unsafe scratch code, and unused assets were removed.
@@ -42,8 +44,8 @@ These percentages are evidence-based ranges, not story-point completion. Prototy
 | Curfew requests | 90% | 65% | Tenant/guardian/staff review flow exists. Timezone and exception behavior need physical/live tests. |
 | Gate/geofence | 80% | 40% | Foreground and native adapters exist, but polygon/circle semantics differ and iOS lacks Android-equivalent background upload. |
 | Messaging/read receipts | 90% | 60% | Realtime service and notification hook exist. Publication, RLS, and push delivery need live multi-role tests. |
-| Announcements | 80% | 40% | CRUD works, but announcement push dispatch is a no-op. |
-| In-app/push notifications | 70% | 35% | Notification service/FCM functions exist, but one global notification entry still opens a placeholder page and iOS Firebase/APNs setup is incomplete. |
+| Announcements | 90% | 55% | CRUD and audience-targeted dispatch are wired; staging recipient and physical-device delivery remain unverified. |
+| In-app/push notifications | 82% | 45% | Core event hooks, authorized fan-out, token lifecycle, and Android handlers exist; several secondary modules lack hooks, one shortcut remains obsolete, and live Android/iOS delivery is unverified. |
 | Guardian portal | 90% | 65% | Linked tenant, payment, curfew, gate, and messaging views exist. Relationship isolation needs live testing. |
 | Cleaning and inspections | 85% | 55% | Full RPC/table workflows exist. Physical/staging workflow and evidence-bucket tests remain. |
 | Conduct and appeals | 85% | 50% | Case/audit/evidence/appeal workflows exist. Policy acceptance and deployed access tests remain. |
@@ -58,12 +60,11 @@ These percentages are evidence-based ranges, not story-point completion. Prototy
 These should be resolved before a formal demonstration or defense because they can visibly fail or contradict the paper.
 
 1. **Boundary editing calls a missing RPC.** `BoundaryConfigService` calls `update_dorm_boundary_config`, while `202609250002_boundary_config_editable.sql` is empty and no migration defines the function.
-2. **Announcement push silently does nothing.** `_dispatchFCMNotificationIfConfigured` is a comment-only stub.
+2. **Announcement push is not live-verified.** Repository dispatch is implemented, but deployed functions, secrets, audience fan-out, and device delivery need staging proof.
 3. **Two notification experiences disagree.** The primary `NotificationsPage` reads live `app_notifications`, but the header/global notification route in `common_widgets.dart` opens `_GlobalNotificationsPage`, which always displays “not connected yet.”
 4. **Device binding is a placeholder.** The page displays a button but does not create a trusted-device record or hardware binding. Native geofence registration is a separate mechanism.
 5. **Emergency contact calling is a placeholder.** Contact data displays, but the Call action only shows a snackbar.
 6. **Curfew/geofence screens visibly label parts of the workflow WIP.** This is honest, but it means those features should be demonstrated as under physical-device validation.
-7. **Documentation is stale in places.** README/progress sections still describe some now-live features as mock/simulated and can contradict the current implementation.
 
 ## Production release blockers
 
@@ -101,7 +102,7 @@ These should be resolved before a formal demonstration or defense because they c
 Complete these in order:
 
 1. Decide whether boundary editing belongs in scope. Implement its RPC migration or remove the editor.
-2. Route announcement creation through the real notification service, or remove push claims from the demo.
+2. Deploy the FCM functions/secrets and verify announcement and core-module delivery on physical Android devices.
 3. Make every notification button open the live `NotificationsPage`; remove the placeholder implementation.
 4. Either implement device binding and phone launching or label/remove those actions from the defense build.
 5. Update README/progress/paper statements so they match the repository exactly.
@@ -128,7 +129,7 @@ After prototype cleanup:
 
 ```text
 flutter analyze                  PASS (no issues)
-flutter test                     PASS (381 tests)
+flutter test                     PASS (410 tests)
 flutter build apk --debug        PASS
 Android Firebase config          PRESENT
 iOS Firebase config              MISSING

@@ -67,7 +67,7 @@ If the team chooses to implement one of these in Capstone 1, move it into the cu
 | Check | Last result | Date |
 |---|---|---|
 | `flutter analyze` | Pass — no issues | 2026-09-25 |
-| `flutter test` | Pass — 381 tests | 2026-09-25 |
+| `flutter test` | Pass — 410 tests | 2026-09-25 |
 | `flutter build apk --debug` | Pass | 2026-09-25 |
 | Remote migration parity | Not verified | — |
 | Remote role/RLS matrix | Not verified | — |
@@ -110,6 +110,8 @@ If the team chooses to implement one of these in Capstone 1, move it into the cu
   - Due: TBD
   - Client state: Android Firebase file matches `com.carmelita.carmelink`; notification permission, channel, icon, token registration/refresh/revocation, foreground display, background handler, and tap routing are implemented.
   - Repository state (2026-09-25): The dispatcher supports role, multiple-user, tenant, and linked-guardian targets with caller authorization; current staff roles are used; announcement and feature lifecycle hooks are connected; and Android WorkManager invokes `notify-geofence` after recording a native background transition.
+  - Covered event families: messages, announcements, gate/geofence, payments, utility bills, maintenance, visitors, curfew, conduct publication/appeals, and inspection completion.
+  - Not yet covered comprehensively: confidential reports, contract/onboarding review, cleaning, inspection scheduling/findings, employee-curfew profile changes, guardian-link changes, room/residency changes, and contract-expiry reminders.
   - Remaining risk: Edge Functions and FCM secrets have not been deployed and exercised on physical devices in this audit, so production delivery is not yet proven.
   - Acceptance: Deploy corrected functions; register two physical Android devices; verify token rows; test foreground/background/terminated delivery and tap routing for message, gate, payment, maintenance, visitor, curfew, conduct, inspection, utility, and announcement events; confirm `push_sent_at` and zero unexpected `push_error` values.
 
@@ -307,3 +309,4 @@ Add one row before merging a scope-sensitive change.
 |---|---|---|---|---|---|
 | 2026-09-25 | Audit | Removed app-usage tracking | Removed Android special permission and local behavioral data access | Analyze, 381 tests, Android debug build | Usage tracking resolved |
 | 2026-09-25 | Audit | Removed unreachable mock/scratch code and unused assets | Removed hardcoded scratch credential path; reduced bundle/startup image work | Analyze, tests, Android debug build | Cleanup resolved |
+| 2026-09-25 | Audit | Completed core FCM module hooks and repaired post-merge UI tests | Added authorized recipient fan-out for core notification events; no new permission | Analyze and 410 tests | FCM/live-verification and documentation items updated |

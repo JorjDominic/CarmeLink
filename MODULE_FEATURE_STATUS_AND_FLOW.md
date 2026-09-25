@@ -120,10 +120,12 @@
 | Read receipts | Implemented, verify live | RPC advances caller-specific read state; UI maps outgoing delivery/read metadata. | Confirm one participant cannot alter another's marker. |
 | Message push | Implemented, verify live | After insert, `notify-message` selects valid recipients, creates in-app rows, sends FCM, and revokes invalid tokens. | Confirm recipient logic for staff channels and active-chat suppression. |
 | Announcement board | Implemented | Staff creates/edits/pins/deletes; tenants/guardians filter visible audience; service caches results for 30 seconds. | Verify audience RLS, not only client filtering. |
-| Announcement push | Placeholder/no-op | Announcement is saved, but `_dispatchFCMNotificationIfConfigured` contains no dispatch. | Route through `notifyNewAnnouncement`/Edge Function and mark outcome. |
+| Announcement push | Implemented, verify live | Creation invokes `notifyNewAnnouncement`; the Edge Function creates authorized recipient rows, attempts FCM, and the announcement records accepted dispatch. | Deploy secrets/functions and verify each audience on physical devices. |
 | Live notification center | Implemented, verify live | `NotificationsPage` streams/fetches recipient rows and supports mark-one/mark-all read. Push taps route to messages or notification center. | Live FCM/APNs and route tests. |
 | Header notification shortcut | Broken/inconsistent | A shared header opens `_GlobalNotificationsPage`, whose list is hardcoded empty and says service is disconnected. | Replace it with the real `NotificationsPage`. |
 | Notification preferences | Local/partial | UI stores toggles only in widget/process state; it does not persist server preferences or control fan-out. | Add durable per-user preferences and enforce them during dispatch, or label as local UI. |
+| Core module notification hooks | Implemented, verify live | Messages, announcements, gate events, payments/utilities, maintenance, visitors, curfew, conduct publication/appeals, and inspection completion dispatch through protected notification paths. | Deploy and test each recipient path on staging devices. |
+| Secondary module notification hooks | Incomplete | Confidential reports, contract/onboarding review, cleaning, inspection scheduling/findings, employee-curfew profile changes, guardian links, room/residency changes, and contract-expiry reminders do not have comprehensive push coverage. | Define which events truly require alerts, then implement and test only the approved set. |
 | Guardian personal alert time | Local/partial | Static in-memory time defaults to 9 PM; helper checks if linked tenant is outside after cutoff. | Resets on restart and does not schedule an OS alert. |
 | Emergency/safety alerts | Partial | Guardian-facing information/presence pages exist; persistent emergency alert automation is not a distinct completed backend workflow. | Define triggers, recipients, acknowledgement, and escalation if in scope. |
 
@@ -190,7 +192,7 @@
 
 ```text
 flutter analyze             PASS — no issues
-flutter test                PASS — 381 tests
+flutter test                PASS — 410 tests
 flutter build apk --debug   PASS
 Remote migration parity     NOT VERIFIED
 Remote RLS/Storage tests    NOT VERIFIED
@@ -205,7 +207,7 @@ The core dormitory management system is substantially implemented and is suitabl
 Highest-priority fixes:
 
 1. Resolve the missing boundary-update RPC or remove boundary editing.
-2. Connect announcement push and remove the obsolete empty notification page.
+2. Deploy and physically verify announcement push; remove the obsolete empty notification page.
 3. Remove or implement device binding, feedback submission, and call actions.
 4. Align employee-curfew behavior and polygon/circle geofence semantics.
 5. Synchronize and test the complete backend in staging with every role.
