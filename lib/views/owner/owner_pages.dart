@@ -5219,18 +5219,23 @@ class _LocationTestPanelState extends State<_LocationTestPanel> {
                 Icon(Icons.science_outlined, size: 18, color: scheme.primary),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    'Location Test Panel',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: scheme.primary,
-                      fontSize: 14,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Location Test Panel',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: scheme.primary,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        'Owner only • no coordinates stored',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                ),
-                Text(
-                  'Owner only • no coordinates stored',
-                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
@@ -5345,10 +5350,13 @@ class _LocationTestPanelState extends State<_LocationTestPanel> {
           ),
           const SizedBox(height: 10),
 
-          // Evaluate button + result
+          // Evaluate button + result (Wrap prevents right-side overflow)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Row(
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 FilledButton.tonalIcon(
                   onPressed: _evaluating ? null : _evaluate,
@@ -5364,8 +5372,7 @@ class _LocationTestPanelState extends State<_LocationTestPanel> {
                     visualDensity: VisualDensity.compact,
                   ),
                 ),
-                if (hasResult) ...[
-                  const SizedBox(width: 12),
+                if (hasResult)
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -5380,8 +5387,9 @@ class _LocationTestPanelState extends State<_LocationTestPanel> {
                             : const Color(0xFFB03A2E),
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    child: Wrap(
+                      spacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Icon(
                           isIn ? Icons.home_rounded : Icons.directions_walk_rounded,
@@ -5390,7 +5398,6 @@ class _LocationTestPanelState extends State<_LocationTestPanel> {
                               ? const Color(0xFF56886B)
                               : const Color(0xFFB03A2E),
                         ),
-                        const SizedBox(width: 4),
                         Text(
                           _evalDirection!,
                           style: TextStyle(
@@ -5401,17 +5408,14 @@ class _LocationTestPanelState extends State<_LocationTestPanel> {
                             fontSize: 13,
                           ),
                         ),
-                        if (_evalDistMeters != null) ...[
-                          const SizedBox(width: 6),
+                        if (_evalDistMeters != null)
                           Text(
                             '≈ ${_evalDistMeters!.toStringAsFixed(0)} m from centroid',
                             style: const TextStyle(fontSize: 11),
                           ),
-                        ],
                       ],
                     ),
                   ),
-                ],
               ],
             ),
           ),
@@ -5435,50 +5439,109 @@ class _LocationTestPanelState extends State<_LocationTestPanel> {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<TenantDirectoryEntry>(
-                        initialValue: _selectedTenant,
-                        decoration: const InputDecoration(
-                          labelText: 'Tenant',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 8,
-                          ),
-                          isDense: true,
-                        ),
-                        items: widget.tenants.map((t) {
-                          return DropdownMenuItem(
-                            value: t,
-                            child: Text('${t.name} (Rm ${t.room})'),
-                          );
-                        }).toList(),
-                        onChanged: (val) =>
-                            setState(() => _selectedTenant = val),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    FilledButton.icon(
-                      onPressed: _simulating ? null : _simulate,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF627FA8),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      icon: _simulating
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 340;
+                    if (isNarrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          DropdownButtonFormField<TenantDirectoryEntry>(
+                            initialValue: _selectedTenant,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Tenant',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
                               ),
-                            )
-                          : const Icon(Icons.play_circle_outline, size: 16),
-                      label: const Text('Simulate'),
-                    ),
-                  ],
+                              isDense: true,
+                            ),
+                            items: widget.tenants.map((t) {
+                              return DropdownMenuItem(
+                                value: t,
+                                child: Text(
+                                  '${t.name} (Rm ${t.room})',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) =>
+                                setState(() => _selectedTenant = val),
+                          ),
+                          const SizedBox(height: 8),
+                          FilledButton.icon(
+                            onPressed: _simulating ? null : _simulate,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF627FA8),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            icon: _simulating
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.play_circle_outline, size: 16),
+                            label: const Text('Simulate'),
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<TenantDirectoryEntry>(
+                            initialValue: _selectedTenant,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Tenant',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              isDense: true,
+                            ),
+                            items: widget.tenants.map((t) {
+                              return DropdownMenuItem(
+                                value: t,
+                                child: Text(
+                                  '${t.name} (Rm ${t.room})',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) =>
+                                setState(() => _selectedTenant = val),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        FilledButton.icon(
+                          onPressed: _simulating ? null : _simulate,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF627FA8),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: _simulating
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.play_circle_outline, size: 16),
+                          label: const Text('Simulate'),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -5510,6 +5573,16 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
   final _radiusCtrl = TextEditingController();
   final _bufferCtrl = TextEditingController();
 
+  // 4 Polygon corner coordinate controllers
+  final _p1LatCtrl = TextEditingController();
+  final _p1LngCtrl = TextEditingController();
+  final _p2LatCtrl = TextEditingController();
+  final _p2LngCtrl = TextEditingController();
+  final _p3LatCtrl = TextEditingController();
+  final _p3LngCtrl = TextEditingController();
+  final _p4LatCtrl = TextEditingController();
+  final _p4LngCtrl = TextEditingController();
+
   String _mode = 'polygon';
   bool _loading = true;
   bool _saving = false;
@@ -5529,6 +5602,14 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
     _lngCtrl.dispose();
     _radiusCtrl.dispose();
     _bufferCtrl.dispose();
+    _p1LatCtrl.dispose();
+    _p1LngCtrl.dispose();
+    _p2LatCtrl.dispose();
+    _p2LngCtrl.dispose();
+    _p3LatCtrl.dispose();
+    _p3LngCtrl.dispose();
+    _p4LatCtrl.dispose();
+    _p4LngCtrl.dispose();
     super.dispose();
   }
 
@@ -5544,6 +5625,7 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
         _radiusCtrl.text = snap.radiusMeters.toStringAsFixed(1);
         _bufferCtrl.text = snap.edgeBufferMeters.toStringAsFixed(1);
         _mode = snap.boundaryMode;
+        _populatePolygonCorners(snap.polygonPoints);
       } else {
         // Fallback to compiled-in defaults
         _latCtrl.text =
@@ -5555,9 +5637,10 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
         _bufferCtrl.text =
             GeofenceLocationService.debounceBufferMeters.toStringAsFixed(1);
         _mode = 'polygon';
+        _populatePolygonCorners(GeofenceLocationService.productionDormitoryPolygon);
       }
     } catch (_) {
-      // If load fails, show empty fields with defaults pre-filled.
+      // If load fails, show defaults
       _latCtrl.text =
           GeofenceLocationService.carmelitaLatitude.toStringAsFixed(8);
       _lngCtrl.text =
@@ -5566,9 +5649,54 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
           GeofenceLocationService.geofenceRadiusMeters.toStringAsFixed(1);
       _bufferCtrl.text =
           GeofenceLocationService.debounceBufferMeters.toStringAsFixed(1);
+      _populatePolygonCorners(GeofenceLocationService.productionDormitoryPolygon);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _populatePolygonCorners(List<LatLngPoint> points) {
+    final list = points.isNotEmpty
+        ? points
+        : GeofenceLocationService.productionDormitoryPolygon;
+    if (list.isNotEmpty) {
+      _p1LatCtrl.text = list[0].latitude.toStringAsFixed(8);
+      _p1LngCtrl.text = list[0].longitude.toStringAsFixed(8);
+    }
+    if (list.length > 1) {
+      _p2LatCtrl.text = list[1].latitude.toStringAsFixed(8);
+      _p2LngCtrl.text = list[1].longitude.toStringAsFixed(8);
+    }
+    if (list.length > 2) {
+      _p3LatCtrl.text = list[2].latitude.toStringAsFixed(8);
+      _p3LngCtrl.text = list[2].longitude.toStringAsFixed(8);
+    }
+    if (list.length > 3) {
+      _p4LatCtrl.text = list[3].latitude.toStringAsFixed(8);
+      _p4LngCtrl.text = list[3].longitude.toStringAsFixed(8);
+    }
+  }
+
+  void _autoCalculateCorners() {
+    final lat = double.tryParse(_latCtrl.text.trim());
+    final lng = double.tryParse(_lngCtrl.text.trim());
+    final radius = double.tryParse(_radiusCtrl.text.trim()) ?? 50.0;
+    if (lat == null || lng == null) return;
+    final r = radius / 111000;
+    _p1LatCtrl.text = (lat + r).toStringAsFixed(8);
+    _p1LngCtrl.text = (lng + r).toStringAsFixed(8);
+    _p2LatCtrl.text = (lat - r).toStringAsFixed(8);
+    _p2LngCtrl.text = (lng + r).toStringAsFixed(8);
+    _p3LatCtrl.text = (lat - r).toStringAsFixed(8);
+    _p3LngCtrl.text = (lng - r).toStringAsFixed(8);
+    _p4LatCtrl.text = (lat + r).toStringAsFixed(8);
+    _p4LngCtrl.text = (lng - r).toStringAsFixed(8);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Auto-calculated 4 corners around center.'),
+        duration: Duration(seconds: 1),
+      ),
+    );
   }
 
   Future<void> _captureGps() async {
@@ -5594,10 +5722,11 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
       if (mounted) {
         _latCtrl.text = pos.latitude.toStringAsFixed(8);
         _lngCtrl.text = pos.longitude.toStringAsFixed(8);
+        _autoCalculateCorners();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Center set to your GPS: '
+              'Center and 4 corners set to your GPS: '
               '${pos.latitude.toStringAsFixed(5)}, '
               '${pos.longitude.toStringAsFixed(5)}',
             ),
@@ -5636,18 +5765,36 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
 
     setState(() => _saving = true);
     try {
-      // If the user changed center coordinates but kept polygon mode,
-      // auto-generate a square boundary around the new center so the polygon
-      // matches the new location (using the current or entered radius).
       List<LatLngPoint>? newPolygon;
       if (_mode == 'polygon') {
-        final r = (radius ?? _current?.radiusMeters ?? 50.0) / 111000;
-        newPolygon = [
-          LatLngPoint(lat + r, lng + r), // NE
-          LatLngPoint(lat - r, lng + r), // SE
-          LatLngPoint(lat - r, lng - r), // SW
-          LatLngPoint(lat + r, lng - r), // NW
-        ];
+        final p1Lat = double.tryParse(_p1LatCtrl.text.trim());
+        final p1Lng = double.tryParse(_p1LngCtrl.text.trim());
+        final p2Lat = double.tryParse(_p2LatCtrl.text.trim());
+        final p2Lng = double.tryParse(_p2LngCtrl.text.trim());
+        final p3Lat = double.tryParse(_p3LatCtrl.text.trim());
+        final p3Lng = double.tryParse(_p3LngCtrl.text.trim());
+        final p4Lat = double.tryParse(_p4LatCtrl.text.trim());
+        final p4Lng = double.tryParse(_p4LngCtrl.text.trim());
+
+        if (p1Lat != null && p1Lng != null &&
+            p2Lat != null && p2Lng != null &&
+            p3Lat != null && p3Lng != null &&
+            p4Lat != null && p4Lng != null) {
+          newPolygon = [
+            LatLngPoint(p1Lat, p1Lng),
+            LatLngPoint(p2Lat, p2Lng),
+            LatLngPoint(p3Lat, p3Lng),
+            LatLngPoint(p4Lat, p4Lng),
+          ];
+        } else {
+          final r = (radius ?? _current?.radiusMeters ?? 50.0) / 111000;
+          newPolygon = [
+            LatLngPoint(lat + r, lng + r),
+            LatLngPoint(lat - r, lng + r),
+            LatLngPoint(lat - r, lng - r),
+            LatLngPoint(lat + r, lng - r),
+          ];
+        }
       }
 
       await _service.updateConfig(
@@ -5681,6 +5828,48 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
     }
   }
 
+  Widget _buildCornerRow(String label, TextEditingController latCtrl, TextEditingController lngCtrl) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: latCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Lat',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    isDense: true,
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextField(
+                  controller: lngCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Lng',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    isDense: true,
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -5688,17 +5877,22 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
         children: [
           Icon(Icons.tune_rounded, size: 20),
           SizedBox(width: 8),
-          Text('Edit Boundary Configuration'),
+          Expanded(
+            child: Text(
+              'Edit Boundary Configuration',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
       content: _loading
           ? const SizedBox(
-              width: 300,
+              width: 260,
               height: 120,
               child: Center(child: CircularProgressIndicator()),
             )
-          : SizedBox(
-              width: 360,
+          : ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -5716,9 +5910,8 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
                       ),
                       child: Text(
                         'Changes take effect immediately for all users. '
-                        'The polygon is auto-generated as a square around the '
-                        'center when in Polygon mode. '
-                        'Use the Perimeter Visualizer to fine-tune corner points.',
+                        'You can fine-tune all 4 corner coordinates of the polygon below, '
+                        'or auto-calculate them from the center & radius.',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -5852,13 +6045,28 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
                           setState(() => _mode = s.first),
                     ),
                     if (_mode == 'polygon') ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'The polygon will be auto-generated as a square around '
-                        'the center using the radius you entered above. '
-                        'Use the Perimeter Visualizer for custom corner editing.',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Polygon 4 Corners',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: _autoCalculateCorners,
+                            icon: const Icon(Icons.sync_rounded, size: 14),
+                            label: const Text('Auto-fit from Center', style: TextStyle(fontSize: 12)),
+                            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 6),
+                      _buildCornerRow('Corner 1 (NE / East)', _p1LatCtrl, _p1LngCtrl),
+                      _buildCornerRow('Corner 2 (SE / South)', _p2LatCtrl, _p2LngCtrl),
+                      _buildCornerRow('Corner 3 (SW / West)', _p3LatCtrl, _p3LngCtrl),
+                      _buildCornerRow('Corner 4 (NW / North)', _p4LatCtrl, _p4LngCtrl),
                     ],
 
                     // Updated at

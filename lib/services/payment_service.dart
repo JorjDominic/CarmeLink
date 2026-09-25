@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
+import 'app_notification_service.dart';
 import 'secure_media_service.dart';
 
 class PaymentService {
@@ -99,7 +101,23 @@ class PaymentService {
         'p_amount': amount,
       });
 
-      return Payment.fromJson(Map<String, dynamic>.from(updatedRow as Map));
+      final payment =
+          Payment.fromJson(Map<String, dynamic>.from(updatedRow as Map));
+      final resolvedName =
+          (payment.tenantName != null && payment.tenantName!.isNotEmpty)
+              ? payment.tenantName!
+              : (_client.auth.currentUser?.userMetadata?['full_name']
+                      as String? ??
+                  'A tenant');
+
+      unawaited(AppNotificationService.instance.notifyPaymentSubmitted(
+        paymentId: paymentId,
+        tenantName: resolvedName,
+        amount: amount,
+        referenceNumber: referenceNumber.trim(),
+      ));
+
+      return payment;
     } catch (_) {
       if (uploadedPath != null) {
         await _safeRemoveReceipt(uploadedPath);
@@ -168,7 +186,18 @@ class PaymentService {
       'p_approve': approve,
       'p_review_notes': reviewNotes,
     });
-    return Payment.fromJson(Map<String, dynamic>.from(updatedRow as Map));
+    final payment =
+        Payment.fromJson(Map<String, dynamic>.from(updatedRow as Map));
+
+    unawaited(AppNotificationService.instance.notifyPaymentReviewed(
+      tenantId: payment.tenantId,
+      paymentId: paymentId,
+      approved: approve,
+      amount: payment.amount,
+      reason: reviewNotes,
+    ));
+
+    return payment;
   }
 
   /// Creates a variable utility charge. Rent is generated only from contracts.
@@ -193,7 +222,16 @@ class PaymentService {
       'p_period_end': _dateOnly(periodEnd),
       'p_notes': notes?.trim(),
     });
-    return Payment.fromJson(Map<String, dynamic>.from(row as Map));
+    final payment = Payment.fromJson(Map<String, dynamic>.from(row as Map));
+
+    unawaited(AppNotificationService.instance.notifyUtilityBillCreated(
+      tenantId: tenantId,
+      title: title.trim(),
+      amount: amount,
+      dueDate: _dateOnly(dueDate),
+    ));
+
+    return payment;
   }
 
   String _dateOnly(DateTime value) =>
@@ -226,6 +264,22 @@ class PaymentService {
       'p_items': items,
     });
     final row = Map<String, dynamic>.from(result as Map);
+
+    for (final item in items) {
+      final tId = item['tenant_id']?.toString();
+      final title = item['title']?.toString() ?? 'Utility Charge';
+      final amt = (item['amount'] as num?)?.toDouble() ?? 0.0;
+      final dueDate = item['due_date']?.toString() ?? '';
+      if (tId != null && tId.isNotEmpty) {
+        unawaited(AppNotificationService.instance.notifyUtilityBillCreated(
+          tenantId: tId,
+          title: title,
+          amount: amt,
+          dueDate: dueDate,
+        ));
+      }
+    }
+
     return (row['charge_count'] as num?)?.toInt() ?? 0;
   }
 
