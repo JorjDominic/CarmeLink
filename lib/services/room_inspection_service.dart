@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import 'app_notification_service.dart';
 
 class RoomInspectionRecord {
   const RoomInspectionRecord({
@@ -218,6 +220,36 @@ class RoomInspectionService {
     );
   }
 
+  Future<void> _notifyInspectionCompleted(
+    RoomInspectionRecord inspection,
+  ) async {
+    try {
+      final room = await _client
+          .from('rooms')
+          .select('room_number')
+          .eq('id', inspection.roomId)
+          .single();
+      final assignments = await _client
+          .from('tenant_assignments')
+          .select('tenant_id, bed_space:bed_spaces!inner(room_id)')
+          .eq('status', 'active')
+          .eq('bed_space.room_id', inspection.roomId);
+      final roomName = 'Room ${room['room_number'] ?? ''}'.trim();
+      for (final assignment in assignments) {
+        final tenantId = assignment['tenant_id'] as String?;
+        if (tenantId == null || tenantId.isEmpty) continue;
+        await AppNotificationService.instance.notifyInspectionCompleted(
+          tenantId: tenantId,
+          inspectionId: inspection.id,
+          roomName: roomName,
+          status: 'Completed',
+        );
+      }
+    } catch (_) {
+      // Inspection completion must remain successful if push dispatch fails.
+    }
+  }
+
   Future<String> addFinding({
     required RoomInspectionRecord inspection,
     required String category,
@@ -272,6 +304,7 @@ class RoomInspectionService {
         'p_summary': summary.trim(),
       },
     );
+    unawaited(_notifyInspectionCompleted(inspection));
   }
 
   Future<void> cancelInspection({

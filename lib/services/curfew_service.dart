@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
+import 'app_notification_service.dart';
 
 class CurfewService {
   const CurfewService();
@@ -53,9 +56,8 @@ class CurfewService {
       throw Exception('Authentication required to submit curfew exception');
     }
 
-    final initialStatus = requestType == 'overnight_leave'
-        ? 'pending_guardian'
-        : 'pending_staff';
+    final initialStatus =
+        requestType == 'overnight_leave' ? 'pending_guardian' : 'pending_staff';
 
     final row = await client
         .from('curfew_requests')
@@ -71,7 +73,18 @@ class CurfewService {
         .select(_columns)
         .single();
 
-    return CurfewRequest.fromJson(row);
+    final request = CurfewRequest.fromJson(row);
+    final tenantName =
+        client.auth.currentUser?.userMetadata?['full_name']?.toString().trim();
+    unawaited(AppNotificationService.instance.notifyCurfewPassRequested(
+      requestId: request.id,
+      tenantId: request.tenantId,
+      tenantName: tenantName?.isNotEmpty == true ? tenantName! : 'A tenant',
+      requestType: request.requestTypeLabel,
+      curfewDate: request.departureTime.toString().split(' ').first,
+      requiresGuardianReview: request.isOvernightLeave,
+    ));
+    return request;
   }
 
   /// Cancels an existing pending curfew request.
@@ -134,7 +147,9 @@ class CurfewService {
         .select(columnsWithTenant)
         .single();
 
-    return CurfewRequest.fromJson(row);
+    final request = CurfewRequest.fromJson(row);
+    unawaited(_notifyDecision(request));
+    return request;
   }
 
   /// Lists curfew requests for the guardian's linked resident(s).
@@ -143,9 +158,7 @@ class CurfewService {
     if (client == null) return const [];
 
     try {
-      var query = client
-          .from('curfew_requests')
-          .select(columnsWithTenant);
+      var query = client.from('curfew_requests').select(columnsWithTenant);
 
       if (tenantId != null && tenantId.trim().isNotEmpty) {
         query = query.eq('tenant_id', tenantId.trim());
@@ -186,7 +199,16 @@ class CurfewService {
         .select(columnsWithTenant)
         .single();
 
-    return CurfewRequest.fromJson(row);
+    final request = CurfewRequest.fromJson(row);
+    unawaited(_notifyDecision(request));
+    return request;
   }
-}
 
+  Future<void> _notifyDecision(CurfewRequest request) =>
+      AppNotificationService.instance.notifyCurfewPassStatusChanged(
+        tenantId: request.tenantId,
+        requestId: request.id,
+        requestType: request.requestTypeLabel,
+        status: request.status,
+      );
+}

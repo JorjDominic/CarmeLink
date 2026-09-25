@@ -46,10 +46,10 @@ class TripwireSyncWorker(context: Context, params: WorkerParameters) : Worker(co
             val age = System.currentTimeMillis() - event.optLong("observed_at")
             if (age > 24L * 60L * 60L * 1000L) continue
 
-            val response: Int
+            val response: Pair<Int, String>
             try {
                 var r = send(baseUrl, apiKey, accessToken, event)
-                if (r == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                if (r.first == HttpURLConnection.HTTP_UNAUTHORIZED) {
                     accessToken = refreshSession(baseUrl, apiKey) ?: run {
                         for (pending in index until queue.length()) remaining.put(queue.get(pending))
                         persist(remaining)
@@ -67,17 +67,43 @@ class TripwireSyncWorker(context: Context, params: WorkerParameters) : Worker(co
                 return Result.retry()
             }
 
-            if (response !in 200..299) {
+            if (response.first !in 200..299) {
                 for (pending in index until queue.length()) remaining.put(queue.get(pending))
                 persist(remaining)
-                return if (response in 400..499) Result.failure() else Result.retry()
+                return if (response.first in 400..499) Result.failure() else Result.retry()
+            }
+
+            val eventId = response.second.trim().removeSurrounding("\"")
+            if (eventId.isNotBlank()) {
+                val notificationResponse = try {
+                    post(
+                        "$baseUrl/functions/v1/notify-geofence",
+                        apiKey,
+                        accessToken,
+                        JSONObject().put("event_id", eventId),
+                    ).first
+                } catch (_: IOException) {
+                    for (pending in index until queue.length()) remaining.put(queue.get(pending))
+                    persist(remaining)
+                    return Result.retry()
+                }
+                if (notificationResponse !in 200..299) {
+                    for (pending in index until queue.length()) remaining.put(queue.get(pending))
+                    persist(remaining)
+                    return if (notificationResponse in 400..499) Result.failure() else Result.retry()
+                }
             }
         }
         persist(remaining)
         return Result.success()
     }
 
-    private fun send(baseUrl: String, apiKey: String, token: String, event: JSONObject): Int {
+    private fun send(
+        baseUrl: String,
+        apiKey: String,
+        token: String,
+        event: JSONObject,
+    ): Pair<Int, String> {
         val body = JSONObject()
             .put("p_direction", event.getString("direction"))
             .put("p_observed_at", isoTimestamp(event.getLong("observed_at")))
@@ -87,7 +113,7 @@ class TripwireSyncWorker(context: Context, params: WorkerParameters) : Worker(co
             apiKey,
             token,
             body,
-        ).first
+        )
     }
 
     private fun refreshSession(baseUrl: String, apiKey: String): String? {

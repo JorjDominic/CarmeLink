@@ -24,16 +24,16 @@ Deno.serve(async (request) => {
     const recipients = new Set<string>()
     if (conversation.type === 'tenant_management') {
       if (message.sender_id === conversation.tenant_id) {
-        const { data: staff } = await auth.admin.from('profiles').select('id').eq('role', 'owner_caretaker')
+        const { data: staff } = await auth.admin.from('profiles').select('id').in('role', ['owner', 'caretaker'])
         staff?.forEach((profile) => recipients.add(profile.id))
       } else if (conversation.tenant_id) recipients.add(conversation.tenant_id)
     } else if (conversation.type === 'guardian_management') {
       if (message.sender_id === conversation.guardian_id) {
-        const { data: staff } = await auth.admin.from('profiles').select('id').eq('role', 'owner_caretaker')
+        const { data: staff } = await auth.admin.from('profiles').select('id').in('role', ['owner', 'caretaker'])
         staff?.forEach((profile) => recipients.add(profile.id))
       } else if (conversation.guardian_id) recipients.add(conversation.guardian_id)
     } else if (conversation.type === 'internal_staff') {
-      const { data: staff } = await auth.admin.from('profiles').select('id').eq('role', 'owner_caretaker').neq('id', message.sender_id)
+      const { data: staff } = await auth.admin.from('profiles').select('id').in('role', ['owner', 'caretaker']).neq('id', message.sender_id)
       staff?.forEach((profile) => recipients.add(profile.id))
     }
     recipients.delete(message.sender_id)

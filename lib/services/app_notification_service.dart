@@ -120,7 +120,7 @@ class AppNotificationService {
   // ==========================================
   // MODULE: ANNOUNCEMENTS
   // ==========================================
-  Future<void> notifyNewAnnouncement({
+  Future<bool> notifyNewAnnouncement({
     required String title,
     required String body,
     required String audience,
@@ -132,7 +132,7 @@ class AppNotificationService {
       _ => 'all',
     };
 
-    await sendNotification(
+    return sendNotification(
       title: '📢 $title',
       body: body.length > 200 ? '${body.substring(0, 197)}...' : body,
       notificationType: 'announcement',
@@ -316,15 +316,19 @@ class AppNotificationService {
   // ==========================================
   Future<void> notifyCurfewPassRequested({
     required String requestId,
+    required String tenantId,
     required String tenantName,
     required String requestType,
     required String curfewDate,
+    required bool requiresGuardianReview,
   }) async {
     await sendNotification(
       title: '🌙 Curfew Pass Request',
       body: '$tenantName requested a $requestType pass for $curfewDate.',
       notificationType: 'curfew',
       recipientRole: 'staff',
+      tenantId: tenantId,
+      notifyGuardians: requiresGuardianReview,
       routeType: 'curfew',
       routeId: requestId,
       data: {
@@ -480,8 +484,8 @@ class AppNotificationService {
         .eq('recipient_id', user.id)
         .order('created_at', ascending: false)
         .limit(limit)
-        .map((rows) =>
-            rows.map((r) => AppNotificationItem.fromRow(r)).toList());
+        .map(
+            (rows) => rows.map((r) => AppNotificationItem.fromRow(r)).toList());
   }
 
   Future<void> markAsRead(String notificationId) async {

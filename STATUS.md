@@ -104,6 +104,15 @@ If the team chooses to implement one of these in Capstone 1, move it into the cu
 
 ## Must fix before live demo
 
+- [ ] **Android FCM implementation completed; staging delivery still needs proof**
+  - Owner: Backend/mobile team
+  - Target: Demo and Production
+  - Due: TBD
+  - Client state: Android Firebase file matches `com.carmelita.carmelink`; notification permission, channel, icon, token registration/refresh/revocation, foreground display, background handler, and tap routing are implemented.
+  - Repository state (2026-09-25): The dispatcher supports role, multiple-user, tenant, and linked-guardian targets with caller authorization; current staff roles are used; announcement and feature lifecycle hooks are connected; and Android WorkManager invokes `notify-geofence` after recording a native background transition.
+  - Remaining risk: Edge Functions and FCM secrets have not been deployed and exercised on physical devices in this audit, so production delivery is not yet proven.
+  - Acceptance: Deploy corrected functions; register two physical Android devices; verify token rows; test foreground/background/terminated delivery and tap routing for message, gate, payment, maintenance, visitor, curfew, conduct, inspection, utility, and announcement events; confirm `push_sent_at` and zero unexpected `push_error` values.
+
 - [ ] **Broken boundary editor**
   - Owner: Unassigned
   - Target: Demo and Defense
@@ -119,13 +128,12 @@ If the team chooses to implement one of these in Capstone 1, move it into the cu
   - Current state: Shared header opens `_GlobalNotificationsPage`, which always says notifications are disconnected, while the real `NotificationsPage` exists.
   - Acceptance: Every notification entry point opens the live notification list; no `_GlobalNotificationsPage` remains; widget test taps the header and finds live notification-page content.
 
-- [ ] **Announcement push does not dispatch**
-  - Owner: Unassigned
+- [ ] **Announcement push is implemented but needs staging verification**
+  - Owner: Backend/mobile team
   - Target: Demo if push is demonstrated; otherwise Defense wording
   - Due: TBD
-  - Current state: Announcement CRUD works, but `_dispatchFCMNotificationIfConfigured` is a no-op.
-  - Decision: Route creation through `AppNotificationService.notifyNewAnnouncement`, or explicitly demonstrate announcements as an in-app board without automatic push.
-  - Acceptance: Staging creation produces the intended recipient notification rows and device push, or all automatic-push claims/actions are removed.
+  - Current state: Announcement creation dispatches through `AppNotificationService.notifyNewAnnouncement` and records `fcm_sent` only after the Edge Function accepts the request.
+  - Acceptance: Staging creation produces the intended recipient notification rows and device push for tenant, guardian, and all-resident audiences.
 
 - [ ] **Device Binding button is nonfunctional**
   - Owner: Unassigned
@@ -299,4 +307,3 @@ Add one row before merging a scope-sensitive change.
 |---|---|---|---|---|---|
 | 2026-09-25 | Audit | Removed app-usage tracking | Removed Android special permission and local behavioral data access | Analyze, 381 tests, Android debug build | Usage tracking resolved |
 | 2026-09-25 | Audit | Removed unreachable mock/scratch code and unused assets | Removed hardcoded scratch credential path; reduced bundle/startup image work | Analyze, tests, Android debug build | Cleanup resolved |
-

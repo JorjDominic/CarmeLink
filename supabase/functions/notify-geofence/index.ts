@@ -36,7 +36,7 @@ Deno.serve(async (request) => {
 
     const recipients = new Set<string>()
     const { data: staff, error: staffError } = await auth.admin.from('profiles')
-      .select('id').eq('role', 'owner_caretaker')
+      .select('id').in('role', ['owner', 'caretaker'])
     if (staffError) throw new Error(`Unable to load staff recipients: ${staffError.message}`)
     staff?.forEach((profile) => recipients.add(profile.id))
 

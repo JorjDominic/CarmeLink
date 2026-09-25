@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
+import 'app_notification_service.dart';
 
 class VisitorService {
   const VisitorService();
@@ -71,7 +74,16 @@ class VisitorService {
         })
         .select(_columns)
         .single();
-    return VisitorRequest.fromRow(row);
+    final request = VisitorRequest.fromRow(row);
+    final tenantName =
+        client.auth.currentUser?.userMetadata?['full_name']?.toString().trim();
+    unawaited(AppNotificationService.instance.notifyVisitorPassRequested(
+      passId: request.id,
+      tenantName: tenantName?.isNotEmpty == true ? tenantName! : 'A tenant',
+      visitorName: request.visitorName,
+      visitDate: request.schedule.toString().split(' ').first,
+    ));
+    return request;
   }
 
   Future<VisitorRequest> updatePending({
@@ -115,7 +127,19 @@ class VisitorService {
       'p_action': action,
       'p_note': note?.trim(),
     });
-    return VisitorRequest.fromRow(Map<String, dynamic>.from(value as Map));
+    final request =
+        VisitorRequest.fromRow(Map<String, dynamic>.from(value as Map));
+    if (request.tenantId.isNotEmpty && action != 'cancel') {
+      unawaited(
+        AppNotificationService.instance.notifyVisitorPassStatusChanged(
+          tenantId: request.tenantId,
+          passId: request.id,
+          visitorName: request.visitorName,
+          status: request.statusLabel,
+        ),
+      );
+    }
+    return request;
   }
 
   Future<List<VisitorEvent>> listEvents(String requestId) async {
