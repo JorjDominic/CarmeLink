@@ -90,7 +90,35 @@ Status meanings:
 
 - **Input:** None after signing in.
 - **Workflow:** Open the tenant home page.
-- **Result:** The tenant sees balances, curfew/presence summary, room information, recent activity, and shortcuts for payments, maintenance, visitors, and curfew requests.
+- **Result:** The tenant sees balances, curfew/presence summary, room information, active contract status banner, live onboarding document checklist rows, and shortcuts for payments, maintenance, visitors, and curfew requests.
+- **State:** **Working.**
+
+### Complete tenant onboarding & profile details
+
+- **Input:** School name, course/program, year level (optional), emergency contact name, phone, and relationship (required).
+- **Workflow:** Tap the onboarding banner on the Home dashboard, tap Edit in the Profile tab, or scan an onboarding QR code. Complete the 3-step form and submit.
+- **Result:** Profile details are saved. The completion view directs the tenant to the document checklist and lease signature.
+- **State:** **Working.**
+
+### Submit required onboarding documents
+
+- **Input:** PDF or image files (JPG, PNG) from device storage for Tenant Valid ID (required) and Parent/Guardian ID (optional).
+- **Workflow:** Open the Documents Checklist from the Home banner or Profile tab. Tap an item, pick the file from device storage, and submit.
+- **Result:** The file uploads to private Storage; status updates to "Uploaded • Pending Review". If staff rejects an item, review notes are shown with an option to re-upload.
+- **State:** **Working; private Storage staging verification remains.**
+
+### Sign rental lease agreement (Touchscreen E-Sign or Physical Upload)
+
+- **Input:** On-screen finger or stylus signature, legal affirmation, or physical paper document.
+- **Workflow:** Tap "Sign now" on the Home banner or Profile tab. Draw signature on the canvas dialog (`SignaturePadDialog`), check the legal agreement, and tap Submit. Alternatively, upload a signed copy or hand in physical paper at the dorm front desk.
+- **Result:** The electronic signature is rendered to PNG, uploaded, and submitted via `submit_tenant_electronic_signature` RPC. The signer status updates to "Signed on phone (E-Sign) • Pending Review".
+- **State:** **Working.**
+
+### Track live document & signature verification status
+
+- **Input:** None.
+- **Workflow:** View the Home dashboard banner or the Profile tab.
+- **Result:** Individual color-coded status rows show the exact status of Tenant Valid ID, Parent/Guardian ID, Signed Lease Copy, and On-Screen Lease Signature.
 - **State:** **Working.**
 
 ### View assigned room
@@ -353,11 +381,12 @@ in parallel with data collection and paperwork.
    signs into the CarmeLink app (or opens an onboarding invite link/QR) and submits
    emergency contact details plus academic information. Staff can also view/edit these
    details directly in the onboarding panel.
-2. **Verify paperwork** — Required documents (Tenant ID, Guardian ID, Signed photocopies)
+2. **Verify paperwork & signatures** — Required documents (Tenant ID, Guardian ID, Signed photocopies)
    can be uploaded directly by the tenant in the app (picking PDF or images from their phone)
-   or submitted as physical hard copies at the dorm desk. Each item follows:
-   upload → staff review → verify or reject with notes. Rejected items provide actionable
-   feedback to the tenant for fast in-app re-upload.
+   or submitted as physical hard copies at the dorm desk. In addition, the tenant can sign
+   electronically right on their phone using the in-app touch signature canvas or upload a
+   signed hard copy. Each item follows: submit/sign → staff review → verify or reject with notes.
+   Rejected items provide actionable feedback to the tenant for fast in-app re-upload or resigning.
 3. **Set up residency in parallel** — Staff may assign a room/bed and link a
    guardian any time after account creation; neither task is hidden behind the
    paperwork workflow. Room assignment must be completed before official lease

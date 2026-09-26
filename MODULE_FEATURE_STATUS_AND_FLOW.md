@@ -5,6 +5,29 @@
 > Repository state reviewed: September 25, 2026  
 > Status is based on reachable Flutter code, services/controllers, Supabase migrations and Edge Functions, native Android/iOS code, static analysis, tests, and build results. Remote deployment is not assumed merely because SQL exists locally.
 
+## Current implementation ownership
+
+- **Jorj Dominic — reserved:** FCM/push delivery, tenant onboarding/contracts,
+  and geofencing/native gate evaluation. This includes their migrations, RPCs,
+  secrets, platform code, deployment, and physical-device verification.
+- **Japle Ligaya — assigned remainder:** visitor management, rooms/cleaning/
+  inspections, maintenance-facing room work, conduct/cases, non-contract
+  billing/payment operations, move-out/settlement, retention, shared UI cleanup,
+  phone/dialer actions, feedback, CI scripts, Android release packaging,
+  non-reserved realtime/security checks, and operational documentation.
+
+If Japle's task reaches FCM, onboarding/contracts, or geofencing, that dependency
+is handed to Jorj instead of changing the reserved workflow in Japle's branch.
+
+### Assigned UI improvements
+
+Japle's current UI scope is tracked in detail as UI-1 through UI-6 in
+`STATUS.md`: compact one-line tenant payment filters, 10-record Load more
+pagination, consistent Maintenance/Confidential/Missed Cleaning report pages,
+six consolidated owner management areas, floor plan embedded only through Room
+Monitoring, and four owner Operations summary cards in one horizontal row.
+These are pending improvements, not claims about the current build.
+
 ## Status legend
 
 - **Implemented** — normal code path and persistence exist; still requires production deployment verification.
@@ -56,8 +79,9 @@
 |---|---|---|---|
 | Contract CRUD | Implemented, verify live | Owner creates/updates/deletes `tenant_contracts`; database validates tenant/date/state relationships. | Execute remote contract smoke test. |
 | Onboarding invitation | Implemented, verify live | Staff creates an opaque invitation; the matching authenticated tenant submits optional academic data and required emergency-contact data. Cross-account scans explain that the user must switch accounts. | Confirm expiry, single use, and cross-account denial on staging. |
-| Requirements checklist | Implemented, verify live | Contract creation initializes requirement rows. Files are submitted and reviewed through RPC-controlled states. | Confirm private bucket policies and required-document activation block. |
-| Signers | Implemented, verify live | Tracks tenant/owner/guardian/witness requirements and verified/waived state. | Verify independent signer identity and no client-side bypass. |
+| Requirements checklist | Implemented, verify live | Contract creation initializes requirement rows. Files are submitted (PDF/images) or handed in physically at the dorm desk. Live color-coded status rows for Valid ID, Guardian ID, and Signed Copy appear on Tenant Profile and Home Dashboard. | Confirm private bucket policies and required-document activation block. |
+| Electronic lease signature | Implemented | Tenants can sign their lease directly on phone via in-app touch signature canvas (`SignaturePadDialog`), exporting PNG and submitting via `submit_tenant_electronic_signature` RPC to private Storage. Also supports physical hard copy review. | Test signature rendering and verification across multiple device screen sizes. |
+| Signers | Implemented, verify live | Tracks tenant/owner/guardian/witness requirements and verified/waived state. Direct in-app signing triggers signature pad and submits signer record. | Verify independent signer identity and no client-side bypass. |
 | Contract PDF generation | Implemented | The active assignment supplies the room number printed on the official lease; the bed label is intentionally omitted. Generation is blocked until a room is assigned. | Bundled Helvetica warnings indicate limited Unicode support; embed a Unicode font if names may require it. |
 | Generated/signed documents | Implemented, verify live | Uploads versioned files to private Storage, registers metadata, reviews signed files, and guards deletion. | Confirm bucket policies, one-pair rules, and cleanup after failed registration. |
 | Activation and date sync | Implemented, verify live | UI and database require verified email, complete emergency contact, verified latest signed contract, required documents, and required signers. Activation initiates billing from the contract schedule rather than physical move-in. | Prove activation is idempotent and generates rent exactly once. |
@@ -105,7 +129,7 @@
 | Foreground GPS check | Implemented | Requests location, rejects disabled/denied/mock/stale/inaccurate readings, evaluates polygon or circle with edge buffer, then records result through RPC. | Physical-device accuracy testing remains. |
 | Staff manual log | Implemented, verify live | Staff supplies tenant, direction, and mandatory notes to `record_staff_manual_log`. | Confirm caller role/target role and audit values. |
 | Boundary read | Implemented | Loads newest active `dorm_boundary_config` and updates in-memory calculations; failure retains prior/default geometry. | Confirm production coordinates are real approved points. |
-| Boundary editing | Broken/incomplete | Owner UI calls `update_dorm_boundary_config`. Intended migration file is empty and no SQL definition exists locally. | Implement secure RPC migration or remove editor. |
+| Boundary editing | Implemented, verify live | Owner UI calls `update_dorm_boundary_config`. RPC is defined in `202609250002_boundary_config_editable.sql` with owner/staff security definer authorization, bounds checks, and JSON polygon parsing. | Deploy migration to staging Supabase and test boundary update. |
 | Android native tripwire | Implemented, verify physically | Google circular geofence queues IN/OUT, WorkManager uploads through RPC, refreshes tokens, retries network failure, and restores after reboot/update. | Circle expands to at least 100 m; tokens are in ordinary preferences; OEM battery behavior needs testing. |
 | iOS native tripwire | Partial | Core Location circular region/significant changes queue events; Flutter drains them when running. | No native background uploader; register reports success before authorization/monitor confirmation. |
 | Polygon parity | Partial | Foreground Dart supports polygon; native Android/iOS adapters monitor a circle and directly queue circular transitions. | Choose one official model or add coordinate-aware polygon confirmation. |
@@ -122,7 +146,7 @@
 | Announcement board | Implemented | Staff creates/edits/pins/deletes; tenants/guardians filter visible audience; service caches results for 30 seconds. | Verify audience RLS, not only client filtering. |
 | Announcement push | Implemented, verify live | Creation invokes `notifyNewAnnouncement`; the Edge Function creates authorized recipient rows, attempts FCM, and the announcement records accepted dispatch. | Deploy secrets/functions and verify each audience on physical devices. |
 | Live notification center | Implemented, verify live | `NotificationsPage` streams/fetches recipient rows and supports mark-one/mark-all read. Push taps route to messages or notification center. | Live FCM/APNs and route tests. |
-| Header notification shortcut | Broken/inconsistent | A shared header opens `_GlobalNotificationsPage`, whose list is hardcoded empty and says service is disconnected. | Replace it with the real `NotificationsPage`. |
+| Header notification shortcut | Assigned to Japle | A shared header opens `_GlobalNotificationsPage`, whose list is hardcoded empty. Replace with `NotificationsPage` and delete `_GlobalNotificationsPage`. | Assigned in STATUS.md (Task 1). |
 | Notification preferences | Local/partial | UI stores toggles only in widget/process state; it does not persist server preferences or control fan-out. | Add durable per-user preferences and enforce them during dispatch, or label as local UI. |
 | Core module notification hooks | Implemented, verify live | Messages, announcements, gate events, payments/utilities, maintenance, visitors, curfew, conduct publication/appeals, and inspection completion dispatch through protected notification paths. | Deploy and test each recipient path on staging devices. |
 | Secondary module notification hooks | Incomplete | Confidential reports, contract/onboarding review, cleaning, inspection scheduling/findings, employee-curfew profile changes, guardian links, room/residency changes, and contract-expiry reminders do not have comprehensive push coverage. | Define which events truly require alerts, then implement and test only the approved set. |

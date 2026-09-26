@@ -278,6 +278,54 @@ integration portions of Priorities 6, 10–11, and 14–16. Each developer shoul
 use a separate feature branch and avoid editing the same migration or workflow
 files simultaneously.
 
+### Current named ownership split (supersedes the older generic owner table)
+
+The labels `Leader Developer` and `Groupmate` above are replaced by this named
+assignment as of September 26, 2026:
+
+| Workstream | Owner | Boundary |
+|---|---|---|
+| FCM and push delivery | **Jorj Dominic** | Firebase/APNs, Edge Functions, delivery secrets, routing, and physical-device push proof |
+| Tenant onboarding and contracts | **Jorj Dominic** | Invitations, requirements/signers, electronic signatures, PDF versions, activation, and contract-generated billing |
+| Geofencing, gate evaluation, and curfew/gate integration | **Jorj Dominic** | Native tripwires, polygon/circle semantics, boundary configuration, employee-curfew evaluator integration, and physical geofence tests |
+| Visitor management | **Japle Ligaya** | All visitor workflow work except gate/geofence integration |
+| Rooms, cleaning, inspections, and maintenance-facing room operations | **Japle Ligaya** | Non-onboarding room operations and presentation |
+| Conduct cases and appeals | **Japle Ligaya** | Incidents, evidence, warnings, responses, history, and recommendations |
+| Billing and payment operations | **Japle Ligaya** | Non-contract charges, corrections, payment review, and finance presentation; contract-generated rent remains reserved |
+| Move-out and settlement | **Japle Ligaya** | Notice, inspection coordination, clearance, deposit settlement, and refund/shortfall workflow; contract-state changes require Jorj review |
+| Retention, shared UI, CI, and release packaging | **Japle Ligaya** | Retention work, phone actions, feedback, device-binding demo treatment, readiness scripts, Android packaging, and runbooks |
+
+Japle must leave FCM, tenant onboarding/contracts, and geofencing untouched and
+hand dependencies in those areas to Jorj. Jorj remains responsible for their
+schema/RPC changes, deployment, and physical-device acceptance. For shared
+production checks, Japle covers non-reserved modules and Jorj covers the three
+reserved workstreams.
+
+Japle's current execution order is:
+
+1. Complete Tasks 1–5 and UI-1–UI-6 in `STATUS.md`.
+2. Finish visitor and room/inspection workflows.
+3. Finish conduct/case and non-contract billing workflows.
+4. Finish move-out/settlement and retention work.
+5. Complete non-reserved production verification, Android release packaging,
+   CI cleanup, and operational documentation.
+
+### Assigned UI cleanup — Japle Ligaya
+
+The detailed acceptance criteria live in `STATUS.md` under **UI improvement
+workstream**. The current UI assignment is:
+
+| Role | Area | Required result |
+|---|---|---|
+| Tenant | Payments | All/Due/Pending/Verified filters stay in one horizontal row; records display 10 at a time with an explicit Load more action |
+| Tenant | Reports | Maintenance, Confidential Concern, and Missed Cleaning Duty use one consistent hub/card/status pattern while retaining separate permissions and records |
+| Owner | Operations summaries | Four summary containers appear in one horizontal row, with horizontal scrolling on narrow screens |
+| Owner | Management areas | Consolidate overlapping entries into Residents, Rooms & Facilities, Billing & Payments, Reports & Cases, Access & Visitors, and Communication |
+| Owner | Floor plan | Remove the dedicated management destination and keep the map inside Room Monitoring |
+
+These changes are navigation and presentation work. They do not authorize
+changes to FCM, tenant onboarding/contracts, or geofencing.
+
 ### Navigation simplification roadmap
 
 The application should consolidate navigation and presentation without merging

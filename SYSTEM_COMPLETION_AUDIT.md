@@ -5,6 +5,12 @@
 > Audited from the repository on September 25, 2026.  
 > This separates **prototype completeness**, **production code readiness**, and **verified deployment readiness**. A working UI is not treated as proof that the remote backend is correctly deployed.
 
+> **Ownership note (September 26, 2026):** Jorj Dominic retains FCM/push,
+> tenant onboarding/contracts, and geofencing. Japle Ligaya owns every other
+> open module and production-cleanup item, with cross-cutting verification split
+> so each developer covers only their assigned scope. `STATUS.md` contains the
+> authoritative task-level assignments and acceptance criteria.
+
 ## Executive verdict
 
 | Target | Current estimate | Verdict |
