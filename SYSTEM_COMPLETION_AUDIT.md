@@ -11,6 +11,39 @@
 > so each developer covers only their assigned scope. `STATUS.md` contains the
 > authoritative task-level assignments and acceptance criteria.
 
+## Japle merged-work source reconciliation — September 27, 2026
+
+The current `main` tree and Git history were re-audited because earlier Japle
+commits were merged before every planning file was updated. These checkmarks
+mean **implemented in repository source/history**, not production-deployed or
+remotely verified:
+
+- [x] Tenant maintenance CRUD, photo evidence, history, and pending edit/cancel.
+- [x] Visitor request/review/history plus one-calendar-day lead time,
+  9:00 AM–9:00 PM policy, same-day departure, and arrival/departure logging.
+- [x] Bed-based cleaning schedules and private missed-duty reporting.
+- [x] Monthly/follow-up room inspections with three-day notice, evidence,
+  findings, corrective actions, and follow-up.
+- [x] Conduct cases with evidence/responses/warnings/history and separate appeals.
+- [x] Non-destructive retention settings/configuration and audit trail.
+- [x] Tenant My Room and Guardian linked-tenant room/payment views.
+- [x] Tenant payment-proof upload and on-device receipt OCR.
+- [x] Tenant/Guardian announcements and role-scoped persistent messaging.
+- [x] Reports/PDF infrastructure and public/staff web surfaces in source.
+- [x] Production `MockData` dependency removed.
+
+Still **not** closed by this source audit:
+
+- [ ] Immediate `STATUS.md` Tasks 1–5 and UI-1–UI-6 that remain open in current source.
+- [ ] End-to-end move-out/settlement workflow.
+- [ ] Tenant/Guardian permitted self-profile editing and persisted notification preferences.
+- [ ] In-app notification deep-link navigation and Guardian personal-alert persistence/scheduling.
+- [ ] Remote migration/RLS/RPC/Storage/Realtime/staging verification for non-reserved modules.
+- [ ] Android production signing/AAB, production web/session proof, CI cleanup, and operational readiness.
+
+Do not downgrade any remaining production gap merely because its UI/service is
+present locally.
+
 ## Executive verdict
 
 | Target | Current estimate | Verdict |

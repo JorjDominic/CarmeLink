@@ -2740,6 +2740,27 @@ The production system should use the minimum data necessary for each function an
 
 The phases below follow the current ZIP and the ownership model in `DEVELOPMENT_PROGRESS.md`. They are not meant to force both developers to finish one entire phase before moving. The goal is to expose a stable backend contract from Developer 1, then let Developer 2 connect the matching Tenant/Guardian workflow in parallel.
 
+### September 27 source reconciliation
+
+Current named ownership in `DEVELOPMENT_PROGRESS.md` supersedes the older
+Developer 1/Developer 2 labels below. A full source/history audit of current
+`main` also found that multiple Developer 2 checkboxes were stale after Japle
+commits were merged. The checkmarks updated below reflect repository
+implementation only. Remote/staging/RLS/device/release proof remains separate.
+
+Source-confirmed merged Japle work includes Tenant My Room, Guardian linked
+room/payment views, Tenant billing/payment-proof flows, maintenance CRUD/photo/
+floor-plan/history, visitor request UX, announcements, receipt OCR, cleaning,
+room inspections, conduct cases/appeals, retention configuration, and removal
+of production `MockData`.
+
+Still open from this plan include permitted self-profile editing, persisted
+notification preferences, notification deep links, Guardian safety/personal
+alert persistence, remaining shared offline/error-state coverage, move-out/
+settlement, and production verification/hardening. Jorj's reserved FCM/push,
+onboarding/contracts, and geofencing/gate workstreams are not reassigned by
+these older phase labels.
+
 ## Phase 1 — Foundation, Authentication, and Security
 
 ### Developer 1
@@ -2805,10 +2826,10 @@ Next work:
 
 ### Developer 2
 
-- [ ] Connect Tenant `My Room` to the active assignment
-- [ ] Show bed, room, roommates, capacity, and permitted utility information
-- [ ] Connect Guardian `Tenant Information` to verified links only
-- [ ] Add proper empty states when a Tenant has no assignment or a Guardian has no active link
+- [✓] Connect Tenant `My Room` to the active assignment
+- [✓] Show bed, room, roommates, capacity, and permitted utility information
+- [✓] Connect Guardian `Tenant Information` to verified links only
+- [✓] Add proper empty states when a Tenant has no assignment or a Guardian has no active link
 
 ### Integration checkpoint
 
@@ -2839,12 +2860,12 @@ Build the production financial backend and management workflow:
 
 After the payment contract is frozen:
 
-- [ ] Connect Tenant current bill and outstanding balance
-- [ ] Connect Tenant payment history
-- [ ] Upload payment proof to the agreed Storage bucket
-- [ ] Display verification status and receipt information
-- [ ] Connect Guardian read-only payment status for linked Tenants
-- [ ] Handle rejected, partial, overdue, and pending-verification states
+- [✓] Connect Tenant current bill and outstanding balance
+- [✓] Connect Tenant payment history
+- [✓] Upload payment proof to the agreed protected receipt pipeline
+- [✓] Display verification status and receipt information
+- [✓] Connect Guardian read-only payment status for linked Tenants
+- [✓] Handle rejected, partial, overdue, and pending-verification states
 
 ### Integration checkpoint
 
@@ -2879,12 +2900,12 @@ Tenant and Guardian see updated status
 
 This lane can begin as soon as the minimal request schema/RLS contract is ready; it does not need to wait for the full Owner/Caretaker maintenance UI.
 
-- [ ] Submit Tenant maintenance requests
-- [ ] Save category, urgency, description, room/location, and attachments
-- [ ] Show the Tenant's own request history
-- [ ] Show `Pending`, `Assigned`, `In Progress`, `Completed`, and other agreed statuses
-- [ ] Connect the Tenant maintenance floor-plan location selector
-- [ ] Add cancellation/edit rules only for states permitted by the shared contract
+- [✓] Submit Tenant maintenance requests
+- [✓] Save category, urgency, description, room/location, and attachments
+- [✓] Show the Tenant's own request history
+- [✓] Show `Pending`, `Assigned`, `In Progress`, `Completed`, and other agreed statuses
+- [✓] Connect the Tenant maintenance floor-plan location selector
+- [✓] Add cancellation/edit rules only for states permitted by the shared contract
 
 ### Integration checkpoint
 
@@ -2909,13 +2930,13 @@ A Tenant-created `Pending` request must appear in the Owner/Caretaker queue with
 
 The request workflows can be developed before advanced camera/geofence automation.
 
-- [ ] Tenant creates/views/cancels unreviewed curfew requests
-- [ ] Guardian views requests from an already-linked Tenant
-- [ ] Guardian approves/rejects with remarks and timestamp
-- [ ] Show `Awaiting staff decision` after Guardian approval when applicable
-- [ ] Tenant creates/views/cancels unreviewed visitor requests
-- [ ] Connect Tenant Gate & Curfew overview to verified events
-- [ ] Connect Guardian Curfew Overview and Gate Activity to linked-Tenant events only
+- [✓] Tenant creates/views/cancels unreviewed curfew requests
+- [✓] Guardian views requests from an already-linked Tenant
+- [✓] Guardian approves/rejects with remarks and timestamp
+- [✓] Show `Awaiting staff decision` after Guardian approval when applicable
+- [✓] Tenant creates/views/cancels unreviewed visitor requests
+- [✓] Connect Tenant Gate & Curfew overview to verified events
+- [✓] Connect Guardian Curfew Overview and Gate Activity to linked-Tenant events only
 
 ### Integration checkpoint
 
@@ -2947,7 +2968,7 @@ Manual/test gate events should be proven first. Camera, facial recognition, and 
 
 ### Developer 2
 
-- [ ] Connect Tenant/Guardian announcements
+- [✓] Connect Tenant/Guardian announcements
 - [✓] Connect Tenant/Guardian conversations and message history
 - [ ] Connect notifications and deep links
 - [ ] Persist Tenant/Guardian notification preferences
@@ -2978,8 +2999,8 @@ These features come only after the core manual workflows are reliable.
 
 ### Developer 2
 
-- [ ] Integrate OCR results into the Tenant payment-proof experience without treating OCR as authoritative
-- [ ] Display geofence/gate verification state to Tenant/Guardian only when permitted
+- [✓] Integrate OCR results into the Tenant payment-proof experience without treating OCR as authoritative
+- [✓] Display geofence/gate verification state to Tenant/Guardian only when permitted
 - [ ] Connect verification/device-binding pages
 - [ ] Handle unavailable, denied-permission, timeout, and fallback states
 - [ ] Keep the normal request/payment/gate flows usable when automation fails
@@ -3038,8 +3059,8 @@ Supporting user-facing work:
 - [ ] Guardian widget/integration tests
 - [ ] Shared-page tests
 - [ ] Offline/network/error-state tests
-- [ ] Phone/tablet/wide-screen tests for owned interfaces
-- [ ] Verify no owned production page depends on `MockData`
+- [✓] Phone/tablet/wide-screen tests for representative owned interfaces
+- [✓] Verify no owned production page depends on `MockData`
 
 ### Joint final tests
 

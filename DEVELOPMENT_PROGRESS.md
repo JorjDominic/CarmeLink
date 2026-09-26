@@ -218,22 +218,30 @@ policy choices are recorded in the full system plan.
    guardian blocking rule configurable until the client decides it.
 6. [ ] Add versioned policies/addenda for visitors, utilities, employee curfew,
    rent changes, and enforcement/review rules missing from the lease.
-7. [ ] Enforce the one-calendar-day visitor request procedure, contractual
+7. [✓] Enforce the one-calendar-day visitor request procedure, contractual
    9:00 AM–9:00 PM window, approval, and reception arrival/departure logging.
-8. [ ] Add monthly inspections with three days' written notice, evidence,
-   findings, corrective actions, and follow-up.
+   Implemented in Flutter policy checks and database-side enforcement; remote
+   smoke/RLS verification remains a production check.
+8. [✓] Add monthly inspections with three days' written notice, evidence,
+   findings, corrective actions, and follow-up. Implemented in the room
+   inspection migration/service/pages; live storage/RLS verification remains.
 9. [ ] Add a move-in room-condition snapshot if the client approves it.
-10. [ ] Complete restricted disciplinary records before rule-based penalties.
+10. [✓] Complete restricted disciplinary records before rule-based penalties.
+    Conduct cases now include evidence, tenant responses, warnings, history,
+    termination-review recommendation, and a separate appeal workflow.
 11. [ ] Add separately allocated penalty/damage charges linked to an approved
     incident, inspection, or assessment.
-12. [ ] Implement cleaning schedules by bed with private reporting.
+12. [✓] Implement cleaning schedules by bed with private reporting.
+    Bed-based schedules and private missed-duty/noncompliance reporting are in
+    the merged room-cleaning workflow.
 13. [ ] Add approved employee curfew profiles to gate/geofence evaluation.
 14. [ ] Add 30-day move-out notice, final inspection, clearance, and closure.
 15. [ ] Add itemized deposit deductions, 30-day refund tracking, refund proof,
     and separately approved shortfall charges.
 16. [ ] Add formal termination/eviction cases; never auto-evict from an incident.
-17. [ ] Configure sensitive-record retention after client and legal/privacy
-    review.
+17. [✓] Configure sensitive-record retention after client and legal/privacy
+    review. Non-destructive retention configuration and audit history are
+    implemented; automated deletion/anonymization remains intentionally disabled.
 
 ### Consolidated modules and developer ownership
 
@@ -309,6 +317,30 @@ Japle's current execution order is:
 4. Finish move-out/settlement and retention work.
 5. Complete non-reserved production verification, Android release packaging,
    CI cleanup, and operational documentation.
+
+### Japle merged-work reconciliation — September 27, 2026
+
+A source/history audit of current `main` (`13b5b28`) found that several older
+unchecked entries were already implemented in Japle commits that were merged
+before all planning files were back-updated. The implementation state is now:
+
+| Japle workstream | Repository implementation | Still open |
+|---|---|---|
+| Visitor management | **Implemented** — request/edit/cancel, staff review, policy enforcement, arrival/departure history | Remote smoke/RLS proof; separately approved visitor-ID handling if retained |
+| Cleaning | **Implemented** — bed-based schedules and private missed-duty reports | Staging/RLS proof; confirm any later shared-area expansion |
+| Room inspections | **Implemented** — monthly/follow-up, 3-day notice, findings, evidence, corrective actions | Live Storage/RLS proof; move-in/move-out lifecycle remains separate |
+| Maintenance tenant workflow | **Implemented** — CRUD, photo, floor-plan location, history, pending edit/cancel | Live RLS/media verification |
+| Conduct & appeals | **Implemented** — cases, evidence, responses, warnings, history, recommendations, appeals | Live authorization/evidence verification |
+| Retention configuration | **Implemented as config only** | No automatic deletion/anonymization in Capstone 1 |
+| Tenant My Room / Guardian linked views | **Implemented** | Live relationship-isolation/RLS proof |
+| Tenant payment proof + OCR | **Implemented** | Reconciliation/idempotency/remote verification |
+| Announcements / messaging | **Implemented** | Push is Jorj-owned; Realtime/authorization verification remains |
+| Reports/PDFs and web/staff surfaces | **Implemented in source** | Production deployment/session and reconciliation checks |
+| Move-out & settlement | **Not implemented end-to-end** | Notice, final inspection coordination, clearance, deposit/refund/shortfall workflow |
+
+This reconciliation does not turn local/source evidence into production proof.
+Items requiring remote, device, security, release, or staging evidence remain
+open in `STATUS.md` and `SYSTEM_COMPLETION_AUDIT.md`.
 
 ### Assigned UI cleanup — Japle Ligaya
 
@@ -775,7 +807,7 @@ page exists but its important backend workflow is unfinished.
 
 ### Tenant pages
 
-- [ ] **Home** — live room, balance, maintenance, gate, and announcement summary.
+- [✓] **Home** — live room, balance, maintenance, gate, and announcement summary.
 - [✓] **My Room** — assigned room, bed, roommates, capacity, and utilities with live database sync and real-time refresh.
 - [✓] **Payments** — charges, outstanding balance, due dates, filter chips, overdue badges, receipt inspection, and payment history.
 - [✓] **Upload Payment Proof** — payment destination instructions, 5MB receipt attachment with interactive zoom, on-device OCR auto-capture, and live submission.
@@ -791,10 +823,11 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Gate and Curfew** — verified IN/OUT events, curfew status, on-device geofence check-in, and presence timeline.
 - [✓] **Curfew Exception (Tenant)** — differentiated request types ('Late Return' direct to caretaker vs 'Overnight Leave' with guardian endorsement), departure/return schedule pickers, status pills, cancellation of pending requests, and live Supabase real-time sync.
 - [✓] **Visitor Request (current implementation)** — live visitor identity,
-  purpose, schedule, review, contact details, pending edits, same-day-only
-  arrival/departure scheduling, cancellation, visit status, and audit-safe
-  real-time history. **Step 4 must replace same-day scheduling with prior-day
-  registration and add protected visitor ID capture.**
+  purpose, contact details, pending edits, cancellation, review, visit status,
+  and audit-safe real-time history. Confirmed policy enforcement now requires
+  registration at least one calendar day before the visit, 9:00 AM–9:00 PM
+  visiting hours, same-day departure, and staff arrival/departure logging.
+  Protected visitor-ID capture remains separate pending approved requirements.
 - [✓] **Confidential Concern (Tenant Phase)** — restricted live submission and tenant-only history protected by RLS; staff review is deferred.
 - [✓] **Rules and Policies** — maintained dormitory rules and safety guidance.
 
@@ -834,14 +867,14 @@ page exists but its important backend workflow is unfinished.
 - [✓] **Visitor Management** — live approve/reject, arrival/departure recording,
   role-scoped history, and append-only audit events.
 - [✓] **Confidential Reports** — owner-only live review with mandatory notes, protected status decisions, and audit logging.
-- [ ] **Announcements** — create, target, publish, and archive notices.
-- [ ] **Messages** — persistent tenant and guardian conversations.
-- [ ] **Contacts** — verified guardian and emergency contact directory.
+- [✓] **Announcements** — live create/target/publish/archive management is implemented; push delivery remains a separate Jorj-owned verification item.
+- [✓] **Messages** — persistent role-scoped tenant/guardian conversations and realtime message history are implemented; production multi-account verification remains.
+- [✓] **Contacts** — live guardian/emergency contact directory is implemented; direct phone-dial actions remain open in `STATUS.md` Task 2.
 - [✓] **Contracts** — live owner CRUD with tenant, dates, amounts, lifecycle,
   search/filtering, owner-only RLS, and historical records.
 - [ ] **Income and Expenses** — validated financial records and owner-only RLS.
-- [ ] **Disciplinary Records** — verified incidents, notices, and restricted history.
-- [ ] **Reports and Analytics** — owner-only metrics generated from live records.
+- [✓] **Disciplinary Records** — conduct cases, evidence, responses, warnings, restricted history, and appeals are implemented; deployed access verification remains.
+- [✓] **Reports and Analytics** — live operational metrics plus PDF report generation are implemented; financial reconciliation/access-boundary verification remains.
 - [✓] **Accounts & Access** — full CRUD with server-enforced role permissions.
 - [✓] **Guardian Links** — owner-only create, edit, primary selection, and removal using live data.
 - [✓] **Profile** — authenticated owner identity and access level.
@@ -904,9 +937,9 @@ need to be agreed on before implementation.
 - [✓] Sign in, sign out, view authenticated profile, and change password.
 - [✓] Use local theme/settings and view Rules and Dormitory Information.
 - [ ] Edit only the tenant's permitted personal and emergency-contact fields.
-- [ ] Create and view the tenant's own maintenance submissions in `Pending` state.
-- [ ] Create, view, and cancel the tenant's own unreviewed visitor requests.
-- [ ] Create, view, and cancel the tenant's own unreviewed curfew requests.
+- [✓] Create and view the tenant's own maintenance submissions in `Pending` state.
+- [✓] Create, view, and cancel the tenant's own unreviewed visitor requests.
+- [✓] Create, view, and cancel the tenant's own unreviewed curfew requests. Current curfew/gate integration ownership is reserved to Jorj.
 - [✓] Submit and view the tenant's own confidential concerns.
 - [ ] Persist the tenant's own notification preferences.
 
@@ -926,14 +959,15 @@ but it does not require the Owner page. The request may remain
 
 ### Functions that depend on Owner, Caretaker, or external system data
 
-- [ ] Room, bed, roommate, occupancy, and contract display needs staff assignment data.
-- [ ] Payment balances and history need owner-created charges and payment records.
-- [ ] Payment verification needs an owner/caretaker decision.
-- [ ] Maintenance assignment, progress, and completion need caretaker actions.
-- [ ] Announcements and emergency alerts need staff-published content.
-- [ ] Staff messaging needs a staff participant and response workflow.
-- [ ] Gate activity needs verified geofence or manual staff records.
-- [ ] Visitor requests need staff approval for a completed workflow.
+- [✓] Room, bed, roommate, and occupancy display now consumes live staff-managed assignment data; contract lifecycle remains Jorj-owned.
+- [✓] Payment balances and history consume live owner-created charges and payment records.
+- [✓] Payment verification workflow and resulting Tenant/Guardian status display are connected.
+- [✓] Maintenance assignment, progress, completion, notes, and tenant-visible status are connected.
+- [✓] Announcements consume staff-published content.
+- [ ] Emergency/safety alerts still need a complete persisted/acknowledged user-facing workflow.
+- [✓] Staff messaging has persistent role-scoped conversations and response flow.
+- [✓] Gate activity consumes verified/manual event records; geofence/gate implementation ownership is now reserved to Jorj.
+- [✓] Visitor requests have staff approve/reject plus arrival/departure workflow.
 - [✓] Curfew requests need a final staff decision for a completed workflow.
 - [ ] Geofencing, OCR, and analytics need external services.
 
@@ -1073,7 +1107,7 @@ link.
 - [ ] Curfew monitoring and request review — UI implemented, **Mock**
 - [✓] Visitor management — **Live**, RLS-tested multi-account workflow
 - [✓] Confidential reports — owner-only live workflow with protected RPCs and audit logging
-- [ ] Announcements — UI implemented, **Mock**
+- [✓] Announcements — live audience-filtered Supabase notices.
 - [✓] Messaging and conversations — live Supabase persistence and realtime first iteration
 - [ ] Emergency contacts — UI implemented, **Mock**
 - [✓] Contracts — owner CRUD and lifecycle register, **Live**
@@ -1106,17 +1140,18 @@ Owned folders and files:
 
 ### Tenant pages
 
-- [ ] Home/dashboard and My Room — UI implemented, **Mock**
-- [ ] Payments and payment history — UI implemented, **Mock**
-- [ ] Payment-proof upload — UI implemented, **Mock**
-- [ ] Reports hub — UI implemented, **Mock**
-- [ ] Maintenance list, submission, and floor plan — UI implemented, **Mock**
-- [ ] Announcements — UI implemented, **Mock**
+- [✓] Home/dashboard and My Room — live room, balance, maintenance, presence, announcement, assignment, roommate, capacity, and utility data.
+- [✓] Payments and payment history — live charges, balances, statuses, receipt/history views, and refresh.
+- [✓] Payment-proof upload — live protected receipt submission with OCR-assisted field capture.
+- [✓] Reports hub — live unified entry to maintenance, confidential concerns, and missed-cleaning workflows.
+- [✓] Maintenance list, submission, and floor plan — live tenant CRUD/history, photo evidence, status display, pending edit/cancel, and floor-plan location selection.
+- [✓] Announcements — live audience-filtered Supabase notices.
 - [✓] Messages and conversation — live Supabase persistence and realtime first iteration
-- [ ] Gate and curfew overview — UI implemented, **Mock**
-- [ ] Curfew-exception request — UI implemented, **Mock**
-- [✓] Visitor request — **Live**, same-day-only and audit-safe; approved Step 4
-  prior-day registration and protected ID capture are not yet implemented
+- [✓] Gate and curfew overview — live presence/gate/curfew data; current geofence/gate ownership is reserved to Jorj
+- [✓] Curfew-exception request — live request/cancellation/status workflow; current curfew/gate integration ownership is reserved to Jorj
+- [✓] Visitor request — **Live** with at-least-one-calendar-day lead time,
+  9:00 AM–9:00 PM hours, same-day departure, staff review, and audit-safe history;
+  protected visitor ID capture remains pending only if retained in approved scope
 - [✓] Confidential concern — live tenant-only persistence and RLS
 - [✓] Rules and policies
 
@@ -1124,8 +1159,8 @@ Owned folders and files:
 
 - [✓] Home/dashboard — live linked-tenant, room, and payment summary with realtime sync — **Live**
 - [✓] Linked-tenant identity on Profile — **Live**
-- [ ] Curfew overview and gate activity — UI implemented, **Mock**
-- [ ] Curfew-request review — UI implemented, **Mock**
+- [✓] Curfew overview and gate activity — live linked-tenant requests/presence history; current geofence/gate ownership is reserved to Jorj
+- [✓] Curfew-request review — live Guardian endorse/decline workflow with remarks/timestamps; current curfew/gate integration ownership is reserved to Jorj
 - [✓] Payment status — linked tenant charges and verification state — **Live**
 - [✓] Announcements — guardian-audience notices from Supabase — **Live**
 - [✓] Messages and conversation — live Supabase persistence and realtime first iteration
@@ -1146,10 +1181,10 @@ Owned folders and files:
 
 ### Developer 2 next tasks
 
-- [ ] Connect tenant data to tables prepared by Developer 1
-- [ ] Connect guardian-to-tenant relationships
-- [ ] Store payment proofs in Supabase Storage
-- [ ] Persist visitor requests; maintenance, curfew, and confidential reports are live
+- [✓] Connect tenant data to live backend tables/services for room, billing, maintenance, announcements, visitor, confidential, cleaning, inspection, and conduct workflows
+- [✓] Connect guardian-to-tenant relationships for linked resident, room, payment, announcement, messaging, curfew, and gate views
+- [✓] Store payment proofs through the protected receipt-media pipeline while retaining compatible private-storage reads
+- [✓] Persist visitor requests; maintenance and confidential reports are live (curfew/gate ownership is now reserved to Jorj)
 - [✓] Connect announcements and real-time messaging
 - [ ] Connect notification preferences
 - [ ] Verify tenants can access only their own records
@@ -1160,10 +1195,10 @@ Owned folders and files:
 - [✓] Standardize roles as `tenant`, `guardian`, `caretaker`, and `owner`
 - [✓] Create and verify one test login for each role
 - [ ] Agree on table, column, model, and storage-bucket names
-- [ ] Test phone, tablet, and wide-screen layouts
+- [✓] Test representative phone, tablet, and wide-screen layouts with the responsive system matrix and focused narrow-screen widget tests
 - [ ] Add unit, widget, and integration tests
 - [ ] Test session expiry, sign-out, recovery, and offline behavior
-- [ ] Replace all mock data before production release
+- [✓] Remove production `MockData` dependencies; test fixtures remain injected only in tests
 - [ ] Remove visible test credentials and test accounts before release
 - [ ] Complete a final RLS and privacy audit
 

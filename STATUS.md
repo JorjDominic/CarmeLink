@@ -172,7 +172,7 @@ If the team chooses to implement one of these in Capstone 1, move it into the cu
 | Check | Last result | Date |
 |---|---|---|
 | `flutter analyze` | Pass — no issues | 2026-09-25 |
-| `flutter test` | Pass — 410 tests | 2026-09-25 |
+| `flutter test` | Pass — 421 tests | 2026-09-26 |
 | `flutter build apk --debug` | Pass | 2026-09-25 |
 | Remote migration parity | Not verified | — |
 | Remote role/RLS matrix | Not verified | — |
@@ -180,6 +180,83 @@ If the team chooses to implement one of these in Capstone 1, move it into the cu
 | iOS production build/device suite | Not verified | — |
 
 ## Resolved findings
+
+### Japle merged-work reconciliation — September 27, 2026
+
+The items below were rechecked against current `main` source, migrations, tests,
+and Git history after earlier Japle commits were merged before every planning
+file was updated. `[x]` here means the implementation is present in the
+repository; remote/staging/security verification remains tracked separately
+under **Must verify before production data** where applicable.
+
+- [x] **Tenant maintenance CRUD and maintenance-photo workflow implemented**
+  - Owner: Japle Ligaya
+  - Evidence: `lib/services/maintenance_service.dart`, tenant maintenance pages,
+    `20260909181703_tenant_maintenance_crud.sql`,
+    `20260909195825_maintenance_photo_upload.sql`, and focused maintenance tests.
+  - Remaining: live RLS/media-path verification is still open below.
+
+- [x] **Visitor request, staff review/history, and confirmed scheduling policy implemented**
+  - Owner: Japle Ligaya
+  - Evidence: visitor service/UI, `VisitorPolicy`, visitor migrations, and server
+    enforcement requiring at least one calendar day of lead time, the
+    9:00 AM–9:00 PM window, same-day departure, approval, and arrival/departure
+    logging.
+  - Remaining: remote smoke/RLS verification and any separately approved visitor-ID
+    requirement remain open.
+
+- [x] **Room cleaning schedules and private missed-duty reporting implemented**
+  - Owner: Japle Ligaya
+  - Evidence: room-cleaning service/pages, policy tests, and
+    `20260924050000_phase3a_room_cleaning.sql`.
+  - Remaining: staging/RLS verification and any later-approved shared-area duty
+    expansion remain separate.
+
+- [x] **Monthly/follow-up room inspection workflow implemented**
+  - Owner: Japle Ligaya
+  - Evidence: room-inspection service/pages, policy tests, and
+    `20260924060000_phase3b_room_inspections.sql` covering three-day written
+    notice, findings, evidence, corrective actions, and follow-up inspections.
+  - Remaining: move-in snapshots and move-out/final-inspection lifecycle work are
+    separate scope items.
+
+- [x] **Conduct cases, evidence, responses, warnings, history, and appeals implemented**
+  - Owner: Japle Ligaya
+  - Evidence: conduct services/pages plus `20260924070000_phase4a_conduct_cases.sql`
+    and `20260924090000_phase4c_conduct_case_appeals.sql`.
+  - Boundary: cases do not auto-create charges or auto-terminate tenancy.
+
+- [x] **Retention settings/configuration implemented as non-destructive configuration**
+  - Owner: Japle Ligaya
+  - Evidence: retention settings page/service, policy tests, and
+    `20260924100000_phase5a_retention_settings.sql`.
+  - Boundary: automated deletion/anonymization remains deliberately disabled and
+    stays open/deferred below.
+
+- [x] **Tenant My Room and Guardian linked-tenant room/payment views use live records**
+  - Owner: Japle Ligaya / shared application work
+  - Evidence: `MyRoomPage`, `GuardianTenantInfoPage`, `GuardianPaymentStatusPage`,
+    `RoomService`, and `GuardianService`, including no-assignment/no-link empty
+    states.
+  - Remaining: production relationship-isolation/RLS verification is still open.
+
+- [x] **Tenant payment-proof upload with on-device OCR is integrated**
+  - Owner: Japle Ligaya / shared application work
+  - Evidence: `PaymentService`, `ReceiptOcrService`, Tenant payment-proof UI, and
+    receipt OCR/payment widget tests. OCR values remain user-verifiable and are
+    not treated as authoritative payment approval.
+
+- [x] **Announcements, role-scoped messaging, reports/PDF infrastructure, and public/staff web source are implemented**
+  - Owner: Japle Ligaya for non-reserved UI/application work
+  - Evidence: announcement service/pages, messaging service/controller/pages,
+    `DormitoryReportService`, report/analytics pages, and web/staff source/tests.
+  - Remaining: push delivery, production session/deployment proof, Realtime/RLS,
+    and financial reconciliation remain tracked separately.
+
+- [x] **Production `MockData` dependency removed**
+  - Owner: Japle Ligaya / cleanup work
+  - Evidence: production mock-data module was removed and repository guardrails
+    reject `MockData` dependencies in owned production pages.
 
 - [x] **In-app touchscreen electronic lease signature and tenant live document status rows**
   - Owner: Jorj Dominic
