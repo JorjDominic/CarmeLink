@@ -16,6 +16,7 @@ import '../../services/contract_onboarding_service.dart';
 import 'package:carmelitas_dormitory_system/views/shared/retention_settings_page.dart';
 import '../tenant/onboarding_form_page.dart';
 import '../tenant/tenant_requirements_page.dart';
+import 'signature_pad_dialog.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -635,20 +636,39 @@ class _TenantRequiredDocumentsSection extends StatefulWidget {
 class _TenantRequiredDocumentsSectionState
     extends State<_TenantRequiredDocumentsSection> {
   final _service = const ContractOnboardingService();
-  late Future<({TenantContract? contract, List<ContractRequirement> requirements})>
+  late Future<
+          ({
+            TenantContract? contract,
+            List<ContractRequirement> requirements,
+            List<ContractSigner> signers,
+          })>
       _future = _load();
 
-  Future<({TenantContract? contract, List<ContractRequirement> requirements})>
+  Future<
+          ({
+            TenantContract? contract,
+            List<ContractRequirement> requirements,
+            List<ContractSigner> signers,
+          })>
       _load() async {
     try {
       final contract = await _service.getMyContract();
       if (contract == null) {
-        return (contract: null, requirements: <ContractRequirement>[]);
+        return (
+          contract: null,
+          requirements: <ContractRequirement>[],
+          signers: <ContractSigner>[],
+        );
       }
       final reqs = await _service.listRequirements(contract.id);
-      return (contract: contract, requirements: reqs);
+      final signers = await _service.listSigners(contract.id);
+      return (contract: contract, requirements: reqs, signers: signers);
     } catch (_) {
-      return (contract: null, requirements: <ContractRequirement>[]);
+      return (
+        contract: null,
+        requirements: <ContractRequirement>[],
+        signers: <ContractSigner>[],
+      );
     }
   }
 
@@ -663,17 +683,150 @@ class _TenantRequiredDocumentsSectionState
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<
-        ({TenantContract? contract, List<ContractRequirement> requirements})>(
+        ({
+          TenantContract? contract,
+          List<ContractRequirement> requirements,
+          List<ContractSigner> signers,
+        })>(
       future: _future,
       builder: (context, snapshot) {
         final data = snapshot.data;
         final contract = data?.contract;
         final reqs = data?.requirements ?? const [];
+        final signers = data?.signers ?? const [];
+
+        if (contract == null) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SectionTitle('Contract & documents'),
+              const SizedBox(height: 8),
+              _TenantProfileRow(
+                icon: Icons.description_outlined,
+                color: Colors.grey,
+                label: 'Rental contract',
+                value: 'Drafting in progress by dorm management',
+              ),
+            ],
+          );
+        }
+
+        final tenantIdReq =
+            reqs.where((r) => r.type == 'tenant_identity').firstOrNull;
+        final guardianIdReq =
+            reqs.where((r) => r.type == 'guardian_identity').firstOrNull;
+        final signedReq =
+            reqs.where((r) => r.type == 'signed_photocopies').firstOrNull;
+        final tenantSigner =
+            signers.where((s) => s.role == 'tenant').firstOrNull;
 
         final requiredList = reqs.where((r) => r.isRequired).toList();
-        final verifiedCount = requiredList.where((r) => r.isVerified).length;
+        final verifiedCount =
+            requiredList.where((r) => r.isVerified).length;
         final totalRequired = requiredList.length;
-        final isAllVerified = totalRequired > 0 && verifiedCount == totalRequired;
+
+        final errorColor = Theme.of(context).colorScheme.error;
+
+        // 1. Tenant ID status
+        final (tenantIdColor, tenantIdText) = () {
+          if (tenantIdReq == null) {
+            return (const Color(0xFFE65100), 'Not uploaded yet (Action required)');
+          }
+          if (tenantIdReq.isVerified) {
+            return (const Color(0xFF2E7D32), 'Verified & Approved');
+          }
+          if (tenantIdReq.isPendingReview) {
+            return (
+              const Color(0xFF1565C0),
+              'Uploaded (${tenantIdReq.originalFilename ?? "ID copy"}) • Pending Review'
+            );
+          }
+          if (tenantIdReq.status == 'rejected') {
+            return (
+              errorColor,
+              'Rejected: ${tenantIdReq.reviewNotes ?? "Action required"}'
+            );
+          }
+          return (const Color(0xFFE65100), 'Not uploaded yet (Action required)');
+        }();
+
+        // 2. Guardian ID status
+        final (guardianIdColor, guardianIdText) = () {
+          if (guardianIdReq == null) return (Colors.grey, 'Optional');
+          if (guardianIdReq.isVerified) {
+            return (const Color(0xFF2E7D32), 'Verified & Approved');
+          }
+          if (guardianIdReq.isPendingReview) {
+            return (
+              const Color(0xFF1565C0),
+              'Uploaded (${guardianIdReq.originalFilename ?? "Guardian ID"}) • Pending Review'
+            );
+          }
+          if (guardianIdReq.status == 'rejected') {
+            return (
+              errorColor,
+              'Rejected: ${guardianIdReq.reviewNotes ?? "Action required"}'
+            );
+          }
+          if (!guardianIdReq.isRequired) {
+            return (Colors.grey, 'Optional (Not submitted)');
+          }
+          return (const Color(0xFFE65100), 'Not uploaded yet (Action required)');
+        }();
+
+        // 3. Signed Lease copy status
+        final (signedColor, signedText) = () {
+          if (signedReq == null) {
+            return (const Color(0xFFE65100), 'Missing (Action required)');
+          }
+          if (signedReq.physicalCopyReceived) {
+            return (
+              const Color(0xFF2E7D32),
+              'Hard copy received at dorm desk'
+            );
+          }
+          if (signedReq.isVerified) {
+            return (const Color(0xFF2E7D32), 'Verified & Approved');
+          }
+          if (signedReq.isPendingReview) {
+            return (
+              const Color(0xFF1565C0),
+              'Submitted (${signedReq.originalFilename ?? "Contract copy"}) • Pending Review'
+            );
+          }
+          if (signedReq.status == 'rejected') {
+            return (
+              errorColor,
+              'Rejected: ${signedReq.reviewNotes ?? "Action required"}'
+            );
+          }
+          return (
+            const Color(0xFFE65100),
+            'Not submitted yet (Upload or hand in paper)'
+          );
+        }();
+
+        // 4. Lease signature status
+        final (signatureColor, signatureText) = () {
+          if (tenantSigner == null) {
+            return (const Color(0xFFE65100), 'Pending signature');
+          }
+          if (tenantSigner.isVerified) {
+            return (const Color(0xFF2E7D32), 'Signature verified by staff');
+          }
+          if (tenantSigner.status == 'signed') {
+            return (
+              const Color(0xFF1565C0),
+              tenantSigner.signatureMethod == 'electronic'
+                  ? 'Signed on phone (E-Sign) • Pending Review'
+                  : 'Signed via upload • Pending Review',
+            );
+          }
+          if (tenantSigner.status == 'rejected') {
+            return (errorColor, 'Signature rejected • Tap to resign on phone');
+          }
+          return (const Color(0xFFE65100), 'Pending signature • Tap to sign on phone');
+        }();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -681,7 +834,7 @@ class _TenantRequiredDocumentsSectionState
             Row(
               children: [
                 const Expanded(
-                  child: SectionTitle('Contract & required documents'),
+                  child: SectionTitle('Contract, documents & signature'),
                 ),
                 TextButton.icon(
                   onPressed: () async {
@@ -692,13 +845,27 @@ class _TenantRequiredDocumentsSectionState
                     );
                     _reload();
                   },
-                  icon: const Icon(Icons.folder_open_outlined, size: 16),
-                  label: const Text('View Documents'),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text('Open Checklist'),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            CarmelitaCard(
+
+            // 1. Contract overview
+            _TenantProfileRow(
+              icon: Icons.assignment_outlined,
+              color: contract.isActive
+                  ? const Color(0xFF2E7D32)
+                  : const Color(0xFFE65100),
+              label: 'Contract #${contract.contractNumber}',
+              value:
+                  '${contract.status.toUpperCase()} • $verifiedCount of $totalRequired verified • ${shortDate(contract.startsOn)} - ${shortDate(contract.endsOn)}',
+            ),
+            const SizedBox(height: 8),
+
+            // 2. Tenant ID
+            InkWell(
               onTap: () async {
                 await Navigator.of(context).push(
                   MaterialPageRoute(
@@ -707,21 +874,103 @@ class _TenantRequiredDocumentsSectionState
                 );
                 _reload();
               },
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              child: TimelineTile(
-                compact: true,
-                icon: Icons.assignment_outlined,
-                color: contract == null
-                    ? Colors.grey
-                    : isAllVerified
-                        ? const Color(0xFF2E7D32)
-                        : const Color(0xFFE65100),
-                title: contract == null
-                    ? 'Rental contract'
-                    : 'Contract #${contract.contractNumber}',
-                subtitle: contract == null
-                    ? 'Contract drafting in progress by manager'
-                    : '$verifiedCount of $totalRequired required documents verified • Tap to upload/view',
+              borderRadius: BorderRadius.circular(12),
+              child: _TenantProfileRow(
+                icon: Icons.badge_outlined,
+                color: tenantIdColor,
+                label: 'Tenant valid ID (Required)',
+                value: tenantIdText,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // 3. Guardian ID
+            InkWell(
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const TenantRequirementsPage(),
+                  ),
+                );
+                _reload();
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: _TenantProfileRow(
+                icon: Icons.family_restroom_outlined,
+                color: guardianIdColor,
+                label: 'Parent / guardian valid ID',
+                value: guardianIdText,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // 4. Signed Photocopy / Paper copy
+            InkWell(
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const TenantRequirementsPage(),
+                  ),
+                );
+                _reload();
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: _TenantProfileRow(
+                icon: Icons.description_outlined,
+                color: signedColor,
+                label: 'Signed lease agreement copy',
+                value: signedText,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // 5. On-Screen Signature
+            InkWell(
+              onTap: () async {
+                if (tenantSigner?.status == 'pending' ||
+                    tenantSigner?.status == 'rejected') {
+                  final bytes = await showSignaturePadDialog(
+                    context,
+                    signerName: contract.tenantName,
+                    contractNumber: contract.contractNumber,
+                  );
+                  if (bytes != null) {
+                    try {
+                      await _service.submitElectronicSignature(
+                        contractId: contract.id,
+                        signatureBytes: bytes,
+                      );
+                      if (context.mounted) {
+                        showAppSnackBar(
+                          context,
+                          'Electronic signature submitted! Staff will verify it.',
+                        );
+                        _reload();
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        showAppSnackBar(
+                          context,
+                          'Failed to submit signature: $e',
+                        );
+                      }
+                    }
+                  }
+                } else {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const TenantRequirementsPage(),
+                    ),
+                  );
+                  _reload();
+                }
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: _TenantProfileRow(
+                icon: Icons.draw_rounded,
+                color: signatureColor,
+                label: 'Lease signature (On-Screen E-Sign)',
+                value: signatureText,
               ),
             ),
           ],

@@ -26,6 +26,7 @@ import '../shared/conduct_case_pages.dart';
 import '../widgets/feature_widgets.dart';
 import 'onboarding_form_page.dart';
 import 'tenant_requirements_page.dart';
+import '../shared/signature_pad_dialog.dart';
 
 class TenantDashboardPage extends StatelessWidget {
   const TenantDashboardPage({super.key});
@@ -791,6 +792,9 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
     String? token,
     String title,
     String reason,
+    TenantContract? contract,
+    List<ContractRequirement> requirements,
+    List<ContractSigner> signers,
   })> _future = _load();
 
   Future<({
@@ -800,6 +804,9 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
     String? token,
     String title,
     String reason,
+    TenantContract? contract,
+    List<ContractRequirement> requirements,
+    List<ContractSigner> signers,
   })> _load() async {
     try {
       final details = await _service.getMyTenantDetails();
@@ -815,16 +822,26 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
 
       final activeInvite = await _service.getMyActiveInvitation();
 
-      // Check contract document requirements
+      // Check contract document requirements & signers
+      TenantContract? contract;
+      List<ContractRequirement> reqs = [];
+      List<ContractSigner> signers = [];
       bool needsDocuments = false;
       try {
-        final contract = await _docService.getMyContract();
+        contract = await _docService.getMyContract();
         if (contract != null) {
-          final reqs = await _docService.listRequirements(contract.id);
+          reqs = await _docService.listRequirements(contract.id);
+          signers = await _docService.listSigners(contract.id);
           final missingOrRejected = reqs.where((r) =>
               r.isRequired &&
               (r.status == 'missing' || r.status == 'rejected'));
-          if (missingOrRejected.isNotEmpty) {
+          final tenantSigner =
+              signers.where((s) => s.role == 'tenant').firstOrNull;
+          final needsSign = tenantSigner == null ||
+              tenantSigner.status == 'pending' ||
+              tenantSigner.status == 'rejected';
+
+          if (missingOrRejected.isNotEmpty || needsSign) {
             needsDocuments = true;
           }
         }
@@ -836,9 +853,12 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
           needsEmergency: true,
           needsDocuments: true,
           token: activeInvite?.token,
-          title: 'Action Required: Complete Profile & Upload Documents',
+          title: 'Action Required: Complete Profile & Verification',
           reason:
-              'Please submit your emergency contact details and upload required verification documents for contract activation.',
+              'Please submit your emergency contact details and complete the required ID & lease verification below.',
+          contract: contract,
+          requirements: reqs,
+          signers: signers,
         );
       } else if (isEmergencyContactIncomplete || activeInvite != null) {
         return (
@@ -850,6 +870,9 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
           reason: isEmergencyContactIncomplete
               ? 'Please submit your emergency contact details to complete your residency registration.'
               : 'You have a pending onboarding invitation.',
+          contract: contract,
+          requirements: reqs,
+          signers: signers,
         );
       } else if (needsDocuments) {
         return (
@@ -857,9 +880,12 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
           needsEmergency: false,
           needsDocuments: true,
           token: null,
-          title: 'Action Required: Upload Required Documents',
+          title: 'Action Required: Documents & Lease Signature',
           reason:
-              'Your room contract is drafted. Please upload your required ID / documents so management can verify and activate your contract.',
+              'Please complete the required ID documents and sign your lease agreement below so management can activate your contract.',
+          contract: contract,
+          requirements: reqs,
+          signers: signers,
         );
       }
 
@@ -870,6 +896,9 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
         token: null,
         title: '',
         reason: '',
+        contract: null,
+        requirements: <ContractRequirement>[],
+        signers: <ContractSigner>[],
       );
     } catch (_) {
       return (
@@ -879,6 +908,9 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
         token: null,
         title: '',
         reason: '',
+        contract: null,
+        requirements: <ContractRequirement>[],
+        signers: <ContractSigner>[],
       );
     }
   }
@@ -891,6 +923,76 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
     }
   }
 
+  Future<void> _openRequirements() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const TenantRequirementsPage(),
+      ),
+    );
+    _reload();
+  }
+
+  ({Color color, String text}) _getReqStatus(ContractRequirement? req,
+      {bool isOptional = false}) {
+    if (req == null) {
+      return isOptional
+          ? (color: Colors.grey, text: 'Optional (Not submitted)')
+          : (color: const Color(0xFFE65100), text: 'Missing • Action required');
+    }
+    if (req.physicalCopyReceived) {
+      return (color: const Color(0xFF2E7D32), text: 'Hard copy received at desk');
+    }
+    if (req.isVerified) {
+      return (color: const Color(0xFF2E7D32), text: 'Verified & Approved');
+    }
+    if (req.isPendingReview) {
+      return (
+        color: const Color(0xFF1565C0),
+        text: 'Uploaded (${req.originalFilename ?? "Document"}) • Pending Review'
+      );
+    }
+    if (req.status == 'rejected') {
+      return (
+        color: Theme.of(context).colorScheme.error,
+        text: 'Rejected: ${req.reviewNotes ?? "Action required"}'
+      );
+    }
+    if (!req.isRequired) {
+      return (color: Colors.grey, text: 'Optional (Not submitted)');
+    }
+    return (color: const Color(0xFFE65100), text: 'Not uploaded yet (Action required)');
+  }
+
+  ({Color color, String text}) _getSignerStatus(ContractSigner? signer) {
+    if (signer == null) {
+      return (
+        color: const Color(0xFFE65100),
+        text: 'Pending signature • Tap to sign on phone'
+      );
+    }
+    if (signer.isVerified) {
+      return (color: const Color(0xFF2E7D32), text: 'Signature verified by staff');
+    }
+    if (signer.status == 'signed') {
+      return (
+        color: const Color(0xFF1565C0),
+        text: signer.signatureMethod == 'electronic'
+            ? 'Signed on phone (E-Sign) • Pending Review'
+            : 'Signed via upload • Pending Review',
+      );
+    }
+    if (signer.status == 'rejected') {
+      return (
+        color: Theme.of(context).colorScheme.error,
+        text: 'Signature rejected • Tap to resign on phone'
+      );
+    }
+    return (
+      color: const Color(0xFFE65100),
+      text: 'Pending signature • Tap to sign on phone'
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<({
@@ -900,6 +1002,9 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
       String? token,
       String title,
       String reason,
+      TenantContract? contract,
+      List<ContractRequirement> requirements,
+      List<ContractSigner> signers,
     })>(
       future: _future,
       builder: (context, snapshot) {
@@ -909,6 +1014,29 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
         }
 
         final scheme = Theme.of(context).colorScheme;
+        final contract = info.contract;
+        final reqs = info.requirements;
+        final signers = info.signers;
+
+        final tenantIdReq =
+            reqs.where((r) => r.type == 'tenant_identity').firstOrNull;
+        final guardianIdReq =
+            reqs.where((r) => r.type == 'guardian_identity').firstOrNull;
+        final signedReq =
+            reqs.where((r) => r.type == 'signed_photocopies').firstOrNull;
+        final tenantSigner =
+            signers.where((s) => s.role == 'tenant').firstOrNull;
+
+        final tenantIdStatus = _getReqStatus(tenantIdReq);
+        final guardianIdStatus =
+            _getReqStatus(guardianIdReq, isOptional: true);
+        final signedDocStatus = _getReqStatus(signedReq);
+        final signatureStatus = _getSignerStatus(tenantSigner);
+
+        final isSignaturePending = tenantSigner == null ||
+            tenantSigner.status == 'pending' ||
+            tenantSigner.status == 'rejected';
+
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: Container(
@@ -956,7 +1084,9 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
                                 ),
                           ),
                           Text(
-                            'Required before your dormitory contract can be activated',
+                            contract != null
+                                ? 'Contract #${contract.contractNumber} • Required for room activation'
+                                : 'Required before your dormitory contract can be activated',
                             style: Theme.of(context)
                                 .textTheme
                                 .bodySmall
@@ -977,6 +1107,98 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
                         color: scheme.onPrimaryContainer,
                       ),
                 ),
+
+                // Live individual document and signature rows
+                if (contract != null && info.needsDocuments) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: scheme.outlineVariant.withAlpha(100),
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        // 1. Tenant Valid ID
+                        _BannerDocRow(
+                          icon: Icons.badge_outlined,
+                          title: 'Tenant Valid ID (Required)',
+                          statusText: tenantIdStatus.text,
+                          statusColor: tenantIdStatus.color,
+                          onTap: _openRequirements,
+                        ),
+                        const Divider(height: 1, indent: 48),
+
+                        // 2. Parent / Guardian ID
+                        _BannerDocRow(
+                          icon: Icons.family_restroom_outlined,
+                          title: 'Parent / Guardian Valid ID',
+                          statusText: guardianIdStatus.text,
+                          statusColor: guardianIdStatus.color,
+                          onTap: _openRequirements,
+                        ),
+                        const Divider(height: 1, indent: 48),
+
+                        // 3. Signed Lease Agreement Copy
+                        _BannerDocRow(
+                          icon: Icons.description_outlined,
+                          title: 'Signed Lease Copy (Physical/Upload)',
+                          statusText: signedDocStatus.text,
+                          statusColor: signedDocStatus.color,
+                          onTap: _openRequirements,
+                        ),
+                        const Divider(height: 1, indent: 48),
+
+                        // 4. Lease Signature (On-Screen E-Sign)
+                        _BannerDocRow(
+                          icon: Icons.draw_rounded,
+                          title: 'Lease Signature (On-Screen E-Sign)',
+                          statusText: signatureStatus.text,
+                          statusColor: signatureStatus.color,
+                          trailingActionText:
+                              isSignaturePending ? 'Sign now' : null,
+                          onTap: () async {
+                            if (isSignaturePending) {
+                              final bytes = await showSignaturePadDialog(
+                                context,
+                                signerName: contract.tenantName,
+                                contractNumber: contract.contractNumber,
+                              );
+                              if (bytes != null) {
+                                try {
+                                  await _docService.submitElectronicSignature(
+                                    contractId: contract.id,
+                                    signatureBytes: bytes,
+                                  );
+                                  if (context.mounted) {
+                                    showAppSnackBar(
+                                      context,
+                                      'Electronic signature submitted! Staff will verify it.',
+                                    );
+                                    _reload();
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    showAppSnackBar(
+                                      context,
+                                      'Failed to submit signature: $e',
+                                    );
+                                  }
+                                }
+                              }
+                            } else {
+                              _openRequirements();
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 14),
                 Wrap(
                   spacing: 10,
@@ -1005,16 +1227,9 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
                                 foregroundColor: scheme.onSecondary,
                               )
                             : null,
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const TenantRequirementsPage(),
-                            ),
-                          );
-                          _reload();
-                        },
+                        onPressed: _openRequirements,
                         icon: const Icon(Icons.file_upload_outlined, size: 16),
-                        label: const Text('Upload Documents'),
+                        label: const Text('Open Documents Checklist'),
                       ),
                   ],
                 ),
@@ -1023,6 +1238,98 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
           ),
         );
       },
+    );
+  }
+}
+
+class _BannerDocRow extends StatelessWidget {
+  const _BannerDocRow({
+    required this.icon,
+    required this.title,
+    required this.statusText,
+    required this.statusColor,
+    required this.onTap,
+    this.trailingActionText,
+  });
+
+  final IconData icon;
+  final String title;
+  final String statusText;
+  final Color statusColor;
+  final VoidCallback onTap;
+  final String? trailingActionText;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: statusColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          statusText,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: statusColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (trailingActionText != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  trailingActionText!,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                ),
+              )
+            else
+              const Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey),
+          ],
+        ),
+      ),
     );
   }
 }

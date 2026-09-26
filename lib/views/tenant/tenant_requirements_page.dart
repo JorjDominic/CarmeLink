@@ -7,9 +7,10 @@ import 'package:printing/printing.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/contract_onboarding_service.dart';
+import '../shared/signature_pad_dialog.dart';
 
 /// Tenant-facing page for viewing and submitting required onboarding documents
-/// (e.g. Student ID, Parent ID, signed photocopies/agreements).
+/// and in-app electronic signatures.
 class TenantRequirementsPage extends StatefulWidget {
   const TenantRequirementsPage({super.key});
 
@@ -19,18 +20,31 @@ class TenantRequirementsPage extends StatefulWidget {
 
 class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
   final _service = const ContractOnboardingService();
-  late Future<({TenantContract? contract, List<ContractRequirement> requirements})>
-      _future = _load();
+  late Future<
+      ({
+        TenantContract? contract,
+        List<ContractRequirement> requirements,
+        List<ContractSigner> signers,
+      })> _future = _load();
   bool _working = false;
 
-  Future<({TenantContract? contract, List<ContractRequirement> requirements})>
-      _load() async {
+  Future<
+      ({
+        TenantContract? contract,
+        List<ContractRequirement> requirements,
+        List<ContractSigner> signers,
+      })> _load() async {
     final contract = await _service.getMyContract();
     if (contract == null) {
-      return (contract: null, requirements: <ContractRequirement>[]);
+      return (
+        contract: null,
+        requirements: <ContractRequirement>[],
+        signers: <ContractSigner>[],
+      );
     }
     final reqs = await _service.listRequirements(contract.id);
-    return (contract: contract, requirements: reqs);
+    final signers = await _service.listSigners(contract.id);
+    return (contract: contract, requirements: reqs, signers: signers);
   }
 
   void _reload() {
@@ -103,6 +117,36 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
     }
   }
 
+  Future<void> _signOnPhone(TenantContract contract) async {
+    final bytes = await showSignaturePadDialog(
+      context,
+      signerName: contract.tenantName,
+      contractNumber: contract.contractNumber,
+    );
+    if (bytes == null || !mounted) return;
+
+    setState(() => _working = true);
+    try {
+      await _service.submitElectronicSignature(
+        contractId: contract.id,
+        signatureBytes: bytes,
+      );
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          'Electronic signature submitted! Dormitory management will review and verify it.',
+        );
+        _reload();
+      }
+    } catch (error) {
+      if (mounted) {
+        showAppSnackBar(context, 'Failed to submit signature: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -120,7 +164,11 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
       ),
       body: SafeArea(
         child: FutureBuilder<
-            ({TenantContract? contract, List<ContractRequirement> requirements})>(
+            ({
+              TenantContract? contract,
+              List<ContractRequirement> requirements,
+              List<ContractSigner> signers,
+            })>(
           future: _future,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -245,7 +293,8 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
                                       style: Theme.of(context)
                                           .textTheme
                                           .titleMedium
-                                          ?.copyWith(fontWeight: FontWeight.bold),
+                                          ?.copyWith(
+                                              fontWeight: FontWeight.bold),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
@@ -311,12 +360,10 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
                           const SizedBox(height: 10),
                           Text(
                             'Please upload clear photos or PDF copies of each document. The manager will review them before activating your contract.',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color: scheme.onSurfaceVariant,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
                           ),
                         ],
                       ),
@@ -339,6 +386,9 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
                             working: _working,
                             onUpload: () => _upload(item),
                             onView: () => _viewDocument(item),
+                            onSignOnPhone: item.type == 'signed_photocopies'
+                                ? () => _signOnPhone(contract)
+                                : null,
                           )),
                   ],
                 ),
@@ -366,12 +416,14 @@ class _RequirementCard extends StatelessWidget {
     required this.working,
     required this.onUpload,
     required this.onView,
+    this.onSignOnPhone,
   });
 
   final ContractRequirement item;
   final bool working;
   final VoidCallback onUpload;
   final VoidCallback onView;
+  final VoidCallback? onSignOnPhone;
 
   String _description(String type) => switch (type) {
         'tenant_identity' =>
@@ -379,7 +431,7 @@ class _RequirementCard extends StatelessWidget {
         'guardian_identity' =>
           'Upload a copy of parent or legal guardian\'s government-issued ID (recommended for minor residents).',
         'signed_photocopies' =>
-          'Upload a photo or scanned copy of the signed contract agreement or photocopy page.',
+          'Sign lease directly on your phone with your finger (recommended), or upload a photo of your printed signed lease.',
         _ => 'Upload the requested verification document.',
       };
 
@@ -591,24 +643,53 @@ class _RequirementCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (!item.isVerified)
+                if (!item.isVerified && onSignOnPhone != null)
                   FilledButton.icon(
-                    onPressed: working ? null : onUpload,
-                    icon: Icon(
-                      hasFile
-                          ? Icons.file_upload_outlined
-                          : Icons.add_photo_alternate_outlined,
-                      size: 16,
-                    ),
+                    onPressed: working ? null : onSignOnPhone,
+                    icon: const Icon(Icons.draw_rounded, size: 16),
                     label: Text(
-                      hasFile ? 'Replace File' : 'Upload Document',
+                      hasFile
+                          ? 'Redraw Signature on Phone'
+                          : '✍️ Sign on Phone (E-Sign)',
                     ),
                   ),
+                if (!item.isVerified)
+                  (onSignOnPhone != null
+                      ? OutlinedButton.icon(
+                          onPressed: working ? null : onUpload,
+                          icon: Icon(
+                            hasFile
+                                ? Icons.file_upload_outlined
+                                : Icons.upload_file_outlined,
+                            size: 16,
+                          ),
+                          label: Text(
+                            hasFile
+                                ? 'Replace Paper Copy'
+                                : 'Upload Paper Copy',
+                          ),
+                        )
+                      : FilledButton.icon(
+                          onPressed: working ? null : onUpload,
+                          icon: Icon(
+                            hasFile
+                                ? Icons.file_upload_outlined
+                                : Icons.add_photo_alternate_outlined,
+                            size: 16,
+                          ),
+                          label: Text(
+                            hasFile ? 'Replace File' : 'Upload Document',
+                          ),
+                        )),
                 if (hasFile)
                   OutlinedButton.icon(
                     onPressed: working ? null : onView,
                     icon: const Icon(Icons.visibility_outlined, size: 16),
-                    label: const Text('View Document'),
+                    label: Text(
+                      item.type == 'signed_photocopies'
+                          ? 'View Signature / Copy'
+                          : 'View Document',
+                    ),
                   ),
               ],
             ),

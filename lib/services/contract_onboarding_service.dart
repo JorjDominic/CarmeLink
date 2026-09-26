@@ -12,6 +12,14 @@ class ContractOnboardingService {
   static const _bucket = 'contract-documents';
   SupabaseClient get _client => SupabaseConfig.client;
 
+  /// Returns the signed-in tenant's newest Draft or Active contract.
+  Future<TenantContract?> getMyContract() async {
+    final row = await _client.rpc('get_my_contract');
+    if (row == null) return null;
+    final data = Map<String, dynamic>.from(row as Map);
+    return data.isEmpty ? null : TenantContract.fromRow(data);
+  }
+
   Future<List<ContractRequirement>> listRequirements(String contractId) async {
     final rows = await _client
         .from('contract_requirements')
@@ -118,5 +126,41 @@ class ContractOnboardingService {
       'p_required': required,
     });
     return ContractSigner.fromRow(Map<String, dynamic>.from(row as Map));
+  }
+
+  /// Uploads the authenticated tenant's drawn signature and records an
+  /// immutable evidence reference for owner verification.
+  Future<ContractSigner> submitElectronicSignature({
+    required String contractId,
+    required Uint8List signatureBytes,
+  }) async {
+    if (signatureBytes.isEmpty || signatureBytes.length > 2 * 1024 * 1024) {
+      throw Exception('Signature image must be 2 MB or smaller.');
+    }
+    final path = '$contractId/signatures/tenant-'
+        '${DateTime.now().toUtc().microsecondsSinceEpoch}.png';
+    await _client.storage.from(_bucket).uploadBinary(
+          path,
+          signatureBytes,
+          fileOptions: const FileOptions(
+            contentType: 'image/png',
+            upsert: false,
+          ),
+        );
+    try {
+      final row = await _client.rpc(
+        'submit_tenant_electronic_signature',
+        params: {
+          'p_contract_id': contractId,
+          'p_storage_path': path,
+          'p_size_bytes': signatureBytes.length,
+          'p_sha256': sha256.convert(signatureBytes).toString(),
+        },
+      );
+      return ContractSigner.fromRow(Map<String, dynamic>.from(row as Map));
+    } catch (_) {
+      await _client.storage.from(_bucket).remove([path]);
+      rethrow;
+    }
   }
 }
