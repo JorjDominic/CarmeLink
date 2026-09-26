@@ -98,6 +98,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('active contract owns the future-rent adjustment workflow',
+      (tester) async {
+    tester.view.physicalSize = const Size(900, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(const MaterialApp(home: ContractsPage()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Adjust future rent'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Adjust future contract rent'), findsOneWidget);
+    expect(find.text('New monthly rent'), findsOneWidget);
+    expect(find.text('Effective date'), findsOneWidget);
+    expect(find.text('Amendment or approval reason'), findsOneWidget);
+  });
+
   testWidgets('onboarding editor locks the newly created tenant',
       (tester) async {
     await tester.pumpWidget(MaterialApp(

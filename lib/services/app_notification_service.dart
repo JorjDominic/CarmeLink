@@ -266,6 +266,34 @@ class AppNotificationService {
     );
   }
 
+  Future<void> notifyBillingChargeChanged({
+    required String tenantId,
+    required String chargeId,
+    required String title,
+    required String actionType,
+    required String reason,
+  }) async {
+    final action = switch (actionType) {
+      'void' => 'voided',
+      'credit' => 'credited',
+      'debit' => 'adjusted',
+      'due_date_extension' => 'given a new due date',
+      _ => 'updated',
+    };
+    await sendNotification(
+      title: 'Billing charge updated',
+      body: '$title was $action. Reason: $reason',
+      notificationType: 'payment',
+      recipientId: tenantId,
+      routeType: 'payment',
+      routeId: chargeId,
+      data: {
+        'payment_id': chargeId,
+        'action_type': actionType,
+      },
+    );
+  }
+
   // ==========================================
   // MODULE: VISITOR PASSES
   // ==========================================

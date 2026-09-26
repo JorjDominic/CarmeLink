@@ -16,6 +16,7 @@ import '../../services/tenant_service.dart';
 import 'onboarding_invitation_page.dart';
 import 'contract_onboarding_checklist_page.dart';
 import 'tenant_onboarding_flow.dart';
+import 'rent_adjustment_dialog.dart';
 
 Future<bool?> showContractEditor(
   BuildContext context, {
@@ -188,13 +189,17 @@ class _ContractsPageState extends State<ContractsPage> {
                         crossAxisCount: columns,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
-                        mainAxisExtent: enlargedText ? 530 : 410,
+                        mainAxisExtent: enlargedText ? 590 : 440,
                       ),
                       itemBuilder: (_, index) => _ContractCard(
                         contract: items[index],
                         onEdit: () => _openEditor(items[index]),
                         onDelete: () => _delete(items[index]),
                         onDocuments: () => _openDocuments(items[index]),
+                        onAdjustRent: () => showRentAdjustmentDialog(
+                          context,
+                          items[index],
+                        ),
                       ),
                     );
                   }),
@@ -252,11 +257,13 @@ class _ContractCard extends StatelessWidget {
       {required this.contract,
       required this.onEdit,
       required this.onDelete,
-      required this.onDocuments});
+      required this.onDocuments,
+      required this.onAdjustRent});
   final TenantContract contract;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onDocuments;
+  final VoidCallback onAdjustRent;
 
   @override
   Widget build(BuildContext context) {
@@ -297,6 +304,11 @@ class _ContractCard extends StatelessWidget {
         ]),
         const Spacer(),
         Wrap(alignment: WrapAlignment.end, spacing: 2, children: [
+          if (contract.status == 'active')
+            IconButton(
+                tooltip: 'Adjust future rent',
+                onPressed: onAdjustRent,
+                icon: const Icon(Icons.price_change_outlined)),
           TextButton.icon(
               onPressed: onDocuments,
               icon: const Icon(Icons.description_outlined),

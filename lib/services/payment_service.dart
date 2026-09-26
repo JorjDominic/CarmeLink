@@ -103,12 +103,11 @@ class PaymentService {
 
       final payment =
           Payment.fromJson(Map<String, dynamic>.from(updatedRow as Map));
-      final resolvedName =
-          (payment.tenantName != null && payment.tenantName!.isNotEmpty)
-              ? payment.tenantName!
-              : (_client.auth.currentUser?.userMetadata?['full_name']
-                      as String? ??
-                  'A tenant');
+      final resolvedName = (payment.tenantName != null &&
+              payment.tenantName!.isNotEmpty)
+          ? payment.tenantName!
+          : (_client.auth.currentUser?.userMetadata?['full_name'] as String? ??
+              'A tenant');
 
       unawaited(AppNotificationService.instance.notifyPaymentSubmitted(
         paymentId: paymentId,
@@ -234,6 +233,64 @@ class PaymentService {
     return payment;
   }
 
+  /// Creates a manually approved non-contract charge. This is intentionally
+  /// independent from conduct cases and never runs automatically.
+  Future<Payment> createAdditionalCharge({
+    required String tenantId,
+    required String title,
+    required String category,
+    required double amount,
+    required DateTime dueDate,
+    required String reason,
+    String? notes,
+  }) async {
+    _requireAuthId();
+    final row = await _client.rpc('create_additional_charge', params: {
+      'p_tenant_id': tenantId,
+      'p_title': title.trim(),
+      'p_category': category.trim().toLowerCase(),
+      'p_amount': amount,
+      'p_due_date': _dateOnly(dueDate),
+      'p_notes': notes?.trim(),
+      'p_reason': reason.trim(),
+    });
+    final payment = Payment.fromJson(Map<String, dynamic>.from(row as Map));
+    unawaited(AppNotificationService.instance.notifyUtilityBillCreated(
+      tenantId: tenantId,
+      title: title.trim(),
+      amount: amount,
+      dueDate: _dateOnly(dueDate),
+    ));
+    return payment;
+  }
+
+  /// Applies a non-destructive, audited change around an issued charge.
+  Future<Payment> applyChargeAction({
+    required String chargeId,
+    required String actionType,
+    required String reason,
+    double? amount,
+    DateTime? newDueDate,
+  }) async {
+    _requireAuthId();
+    final row = await _client.rpc('apply_billing_charge_action', params: {
+      'p_charge_id': chargeId,
+      'p_action_type': actionType,
+      'p_reason': reason.trim(),
+      'p_amount': amount,
+      'p_new_due_date': newDueDate == null ? null : _dateOnly(newDueDate),
+    });
+    final payment = Payment.fromJson(Map<String, dynamic>.from(row as Map));
+    unawaited(AppNotificationService.instance.notifyBillingChargeChanged(
+      tenantId: payment.tenantId,
+      chargeId: payment.id,
+      title: payment.label,
+      actionType: actionType,
+      reason: reason.trim(),
+    ));
+    return payment;
+  }
+
   String _dateOnly(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
@@ -245,7 +302,7 @@ class PaymentService {
     required String reason,
   }) async {
     _requireAuthId();
-    final result = await _client.rpc('apply_rent_rate_override', params: {
+    final result = await _client.rpc('apply_owner_rent_rate_override', params: {
       'p_tenant_id': tenantId,
       'p_new_monthly_rent': newMonthlyRent,
       'p_effective_date': _dateOnly(effectiveDate),

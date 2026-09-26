@@ -117,6 +117,35 @@ void main() {
       expect(find.text('August Water Bill'), findsOneWidget);
     });
 
+    testWidgets('account summary opens complete billing details',
+        (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      TenantController.instance.setPaymentsForTesting(testPayments);
+
+      await tester.pumpWidget(buildTestable(const PaymentsPage()));
+      await tester.pumpAndSettle();
+
+      final summaryTapTarget = find.ancestor(
+        of: find.text('Total outstanding'),
+        matching: find.byType(InkWell),
+      );
+      expect(summaryTapTarget, findsOneWidget);
+      await tester.tap(summaryTapTarget);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Billing details'), findsOneWidget);
+      expect(find.text('TOTAL OUTSTANDING'), findsOneWidget);
+      expect(find.text('Open bills (2)'), findsOneWidget);
+      expect(find.text('Completed and voided (1)'), findsOneWidget);
+      expect(find.text('Rent'), findsOneWidget);
+      expect(find.text('Utilities'), findsOneWidget);
+      expect(find.text('September Dorm Rent'), findsOneWidget);
+      expect(find.text('August Water Bill'), findsOneWidget);
+    });
+
     testWidgets('tapping Submit proof opens UploadPaymentProofPage',
         (tester) async {
       tester.view.physicalSize = const Size(800, 1200);

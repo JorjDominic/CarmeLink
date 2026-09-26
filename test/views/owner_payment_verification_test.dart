@@ -86,26 +86,28 @@ void main() {
       await tester.pumpAndSettle();
 
       // Page Title
+      expect(find.text('Billing and payments'), findsOneWidget);
+      expect(find.text('Bills'), findsOneWidget);
       expect(find.text('Payment review'), findsOneWidget);
 
       // Financial Metrics Cards
-      expect(find.text('Pending review'), findsWidgets);
+      expect(find.text('Pending review'), findsNothing);
       expect(find.text('Collected'), findsOneWidget);
       expect(find.text('Outstanding'), findsOneWidget);
       expect(find.text('Overdue'), findsWidgets);
 
       // Filter Chips
-      expect(find.text('Pending (1)'), findsOneWidget);
+      expect(find.text('Pending (1)'), findsNothing);
       expect(find.text('Due (0)'), findsOneWidget);
       expect(find.text('Overdue (1)'), findsOneWidget);
       expect(find.text('Verified (1)'), findsOneWidget);
-      expect(find.text('Rejected (1)'), findsOneWidget);
+      expect(find.text('Rejected (1)'), findsNothing);
       expect(find.text('All (4)'), findsOneWidget);
 
-      // By default, filter is 'pending', so pay-2 is displayed
+      // Bills is the default workspace and shows the complete ledger.
       expect(find.text('Maria Santos'), findsOneWidget);
       expect(find.text('Electricity Share'), findsOneWidget);
-      expect(find.text('Juan Dela Cruz'), findsNothing);
+      expect(find.text('Juan Dela Cruz'), findsOneWidget);
     });
 
     testWidgets('filtering by All displays all payments', (tester) async {
@@ -233,7 +235,7 @@ void main() {
     });
 
     testWidgets(
-        'failed mark-paid action preserves due status and reports error',
+        'unpaid bill does not expose an unsafe one-click mark-paid action',
         (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
       tester.view.devicePixelRatio = 1.0;
@@ -254,16 +256,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Juan Dela Cruz'), findsOneWidget);
-      expect(find.text('Awaiting tenant proof'), findsOneWidget);
+      expect(find.text('Awaiting tenant payment proof'), findsOneWidget);
 
       final markPaidBtn = find.widgetWithText(OutlinedButton, 'Mark paid');
-      expect(markPaidBtn, findsOneWidget);
-
-      await tester.tap(markPaidBtn);
-      await tester.pumpAndSettle();
-
+      expect(markPaidBtn, findsNothing);
       expect(payments[0].isDue, isTrue);
-      expect(find.textContaining('Failed to update payment:'), findsOneWidget);
     });
 
     testWidgets('tapping Issue invoice button opens utility charge dialog',
@@ -327,7 +324,8 @@ void main() {
       expect(find.text('Maria Santos'), findsNothing);
     });
 
-    testWidgets('opens audited future rent override dialog', (tester) async {
+    testWidgets('rent adjustment is not exposed from the billing workspace',
+        (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -339,16 +337,8 @@ void main() {
       await tester.pumpWidget(buildTestable(const PaymentVerificationPage()));
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.widgetWithText(OutlinedButton, 'Override future rent'),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Override Future Rent'), findsOneWidget);
-      expect(find.text('New monthly rent'), findsOneWidget);
-      expect(find.text('Effective date'), findsOneWidget);
-      expect(find.text('Reason for increase or decrease'), findsOneWidget);
-      expect(find.text('Apply Override'), findsOneWidget);
+      expect(find.text('Override future rent'), findsNothing);
+      expect(find.text('Adjust future contract rent'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 

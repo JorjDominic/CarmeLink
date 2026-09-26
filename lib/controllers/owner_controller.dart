@@ -343,6 +343,49 @@ class OwnerController extends ChangeNotifier {
     return count;
   }
 
+  Future<Payment> createAdditionalCharge({
+    required String tenantId,
+    required String title,
+    required String category,
+    required double amount,
+    required DateTime dueDate,
+    required String reason,
+    String? notes,
+  }) async {
+    final charge = await _paymentService.createAdditionalCharge(
+      tenantId: tenantId,
+      title: title,
+      category: category,
+      amount: amount,
+      dueDate: dueDate,
+      reason: reason,
+      notes: notes,
+    );
+    _payments.insert(0, charge);
+    notifyListeners();
+    return charge;
+  }
+
+  Future<Payment> applyChargeAction({
+    required String chargeId,
+    required String actionType,
+    required String reason,
+    double? amount,
+    DateTime? newDueDate,
+  }) async {
+    final updated = await _paymentService.applyChargeAction(
+      chargeId: chargeId,
+      actionType: actionType,
+      reason: reason,
+      amount: amount,
+      newDueDate: newDueDate,
+    );
+    final index = _payments.indexWhere((item) => item.id == updated.id);
+    if (index >= 0) _payments[index] = updated;
+    notifyListeners();
+    return updated;
+  }
+
   Future<int> createUtilityChargeCart(
     List<Map<String, dynamic>> items,
   ) async {

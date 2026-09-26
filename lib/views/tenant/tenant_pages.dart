@@ -872,67 +872,82 @@ class _PaymentsPageState extends State<PaymentsPage> {
                     ),
               ),
               const SizedBox(height: 8),
-              CarmelitaCard(
-                emphasis: true,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        margin: const EdgeInsets.only(right: 9),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: .11),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.account_balance_wallet_outlined,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Total outstanding',
-                                style: Theme.of(context).textTheme.bodySmall),
-                            Text(
-                              money(c.outstandingBalance),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.w900),
+              Semantics(
+                button: true,
+                label: 'Open full billing details',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const TenantBillingDetailsPage(),
+                    ),
+                  ),
+                  child: CarmelitaCard(
+                    emphasis: true,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            margin: const EdgeInsets.only(right: 9),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withValues(alpha: .11),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                          ],
+                            child: Icon(
+                              Icons.account_balance_wallet_outlined,
+                              size: 18,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Total outstanding',
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall),
+                                Text(
+                                  money(c.outstandingBalance),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(fontWeight: FontWeight.w900),
+                                ),
+                              ],
+                            ),
+                          ),
+                          StatusPill(overdueCount > 0
+                              ? '$overdueCount overdue'
+                              : 'Up to date'),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right_rounded, size: 20),
+                        ]),
+                        const Divider(height: 14),
+                        _CompactPaymentSummaryRow(
+                          label: 'Rent / Utilities',
+                          value:
+                              '${money(c.outstandingRent)} / ${money(c.outstandingUtilities)}',
+                          icon: Icons.receipt_long_outlined,
                         ),
-                      ),
-                      StatusPill(overdueCount > 0
-                          ? '$overdueCount overdue'
-                          : 'Up to date'),
-                    ]),
-                    const Divider(height: 14),
-                    _CompactPaymentSummaryRow(
-                      label: 'Rent / Utilities',
-                      value:
-                          '${money(c.outstandingRent)} / ${money(c.outstandingUtilities)}',
-                      icon: Icons.receipt_long_outlined,
+                        const SizedBox(height: 6),
+                        _CompactPaymentSummaryRow(
+                          label: 'Next due',
+                          value: nextDue == null
+                              ? 'No pending bills'
+                              : '${shortDate(nextDue.dueDate)} - ${nextDue.label}',
+                          icon: Icons.event_outlined,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
-                    _CompactPaymentSummaryRow(
-                      label: 'Next due',
-                      value: nextDue == null
-                          ? 'No pending bills'
-                          : '${shortDate(nextDue.dueDate)} - ${nextDue.label}',
-                      icon: Icons.event_outlined,
-                    ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
@@ -1025,6 +1040,138 @@ class _PaymentsPageState extends State<PaymentsPage> {
       ),
     );
   }
+}
+
+class TenantBillingDetailsPage extends StatelessWidget {
+  const TenantBillingDetailsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = TenantController.instance;
+    return PageFrame(
+      title: 'Billing details',
+      subtitle: 'Complete bills, balances, due dates, and payment history',
+      onRefresh: () => controller.loadPayments(force: true),
+      actions: [
+        IconButton(
+          tooltip: 'Refresh billing details',
+          onPressed: controller.paymentsLoading
+              ? null
+              : () => controller.loadPayments(force: true),
+          icon: const Icon(Icons.refresh_rounded),
+        ),
+      ],
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          final payments = List<Payment>.from(controller.payments)
+            ..sort((a, b) => b.dueDate.compareTo(a.dueDate));
+          final openBills = payments
+              .where((p) => !p.isVoided && p.outstandingAmount > 0)
+              .toList();
+          final completedBills = payments
+              .where((p) => p.isVoided || p.outstandingAmount <= 0)
+              .toList();
+          final rent = openBills
+              .where((p) => p.isRent)
+              .fold<double>(0, (sum, p) => sum + p.outstandingAmount);
+          final utilities = openBills
+              .where((p) => p.isUtility)
+              .fold<double>(0, (sum, p) => sum + p.outstandingAmount);
+          final other = openBills
+              .where((p) => !p.isRent && !p.isUtility)
+              .fold<double>(0, (sum, p) => sum + p.outstandingAmount);
+          final nextDue = openBills
+              .where((p) => p.isDue || p.isUpcoming)
+              .toList()
+            ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CarmelitaCard(
+                emphasis: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('TOTAL OUTSTANDING',
+                        style: Theme.of(context).textTheme.labelMedium),
+                    const SizedBox(height: 4),
+                    Text(
+                      money(controller.outstandingBalance),
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.w900),
+                    ),
+                    const Divider(height: 24),
+                    _BillingBreakdownRow(label: 'Rent', amount: rent),
+                    _BillingBreakdownRow(label: 'Utilities', amount: utilities),
+                    if (other > 0)
+                      _BillingBreakdownRow(
+                          label: 'Other approved charges', amount: other),
+                    const SizedBox(height: 8),
+                    _CompactPaymentSummaryRow(
+                      label: 'Next due',
+                      value: nextDue.isEmpty
+                          ? 'No pending bills'
+                          : '${shortDate(nextDue.first.dueDate)} · ${nextDue.first.label}',
+                      icon: Icons.event_outlined,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              SectionTitle('Open bills (${openBills.length})'),
+              const SizedBox(height: 10),
+              if (openBills.isEmpty)
+                const EmptyState(
+                  icon: Icons.task_alt_rounded,
+                  title: 'No outstanding bills',
+                  message: 'Your account currently has no unpaid balance.',
+                )
+              else
+                ...openBills.map((payment) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _TenantPaymentCard(payment: payment),
+                    )),
+              const SizedBox(height: 12),
+              SectionTitle('Completed and voided (${completedBills.length})'),
+              const SizedBox(height: 10),
+              if (completedBills.isEmpty)
+                Text(
+                  'No completed billing records yet.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                )
+              else
+                ...completedBills.map((payment) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _TenantPaymentCard(payment: payment),
+                    )),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _BillingBreakdownRow extends StatelessWidget {
+  const _BillingBreakdownRow({required this.label, required this.amount});
+  final String label;
+  final double amount;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: [
+            Expanded(child: Text(label)),
+            Text(money(amount),
+                style: const TextStyle(fontWeight: FontWeight.w800)),
+          ],
+        ),
+      );
 }
 
 class _CompactPaymentSummaryRow extends StatelessWidget {

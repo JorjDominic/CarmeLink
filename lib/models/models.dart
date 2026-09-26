@@ -167,6 +167,7 @@ class Payment {
   bool get isRejected => status.toLowerCase().contains('rejected');
   bool get isPartiallyPaid => status.toLowerCase().contains('partially');
   bool get isUpcoming => status.toLowerCase().contains('upcoming');
+  bool get isVoided => status.toLowerCase() == 'voided';
   bool get isDue => status.toLowerCase() == 'due' || isPartiallyPaid;
   double get outstandingAmount => remainingBalance ?? (isVerified ? 0 : amount);
 

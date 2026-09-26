@@ -2225,8 +2225,8 @@ class PaymentVerificationPage extends StatefulWidget {
 }
 
 class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
-  String _filter =
-      'pending'; // 'pending', 'due', 'overdue', 'verified', 'rejected', 'all'
+  String _workspace = 'bills';
+  String _filter = 'all';
   late final TableRefreshSubscription _subscription;
   String? _processingPaymentId;
   final TextEditingController _searchController = TextEditingController();
@@ -2340,8 +2340,10 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
     final controller = OwnerController.instance;
 
     return PageFrame(
-      title: 'Payment review',
-      subtitle: 'Inspect tenant receipts, issue invoices, and verify balances',
+      title: 'Billing and payments',
+      subtitle: _workspace == 'bills'
+          ? 'Issue bills and monitor tenant balances'
+          : 'Review payment proofs submitted by tenants',
       onRefresh: () => OwnerController.instance.loadPayments(force: true),
       actions: [
         IconButton(
@@ -2407,13 +2409,23 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
             ),
           ];
 
+          final workspacePayments = _workspace == 'review'
+              ? allPayments
+                  .where((p) =>
+                      p.isPending ||
+                      p.isRejected ||
+                      (p.isVerified && (p.reference?.isNotEmpty ?? false)))
+                  .toList()
+              : allPayments;
           final filteredByTab = switch (_filter) {
             'pending' => allPayments.where((p) => p.isPending).toList(),
-            'due' => allPayments.where((p) => p.isDue && !p.isOverdue).toList(),
-            'overdue' => allPayments.where((p) => p.isOverdue).toList(),
-            'verified' => allPayments.where((p) => p.isVerified).toList(),
-            'rejected' => allPayments.where((p) => p.isRejected).toList(),
-            _ => allPayments,
+            'due' =>
+              workspacePayments.where((p) => p.isDue && !p.isOverdue).toList(),
+            'overdue' => workspacePayments.where((p) => p.isOverdue).toList(),
+            'verified' => workspacePayments.where((p) => p.isVerified).toList(),
+            'rejected' => workspacePayments.where((p) => p.isRejected).toList(),
+            'voided' => workspacePayments.where((p) => p.isVoided).toList(),
+            _ => workspacePayments,
           };
 
           final displayed = _searchQuery.trim().isEmpty
@@ -2431,30 +2443,52 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Wrap(
-                alignment: WrapAlignment.end,
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => showDialog<void>(
-                      context: context,
-                      builder: (_) => const _RentOverrideDialog(),
-                    ),
-                    icon: const Icon(Icons.price_change_outlined),
-                    label: const Text('Override future rent'),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: 'bills',
+                    icon: Icon(Icons.receipt_long_outlined),
+                    label: Text('Bills'),
                   ),
-                  FilledButton.icon(
-                    onPressed: () => _openCreateInvoiceDialog(context),
-                    icon: const Icon(Icons.add_card_rounded),
-                    label: const Text('Add utility charge'),
+                  ButtonSegment(
+                    value: 'review',
+                    icon: Icon(Icons.fact_check_outlined),
+                    label: Text('Payment review'),
                   ),
                 ],
+                selected: {_workspace},
+                onSelectionChanged: (selection) => setState(() {
+                  _workspace = selection.first;
+                  _filter = _workspace == 'review' ? 'pending' : 'all';
+                }),
               ),
+              const SizedBox(height: 14),
+              if (_workspace == 'bills')
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (_) => const _AdditionalChargeDialog(),
+                      ),
+                      icon: const Icon(Icons.receipt_long_outlined),
+                      label: const Text('Add other charge'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () => _openCreateInvoiceDialog(context),
+                      icon: const Icon(Icons.add_card_rounded),
+                      label: const Text('Add utility charge'),
+                    ),
+                  ],
+                ),
               const SizedBox(height: 16),
-              // Financial Summary Metrics
-              MutedDashboardGrid(items: dashboardItems),
-              const SizedBox(height: 16),
+              if (_workspace == 'bills') ...[
+                MutedDashboardGrid(items: dashboardItems.sublist(1)),
+                const SizedBox(height: 16),
+              ],
 
               // Search Input
               TextField(
@@ -2502,26 +2536,28 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _FilterChip(
-                      label: 'Pending ($pendingCount)',
-                      selected: _filter == 'pending',
-                      badgeColor: const Color(0xFFAA8A45),
-                      onTap: () => setState(() => _filter = 'pending'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Due ($dueCount)',
-                      selected: _filter == 'due',
-                      badgeColor: const Color(0xFF8C7355),
-                      onTap: () => setState(() => _filter = 'due'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Overdue ($overdueCount)',
-                      selected: _filter == 'overdue',
-                      badgeColor: const Color(0xFFB3261E),
-                      onTap: () => setState(() => _filter = 'overdue'),
-                    ),
+                    if (_workspace == 'review')
+                      _FilterChip(
+                        label: 'Pending ($pendingCount)',
+                        selected: _filter == 'pending',
+                        badgeColor: const Color(0xFFAA8A45),
+                        onTap: () => setState(() => _filter = 'pending'),
+                      ),
+                    if (_workspace == 'bills') ...[
+                      _FilterChip(
+                        label: 'Due ($dueCount)',
+                        selected: _filter == 'due',
+                        badgeColor: const Color(0xFF8C7355),
+                        onTap: () => setState(() => _filter = 'due'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Overdue ($overdueCount)',
+                        selected: _filter == 'overdue',
+                        badgeColor: const Color(0xFFB3261E),
+                        onTap: () => setState(() => _filter = 'overdue'),
+                      ),
+                    ],
                     const SizedBox(width: 8),
                     _FilterChip(
                       label: 'Verified ($verifiedCount)',
@@ -2529,16 +2565,27 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                       badgeColor: const Color(0xFF56886B),
                       onTap: () => setState(() => _filter = 'verified'),
                     ),
+                    if (_workspace == 'review') ...[
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Rejected ($rejectedCount)',
+                        selected: _filter == 'rejected',
+                        badgeColor: const Color(0xFFB3261E),
+                        onTap: () => setState(() => _filter = 'rejected'),
+                      ),
+                    ],
+                    if (_workspace == 'bills') ...[
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Voided',
+                        selected: _filter == 'voided',
+                        badgeColor: Colors.grey,
+                        onTap: () => setState(() => _filter = 'voided'),
+                      ),
+                    ],
                     const SizedBox(width: 8),
                     _FilterChip(
-                      label: 'Rejected ($rejectedCount)',
-                      selected: _filter == 'rejected',
-                      badgeColor: const Color(0xFFB3261E),
-                      onTap: () => setState(() => _filter = 'rejected'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'All (${allPayments.length})',
+                      label: 'All (${workspacePayments.length})',
                       selected: _filter == 'all',
                       badgeColor: Colors.grey,
                       onTap: () => setState(() => _filter = 'all'),
@@ -2587,9 +2634,9 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                       onOpenReceipt: (url) => _openReceiptViewer(payment, url),
                       onConfirm: () => _handleVerify(payment, true),
                       onReject: () => _promptRejectDialog(payment),
-                      onReEvaluate: () => _handleVerify(
-                        payment,
-                        !payment.isVerified,
+                      onManageCharge: () => showDialog<void>(
+                        context: context,
+                        builder: (_) => _ChargeActionDialog(payment: payment),
                       ),
                     ),
                   ),
@@ -3103,6 +3150,297 @@ class _RentOverrideDialog extends StatefulWidget {
   State<_RentOverrideDialog> createState() => _RentOverrideDialogState();
 }
 
+class _AdditionalChargeDialog extends StatefulWidget {
+  const _AdditionalChargeDialog();
+
+  @override
+  State<_AdditionalChargeDialog> createState() =>
+      _AdditionalChargeDialogState();
+}
+
+class _AdditionalChargeDialogState extends State<_AdditionalChargeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _title = TextEditingController();
+  final _amount = TextEditingController();
+  final _reason = TextEditingController();
+  final _notes = TextEditingController();
+  String _category = 'damage';
+  String? _tenantId;
+  late DateTime _dueDate;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final tenants = OwnerController.instance.tenants;
+    _tenantId = tenants.isEmpty ? null : tenants.first.id;
+    _dueDate = DateTime.now().add(const Duration(days: 7));
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _amount.dispose();
+    _reason.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _dueDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 730)),
+    );
+    if (date != null && mounted) setState(() => _dueDate = date);
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      await OwnerController.instance.createAdditionalCharge(
+        tenantId: _tenantId!,
+        title: _title.text.trim(),
+        category: _category,
+        amount: double.parse(_amount.text.trim()),
+        dueDate: _dueDate,
+        reason: _reason.text.trim(),
+        notes: _notes.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      showAppSnackBar(context, 'Additional charge issued.');
+    } catch (error) {
+      if (mounted) {
+        setState(() => _saving = false);
+        showAppSnackBar(context, 'Could not issue charge: $error');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tenants = OwnerController.instance.tenants;
+    const categories = {
+      'damage': 'Property damage',
+      'fine': 'Approved fine',
+      'late_fee': 'Late-payment fee',
+      'cleaning': 'Cleaning charge',
+      'replacement': 'Replacement charge',
+      'other': 'Other approved charge',
+    };
+    return AlertDialog(
+      title: const Text('Add approved charge'),
+      content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+              child: Form(
+            key: _formKey,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Text(
+                  'This charge is entered manually. Conduct cases never create charges automatically.'),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                initialValue: _tenantId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Tenant'),
+                items: tenants
+                    .map((t) => DropdownMenuItem(
+                        value: t.id, child: Text('${t.name} (${t.room})')))
+                    .toList(),
+                onChanged:
+                    _saving ? null : (v) => setState(() => _tenantId = v),
+                validator: (v) => v == null ? 'Select a tenant' : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _category,
+                decoration: const InputDecoration(labelText: 'Charge category'),
+                items: categories.entries
+                    .map((e) =>
+                        DropdownMenuItem(value: e.key, child: Text(e.value)))
+                    .toList(),
+                onChanged:
+                    _saving ? null : (v) => setState(() => _category = v!),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                  controller: _title,
+                  decoration:
+                      const InputDecoration(labelText: 'Title / description'),
+                  validator: (v) => (v?.trim().length ?? 0) < 2
+                      ? 'Enter a description'
+                      : null),
+              const SizedBox(height: 12),
+              TextFormField(
+                  controller: _amount,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      labelText: 'Amount', prefixText: '₱ '),
+                  validator: (v) => (double.tryParse(v?.trim() ?? '') ?? 0) <= 0
+                      ? 'Enter a valid amount'
+                      : null),
+              const SizedBox(height: 12),
+              _UtilityPeriodField(
+                  label: 'Due date', value: _dueDate, onTap: _pickDate),
+              const SizedBox(height: 12),
+              TextFormField(
+                  controller: _reason,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                      labelText: 'Approval reason (required)'),
+                  validator: (v) => (v?.trim().length ?? 0) < 3
+                      ? 'Enter the approval reason'
+                      : null),
+              const SizedBox(height: 12),
+              TextFormField(
+                  controller: _notes,
+                  decoration: const InputDecoration(
+                      labelText: 'Evidence/reference notes (optional)')),
+            ]),
+          ))),
+      actions: [
+        TextButton(
+            onPressed: _saving ? null : () => Navigator.pop(context),
+            child: const Text('Cancel')),
+        FilledButton(
+            onPressed: _saving ? null : _submit,
+            child: Text(_saving ? 'Issuing…' : 'Issue charge')),
+      ],
+    );
+  }
+}
+
+class _ChargeActionDialog extends StatefulWidget {
+  const _ChargeActionDialog({required this.payment});
+  final Payment payment;
+  @override
+  State<_ChargeActionDialog> createState() => _ChargeActionDialogState();
+}
+
+class _ChargeActionDialogState extends State<_ChargeActionDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _amount = TextEditingController();
+  final _reason = TextEditingController();
+  String _action = 'due_date_extension';
+  late DateTime _newDueDate;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _newDueDate = widget.payment.dueDate.add(const Duration(days: 7));
+  }
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    _reason.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final date = await showDatePicker(
+        context: context,
+        initialDate: _newDueDate,
+        firstDate: widget.payment.dueDate.add(const Duration(days: 1)),
+        lastDate: DateTime.now().add(const Duration(days: 730)));
+    if (date != null && mounted) setState(() => _newDueDate = date);
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      await OwnerController.instance.applyChargeAction(
+        chargeId: widget.payment.id,
+        actionType: _action,
+        reason: _reason.text.trim(),
+        amount: _action == 'credit' || _action == 'debit'
+            ? double.parse(_amount.text.trim())
+            : null,
+        newDueDate: _action == 'due_date_extension' ? _newDueDate : null,
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      showAppSnackBar(context, 'Billing action recorded.');
+    } catch (error) {
+      if (mounted) {
+        setState(() => _saving = false);
+        showAppSnackBar(context, 'Could not update charge: $error');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text('Manage ${widget.payment.label}'),
+        content: SizedBox(
+            width: 420,
+            child: Form(
+                key: _formKey,
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  DropdownButtonFormField<String>(
+                      initialValue: _action,
+                      decoration:
+                          const InputDecoration(labelText: 'Audited action'),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'due_date_extension',
+                            child: Text('Extend due date')),
+                        DropdownMenuItem(
+                            value: 'credit', child: Text('Reduce balance')),
+                        DropdownMenuItem(
+                            value: 'debit', child: Text('Increase balance')),
+                        DropdownMenuItem(
+                            value: 'void',
+                            child: Text('Cancel incorrect unpaid bill')),
+                      ],
+                      onChanged:
+                          _saving ? null : (v) => setState(() => _action = v!)),
+                  const SizedBox(height: 12),
+                  if (_action == 'due_date_extension')
+                    _UtilityPeriodField(
+                        label: 'New due date',
+                        value: _newDueDate,
+                        onTap: _pickDate),
+                  if (_action == 'credit' || _action == 'debit')
+                    TextFormField(
+                        controller: _amount,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: const InputDecoration(
+                            labelText: 'Adjustment amount', prefixText: '₱ '),
+                        validator: (v) =>
+                            (double.tryParse(v?.trim() ?? '') ?? 0) <= 0
+                                ? 'Enter a valid amount'
+                                : null),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                      controller: _reason,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration:
+                          const InputDecoration(labelText: 'Reason (required)'),
+                      validator: (v) => (v?.trim().length ?? 0) < 3
+                          ? 'Enter a reason'
+                          : null),
+                ]))),
+        actions: [
+          TextButton(
+              onPressed: _saving ? null : () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: _saving ? null : _submit,
+              child: Text(_saving ? 'Saving…' : 'Confirm')),
+        ],
+      );
+}
+
 class _RentOverrideDialogState extends State<_RentOverrideDialog> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
@@ -3288,7 +3626,7 @@ class _PaymentReviewCard extends StatelessWidget {
     required this.onOpenReceipt,
     required this.onConfirm,
     required this.onReject,
-    required this.onReEvaluate,
+    required this.onManageCharge,
   });
 
   final Payment payment;
@@ -3296,7 +3634,7 @@ class _PaymentReviewCard extends StatelessWidget {
   final ValueChanged<String> onOpenReceipt;
   final VoidCallback onConfirm;
   final VoidCallback onReject;
-  final VoidCallback onReEvaluate;
+  final VoidCallback onManageCharge;
 
   @override
   Widget build(BuildContext context) {
@@ -3655,6 +3993,18 @@ class _PaymentReviewCard extends StatelessWidget {
 
           const SizedBox(height: 14),
 
+          if (!payment.isPending && !payment.isVoided) ...[
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: onManageCharge,
+                icon: const Icon(Icons.tune_rounded, size: 16),
+                label: const Text('Manage bill'),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+
           // ACTION BUTTONS
           if (payment.isPending)
             LayoutBuilder(
@@ -3717,76 +4067,37 @@ class _PaymentReviewCard extends StatelessWidget {
               },
             )
           else if (payment.isDue)
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isNarrow = constraints.maxWidth < 280;
-                final statusBanner = Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: .3),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.schedule_rounded,
-                          size: 16, color: theme.colorScheme.onSurfaceVariant),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'Awaiting tenant proof',
-                          style:
-                              theme.textTheme.bodySmall?.copyWith(fontSize: 11),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-                final markPaidBtn = OutlinedButton.icon(
-                  onPressed: isProcessing ? null : onConfirm,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                  ),
-                  icon: const Icon(Icons.point_of_sale_rounded, size: 16),
-                  label: const Text(
-                    'Mark paid',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                );
-
-                if (isNarrow) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      statusBanner,
-                      const SizedBox(height: 8),
-                      markPaidBtn,
-                    ],
-                  );
-                }
-                return Row(
-                  children: [
-                    Expanded(child: statusBanner),
-                    const SizedBox(width: 8),
-                    markPaidBtn,
-                  ],
-                );
-              },
-            )
-          else
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: onReEvaluate,
-                icon: const Icon(Icons.sync_alt_rounded, size: 16),
-                label: Text(
-                  payment.isVerified ? 'Mark as rejected' : 'Re-verify payment',
-                  style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w700),
-                ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: .3),
+                borderRadius: BorderRadius.circular(10),
               ),
+              child: Row(
+                children: [
+                  Icon(Icons.schedule_rounded,
+                      size: 16, color: theme.colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Awaiting tenant payment proof',
+                      style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (payment.isVerified)
+            const Align(
+              alignment: Alignment.centerRight,
+              child: Text('Payment completed',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+            )
+          else if (payment.isRejected)
+            const Align(
+              alignment: Alignment.centerRight,
+              child: Text('Waiting for a new payment submission'),
             ),
         ],
       ),
@@ -5064,8 +5375,8 @@ class _LocationTestPanelState extends State<_LocationTestPanel> {
   bool _fetchingGps = false;
 
   // Live evaluation result — null until Evaluate is tapped.
-  String? _evalDirection;   // 'IN' or 'OUT'
-  double? _evalDistMeters;  // metres from nearest edge
+  String? _evalDirection; // 'IN' or 'OUT'
+  double? _evalDistMeters; // metres from nearest edge
 
   TenantDirectoryEntry? _selectedTenant;
 
@@ -5435,7 +5746,9 @@ class _LocationTestPanelState extends State<_LocationTestPanel> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Icon(
-                          isIn ? Icons.home_rounded : Icons.directions_walk_rounded,
+                          isIn
+                              ? Icons.home_rounded
+                              : Icons.directions_walk_rounded,
                           size: 14,
                           color: isIn
                               ? const Color(0xFF56886B)
@@ -5529,7 +5842,8 @@ class _LocationTestPanelState extends State<_LocationTestPanel> {
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Icon(Icons.play_circle_outline, size: 16),
+                                : const Icon(Icons.play_circle_outline,
+                                    size: 16),
                             label: const Text('Simulate'),
                           ),
                         ],
@@ -5680,7 +5994,8 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
         _bufferCtrl.text =
             GeofenceLocationService.debounceBufferMeters.toStringAsFixed(1);
         _mode = 'polygon';
-        _populatePolygonCorners(GeofenceLocationService.productionDormitoryPolygon);
+        _populatePolygonCorners(
+            GeofenceLocationService.productionDormitoryPolygon);
       }
     } catch (_) {
       // If load fails, show defaults
@@ -5692,7 +6007,8 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
           GeofenceLocationService.geofenceRadiusMeters.toStringAsFixed(1);
       _bufferCtrl.text =
           GeofenceLocationService.debounceBufferMeters.toStringAsFixed(1);
-      _populatePolygonCorners(GeofenceLocationService.productionDormitoryPolygon);
+      _populatePolygonCorners(
+          GeofenceLocationService.productionDormitoryPolygon);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -5819,10 +6135,14 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
         final p4Lat = double.tryParse(_p4LatCtrl.text.trim());
         final p4Lng = double.tryParse(_p4LngCtrl.text.trim());
 
-        if (p1Lat != null && p1Lng != null &&
-            p2Lat != null && p2Lng != null &&
-            p3Lat != null && p3Lng != null &&
-            p4Lat != null && p4Lng != null) {
+        if (p1Lat != null &&
+            p1Lng != null &&
+            p2Lat != null &&
+            p2Lng != null &&
+            p3Lat != null &&
+            p3Lng != null &&
+            p4Lat != null &&
+            p4Lng != null) {
           newPolygon = [
             LatLngPoint(p1Lat, p1Lng),
             LatLngPoint(p2Lat, p2Lng),
@@ -5871,13 +6191,16 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
     }
   }
 
-  Widget _buildCornerRow(String label, TextEditingController latCtrl, TextEditingController lngCtrl) {
+  Widget _buildCornerRow(String label, TextEditingController latCtrl,
+      TextEditingController lngCtrl) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+          Text(label,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
           const SizedBox(height: 4),
           Row(
             children: [
@@ -5887,10 +6210,12 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
                   decoration: const InputDecoration(
                     labelText: 'Lat',
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     isDense: true,
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true, signed: true),
                 ),
               ),
               const SizedBox(width: 6),
@@ -5900,10 +6225,12 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
                   decoration: const InputDecoration(
                     labelText: 'Lng',
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     isDense: true,
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true, signed: true),
                 ),
               ),
             ],
@@ -5963,8 +6290,8 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
                     // Center coordinates
                     const Text(
                       'Boundary Center',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 13),
+                      style:
+                          TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                     ),
                     const SizedBox(height: 6),
                     Row(
@@ -6066,8 +6393,8 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
                     // Boundary mode
                     const Text(
                       'Detection Mode',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 13),
+                      style:
+                          TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                     ),
                     const SizedBox(height: 6),
                     SegmentedButton<String>(
@@ -6094,22 +6421,29 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
                           const Expanded(
                             child: Text(
                               'Polygon 4 Corners',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 13),
                             ),
                           ),
                           TextButton.icon(
                             onPressed: _autoCalculateCorners,
                             icon: const Icon(Icons.sync_rounded, size: 14),
-                            label: const Text('Auto-fit from Center', style: TextStyle(fontSize: 12)),
-                            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                            label: const Text('Auto-fit from Center',
+                                style: TextStyle(fontSize: 12)),
+                            style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact),
                           ),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      _buildCornerRow('Corner 1 (NE / East)', _p1LatCtrl, _p1LngCtrl),
-                      _buildCornerRow('Corner 2 (SE / South)', _p2LatCtrl, _p2LngCtrl),
-                      _buildCornerRow('Corner 3 (SW / West)', _p3LatCtrl, _p3LngCtrl),
-                      _buildCornerRow('Corner 4 (NW / North)', _p4LatCtrl, _p4LngCtrl),
+                      _buildCornerRow(
+                          'Corner 1 (NE / East)', _p1LatCtrl, _p1LngCtrl),
+                      _buildCornerRow(
+                          'Corner 2 (SE / South)', _p2LatCtrl, _p2LngCtrl),
+                      _buildCornerRow(
+                          'Corner 3 (SW / West)', _p3LatCtrl, _p3LngCtrl),
+                      _buildCornerRow(
+                          'Corner 4 (NW / North)', _p4LatCtrl, _p4LngCtrl),
                     ],
 
                     // Updated at
@@ -8187,11 +8521,17 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
         }
 
         final rentPaid = payments
-            .where((p) => p.category.toLowerCase() == 'rent' && (p.status.toLowerCase() == 'verified' || p.status.toLowerCase() == 'paid'))
+            .where((p) =>
+                p.category.toLowerCase() == 'rent' &&
+                (p.status.toLowerCase() == 'verified' ||
+                    p.status.toLowerCase() == 'paid'))
             .fold<double>(0, (sum, p) => sum + p.amount);
 
         final utilityPaid = payments
-            .where((p) => p.category.toLowerCase() != 'rent' && (p.status.toLowerCase() == 'verified' || p.status.toLowerCase() == 'paid'))
+            .where((p) =>
+                p.category.toLowerCase() != 'rent' &&
+                (p.status.toLowerCase() == 'verified' ||
+                    p.status.toLowerCase() == 'paid'))
             .fold<double>(0, (sum, p) => sum + p.amount);
 
         return PageFrame(
@@ -8233,7 +8573,8 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
                         radius: 20,
                         backgroundColor: Colors.teal.withValues(alpha: 0.12),
                         foregroundColor: Colors.teal,
-                        child: const Icon(Icons.picture_as_pdf_outlined, size: 20),
+                        child:
+                            const Icon(Icons.picture_as_pdf_outlined, size: 20),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -8242,12 +8583,14 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
                           children: [
                             const Text(
                               'Financial & Rent Statement',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 13),
                             ),
                             const SizedBox(height: 3),
                             Text(
                               'Official revenue, dues, and payment ledger',
-                              style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                              style: TextStyle(
+                                  color: Colors.grey.shade600, fontSize: 11),
                             ),
                           ],
                         ),
@@ -8255,13 +8598,16 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
                       const SizedBox(width: 6),
                       IconButton(
                         tooltip: 'Export Statement (PDF)',
-                        icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.teal),
+                        icon: const Icon(Icons.picture_as_pdf_outlined,
+                            color: Colors.teal),
                         onPressed: () {
                           _service.openReportPreview(
                             context,
                             title: 'Financial & Rent Collection Statement',
-                            fileName: 'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                            documentBuilder: () => _service.generateFinancialReportPdf(),
+                            fileName:
+                                'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                            documentBuilder: () =>
+                                _service.generateFinancialReportPdf(),
                           );
                         },
                       ),
@@ -8277,7 +8623,10 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text('COLLECTIONS BY CATEGORY',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            letterSpacing: 0.5)),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -8285,10 +8634,14 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Rent Collections', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                              const Text('Rent Collections',
+                                  style: TextStyle(
+                                      color: Colors.grey, fontSize: 12)),
                               const SizedBox(height: 4),
                               Text('₱${rentPaid.toStringAsFixed(2)}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16)),
                             ],
                           ),
                         ),
@@ -8296,10 +8649,14 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Utility Collections', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                              const Text('Utility Collections',
+                                  style: TextStyle(
+                                      color: Colors.grey, fontSize: 12)),
                               const SizedBox(height: 4),
                               Text('₱${utilityPaid.toStringAsFixed(2)}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16)),
                             ],
                           ),
                         ),
@@ -8329,9 +8686,11 @@ class DisciplinaryRecordsPage extends StatelessWidget {
               child: Material(
                 color: Colors.transparent,
                 child: ListTile(
-                  leading: const Icon(Icons.gavel_outlined, color: Color(0xFF6B1D2F)),
+                  leading: const Icon(Icons.gavel_outlined,
+                      color: Color(0xFF6B1D2F)),
                   title: const Text('Resident Conduct & Violation Cases'),
-                  subtitle: const Text('Hearings, official warnings, and disciplinary records'),
+                  subtitle: const Text(
+                      'Hearings, official warnings, and disciplinary records'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     Navigator.of(context).push(
@@ -8386,7 +8745,8 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   const SizedBox(height: 3),
                   Text(
@@ -8425,18 +8785,27 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
         final rooms = controller.rooms;
         final totalCapacity = rooms.fold<int>(0, (sum, r) => sum + r.capacity);
         final totalOccupied = rooms.fold<int>(0, (sum, r) => sum + r.occupied);
-        final occupancyRate = totalCapacity > 0 ? (totalOccupied / totalCapacity * 100) : 0.0;
+        final occupancyRate =
+            totalCapacity > 0 ? (totalOccupied / totalCapacity * 100) : 0.0;
 
         final payments = controller.payments;
-        final verifiedCount = payments.where((p) => p.status.toLowerCase() == 'verified' || p.status.toLowerCase() == 'paid').length;
-        final paymentCompliance = payments.isNotEmpty ? (verifiedCount / payments.length * 100) : 100.0;
+        final verifiedCount = payments
+            .where((p) =>
+                p.status.toLowerCase() == 'verified' ||
+                p.status.toLowerCase() == 'paid')
+            .length;
+        final paymentCompliance = payments.isNotEmpty
+            ? (verifiedCount / payments.length * 100)
+            : 100.0;
 
         final maintenance = controller.staffMaintenanceReports;
         final openMaintenance = maintenance.where((m) => m.isOpen).length;
-        final highPriority = maintenance.where((m) => m.isOpen && m.isHighUrgency).length;
+        final highPriority =
+            maintenance.where((m) => m.isOpen && m.isHighUrgency).length;
 
         final gateEvents = controller.gateEvents;
-        final flaggedCurfew = gateEvents.where((e) => e.status == 'Flagged').length;
+        final flaggedCurfew =
+            gateEvents.where((e) => e.status == 'Flagged').length;
 
         return PageFrame(
           title: 'Reports & Analytics',
@@ -8449,8 +8818,10 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
                 _reportService.openReportPreview(
                   context,
                   title: 'Executive Performance Overview',
-                  fileName: 'carmelitas_executive_overview_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                  documentBuilder: () => _reportService.generateExecutiveOverviewPdf(),
+                  fileName:
+                      'carmelitas_executive_overview_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                  documentBuilder: () =>
+                      _reportService.generateExecutiveOverviewPdf(),
                 );
               },
             ),
@@ -8495,11 +8866,14 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
               _buildReportCard(
                 context: context,
                 title: 'Financial & Rent Collection Statement',
-                description: 'Complete breakdown of rent, utility billing, verified receipts, and outstanding dues.',
+                description:
+                    'Complete breakdown of rent, utility billing, verified receipts, and outstanding dues.',
                 icon: Icons.account_balance_wallet_outlined,
                 color: Colors.teal,
-                fileName: 'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                documentBuilder: () => _reportService.generateFinancialReportPdf(),
+                fileName:
+                    'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () =>
+                    _reportService.generateFinancialReportPdf(),
               ),
               const SizedBox(height: 10),
 
@@ -8507,11 +8881,14 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
               _buildReportCard(
                 context: context,
                 title: 'Dormitory Occupancy & Tenant Roster',
-                description: 'Full room-by-room census, 40-bed vacancy breakdown, and active resident directory.',
+                description:
+                    'Full room-by-room census, 40-bed vacancy breakdown, and active resident directory.',
                 icon: Icons.meeting_room_outlined,
                 color: Colors.indigo,
-                fileName: 'carmelitas_occupancy_roster_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                documentBuilder: () => _reportService.generateOccupancyRosterPdf(),
+                fileName:
+                    'carmelitas_occupancy_roster_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () =>
+                    _reportService.generateOccupancyRosterPdf(),
               ),
               const SizedBox(height: 10),
 
@@ -8519,11 +8896,14 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
               _buildReportCard(
                 context: context,
                 title: 'Facility Maintenance & Work Orders Log',
-                description: 'Operational summary of active repairs, urgency levels, technician notes, and resolutions.',
+                description:
+                    'Operational summary of active repairs, urgency levels, technician notes, and resolutions.',
                 icon: Icons.handyman_outlined,
                 color: Colors.orange,
-                fileName: 'carmelitas_maintenance_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                documentBuilder: () => _reportService.generateMaintenanceReportPdf(),
+                fileName:
+                    'carmelitas_maintenance_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () =>
+                    _reportService.generateMaintenanceReportPdf(),
               ),
               const SizedBox(height: 10),
 
@@ -8531,11 +8911,14 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
               _buildReportCard(
                 context: context,
                 title: 'Security, Gate & Curfew Audit Log',
-                description: 'Gate crossings, geofence tripwire logs, curfew flags, and approved overnight passes.',
+                description:
+                    'Gate crossings, geofence tripwire logs, curfew flags, and approved overnight passes.',
                 icon: Icons.schedule_outlined,
                 color: Colors.purple,
-                fileName: 'carmelitas_curfew_security_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                documentBuilder: () => _reportService.generateCurfewGateReportPdf(),
+                fileName:
+                    'carmelitas_curfew_security_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () =>
+                    _reportService.generateCurfewGateReportPdf(),
               ),
               const SizedBox(height: 10),
 
@@ -8543,11 +8926,14 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
               _buildReportCard(
                 context: context,
                 title: 'Consolidated Executive Overview',
-                description: 'Comprehensive high-level summary combining finance, occupancy, security, and repairs.',
+                description:
+                    'Comprehensive high-level summary combining finance, occupancy, security, and repairs.',
                 icon: Icons.analytics_outlined,
                 color: const Color(0xFF6B1D2F),
-                fileName: 'carmelitas_executive_summary_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                documentBuilder: () => _reportService.generateExecutiveOverviewPdf(),
+                fileName:
+                    'carmelitas_executive_summary_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () =>
+                    _reportService.generateExecutiveOverviewPdf(),
               ),
               const SizedBox(height: 20),
             ],
