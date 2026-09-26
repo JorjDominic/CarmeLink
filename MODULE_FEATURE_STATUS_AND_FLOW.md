@@ -55,12 +55,12 @@
 | Feature | State | Current processing flow | Remaining risk/gap |
 |---|---|---|---|
 | Contract CRUD | Implemented, verify live | Owner creates/updates/deletes `tenant_contracts`; database validates tenant/date/state relationships. | Execute remote contract smoke test. |
-| Onboarding invitation | Implemented, verify live | Staff creates opaque invitation; authenticated tenant claims token through RPC and submits personal/onboarding data. | Confirm expiry, single use, and cross-account denial. |
+| Onboarding invitation | Implemented, verify live | Staff creates an opaque invitation; the matching authenticated tenant submits optional academic data and required emergency-contact data. Cross-account scans explain that the user must switch accounts. | Confirm expiry, single use, and cross-account denial on staging. |
 | Requirements checklist | Implemented, verify live | Contract creation initializes requirement rows. Files are submitted and reviewed through RPC-controlled states. | Confirm private bucket policies and required-document activation block. |
 | Signers | Implemented, verify live | Tracks tenant/owner/guardian/witness requirements and verified/waived state. | Verify independent signer identity and no client-side bypass. |
-| Contract PDF generation | Implemented | Client generates official lease PDF bytes and supports print/preview. | Bundled Helvetica warnings indicate limited Unicode support; embed a Unicode font if names may require it. |
+| Contract PDF generation | Implemented | The active assignment supplies the room number printed on the official lease; the bed label is intentionally omitted. Generation is blocked until a room is assigned. | Bundled Helvetica warnings indicate limited Unicode support; embed a Unicode font if names may require it. |
 | Generated/signed documents | Implemented, verify live | Uploads versioned files to private Storage, registers metadata, reviews signed files, and guards deletion. | Confirm bucket policies, one-pair rules, and cleanup after failed registration. |
-| Activation and date sync | Implemented, verify live | Triggers enforce verification/onboarding, synchronize active dates into tenant details, and initiate billing. | Prove activation is idempotent and generates rent exactly once. |
+| Activation and date sync | Implemented, verify live | UI and database require verified email, complete emergency contact, verified latest signed contract, required documents, and required signers. Activation initiates billing from the contract schedule rather than physical move-in. | Prove activation is idempotent and generates rent exactly once. |
 
 ## Billing, payments, and finance
 

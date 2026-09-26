@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/widgets/common_widgets.dart';
 import '../../services/onboarding_invitation_service.dart';
@@ -12,9 +13,9 @@ import '../../services/onboarding_invitation_service.dart';
 /// Step 2 — Academic / employment details (optional)
 /// Step 3 — Emergency contact (required)
 class OnboardingFormPage extends StatefulWidget {
-  const OnboardingFormPage({super.key, required this.token});
+  const OnboardingFormPage({super.key, this.token});
 
-  final String token;
+  final String? token;
 
   @override
   State<OnboardingFormPage> createState() => _OnboardingFormPageState();
@@ -26,6 +27,7 @@ class _OnboardingFormPageState extends State<OnboardingFormPage> {
   // Claim state
   _ClaimState _claimState = _ClaimState.loading;
   String? _claimError;
+  String? _effectiveToken;
 
   // Step tracking
   int _step = 0;
@@ -63,7 +65,46 @@ class _OnboardingFormPageState extends State<OnboardingFormPage> {
 
   Future<void> _claim() async {
     try {
-      await _service.claimInvitation(widget.token);
+      _effectiveToken = widget.token?.trim();
+      if (_effectiveToken != null && _effectiveToken!.isNotEmpty) {
+        await _service.claimInvitation(_effectiveToken!);
+      } else {
+        final active = await _service.getMyActiveInvitation();
+        if (active != null) {
+          _effectiveToken = active.token;
+          try {
+            await _service.claimInvitation(active.token);
+          } catch (_) {}
+        }
+      }
+
+      // Pre-fill existing details if any
+      final details = await _service.getMyTenantDetails();
+      if (details != null) {
+        if (_schoolCtrl.text.isEmpty && details['school_name'] != null) {
+          _schoolCtrl.text = details['school_name'].toString();
+        }
+        if (_courseCtrl.text.isEmpty && details['course_or_program'] != null) {
+          _courseCtrl.text = details['course_or_program'].toString();
+        }
+        if (_yearLevelCtrl.text.isEmpty && details['year_level'] != null) {
+          _yearLevelCtrl.text = details['year_level'].toString();
+        }
+        if (_ecNameCtrl.text.isEmpty &&
+            details['emergency_contact_name'] != null) {
+          _ecNameCtrl.text = details['emergency_contact_name'].toString();
+        }
+        if (_ecPhoneCtrl.text.isEmpty &&
+            details['emergency_contact_phone'] != null) {
+          _ecPhoneCtrl.text = details['emergency_contact_phone'].toString();
+        }
+        if (_ecRelationshipCtrl.text.isEmpty &&
+            details['emergency_contact_relationship'] != null) {
+          _ecRelationshipCtrl.text =
+              details['emergency_contact_relationship'].toString();
+        }
+      }
+
       if (mounted) {
         setState(() {
           _claimState = _ClaimState.ready;
@@ -84,8 +125,8 @@ class _OnboardingFormPageState extends State<OnboardingFormPage> {
     setState(() => _submitting = true);
     try {
       final yearLevel = int.tryParse(_yearLevelCtrl.text.trim());
-      await _service.completeInvitation(
-        token: widget.token,
+      await _service.submitTenantDetailsDirectly(
+        token: _effectiveToken,
         schoolName: _schoolCtrl.text.trim(),
         courseOrProgram: _courseCtrl.text.trim(),
         yearLevel: yearLevel,
@@ -155,7 +196,7 @@ class _OnboardingFormPageState extends State<OnboardingFormPage> {
   static String _friendlyError(Object error) {
     final msg = error.toString();
     if (msg.contains('does not belong to your account')) {
-      return 'This invitation link is not for your account. Please scan the QR code sent to you.';
+      return 'This invitation belongs to a different tenant account. Sign out, sign in with the account that received this invitation, and scan it again.';
     }
     if (msg.contains('has already been completed')) {
       return 'You have already submitted your onboarding information.';
@@ -707,3 +748,89 @@ class _InfoTile extends StatelessWidget {
         ],
       );
 }
+
+/// Parses any raw link or text into a clean invitation token string.
+/// Handles `carmelink://onboarding?token=<token>`, `https://...?token=<token>`,
+/// or a raw hex token.
+String parseOnboardingToken(String input) {
+  final trimmed = input.trim();
+  if (trimmed.isEmpty) return '';
+  final uri = Uri.tryParse(trimmed);
+  if (uri != null && uri.queryParameters.containsKey('token')) {
+    return uri.queryParameters['token']!.trim();
+  }
+  return trimmed;
+}
+
+/// Shows a dialog for the tenant to enter or paste an onboarding invitation link or code.
+Future<void> showEnterOnboardingCodeDialog(BuildContext context) async {
+  final controller = TextEditingController();
+
+  try {
+    final clip = await Clipboard.getData('text/plain');
+    final text = clip?.text?.trim() ?? '';
+    if (text.contains('onboarding') || text.length >= 32) {
+      controller.text = text;
+    }
+  } catch (_) {}
+
+  if (!context.mounted) return;
+
+  final token = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Enter Onboarding Link or Code'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Paste the link or code provided by the dormitory staff:',
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              labelText: 'Invitation link or code',
+              hintText: 'Paste link or code here',
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.paste_rounded),
+                tooltip: 'Paste from clipboard',
+                onPressed: () async {
+                  final clip = await Clipboard.getData('text/plain');
+                  if (clip?.text != null) {
+                    controller.text = clip!.text!.trim();
+                  }
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final parsed = parseOnboardingToken(controller.text);
+            if (parsed.isNotEmpty) {
+              Navigator.pop(ctx, parsed);
+            }
+          },
+          child: const Text('Continue'),
+        ),
+      ],
+    ),
+  );
+
+  if (token != null && token.isNotEmpty && context.mounted) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OnboardingFormPage(token: token),
+      ),
+    );
+  }
+}
+

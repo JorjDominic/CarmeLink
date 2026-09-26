@@ -76,6 +76,18 @@ If the team chooses to implement one of these in Capstone 1, move it into the cu
 
 ## Resolved findings
 
+- [x] **Onboarding safety gates and guardian-less curfew routing aligned**
+  - Owner: Completed during workflow review
+  - Target: Defense / Production
+  - Completed: 2026-09-26
+  - Result: Contract activation now requires complete emergency-contact name,
+    phone, and relationship in both UI and database enforcement. Overnight leave
+    requests use guardian-first review when a guardian is linked and otherwise
+    route directly to mandatory staff review instead of stalling.
+  - Regression check: `onboarding_safety_contract_test.dart` verifies the RPC,
+    direct-insert revocation, activation guard, form validation, and cross-account
+    QR recovery message.
+
 - [x] **Application-usage tracking removed**
   - Owner: Completed during audit
   - Target: Demo / Defense / Production
@@ -101,6 +113,23 @@ If the team chooses to implement one of these in Capstone 1, move it into the cu
   - Target: Performance
   - Completed: 2026-09-25
   - Result: Removed two unreferenced poster images and changed startup to pre-cache only the logo.
+
+## Recorded client decisions
+
+- [x] **Rent follows the contract date**
+  - Owner: Client / project team
+  - Target: Defense / Production
+  - Decided: 2026-09-26
+  - Decision: Rent follows the signed contract schedule and is not delayed to a
+    later physical move-in date. Occupancy metrics continue to use active room
+    assignments rather than contracts.
+
+- [x] **Official lease identifies the room, not the bed**
+  - Owner: Client / project team
+  - Target: Defense
+  - Decided: 2026-09-26
+  - Decision: A room assignment is required before generating the official
+    lease. The PDF prints the room number and deliberately omits the bed label.
 
 ## Must fix before live demo
 

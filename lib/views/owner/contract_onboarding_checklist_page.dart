@@ -47,7 +47,11 @@ class _ContractOnboardingChecklistPageState
     );
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() {
+    setState(() {
+      _future = _load();
+    });
+  }
 
   Future<void> _upload(ContractRequirement item) async {
     final file = await FilePicker.pickFile(

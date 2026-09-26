@@ -11,7 +11,11 @@ import '../../services/geofence_service.dart';
 import '../../services/guardian_alert_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/app_notification_service.dart';
+import '../../services/onboarding_invitation_service.dart';
+import '../../services/contract_onboarding_service.dart';
 import 'package:carmelitas_dormitory_system/views/shared/retention_settings_page.dart';
+import '../tenant/onboarding_form_page.dart';
+import '../tenant/tenant_requirements_page.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -501,6 +505,10 @@ class _TenantProfileContent extends StatelessWidget {
             label: 'Room assignment',
             value: const ProfileService().tenantRoomAssignment(user.id),
           ),
+          const SizedBox(height: 16),
+          _TenantOnboardingDetailsSection(userId: user.id),
+          const SizedBox(height: 16),
+          const _TenantRequiredDocumentsSection(),
           const SizedBox(height: 20),
           const SectionTitle('Account'),
           const SizedBox(height: 10),
@@ -522,6 +530,205 @@ class _TenantProfileContent extends StatelessWidget {
           ),
         ],
       );
+}
+
+class _TenantOnboardingDetailsSection extends StatefulWidget {
+  const _TenantOnboardingDetailsSection({required this.userId});
+  final String userId;
+
+  @override
+  State<_TenantOnboardingDetailsSection> createState() =>
+      _TenantOnboardingDetailsSectionState();
+}
+
+class _TenantOnboardingDetailsSectionState
+    extends State<_TenantOnboardingDetailsSection> {
+  final _service = const OnboardingInvitationService();
+  late Future<Map<String, dynamic>?> _future = _load();
+
+  Future<Map<String, dynamic>?> _load() =>
+      _service.getMyTenantDetails(widget.userId);
+
+  void _reload() {
+    if (mounted) {
+      setState(() {
+        _future = _load();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _future,
+      builder: (context, snapshot) {
+        final details = snapshot.data;
+        final ecName =
+            details?['emergency_contact_name']?.toString().trim() ?? '';
+        final ecPhone =
+            details?['emergency_contact_phone']?.toString().trim() ?? '';
+        final ecRel =
+            details?['emergency_contact_relationship']?.toString().trim() ?? '';
+        final school = details?['school_name']?.toString().trim() ?? '';
+        final course = details?['course_or_program']?.toString().trim() ?? '';
+
+        final isComplete =
+            ecName.isNotEmpty && ecPhone.isNotEmpty && ecRel.isNotEmpty;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: SectionTitle('Emergency & academic details'),
+                ),
+                TextButton.icon(
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const OnboardingFormPage(),
+                      ),
+                    );
+                    _reload();
+                  },
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: Text(isComplete ? 'Edit' : 'Add Details'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _TenantProfileRow(
+              icon: Icons.contact_emergency_outlined,
+              color: isComplete
+                  ? const Color(0xFF2E7D32)
+                  : Theme.of(context).colorScheme.error,
+              label: 'Emergency contact',
+              value: isComplete
+                  ? '$ecName ($ecRel) • $ecPhone'
+                  : 'Not provided (Action required)',
+            ),
+            if (school.isNotEmpty || course.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _TenantProfileRow(
+                icon: Icons.school_outlined,
+                color: const Color(0xFF1976D2),
+                label: 'School & course',
+                value: [school, course].where((s) => s.isNotEmpty).join(' • '),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _TenantRequiredDocumentsSection extends StatefulWidget {
+  const _TenantRequiredDocumentsSection();
+
+  @override
+  State<_TenantRequiredDocumentsSection> createState() =>
+      _TenantRequiredDocumentsSectionState();
+}
+
+class _TenantRequiredDocumentsSectionState
+    extends State<_TenantRequiredDocumentsSection> {
+  final _service = const ContractOnboardingService();
+  late Future<({TenantContract? contract, List<ContractRequirement> requirements})>
+      _future = _load();
+
+  Future<({TenantContract? contract, List<ContractRequirement> requirements})>
+      _load() async {
+    try {
+      final contract = await _service.getMyContract();
+      if (contract == null) {
+        return (contract: null, requirements: <ContractRequirement>[]);
+      }
+      final reqs = await _service.listRequirements(contract.id);
+      return (contract: contract, requirements: reqs);
+    } catch (_) {
+      return (contract: null, requirements: <ContractRequirement>[]);
+    }
+  }
+
+  void _reload() {
+    if (mounted) {
+      setState(() {
+        _future = _load();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<
+        ({TenantContract? contract, List<ContractRequirement> requirements})>(
+      future: _future,
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        final contract = data?.contract;
+        final reqs = data?.requirements ?? const [];
+
+        final requiredList = reqs.where((r) => r.isRequired).toList();
+        final verifiedCount = requiredList.where((r) => r.isVerified).length;
+        final totalRequired = requiredList.length;
+        final isAllVerified = totalRequired > 0 && verifiedCount == totalRequired;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: SectionTitle('Contract & required documents'),
+                ),
+                TextButton.icon(
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TenantRequirementsPage(),
+                      ),
+                    );
+                    _reload();
+                  },
+                  icon: const Icon(Icons.folder_open_outlined, size: 16),
+                  label: const Text('View Documents'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            CarmelitaCard(
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const TenantRequirementsPage(),
+                  ),
+                );
+                _reload();
+              },
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              child: TimelineTile(
+                compact: true,
+                icon: Icons.assignment_outlined,
+                color: contract == null
+                    ? Colors.grey
+                    : isAllVerified
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFFE65100),
+                title: contract == null
+                    ? 'Rental contract'
+                    : 'Contract #${contract.contractNumber}',
+                subtitle: contract == null
+                    ? 'Contract drafting in progress by manager'
+                    : '$verifiedCount of $totalRequired required documents verified • Tap to upload/view',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _TenantProfileRow extends StatelessWidget {

@@ -344,6 +344,36 @@ Caretakers use many of the same operational screens as owners. Actions that requ
 - **Result:** A contract record is created with requirements/signers. Activation can update tenant dates and generate billing.
 - **State:** **Working; full activation must be tested in staging.**
 
+### Tenant onboarding — four-phase staff workflow
+
+The workflow is resumable rather than a strict stepper. Residency setup can run
+in parallel with data collection and paperwork.
+
+1. **Enroll** — Staff creates the tenant account and Draft contract. The tenant
+   signs into the CarmeLink app (or opens an onboarding invite link/QR) and submits
+   emergency contact details plus academic information. Staff can also view/edit these
+   details directly in the onboarding panel.
+2. **Verify paperwork** — Required documents (Tenant ID, Guardian ID, Signed photocopies)
+   can be uploaded directly by the tenant in the app (picking PDF or images from their phone)
+   or submitted as physical hard copies at the dorm desk. Each item follows:
+   upload → staff review → verify or reject with notes. Rejected items provide actionable
+   feedback to the tenant for fast in-app re-upload.
+3. **Set up residency in parallel** — Staff may assign a room/bed and link a
+   guardian any time after account creation; neither task is hidden behind the
+   paperwork workflow. Room assignment must be completed before official lease
+   PDF generation because the client lease identifies the room, but it does not
+   print the bed label. Guardian linking remains optional for activation.
+   Overnight-leave requests go to the linked guardian first when one exists;
+   otherwise they skip directly to mandatory staff review so they cannot stall.
+4. **Activate** — Activation requires verified email, complete emergency
+   contact, verified latest signed contract, all required documents, and all
+   required signers. Successful activation locks contract facts and generates
+   the deposit and rent schedule.
+
+**Recorded client policy:** rent begins from the contract schedule rather than
+being delayed to physical move-in. The official lease identifies the assigned
+room only; occupancy reporting remains based on active assignments.
+
 ### Send and manage onboarding invitations
 
 - **Input:** Tenant account.

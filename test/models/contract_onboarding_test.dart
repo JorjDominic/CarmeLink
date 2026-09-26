@@ -68,4 +68,44 @@ void main() {
     expect(witness.isConfigurable, isTrue);
     expect(witness.isSatisfied, isTrue);
   });
+
+  test('tenant identity requirement properties and rejection notes', () {
+    final item = ContractRequirement.fromRow({
+      'id': 'requirement-3',
+      'contract_id': 'contract-1',
+      'requirement_type': 'tenant_identity',
+      'is_required': true,
+      'status': 'rejected',
+      'physical_copy_received': false,
+      'signature_count': 0,
+      'storage_path': 'contract-1/requirements/id.jpg',
+      'original_filename': 'student_id.jpg',
+      'review_notes': 'Blurry photo, please upload a clearer copy',
+    });
+
+    expect(item.label, 'Tenant school/employee ID');
+    expect(item.isVerified, isFalse);
+    expect(item.isPendingReview, isFalse);
+    expect(item.isSatisfied, isFalse);
+    expect(item.originalFilename, 'student_id.jpg');
+    expect(item.reviewNotes, 'Blurry photo, please upload a clearer copy');
+  });
+
+  test('pending_review status is recognized correctly', () {
+    final item = ContractRequirement.fromRow({
+      'id': 'requirement-4',
+      'contract_id': 'contract-1',
+      'requirement_type': 'tenant_identity',
+      'is_required': true,
+      'status': 'pending_review',
+      'physical_copy_received': false,
+      'signature_count': 0,
+      'storage_path': 'contract-1/requirements/id.pdf',
+      'original_filename': 'enrollment.pdf',
+    });
+
+    expect(item.isPendingReview, isTrue);
+    expect(item.isVerified, isFalse);
+    expect(item.isSatisfied, isFalse);
+  });
 }

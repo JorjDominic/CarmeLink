@@ -17,11 +17,15 @@ import '../../services/geofence_scheduler.dart';
 import '../../services/receipt_ocr_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/tripwire_geofence_service.dart';
+import '../../services/onboarding_invitation_service.dart';
+import '../../services/contract_onboarding_service.dart';
 import '../shared/room_cleaning_pages.dart';
 import '../shared/room_inspection_pages.dart';
 import '../shared/employee_curfew_profile_pages.dart';
 import '../shared/conduct_case_pages.dart';
 import '../widgets/feature_widgets.dart';
+import 'onboarding_form_page.dart';
+import 'tenant_requirements_page.dart';
 
 class TenantDashboardPage extends StatelessWidget {
   const TenantDashboardPage({super.key});
@@ -93,7 +97,8 @@ class TenantDashboardPage extends StatelessWidget {
                   icon: Icons.home_rounded,
                 ),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 16),
+              const _TenantOnboardingBanner(),
               CarmelitaCard(
                 emphasis: true,
                 onTap: () => Navigator.of(context).push(
@@ -764,6 +769,260 @@ class _MyRoomPageState extends State<MyRoomPage> {
           );
         },
       ),
+    );
+  }
+}
+
+class _TenantOnboardingBanner extends StatefulWidget {
+  const _TenantOnboardingBanner();
+
+  @override
+  State<_TenantOnboardingBanner> createState() =>
+      _TenantOnboardingBannerState();
+}
+
+class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
+  final _service = const OnboardingInvitationService();
+  final _docService = const ContractOnboardingService();
+  late Future<({
+    bool needsOnboarding,
+    bool needsEmergency,
+    bool needsDocuments,
+    String? token,
+    String title,
+    String reason,
+  })> _future = _load();
+
+  Future<({
+    bool needsOnboarding,
+    bool needsEmergency,
+    bool needsDocuments,
+    String? token,
+    String title,
+    String reason,
+  })> _load() async {
+    try {
+      final details = await _service.getMyTenantDetails();
+      final ecName =
+          details?['emergency_contact_name']?.toString().trim() ?? '';
+      final ecPhone =
+          details?['emergency_contact_phone']?.toString().trim() ?? '';
+      final ecRel =
+          details?['emergency_contact_relationship']?.toString().trim() ?? '';
+
+      final isEmergencyContactIncomplete =
+          ecName.length < 2 || ecPhone.length < 7 || ecRel.length < 2;
+
+      final activeInvite = await _service.getMyActiveInvitation();
+
+      // Check contract document requirements
+      bool needsDocuments = false;
+      try {
+        final contract = await _docService.getMyContract();
+        if (contract != null) {
+          final reqs = await _docService.listRequirements(contract.id);
+          final missingOrRejected = reqs.where((r) =>
+              r.isRequired &&
+              (r.status == 'missing' || r.status == 'rejected'));
+          if (missingOrRejected.isNotEmpty) {
+            needsDocuments = true;
+          }
+        }
+      } catch (_) {}
+
+      if (isEmergencyContactIncomplete && needsDocuments) {
+        return (
+          needsOnboarding: true,
+          needsEmergency: true,
+          needsDocuments: true,
+          token: activeInvite?.token,
+          title: 'Action Required: Complete Profile & Upload Documents',
+          reason:
+              'Please submit your emergency contact details and upload required verification documents for contract activation.',
+        );
+      } else if (isEmergencyContactIncomplete || activeInvite != null) {
+        return (
+          needsOnboarding: true,
+          needsEmergency: true,
+          needsDocuments: false,
+          token: activeInvite?.token,
+          title: 'Action Required: Complete Profile & Emergency Contact',
+          reason: isEmergencyContactIncomplete
+              ? 'Please submit your emergency contact details to complete your residency registration.'
+              : 'You have a pending onboarding invitation.',
+        );
+      } else if (needsDocuments) {
+        return (
+          needsOnboarding: true,
+          needsEmergency: false,
+          needsDocuments: true,
+          token: null,
+          title: 'Action Required: Upload Required Documents',
+          reason:
+              'Your room contract is drafted. Please upload your required ID / documents so management can verify and activate your contract.',
+        );
+      }
+
+      return (
+        needsOnboarding: false,
+        needsEmergency: false,
+        needsDocuments: false,
+        token: null,
+        title: '',
+        reason: '',
+      );
+    } catch (_) {
+      return (
+        needsOnboarding: false,
+        needsEmergency: false,
+        needsDocuments: false,
+        token: null,
+        title: '',
+        reason: '',
+      );
+    }
+  }
+
+  void _reload() {
+    if (mounted) {
+      setState(() {
+        _future = _load();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<({
+      bool needsOnboarding,
+      bool needsEmergency,
+      bool needsDocuments,
+      String? token,
+      String title,
+      String reason,
+    })>(
+      future: _future,
+      builder: (context, snapshot) {
+        final info = snapshot.data;
+        if (info == null || !info.needsOnboarding) {
+          return const SizedBox.shrink();
+        }
+
+        final scheme = Theme.of(context).colorScheme;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer.withAlpha(200),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: scheme.primary.withAlpha(60),
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        info.needsDocuments && !info.needsEmergency
+                            ? Icons.folder_shared_outlined
+                            : Icons.assignment_ind_rounded,
+                        color: scheme.onPrimary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            info.title,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: scheme.onPrimaryContainer,
+                                ),
+                          ),
+                          Text(
+                            'Required before your dormitory contract can be activated',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color:
+                                      scheme.onPrimaryContainer.withAlpha(180),
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  info.reason,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onPrimaryContainer,
+                      ),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    if (info.needsEmergency)
+                      FilledButton.icon(
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => OnboardingFormPage(
+                                token: info.token,
+                              ),
+                            ),
+                          );
+                          _reload();
+                        },
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                        label: const Text('Complete Profile'),
+                      ),
+                    if (info.needsDocuments)
+                      FilledButton.icon(
+                        style: info.needsEmergency
+                            ? FilledButton.styleFrom(
+                                backgroundColor: scheme.secondary,
+                                foregroundColor: scheme.onSecondary,
+                              )
+                            : null,
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const TenantRequirementsPage(),
+                            ),
+                          );
+                          _reload();
+                        },
+                        icon: const Icon(Icons.file_upload_outlined, size: 16),
+                        label: const Text('Upload Documents'),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

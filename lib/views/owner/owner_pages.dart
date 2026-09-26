@@ -854,10 +854,10 @@ class TenantDetailsPage extends StatelessWidget {
                   Text('Primary guardian: '
                       '${needsGuardian ? 'Not assigned' : 'Assigned'}'),
                   const SizedBox(height: 12),
-                  FilledButton.icon(
-                    key: const Key('web-tenant-onboarding-action'),
-                    onPressed: () async {
-                      if (needsContract) {
+                  if (needsContract)
+                    FilledButton.icon(
+                      key: const Key('web-tenant-onboarding-action'),
+                      onPressed: () async {
                         final saved = await showContractEditor(
                           context,
                           initialTenantId: tenant.id,
@@ -867,7 +867,16 @@ class TenantDetailsPage extends StatelessWidget {
                         if (saved == true && context.mounted) {
                           Navigator.pop(context);
                         }
-                      } else {
+                      },
+                      icon: const Icon(Icons.description_outlined),
+                      label: const Text('Create draft contract'),
+                    ),
+                  if (needsContract && (needsBed || needsGuardian))
+                    const SizedBox(height: 8),
+                  if (needsBed || needsGuardian)
+                    OutlinedButton.icon(
+                      key: const Key('web-tenant-residency-setup-action'),
+                      onPressed: () async {
                         await continueTenantOnboarding(
                           context,
                           tenantId: tenant.id,
@@ -875,15 +884,14 @@ class TenantDetailsPage extends StatelessWidget {
                           fromSavedContract: false,
                         );
                         if (context.mounted) Navigator.pop(context);
-                      }
-                    },
-                    icon: Icon(needsContract
-                        ? Icons.description_outlined
-                        : Icons.task_alt_outlined),
-                    label: Text(needsContract
-                        ? 'Create draft contract'
-                        : 'Continue onboarding'),
-                  ),
+                      },
+                      icon: const Icon(Icons.bed_outlined),
+                      label: Text(needsBed && needsGuardian
+                          ? 'Set up room and guardian'
+                          : needsBed
+                              ? 'Assign room and bed'
+                              : 'Link guardian'),
+                    ),
                 ],
               ),
             ),

@@ -409,8 +409,9 @@ capture is not yet represented as a substitute for the physical signed copy.
     Waived state, signer name, method, timestamps, and notes. A verified PDF does
     not by itself prove every required signer was verified.
 11. **Owner opens Activate contract.** The sheet displays required and follow-up
-    checks. Activation is enabled only when email, the latest signed PDF, all
-    required documents, and every required signer are verified. QR completion,
+    checks. Activation is enabled only when email, emergency-contact name/phone/
+    relationship, the latest signed PDF, all required documents, and every
+    required signer are verified. QR completion,
     guardian linking, and room/bed assignment remain visible follow-up checks
     unless their corresponding per-contract requirement is enabled.
 12. **Database rechecks activation.** Server triggers reject client bypasses,

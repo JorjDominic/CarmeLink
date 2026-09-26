@@ -56,22 +56,14 @@ class CurfewService {
       throw Exception('Authentication required to submit curfew exception');
     }
 
-    final initialStatus =
-        requestType == 'overnight_leave' ? 'pending_guardian' : 'pending_staff';
-
-    final row = await client
-        .from('curfew_requests')
-        .insert({
-          'tenant_id': tenantId,
-          'destination': destination.trim(),
-          'reason': reason.trim(),
-          'departure_time': departureTime.toUtc().toIso8601String(),
-          'expected_return_time': expectedReturnTime.toUtc().toIso8601String(),
-          'request_type': requestType,
-          'status': initialStatus,
-        })
-        .select(_columns)
-        .single();
+    final result = await client.rpc('submit_curfew_request', params: {
+      'p_destination': destination.trim(),
+      'p_reason': reason.trim(),
+      'p_departure_time': departureTime.toUtc().toIso8601String(),
+      'p_expected_return_time': expectedReturnTime.toUtc().toIso8601String(),
+      'p_request_type': requestType,
+    });
+    final row = Map<String, dynamic>.from(result as Map);
 
     final request = CurfewRequest.fromJson(row);
     final tenantName =
@@ -82,7 +74,7 @@ class CurfewService {
       tenantName: tenantName?.isNotEmpty == true ? tenantName! : 'A tenant',
       requestType: request.requestTypeLabel,
       curfewDate: request.departureTime.toString().split(' ').first,
-      requiresGuardianReview: request.isOvernightLeave,
+      requiresGuardianReview: request.isPendingGuardian,
     ));
     return request;
   }

@@ -44,7 +44,17 @@ class ContractDocumentService {
           'A printable contract already exists. Delete it before generating another.');
     }
     final version = await _nextVersion(contract.id);
-    final bytes = await buildPdfBytes(contract, version);
+    final roomNumber = await _assignedRoomNumber(contract.tenantId);
+    if (roomNumber == null) {
+      throw Exception(
+        'Assign the tenant to a room before generating the official lease.',
+      );
+    }
+    final bytes = await buildPdfBytes(
+      contract,
+      version,
+      roomNumber: roomNumber,
+    );
     final filename = '${contract.contractNumber}-v$version.pdf';
     final path = '${contract.id}/v$version/generated-'
         '${DateTime.now().toUtc().microsecondsSinceEpoch}.pdf';
@@ -156,6 +166,19 @@ class ContractDocumentService {
     return rows.isEmpty ? 1 : (rows.first['version'] as int) + 1;
   }
 
+  Future<String?> _assignedRoomNumber(String tenantId) async {
+    final row = await _client
+        .from('tenant_assignments')
+        .select('bed_spaces!inner(rooms!inner(room_number))')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'active')
+        .maybeSingle();
+    final bed = row?['bed_spaces'] as Map<String, dynamic>?;
+    final room = bed?['rooms'] as Map<String, dynamic>?;
+    final number = room?['room_number']?.toString().trim();
+    return number == null || number.isEmpty ? null : number;
+  }
+
   Future<void> _upload(String path, Uint8List bytes, String mimeType) async {
     await _client.storage.from(_bucket).uploadBinary(
           path,
@@ -194,7 +217,11 @@ class ContractDocumentService {
 
   /// Builds the printable document independently from storage registration.
   /// Public so PDF pagination can be regression-tested without Supabase.
-  Future<Uint8List> buildPdfBytes(TenantContract contract, int version) async {
+  Future<Uint8List> buildPdfBytes(
+    TenantContract contract,
+    int version, {
+    String? roomNumber,
+  }) async {
     final document = pw.Document(
       version: PdfVersion.pdf_1_5,
       title: '${contract.contractNumber} version $version',
@@ -249,6 +276,7 @@ class ContractDocumentService {
           _pdfRow('Lessor', OfficialLeaseContent.lessorName),
           _pdfRow('Dormitory address', OfficialLeaseContent.address),
           _pdfRow('Tenant name', contract.tenantName),
+          _pdfRow('Assigned room', roomNumber ?? 'Not assigned'),
           _pdfRow('Tenant profile ID', contract.tenantId),
         ]),
         _pdfSection('Agreement term', [

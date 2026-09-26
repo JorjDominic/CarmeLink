@@ -364,6 +364,12 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
           .maybeSingle(),
       const ContractOnboardingService().listRequirements(widget.contract.id),
       const ContractOnboardingService().listSigners(widget.contract.id),
+      SupabaseConfig.client
+          .from('tenant_details')
+          .select(
+              'emergency_contact_name, emergency_contact_phone, emergency_contact_relationship')
+          .eq('profile_id', tenantId)
+          .maybeSingle(),
     ]);
     final tenants = results[0] as List<TenantDirectoryEntry>;
     final links = results[1] as List<Map<String, dynamic>>;
@@ -371,12 +377,23 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
     final profile = results[3] as Map<String, dynamic>?;
     final requirements = results[4] as List<ContractRequirement>;
     final signers = results[5] as List<ContractSigner>;
+    final tenantDetails = results[6] as Map<String, dynamic>?;
+    final emergencyName =
+        tenantDetails?['emergency_contact_name']?.toString().trim() ?? '';
+    final emergencyPhone =
+        tenantDetails?['emergency_contact_phone']?.toString().trim() ?? '';
+    final emergencyRelationship =
+        tenantDetails?['emergency_contact_relationship']?.toString().trim() ??
+            '';
     final tenant = tenants.where((item) => item.id == tenantId).firstOrNull;
     return _OnboardingNeeds(
       needsBed: tenant?.assignmentId == null,
       needsGuardian: !links.any((link) => link['tenant_id'] == tenantId),
       invitationCompleted: invitations.any((inv) => inv.isCompleted),
       emailVerified: profile?['email_verified_at'] != null,
+      emergencyContactComplete: emergencyName.length >= 2 &&
+          emergencyPhone.length >= 7 &&
+          emergencyRelationship.length >= 2,
       requiredDocumentsVerified: requirements
           .where((item) => item.isRequired)
           .every((item) => item.isVerified),
@@ -659,7 +676,9 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
             FutureBuilder<_OnboardingNeeds>(
               future: _onboardingNeeds,
               builder: (context, snap) {
-                final completed = snap.data?.invitationCompleted ?? false;
+                final completed =
+                    (snap.data?.emergencyContactComplete ?? false) ||
+                        (snap.data?.invitationCompleted ?? false);
                 return OutlinedButton.icon(
                   onPressed: _working
                       ? null
@@ -673,10 +692,10 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
                         },
                   icon: Icon(completed
                       ? Icons.check_circle_outline_rounded
-                      : Icons.qr_code_2_rounded),
+                      : Icons.assignment_ind_outlined),
                   label: Text(completed
-                      ? 'Onboarding data submitted — view invitations'
-                      : 'Send QR invitation for data entry'),
+                      ? 'Tenant profile & emergency contact completed'
+                      : 'Tenant profile & emergency contact pending'),
                 );
               },
             ),
@@ -825,6 +844,7 @@ class _OnboardingNeeds {
     required this.needsGuardian,
     this.invitationCompleted = false,
     this.emailVerified = false,
+    this.emergencyContactComplete = false,
     this.requiredDocumentsVerified = false,
     this.requiredSignersVerified = false,
   });
@@ -833,6 +853,7 @@ class _OnboardingNeeds {
   final bool needsGuardian;
   final bool invitationCompleted;
   final bool emailVerified;
+  final bool emergencyContactComplete;
   final bool requiredDocumentsVerified;
   final bool requiredSignersVerified;
   bool get hasRemainingSteps => needsBed || needsGuardian;
@@ -870,6 +891,7 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
 
   bool get _canActivate =>
       widget.needs?.emailVerified == true &&
+      widget.needs?.emergencyContactComplete == true &&
       _hasVerifiedSignedDocument &&
       widget.needs?.requiredDocumentsVerified == true &&
       widget.needs?.requiredSignersVerified == true;
@@ -928,6 +950,11 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
             requiredForActivation: true,
           ),
           _ActivationRequirement(
+            complete: needs?.emergencyContactComplete == true,
+            label: 'Emergency contact name, phone, and relationship completed',
+            requiredForActivation: true,
+          ),
+          _ActivationRequirement(
             complete: _hasVerifiedSignedDocument,
             label: 'Latest signed contract verified',
             requiredForActivation: true,
@@ -979,8 +1006,9 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Room/bed, guardian, and QR onboarding are tracked as follow-up '
-            'steps until the client finalizes which ones must block activation.',
+            'Room/bed and guardian setup remain parallel residency tasks. '
+            'Overnight leave requests skip guardian review when no guardian is linked, '
+            'but still require staff approval.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

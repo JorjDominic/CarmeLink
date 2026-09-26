@@ -23,6 +23,7 @@ void main() {
     final bytes = await const ContractDocumentService().buildPdfBytes(
       contract,
       1,
+      roomNumber: '101',
     );
 
     expect(bytes, isNotEmpty);

@@ -2379,6 +2379,27 @@ both required channels are verified.
 
 ### Canonical tenant onboarding workflow
 
+For the thesis narrative, defense, and staff explanation, present onboarding as
+four resumable phases rather than one strict sequence:
+
+1. **Enroll:** create the account and Draft contract, verify email, and complete
+   the QR form with optional academic details and required emergency contact.
+2. **Verify paperwork:** documents, signers, and the latest signed contract all
+   repeat the same submit/upload → staff review → verify/reject pattern.
+3. **Set up residency in parallel:** room/bed assignment and guardian linking
+   are available after account creation and may proceed during phases 1 or 2.
+   Room assignment must precede official PDF generation because the client
+   lease prints the room number; the bed label is intentionally omitted.
+4. **Activate:** verified email, complete emergency contact, verified latest
+   signed contract, required documents, and required signers are hard gates;
+   activation then generates deposit and contract-date rent billing.
+
+Guardian linking is not an activation gate. An overnight-leave request uses
+guardian-first review when a link exists and otherwise routes directly to staff,
+preventing an unreachable `pending_guardian` state. Rent follows the contract
+schedule rather than a later physical move-in date. Occupancy reporting remains
+assignment-based, so financial obligation and physical occupancy stay distinct.
+
 > [!IMPORTANT]
 > This workflow is temporarily deferred pending the group web application. It
 > remains a release-critical requirement and the authoritative integration
