@@ -16,10 +16,12 @@ void main() {
         isTrue,
       );
       expect(shell.contains('_notificationsPage()'), isTrue);
-      expect(shell.contains('onOpenNotification: _openNotificationDestination'), isTrue);
+      expect(shell.contains('onOpenNotification: _openNotificationDestination'),
+          isTrue);
     });
 
-    test('device binding is clearly planned and cannot trigger a fake flow', () {
+    test('device binding is clearly planned and cannot trigger a fake flow',
+        () {
       final source =
           File('lib/views/shared/shared_views.dart').readAsStringSync();
       final settingsStart = source.indexOf('class SettingsPage');
@@ -34,7 +36,8 @@ void main() {
       expect(settings.contains('const DeviceBindingPage()'), isFalse);
     });
 
-    test('web staff navigation is simplified into residents and operations', () {
+    test('web staff navigation is simplified into residents and operations',
+        () {
       final source = File(
         'lib/web/dashboard/staff_web_portal_shell.dart',
       ).readAsStringSync();
@@ -43,10 +46,13 @@ void main() {
         expect(source.contains("label: '$label'"), isTrue);
       }
       expect(source.contains("label: 'Curfew'"), isFalse);
-      expect(source.contains('desktopTools(UserRole role) => const []'), isTrue);
+      expect(
+          source.contains('desktopTools(UserRole role) => const []'), isTrue);
     });
 
-    test('operations hub exposes the six approved groups without floor-plan duplication', () {
+    test(
+        'operations hub exposes the six approved groups without floor-plan duplication',
+        () {
       final source =
           File('lib/views/owner/owner_pages.dart').readAsStringSync();
 
@@ -95,14 +101,20 @@ void main() {
       expect(shell.contains("'staff-web-live-sync'"), isTrue);
       expect(shell.contains("'gate_events'"), isTrue);
       expect(shell.contains("'payments'"), isTrue);
-      expect(shell.contains('notificationPageBuilder: _notificationDestination'), isTrue);
+      expect(
+          shell.contains('notificationPageBuilder: _notificationDestination'),
+          isTrue);
       expect(adaptive.contains('streamMyNotifications(limit: 60)'), isTrue);
       expect(adaptive.contains('_UnreadCountBadge'), isTrue);
       expect(adaptive.contains("label: 'View'"), isTrue);
-      expect(adaptive.contains('onOpenNotification: _openNotificationDestination'), isTrue);
+      expect(
+          adaptive.contains('onOpenNotification: _openNotificationDestination'),
+          isTrue);
     });
 
-    test('web pages can use the workspace width and the pictured curfew page expands', () {
+    test(
+        'web pages can use the workspace width and the pictured curfew page expands',
+        () {
       final common =
           File('lib/core/widgets/common_widgets.dart').readAsStringSync();
       final owner = File('lib/views/owner/owner_pages.dart').readAsStringSync();
@@ -124,7 +136,8 @@ void main() {
       expect(tenant.contains("title: 'Maintenance issue'"), isTrue);
       expect(tenant.contains("title: 'Confidential concern'"), isTrue);
       expect(cleaning.contains("title: 'Missed cleaning duty'"), isTrue);
-      expect(cleaning.contains("label: const Text('Report privately')"), isTrue);
+      expect(
+          cleaning.contains("label: const Text('Report privately')"), isTrue);
     });
 
     test('payment history uses a ten-record load-more contract', () {
@@ -139,7 +152,8 @@ void main() {
       expect(source.contains("endLabel: 'End of payment records'"), isTrue);
     });
 
-    test('web metadata uses CarmeLink branding rather than Flutter defaults', () {
+    test('web metadata uses CarmeLink branding rather than Flutter defaults',
+        () {
       final index = File('web/index.html').readAsStringSync();
       final manifest = File('web/manifest.json').readAsStringSync();
 
@@ -155,7 +169,8 @@ void main() {
 
       expect(source.contains("title: 'Feedback preview'"), isTrue);
       expect(source.contains('sent or stored until the backend'), isTrue);
-      expect(source.contains('transmitted or stored until backend support'), isTrue);
+      expect(source.contains('transmitted or stored until backend support'),
+          isTrue);
     });
 
     test('readiness script permits the active web branch', () {

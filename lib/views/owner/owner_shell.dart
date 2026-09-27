@@ -71,16 +71,16 @@ class _OwnerShellState extends State<OwnerShell> {
       _refreshAgain = false;
       _refreshInFlight = true;
       try {
-      final controller = OwnerController.instance;
-      await controller.loadRooms(force: true);
-      await controller.loadPayments(force: true);
-      await controller.loadCurfewRequests(force: true);
-      await controller.loadStaffMaintenance(force: true);
-      await controller.loadContracts(force: true);
-      await controller.loadTenants(force: true);
-      await controller.loadGateEvents(force: true);
-      await controller.loadVisitors(force: true);
-      await controller.loadConcerns(force: true);
+        final controller = OwnerController.instance;
+        await controller.loadRooms(force: true);
+        await controller.loadPayments(force: true);
+        await controller.loadCurfewRequests(force: true);
+        await controller.loadStaffMaintenance(force: true);
+        await controller.loadContracts(force: true);
+        await controller.loadTenants(force: true);
+        await controller.loadGateEvents(force: true);
+        await controller.loadVisitors(force: true);
+        await controller.loadConcerns(force: true);
       } finally {
         _refreshInFlight = false;
       }

@@ -62,14 +62,14 @@ class _TenantShellState extends State<TenantShell> {
       _refreshAgain = false;
       _refreshInFlight = true;
       try {
-      final controller = TenantController.instance;
-      await controller.loadMaintenance(force: true);
-      await controller.loadMyRoom(force: true);
-      await controller.loadCurfewRequests(force: true);
-      await controller.loadPayments(force: true);
-      await controller.loadGateEvents(force: true);
-      await controller.loadVisitors(force: true);
-      await controller.loadConcerns(force: true);
+        final controller = TenantController.instance;
+        await controller.loadMaintenance(force: true);
+        await controller.loadMyRoom(force: true);
+        await controller.loadCurfewRequests(force: true);
+        await controller.loadPayments(force: true);
+        await controller.loadGateEvents(force: true);
+        await controller.loadVisitors(force: true);
+        await controller.loadConcerns(force: true);
       } finally {
         _refreshInFlight = false;
       }
@@ -93,7 +93,10 @@ class _TenantShellState extends State<TenantShell> {
       'payment' => const PaymentsPage(),
       'maintenance' => const MaintenanceReportsPage(),
       'visitor' => const VisitorRequestPage(),
-      'curfew' || 'gate' || 'gate_event' || 'safety' =>
+      'curfew' ||
+      'gate' ||
+      'gate_event' ||
+      'safety' =>
         const TenantPresencePage(),
       'announcement' => const TenantAnnouncementsPage(),
       _ => null,

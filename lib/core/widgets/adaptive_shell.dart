@@ -174,8 +174,8 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     try {
       // Seed first so existing unread history never appears as a burst of
       // "new" popups when the staff portal opens.
-      final initial = await AppNotificationService.instance
-          .fetchMyNotifications(limit: 60);
+      final initial =
+          await AppNotificationService.instance.fetchMyNotifications(limit: 60);
       if (!mounted) return;
       _onNotificationSnapshot(initial);
 

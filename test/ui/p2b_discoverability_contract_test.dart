@@ -40,12 +40,13 @@ void main() {
       expect(source.contains('VisitorManagementPage()'), isTrue);
     });
 
-    test('web staff sidebar stays simplified while Operations exposes staff tools', () {
+    test(
+        'web staff sidebar stays simplified while Operations exposes staff tools',
+        () {
       final shell = File(
         'lib/web/dashboard/staff_web_portal_shell.dart',
       ).readAsStringSync();
-      final owner =
-          File('lib/views/owner/owner_pages.dart').readAsStringSync();
+      final owner = File('lib/views/owner/owner_pages.dart').readAsStringSync();
 
       expect(shell.contains("label: 'Residents'"), isTrue);
       expect(shell.contains("label: 'Operations'"), isTrue);
