@@ -4949,7 +4949,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                   const MetricCard(
                     label: 'Official gate',
                     value: 'Point 1 → 2',
-                    detail: '15 m corridor on polygon edge',
+                    detail: '3.75 m tolerance on centered gate segment',
                     icon: Icons.door_front_door_outlined,
                   ),
                 ],
@@ -5953,7 +5953,7 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
   final _p3LngCtrl = TextEditingController();
   final _p4LatCtrl = TextEditingController();
   final _p4LngCtrl = TextEditingController();
-  final _gateToleranceCtrl = TextEditingController(text: '15.0');
+  final _gateToleranceCtrl = TextEditingController(text: '3.75');
 
   String _mode = 'polygon';
   bool _gateEnabled = true;
@@ -6014,7 +6014,7 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
             GeofenceLocationService.debounceBufferMeters.toStringAsFixed(1);
         _mode = 'polygon';
         _gateEnabled = true;
-        _gateToleranceCtrl.text = '15.0';
+        _gateToleranceCtrl.text = '3.75';
         _populatePolygonCorners(
             GeofenceLocationService.productionDormitoryPolygon);
       }
@@ -6029,7 +6029,7 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
       _bufferCtrl.text =
           GeofenceLocationService.debounceBufferMeters.toStringAsFixed(1);
       _gateEnabled = true;
-      _gateToleranceCtrl.text = '15.0';
+      _gateToleranceCtrl.text = '3.75';
       _populatePolygonCorners(
           GeofenceLocationService.productionDormitoryPolygon);
     } finally {
@@ -6203,14 +6203,11 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
       final effectivePolygon =
           newPolygon ?? _current?.polygonPoints ?? const <LatLngPoint>[];
       final gateEnabled = _gateEnabled && _mode == 'polygon';
+      final gateSegment = centeredGateSegment(effectivePolygon);
       await _service.updateGateConfig(
         enabled: gateEnabled,
-        start: gateEnabled && effectivePolygon.length >= 2
-            ? effectivePolygon[0]
-            : null,
-        end: gateEnabled && effectivePolygon.length >= 2
-            ? effectivePolygon[1]
-            : null,
+        start: gateEnabled && gateSegment.length == 2 ? gateSegment[0] : null,
+        end: gateEnabled && gateSegment.length == 2 ? gateSegment[1] : null,
         toleranceMeters: gateTolerance,
       );
 
@@ -6519,7 +6516,7 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                               subtitle: const Text(
-                                'Uses the full boundary edge from Point 1 to Point 2.',
+                                'Uses the centered 25% of the Point 1 to Point 2 edge.',
                               ),
                             ),
                             if (_gateEnabled) ...[

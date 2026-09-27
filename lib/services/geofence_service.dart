@@ -41,6 +41,32 @@ class LatLngPoint {
   int get hashCode => Object.hash(latitude, longitude);
 }
 
+/// Returns a centered portion of the Point 1 to Point 2 gate edge.
+///
+/// A [scale] of 0.25 keeps the middle 25% of the edge, reducing its length by
+/// 75% while preserving the original center and orientation.
+List<LatLngPoint> centeredGateSegment(
+  List<LatLngPoint> polygon, {
+  double scale = 0.25,
+}) {
+  if (polygon.length < 2) return const <LatLngPoint>[];
+  final clampedScale = scale.clamp(0.0, 1.0);
+  final startFraction = (1 - clampedScale) / 2;
+  final endFraction = 1 - startFraction;
+  final start = polygon[0];
+  final end = polygon[1];
+
+  LatLngPoint interpolate(double fraction) => LatLngPoint(
+        start.latitude + (end.latitude - start.latitude) * fraction,
+        start.longitude + (end.longitude - start.longitude) * fraction,
+      );
+
+  return <LatLngPoint>[
+    interpolate(startFraction),
+    interpolate(endFraction),
+  ];
+}
+
 enum GeofenceFailureReason {
   none,
   permissionDenied,

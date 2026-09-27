@@ -2167,7 +2167,9 @@ class _ActualGeofenceMap extends StatelessWidget {
       GeofenceLocationService.activeCenterLatitude,
       GeofenceLocationService.activeCenterLongitude,
     );
-    final gate = points.length >= 2 ? points.take(2).toList() : <LatLng>[];
+    final gate = centeredGateSegment(GeofenceLocationService.activePolygon)
+        .map((point) => LatLng(point.latitude, point.longitude))
+        .toList(growable: false);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
@@ -2221,7 +2223,7 @@ class _ActualGeofenceMap extends StatelessWidget {
                 Polyline(
                   points: gate,
                   color: const Color(0xFFC77800).withValues(alpha: .22),
-                  strokeWidth: 30,
+                  strokeWidth: 7.5,
                   useStrokeWidthInMeter: true,
                 ),
                 Polyline(

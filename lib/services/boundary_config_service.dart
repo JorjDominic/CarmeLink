@@ -84,7 +84,7 @@ class BoundaryConfigService {
     required bool enabled,
     LatLngPoint? start,
     LatLngPoint? end,
-    double toleranceMeters = 15,
+    double toleranceMeters = 3.75,
   }) async {
     if (enabled && (start == null || end == null)) {
       throw ArgumentError('Both gate endpoints are required when enabled.');
@@ -141,7 +141,7 @@ class BoundaryConfigService {
                 )
               : null,
       gateToleranceMeters:
-          (row['gate_tolerance_meters'] as num?)?.toDouble() ?? 15,
+          (row['gate_tolerance_meters'] as num?)?.toDouble() ?? 3.75,
       configVersion: (row['config_version'] as num?)?.toInt() ?? 1,
       updatedAt: row['updated_at'] == null
           ? null

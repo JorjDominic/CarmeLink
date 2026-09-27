@@ -259,6 +259,18 @@ void main() {
   });
 
   group('Official Gate Configuration', () {
+    test('75 percent reduction keeps the gate segment centered', () {
+      final segment = centeredGateSegment(const [
+        LatLngPoint(0, 0),
+        LatLngPoint(4, 8),
+      ]);
+
+      expect(segment, const [
+        LatLngPoint(1.5, 3),
+        LatLngPoint(2.5, 5),
+      ]);
+    });
+
     test('parses an enabled gate corridor from the boundary row', () {
       final snapshot = BoundaryConfigService.configFromRow({
         'gate_enabled': true,
