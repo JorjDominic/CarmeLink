@@ -12,6 +12,7 @@ import '../../services/contract_onboarding_service.dart';
 import '../../services/guardian_link_service.dart';
 import '../../services/tenant_service.dart';
 import 'contract_onboarding_checklist_page.dart';
+import 'onboarding_invitation_page.dart';
 import 'tenant_onboarding_flow.dart';
 import 'rent_adjustment_dialog.dart';
 
@@ -647,6 +648,18 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
               icon: const Icon(Icons.fact_check_outlined),
               label: const Text('Required documents & signers'),
             ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _working
+                  ? null
+                  : () => showOnboardingInvitations(
+                        context,
+                        tenantId: widget.contract.tenantId,
+                        tenantName: widget.contract.tenantName,
+                      ),
+              icon: const Icon(Icons.qr_code_2_outlined),
+              label: const Text('Tenant profile & onboarding QR'),
+            ),
             // Activate contract — only shown for draft contracts
             if (widget.contract.status == 'draft') ...[
               const SizedBox(height: 10),
@@ -670,9 +683,6 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
             FutureBuilder<_OnboardingNeeds>(
               future: _onboardingNeeds,
               builder: (context, onboardingSnapshot) {
-                if (onboardingSnapshot.data?.requiredSignersVerified != true) {
-                  return const SizedBox.shrink();
-                }
                 final needs = onboardingSnapshot.data;
                 if (needs != null && !needs.hasRemainingSteps) {
                   return const SizedBox.shrink();

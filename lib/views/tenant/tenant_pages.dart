@@ -51,9 +51,11 @@ class TenantDashboardPage extends StatelessWidget {
           final firstName =
               session.currentUser?.name.trim().split(' ').first ?? 'Resident';
 
+          final nonDepositPayments =
+              controller.payments.where((p) => !p.isDeposit).toList();
           final nextDue = controller.nextDuePayment ??
-              (controller.payments.isNotEmpty
-                  ? controller.payments.first
+              (nonDepositPayments.isNotEmpty
+                  ? nonDepositPayments.first
                   : null);
           final outstanding = controller.outstandingBalance;
           final maintenance = controller.maintenance.isEmpty
@@ -1667,7 +1669,7 @@ class TenantBillingDetailsPage extends StatelessWidget {
               .where((p) => !p.isRent && !p.isUtility && !p.isDeposit)
               .fold<double>(0, (sum, p) => sum + p.outstandingAmount);
           final nextDue = openBills
-              .where((p) => p.isDue || p.isUpcoming)
+              .where((p) => !p.isDeposit && (p.isDue || p.isUpcoming))
               .toList()
             ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
@@ -2055,34 +2057,59 @@ class _TenantPaymentCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Flexible(
-                    child: payment.isOverdue
+                    child: payment.isDeposit
                         ? Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.red.shade50,
+                              color: const Color(0xFF627FA8)
+                                  .withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.red.shade300),
                             ),
                             child: Text(
-                              'Overdue • Due ${shortDate(payment.dueDate)}',
+                              payment.isVerified
+                                  ? 'Deposit held on account'
+                                  : 'Refundable security deposit',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.red.shade800,
+                                color: Color(0xFF2C4A6F),
                               ),
                             ),
                           )
-                        : Text(
-                            'Due ${shortDate(payment.dueDate)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                        : payment.isOverdue
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border:
+                                      Border.all(color: Colors.red.shade300),
+                                ),
+                                child: Text(
+                                  'Overdue • Due ${shortDate(payment.dueDate)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.red.shade800,
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                'Due ${shortDate(payment.dueDate)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
                   ),
                 ],
               ),

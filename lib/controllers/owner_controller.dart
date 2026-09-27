@@ -198,7 +198,7 @@ class OwnerController extends ChangeNotifier {
       payments.where((payment) => payment.isPending).length;
 
   int get overduePaymentCount =>
-      payments.where((payment) => payment.isOverdue).length;
+      payments.where((payment) => !payment.isDeposit && payment.isOverdue).length;
 
   double get totalCollectedRevenue => payments
       .where((payment) => payment.isVerified && !payment.isDeposit)
@@ -280,11 +280,16 @@ class OwnerController extends ChangeNotifier {
       }
 
       final overduePayments = _payments
-          .where((p) => p.isOverdue && !p.isVerified && !p.isVoided)
+          .where((p) =>
+              !p.isDeposit && p.isOverdue && !p.isVerified && !p.isVoided)
           .toList();
       final dueTodayPayments = _payments
           .where((p) =>
-              p.isDueNow && !p.isOverdue && !p.isVerified && !p.isVoided)
+              !p.isDeposit &&
+              p.isDueNow &&
+              !p.isOverdue &&
+              !p.isVerified &&
+              !p.isVoided)
           .toList();
 
       final totalCount = overduePayments.length + dueTodayPayments.length;

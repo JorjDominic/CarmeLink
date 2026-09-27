@@ -1,6 +1,7 @@
 import Flutter
 import CoreLocation
 import UIKit
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -51,7 +52,11 @@ import UIKit
         gateEndLatitude: args["gateEndLatitude"] as? Double,
         gateEndLongitude: args["gateEndLongitude"] as? Double,
         gateTolerance: args["gateToleranceMeters"] as? Double ?? 15,
-        configVersion: args["configVersion"] as? Int ?? 1
+        configVersion: args["configVersion"] as? Int ?? 1,
+        accessToken: args["accessToken"] as? String ?? "",
+        refreshToken: args["refreshToken"] as? String ?? "",
+        supabaseURL: args["supabaseUrl"] as? String ?? "",
+        publishableKey: args["publishableKey"] as? String ?? ""
       )
       result(true)
     case "unregister":
@@ -86,8 +91,13 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   private let gateRegionIdentifier = "carmelita_official_gate"
   private let queueKey = "tripwire_pending_events"
   private let registeredKey = "tripwire_registered"
+  private let queuedDirectionKey = "tripwire_queued_direction"
+  private let confirmedDirectionKey = "tripwire_confirmed_direction"
   private var burstTimeout: DispatchWorkItem?
   private var burstActive = false
+  private var syncing = false
+  private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+  private var burstBackgroundTask: UIBackgroundTaskIdentifier = .invalid
 
   private override init() {
     super.init()
@@ -110,12 +120,17 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     gateEndLatitude: Double?,
     gateEndLongitude: Double?,
     gateTolerance: Double,
-    configVersion: Int
+    configVersion: Int,
+    accessToken: String,
+    refreshToken: String,
+    supabaseURL: String,
+    publishableKey: String
   ) {
     let previousTenant = defaults.string(forKey: "tripwire_tenant_id")
     if previousTenant != tenantId {
       defaults.removeObject(forKey: queueKey)
-      defaults.removeObject(forKey: "tripwire_confirmed_direction")
+      defaults.removeObject(forKey: confirmedDirectionKey)
+      defaults.removeObject(forKey: queuedDirectionKey)
     }
     defaults.set(tenantId, forKey: "tripwire_tenant_id")
     defaults.set(latitude, forKey: "tripwire_latitude")
@@ -127,30 +142,44 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     defaults.set(gateEnabled, forKey: "tripwire_gate_enabled")
     defaults.set(gateTolerance, forKey: "tripwire_gate_tolerance")
     defaults.set(configVersion, forKey: "tripwire_config_version")
+    defaults.set(accessToken, forKey: "tripwire_access_token")
+    defaults.set(refreshToken, forKey: "tripwire_refresh_token")
+    defaults.set(supabaseURL, forKey: "tripwire_supabase_url")
+    defaults.set(publishableKey, forKey: "tripwire_publishable_key")
     if let value = gateStartLatitude { defaults.set(value, forKey: "tripwire_gate_start_lat") }
     if let value = gateStartLongitude { defaults.set(value, forKey: "tripwire_gate_start_lng") }
     if let value = gateEndLatitude { defaults.set(value, forKey: "tripwire_gate_end_lat") }
     if let value = gateEndLongitude { defaults.set(value, forKey: "tripwire_gate_end_lng") }
     if initialDirection == "IN" || initialDirection == "OUT" {
-      defaults.set(initialDirection, forKey: "tripwire_confirmed_direction")
+      defaults.set(initialDirection, forKey: confirmedDirectionKey)
     }
 
-    // Flutter owns the user-facing permission flow. Starting native region
-    // monitoring before iOS finishes the Always-authorization upgrade can
-    // produce failures immediately after the permission sheet closes.
-    if manager.authorizationStatus == .authorizedAlways {
+    // Start monitoring if authorized for Always OR When In Use.
+    // When In Use will still receive region callbacks while active/suspended,
+    // and requesting Always authorization prompts the user to upgrade to full background.
+    let status = manager.authorizationStatus
+    if status == .authorizedAlways || status == .authorizedWhenInUse {
       startMonitoring(latitude: latitude, longitude: longitude, radius: radius)
     }
+    if status == .authorizedWhenInUse {
+      manager.requestAlwaysAuthorization()
+    }
+    syncPendingEvents()
   }
 
   func restoreIfNeeded() {
-    guard defaults.bool(forKey: registeredKey),
-          manager.authorizationStatus == .authorizedAlways else { return }
+    guard defaults.bool(forKey: registeredKey) else { return }
+    let status = manager.authorizationStatus
+    guard status == .authorizedAlways || status == .authorizedWhenInUse else { return }
     startMonitoring(
       latitude: defaults.double(forKey: "tripwire_latitude"),
       longitude: defaults.double(forKey: "tripwire_longitude"),
       radius: defaults.double(forKey: "tripwire_radius")
     )
+    if status == .authorizedWhenInUse {
+      manager.requestAlwaysAuthorization()
+    }
+    syncPendingEvents()
   }
 
   private func startMonitoring(latitude: Double, longitude: Double, radius: Double) {
@@ -158,7 +187,9 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     for region in manager.monitoredRegions where region.identifier == regionIdentifier || region.identifier == gateRegionIdentifier {
       manager.stopMonitoring(for: region)
     }
-    let effectiveRadius = min(max(radius, 25), manager.maximumRegionMonitoringDistance)
+    // Region monitoring is only a low-power wake-up hint. Use the same
+    // reliable minimum as Android; the precise polygon remains authoritative.
+    let effectiveRadius = min(max(radius, 100), manager.maximumRegionMonitoringDistance)
     let region = CLCircularRegion(
       center: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
       radius: effectiveRadius,
@@ -184,7 +215,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     manager.startMonitoringSignificantLocationChanges()
     manager.requestLocation()
 
-    if defaults.string(forKey: "tripwire_confirmed_direction") == nil {
+    if defaults.string(forKey: confirmedDirectionKey) == nil {
       manager.requestState(for: region)
     }
   }
@@ -198,6 +229,9 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     for key in [
       queueKey, registeredKey, "tripwire_tenant_id", "tripwire_latitude",
       "tripwire_longitude", "tripwire_radius", "tripwire_confirmed_direction",
+      queuedDirectionKey, "tripwire_access_token", "tripwire_refresh_token",
+      "tripwire_supabase_url", "tripwire_publishable_key", "tripwire_last_sync_error",
+      "tripwire_last_notification_error", "tripwire_last_synced_at",
     ] {
       defaults.removeObject(forKey: key)
     }
@@ -220,12 +254,13 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   ) {
     guard
       region.identifier == regionIdentifier,
-      defaults.string(forKey: "tripwire_confirmed_direction") == nil
+      defaults.string(forKey: confirmedDirectionKey) == nil &&
+        defaults.string(forKey: queuedDirectionKey) == nil
     else { return }
     if state == .inside {
-      defaults.set("IN", forKey: "tripwire_confirmed_direction")
+      defaults.set("IN", forKey: confirmedDirectionKey)
     } else if state == .outside {
-      defaults.set("OUT", forKey: "tripwire_confirmed_direction")
+      defaults.set("OUT", forKey: confirmedDirectionKey)
     }
   }
 
@@ -245,13 +280,13 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     defaults.set(location.coordinate.latitude, forKey: "tripwire_last_lat")
     defaults.set(location.coordinate.longitude, forKey: "tripwire_last_lng")
     defaults.set(location.timestamp.timeIntervalSince1970, forKey: "tripwire_last_at")
-    if defaults.string(forKey: "tripwire_confirmed_direction") == nil {
+    if effectiveDirection() == nil {
       // The first significant-location callback establishes state; it is not
       // evidence that a crossing occurred after monitoring began.
-      defaults.set(direction, forKey: "tripwire_confirmed_direction")
+      defaults.set(direction, forKey: confirmedDirectionKey)
       return
     }
-    let previousDirection = defaults.string(forKey: "tripwire_confirmed_direction")
+    let previousDirection = effectiveDirection()
     // When gate line is enabled, additionally require the movement path to
     // cross the gate segment. Without a gate line, polygon evaluation alone
     // is sufficient to confirm a crossing.
@@ -270,6 +305,15 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     // evaluation, regardless of whether the virtual gate line is configured.
     burstTimeout?.cancel()
     burstActive = true
+
+    if burstBackgroundTask != .invalid {
+      UIApplication.shared.endBackgroundTask(burstBackgroundTask)
+      burstBackgroundTask = .invalid
+    }
+    burstBackgroundTask = UIApplication.shared.beginBackgroundTask(withName: "CarmeLinkLocationBurst") { [weak self] in
+      self?.stopLocationBurst()
+    }
+
     manager.desiredAccuracy = kCLLocationAccuracyBest
     manager.distanceFilter = 3
     manager.startUpdatingLocation()
@@ -285,6 +329,10 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     if burstActive { manager.stopUpdatingLocation() }
     burstActive = false
     manager.distanceFilter = kCLDistanceFilterNone
+    if burstBackgroundTask != .invalid {
+      UIApplication.shared.endBackgroundTask(burstBackgroundTask)
+      burstBackgroundTask = .invalid
+    }
   }
 
   // ─── Geometry helpers ─────────────────────────────────────────────────────
@@ -322,7 +370,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     }.min() ?? .greatestFiniteMagnitude
     // Hysteresis: if we're within the edge buffer, keep the last known direction.
     if edgeDistance <= defaults.double(forKey: "tripwire_edge_buffer"),
-       let previous = defaults.string(forKey: "tripwire_confirmed_direction") { return previous }
+       let previous = effectiveDirection() { return previous }
     return inside ? "IN" : "OUT"
   }
 
@@ -375,10 +423,18 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   // ─── CLLocationManagerDelegate — auth & errors ────────────────────────────
 
   func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-    if manager.authorizationStatus == .authorizedAlways {
+    let status = manager.authorizationStatus
+    if status == .authorizedAlways || status == .authorizedWhenInUse {
       restoreIfNeeded()
-    } else if manager.authorizationStatus == .denied ||
-                manager.authorizationStatus == .restricted {
+    } else if status == .denied || status == .restricted {
+      stopLocationBurst()
+    }
+  }
+
+  func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+    if status == .authorizedAlways || status == .authorizedWhenInUse {
+      restoreIfNeeded()
+    } else if status == .denied || status == .restricted {
       stopLocationBurst()
     }
   }
@@ -406,7 +462,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
 
   private func append(direction: String) {
     guard let tenantId = defaults.string(forKey: "tripwire_tenant_id") else { return }
-    let previous = defaults.string(forKey: "tripwire_confirmed_direction")
+    let previous = effectiveDirection()
     guard previous != direction else { return }
     var events = pendingEventsRaw()
     events.append([
@@ -418,11 +474,208 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     ])
     if events.count > 24 { events = Array(events.suffix(24)) }
     defaults.set(events, forKey: queueKey)
-    defaults.set(direction, forKey: "tripwire_confirmed_direction")
+    defaults.set(direction, forKey: queuedDirectionKey)
+    showCrossingNotification(direction: direction)
+    syncPendingEvents()
+  }
+
+  private func showCrossingNotification(direction: String) {
+    let center = UNUserNotificationCenter.current()
+    let content = UNMutableNotificationContent()
+    let isEntry = direction == "IN"
+    content.title = isEntry ? "🏠 Entered dormitory" : "🚪 Left dormitory"
+    content.body = isEntry ? "Your entry was detected. Welcome home!" : "Your departure was detected. Stay safe!"
+    content.sound = .default
+    content.userInfo = ["route_type": "gate", "direction": direction]
+
+    let request = UNNotificationRequest(
+      identifier: isEntry ? "carmelink_entry" : "carmelink_exit",
+      content: content,
+      trigger: nil
+    )
+    center.add(request, withCompletionHandler: nil)
   }
 
   private func pendingEventsRaw() -> [[String: Any]] {
     defaults.array(forKey: queueKey) as? [[String: Any]] ?? []
+  }
+
+  private func effectiveDirection() -> String? {
+    defaults.string(forKey: queuedDirectionKey) ??
+      defaults.string(forKey: confirmedDirectionKey)
+  }
+
+  private func persist(events: [[String: Any]]) {
+    defaults.set(events, forKey: queueKey)
+    if let direction = events.last?["direction"] as? String {
+      defaults.set(direction, forKey: queuedDirectionKey)
+    } else {
+      defaults.removeObject(forKey: queuedDirectionKey)
+    }
+  }
+
+  /// Uploads queued crossings while iOS keeps the app alive after a region
+  /// callback. Flutter also drains the same idempotent queue on next resume.
+  private func syncPendingEvents() {
+    DispatchQueue.main.async { [weak self] in self?.beginSyncIfNeeded() }
+  }
+
+  private func beginSyncIfNeeded() {
+    guard !syncing, !pendingEvents().isEmpty else { return }
+    guard
+      !(defaults.string(forKey: "tripwire_supabase_url") ?? "").isEmpty,
+      !(defaults.string(forKey: "tripwire_publishable_key") ?? "").isEmpty,
+      !(defaults.string(forKey: "tripwire_access_token") ?? "").isEmpty
+    else { return }
+    syncing = true
+    backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "CarmeLinkTripwireSync") { [weak self] in
+      self?.finishSync()
+    }
+    uploadNextEvent()
+  }
+
+  private func uploadNextEvent() {
+    let events = pendingEvents()
+    guard let event = events.first else {
+      persist(events: [])
+      finishSync()
+      return
+    }
+    upload(event: event, allowTokenRefresh: true)
+  }
+
+  private func upload(event: [String: Any], allowTokenRefresh: Bool) {
+    guard
+      let direction = event["direction"] as? String,
+      let eventId = event["event_id"] as? String,
+      let observedAt = event["observed_at"] as? Int
+    else {
+      persist(events: pendingEventsRaw().filter { ($0["event_id"] as? String) != (event["event_id"] as? String) })
+      uploadNextEvent()
+      return
+    }
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    let body: [String: Any] = [
+      "p_direction": direction,
+      "p_observed_at": formatter.string(from: Date(timeIntervalSince1970: Double(observedAt) / 1000)),
+      "p_client_event_id": eventId,
+    ]
+    post(path: "/rest/v1/rpc/record_tenant_geofence_transition", body: body) { [weak self] code, data, error in
+      guard let self else { return }
+      if code == 401 && allowTokenRefresh {
+        self.refreshSession { refreshed in
+          if refreshed { self.upload(event: event, allowTokenRefresh: false) }
+          else { self.failSync("Authentication refresh failed while syncing gate event.") }
+        }
+        return
+      }
+      guard error == nil, (200...299).contains(code) else {
+        let details = data.flatMap { String(data: $0, encoding: .utf8) } ?? error?.localizedDescription ?? "Unknown error"
+        self.failSync("Gate event sync failed (\(code)): \(details.prefix(500))")
+        return
+      }
+
+      self.defaults.set(direction, forKey: self.confirmedDirectionKey)
+      self.defaults.set(Date().timeIntervalSince1970 * 1000, forKey: "tripwire_last_synced_at")
+      self.defaults.removeObject(forKey: "tripwire_last_sync_error")
+      self.persist(events: self.pendingEventsRaw().filter { ($0["event_id"] as? String) != eventId })
+
+      let responseText = data.flatMap { String(data: $0, encoding: .utf8) }
+      let storedEventId = responseText?.trimmingCharacters(
+        in: CharacterSet(charactersIn: "\"\n\r ")
+      )
+      if let storedEventId, !storedEventId.isEmpty {
+        self.post(
+          path: "/functions/v1/notify-geofence",
+          body: ["event_id": storedEventId]
+        ) { code, data, error in
+          if error != nil || !(200...299).contains(code) {
+            let details = data.flatMap { String(data: $0, encoding: .utf8) } ??
+              error?.localizedDescription ?? "Unknown error"
+            self.defaults.set(
+              "Notification delivery failed (\(code)): \(details.prefix(300))",
+              forKey: "tripwire_last_notification_error"
+            )
+          } else {
+            self.defaults.removeObject(forKey: "tripwire_last_notification_error")
+          }
+          self.uploadNextEvent()
+        }
+      } else {
+        self.uploadNextEvent()
+      }
+    }
+  }
+
+  private func refreshSession(completion: @escaping (Bool) -> Void) {
+    guard let refreshToken = defaults.string(forKey: "tripwire_refresh_token"), !refreshToken.isEmpty else {
+      completion(false)
+      return
+    }
+    post(
+      path: "/auth/v1/token?grant_type=refresh_token",
+      body: ["refresh_token": refreshToken],
+      includeAuthorization: false
+    ) { [weak self] code, data, _ in
+      guard let self, (200...299).contains(code), let data,
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let access = json["access_token"] as? String, !access.isEmpty else {
+        completion(false)
+        return
+      }
+      self.defaults.set(access, forKey: "tripwire_access_token")
+      if let refresh = json["refresh_token"] as? String, !refresh.isEmpty {
+        self.defaults.set(refresh, forKey: "tripwire_refresh_token")
+      }
+      completion(true)
+    }
+  }
+
+  private func post(
+    path: String,
+    body: [String: Any],
+    includeAuthorization: Bool = true,
+    completion: @escaping (Int, Data?, Error?) -> Void
+  ) {
+    guard
+      let base = defaults.string(forKey: "tripwire_supabase_url"),
+      let url = URL(string: base + path),
+      let apiKey = defaults.string(forKey: "tripwire_publishable_key"),
+      let payload = try? JSONSerialization.data(withJSONObject: body)
+    else {
+      completion(0, nil, NSError(domain: "CarmeLinkTripwire", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid sync configuration."]))
+      return
+    }
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.httpBody = payload
+    request.timeoutInterval = 15
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.setValue(apiKey, forHTTPHeaderField: "apikey")
+    if includeAuthorization, let token = defaults.string(forKey: "tripwire_access_token") {
+      request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    }
+    URLSession.shared.dataTask(with: request) { data, response, error in
+      completion((response as? HTTPURLResponse)?.statusCode ?? 0, data, error)
+    }.resume()
+  }
+
+  private func failSync(_ message: String) {
+    defaults.set(message, forKey: "tripwire_last_sync_error")
+    finishSync()
+  }
+
+  private func finishSync() {
+    guard Thread.isMainThread else {
+      DispatchQueue.main.async { [weak self] in self?.finishSync() }
+      return
+    }
+    syncing = false
+    if backgroundTask != .invalid {
+      UIApplication.shared.endBackgroundTask(backgroundTask)
+      backgroundTask = .invalid
+    }
   }
 
   func pendingEvents() -> [[String: Any]] {
@@ -431,10 +684,13 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   }
 
   func acknowledge(eventId: String) {
-    defaults.set(
-      pendingEventsRaw().filter { ($0["event_id"] as? String) != eventId },
-      forKey: queueKey
-    )
+    let events = pendingEventsRaw()
+    let acknowledged = events.first { ($0["event_id"] as? String) == eventId }
+    let remaining = events.filter { ($0["event_id"] as? String) != eventId }
+    if let direction = acknowledged?["direction"] as? String {
+      defaults.set(direction, forKey: confirmedDirectionKey)
+    }
+    persist(events: remaining)
   }
 
   func status() -> [String: Any] {
@@ -442,8 +698,12 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       "registered": defaults.bool(forKey: registeredKey),
       "gateEnabled": defaults.bool(forKey: "tripwire_gate_enabled"),
       "configVersion": defaults.integer(forKey: "tripwire_config_version"),
-      "direction": defaults.string(forKey: "tripwire_confirmed_direction") as Any,
+      "direction": defaults.string(forKey: confirmedDirectionKey) ?? NSNull(),
+      "pendingDirection": defaults.string(forKey: queuedDirectionKey) ?? NSNull(),
       "pendingCount": pendingEvents().count,
+      "lastSyncError": defaults.string(forKey: "tripwire_last_sync_error") ?? NSNull(),
+      "lastNotificationError": defaults.string(forKey: "tripwire_last_notification_error") ?? NSNull(),
+      "lastSyncedAt": defaults.object(forKey: "tripwire_last_synced_at") ?? NSNull(),
       "authorization": manager.authorizationStatus.rawValue,
     ]
   }

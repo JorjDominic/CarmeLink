@@ -108,18 +108,21 @@ class TenantController extends ChangeNotifier {
       .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
 
   Payment? get nextDuePayment {
-    final due = payments.where((p) => p.isDue || p.isUpcoming).toList()
+    final due = payments
+        .where((p) => !p.isDeposit && (p.isDue || p.isUpcoming))
+        .toList()
       ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
     return due.isNotEmpty ? due.first : null;
   }
 
-  List<Payment> get duePayments => payments.where((p) => p.isDue).toList();
+  List<Payment> get duePayments =>
+      payments.where((p) => !p.isDeposit && p.isDue).toList();
   List<Payment> get pendingPayments =>
       payments.where((p) => p.isPending).toList();
   List<Payment> get verifiedPayments =>
       payments.where((p) => p.isVerified).toList();
   List<Payment> get overduePayments =>
-      payments.where((p) => p.isOverdue).toList();
+      payments.where((p) => !p.isDeposit && p.isOverdue).toList();
 
   List<MaintenanceReport> get maintenance => List.unmodifiable(_maintenance);
 

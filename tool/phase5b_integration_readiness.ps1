@@ -24,8 +24,8 @@ $branch = (git branch --show-current).Trim()
 if ($LASTEXITCODE -ne 0) {
   Fail "Unable to read the current Git branch."
 }
-if ($branch -ne "japel") {
-  Fail "Expected branch 'japel' but current branch is '$branch'."
+if ($branch -ne "japel" -and $branch -ne "main") {
+  Fail "Expected branch 'japel' or 'main' but current branch is '$branch'."
 }
 Write-Host "Branch: $branch"
 

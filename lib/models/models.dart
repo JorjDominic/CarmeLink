@@ -180,6 +180,7 @@ class Payment {
   double get outstandingAmount => remainingBalance ?? (isVerified ? 0 : amount);
 
   bool get isOverdue {
+    if (isDeposit) return false;
     if (!isDue) return false;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -1013,7 +1014,9 @@ class TenantContract {
       id: row['id'] as String,
       tenantId: row['tenant_id'] as String,
       tenantName: profile?['full_name'] as String? ?? 'Unknown tenant',
-      contractNumber: row['contract_number'] as String,
+      contractNumber: (row['contract_number'] as String?)?.trim().isNotEmpty == true
+          ? (row['contract_number'] as String).trim()
+          : 'Pending Generation',
       startsOn: DateTime.parse(row['starts_on'] as String).toLocal(),
       endsOn: DateTime.parse(row['ends_on'] as String).toLocal(),
       monthlyRent: (row['monthly_rent'] as num).toDouble(),

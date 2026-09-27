@@ -77,6 +77,9 @@ class TripwireGeofenceService {
         'publishableKey': SupabaseConfig.publishableKey,
       }).timeout(_platformTimeout);
       await syncPending();
+      // Native iOS may have completed the upload itself while Flutter was
+      // suspended, so always reconcile the visible presence state on resume.
+      await TenantController.instance.loadGateEvents(force: true);
     } on MissingPluginException {
       // Desktop and unsupported test platforms do not install native adapters.
     } catch (error) {
