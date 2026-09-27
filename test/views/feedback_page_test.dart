@@ -9,7 +9,7 @@ void main() {
       (tester) async {
     await tester.pumpWidget(app());
 
-    expect(find.text('Send feedback'), findsOneWidget);
+    expect(find.text('Feedback preview'), findsOneWidget);
     expect(find.text('Feedback type'), findsOneWidget);
     expect(find.textContaining('currently a UI preview'), findsOneWidget);
     expect(find.byTooltip('5 stars'), findsOneWidget);
@@ -23,11 +23,11 @@ void main() {
       find.byType(TextField),
       'The payment screen is clear and easy to understand.',
     );
-    await tester.ensureVisible(find.text('Submit feedback'));
-    await tester.tap(find.text('Submit feedback'));
+    await tester.ensureVisible(find.text('Validate feedback form'));
+    await tester.tap(find.text('Validate feedback form'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Feedback UI complete'), findsOneWidget);
+    expect(find.text('Feedback preview validated'), findsOneWidget);
     expect(find.textContaining('not sent or stored'), findsOneWidget);
   });
 }

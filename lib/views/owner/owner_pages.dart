@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../controllers/messaging_controller.dart';
 import '../../controllers/owner_controller.dart';
@@ -61,6 +62,28 @@ void _ownerPush(BuildContext context, Widget page) {
   Navigator.of(context).push(
     MaterialPageRoute(builder: (_) => page),
   );
+}
+
+Future<void> _openPhoneDialer(BuildContext context, String phone) async {
+  final cleanPhone = phone.trim().replaceAll(RegExp(r'[^0-9+]'), '');
+  if (cleanPhone.isEmpty) {
+    showAppSnackBar(context, 'No phone number is available.');
+    return;
+  }
+
+  try {
+    final opened = await launchUrl(
+      Uri(scheme: 'tel', path: cleanPhone),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && context.mounted) {
+      showAppSnackBar(context, 'Could not open phone dialer.');
+    }
+  } catch (_) {
+    if (context.mounted) {
+      showAppSnackBar(context, 'Could not open phone dialer.');
+    }
+  }
 }
 
 // Temporarily hidden until the full contract-onboarding flow is resumed.
@@ -847,10 +870,16 @@ class TenantQuickPreview extends StatelessWidget {
             value: '${tenant.room} • ${tenant.bedSpace}',
             icon: Icons.bed_outlined,
           ),
-          InfoRow(
-            label: 'Phone',
-            value: tenant.phone,
-            icon: Icons.phone_outlined,
+          Material(
+            type: MaterialType.transparency,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.phone_outlined),
+              title: const Text('Phone'),
+              subtitle: Text(tenant.phone),
+              trailing: const Icon(Icons.call_outlined),
+              onTap: () => _openPhoneDialer(context, tenant.phone),
+            ),
           ),
           InfoRow(
             label: 'Guardian',
@@ -931,20 +960,32 @@ class TenantDetailsPage extends StatelessWidget {
                   value: '${tenant.room} • ${tenant.bedSpace}',
                   icon: Icons.meeting_room_outlined,
                 ),
-                InfoRow(
-                  label: 'Phone',
-                  value: tenant.phone,
-                  icon: Icons.phone_outlined,
+                Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.phone_outlined),
+                    title: const Text('Phone'),
+                    subtitle: Text(tenant.phone),
+                    trailing: const Icon(Icons.call_outlined),
+                    onTap: () => _openPhoneDialer(context, tenant.phone),
+                  ),
                 ),
                 InfoRow(
                   label: 'Guardian',
                   value: tenant.guardianName,
                   icon: Icons.family_restroom_outlined,
                 ),
-                InfoRow(
-                  label: 'Guardian phone',
-                  value: tenant.guardianPhone,
-                  icon: Icons.contact_phone_outlined,
+                Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.contact_phone_outlined),
+                    title: const Text('Guardian phone'),
+                    subtitle: Text(tenant.guardianPhone),
+                    trailing: const Icon(Icons.call_outlined),
+                    onTap: () => _openPhoneDialer(context, tenant.guardianPhone),
+                  ),
                 ),
                 InfoRow(
                     label: 'Residency status',
@@ -8662,32 +8703,41 @@ class EmergencyContactsPage extends StatelessWidget {
         child: Column(
           children: controller.tenants
               .map(
-                (tenant) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    child: Icon(
-                      Icons.contact_phone_outlined,
+                (tenant) => Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(
+                      child: Icon(
+                        Icons.contact_phone_outlined,
+                      ),
                     ),
-                  ),
-                  title: Text(
-                    tenant.guardianName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
+                    title: Text(
+                      tenant.guardianName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  subtitle: Text(
-                    '${tenant.name} • '
-                    '${tenant.guardianPhone}',
-                  ),
-                  trailing: IconButton(
-                    tooltip: 'Call',
-                    onPressed: () => showAppSnackBar(
-                      context,
-                      'Phone launcher integration placeholder.',
+                    subtitle: Text(
+                      '${tenant.name} • '
+                      '${tenant.guardianPhone}',
                     ),
-                    icon: const Icon(
-                      Icons.call_outlined,
+                    trailing: IconButton(
+                      tooltip: 'Call ${tenant.guardianName}',
+                      onPressed: tenant.guardianPhone.trim().isEmpty
+                          ? null
+                          : () => _openPhoneDialer(
+                                context,
+                                tenant.guardianPhone,
+                              ),
+                      icon: const Icon(Icons.call_outlined),
                     ),
+                    onTap: tenant.guardianPhone.trim().isEmpty
+                        ? null
+                        : () => _openPhoneDialer(
+                              context,
+                              tenant.guardianPhone,
+                            ),
                   ),
                 ),
               )

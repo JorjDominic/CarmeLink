@@ -1254,16 +1254,18 @@ class SettingsPage extends StatelessWidget {
                   ),
                   if (isTenant) ...[
                     const Divider(),
-                    ListTile(
+                    const ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.phonelink_lock_outlined),
-                      title: const Text('Device binding',
-                          style: TextStyle(fontWeight: FontWeight.w700)),
-                      subtitle: const Text(
-                          'Register this device for background geofence presence detection.'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => const DeviceBindingPage())),
+                      enabled: false,
+                      leading: Icon(Icons.phonelink_lock_outlined),
+                      title: Text(
+                        'Device binding',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        'Trusted-device registration is planned for Capstone 2.',
+                      ),
+                      trailing: StatusPill('Capstone 2 · Planned'),
                     ),
                   ],
                   const Divider(),
@@ -1423,7 +1425,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         icon: const Icon(Icons.check_circle_outline),
-        title: const Text('Feedback UI complete'),
+        title: const Text('Feedback preview validated'),
         content: const Text(
           'Thank you. This preview validates the feedback form, but it is not '
           'sent or stored until the backend feedback service is connected.',
@@ -1441,8 +1443,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
   @override
   Widget build(BuildContext context) {
     return PageFrame(
-      title: 'Send feedback',
-      subtitle: 'Help us improve your experience',
+      title: 'Feedback preview',
+      subtitle: 'Validate the feedback form experience',
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720),
         child: Column(
@@ -1539,7 +1541,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Include my account details'),
                       subtitle: const Text(
-                        'Helps support identify your role and follow up later.',
+                        'Included only in this local UI preview; nothing is transmitted.',
                       ),
                       value: includeAccountDetails,
                       onChanged: (value) =>
@@ -1575,7 +1577,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                     ? Icons.check_circle_outline
                     : Icons.send_outlined),
                 label:
-                    Text(submitted ? 'Preview validated' : 'Submit feedback'),
+                    Text(submitted ? 'Preview validated' : 'Validate feedback form'),
               ),
             ),
           ],
