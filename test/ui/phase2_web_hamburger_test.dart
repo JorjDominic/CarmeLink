@@ -4,13 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Phase 2 responsive web hamburger', () {
-    test('desktop sidebar starts at 1200 logical pixels', () {
+    test('desktop sidebar starts at 1024 logical pixels', () {
       final source =
           File('lib/core/widgets/adaptive_shell.dart').readAsStringSync();
 
       expect(
         source.contains(
-          'webPortal && MediaQuery.sizeOf(context).width >= 1200',
+          'webPortal && MediaQuery.sizeOf(context).width >= 1024',
         ),
         isTrue,
       );

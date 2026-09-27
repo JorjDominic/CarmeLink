@@ -88,10 +88,40 @@ class AdaptiveRoleShell extends StatefulWidget {
 
 class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   int index = 0;
+  GlobalKey<NavigatorState> _webWorkspaceNavigatorKey =
+      GlobalKey<NavigatorState>();
 
   void _select(int value) {
-    if (value == index) return;
-    setState(() => index = value);
+    if (value == index) {
+      final navigator = _webWorkspaceNavigatorKey.currentState;
+      if (navigator != null && navigator.canPop()) {
+        navigator.popUntil((route) => route.isFirst);
+      }
+      return;
+    }
+    setState(() {
+      index = value;
+      _webWorkspaceNavigatorKey = GlobalKey<NavigatorState>();
+    });
+  }
+
+  void _openWebWorkspacePage(Widget page) {
+    final navigator = _webWorkspaceNavigatorKey.currentState;
+    if (navigator != null) {
+      navigator.push(MaterialPageRoute<void>(builder: (_) => page));
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+  }
+
+  Widget _webWorkspace(Widget page, int activeIndex) {
+    return Navigator(
+      key: _webWorkspaceNavigatorKey,
+      onGenerateRoute: (_) => MaterialPageRoute<void>(
+        settings: RouteSettings(name: '/staff/workspace/$activeIndex'),
+        builder: (_) => page,
+      ),
+    );
   }
 
   Future<void> _openMenu() async {
@@ -258,6 +288,10 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   }
 
   void _openMessages() {
+    if (CarmeLinkSurfaceScope.isWebPortal(context)) {
+      _openWebWorkspacePage(widget.messagePage);
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => widget.messagePage),
     );
@@ -269,7 +303,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     // Mobile keeps the original tab count, even when the browser is resized
     // after selecting a desktop-only management destination.
     final webPortal = CarmeLinkSurfaceScope.isWebPortal(context);
-    final desktopWeb = webPortal && MediaQuery.sizeOf(context).width >= 1200;
+    final desktopWeb = webPortal && MediaQuery.sizeOf(context).width >= 1024;
     final activeDestinations = webPortal
         ? [...widget.destinations, ...widget.webDestinations]
         : widget.destinations;
@@ -299,9 +333,10 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                         selectedIndex: activeIndex,
                         onSelected: _select,
                         onOpenMessages: _openMessages,
+                        onOpenPage: _openWebWorkspacePage,
                       ),
                       const VerticalDivider(width: 1),
-                      Expanded(child: page),
+                      Expanded(child: _webWorkspace(page, activeIndex)),
                     ],
                   )
                 : Column(
@@ -310,7 +345,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                         roleLabel: widget.roleLabel,
                         onMenu: _openMenu,
                       ),
-                      Expanded(child: page),
+                      Expanded(child: _webWorkspace(page, activeIndex)),
                     ],
                   )
             : Stack(
@@ -468,6 +503,7 @@ class _WebStaffSidebar extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelected,
     required this.onOpenMessages,
+    required this.onOpenPage,
   });
 
   final String roleLabel;
@@ -476,12 +512,7 @@ class _WebStaffSidebar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final VoidCallback onOpenMessages;
-
-  void _open(BuildContext context, Widget page) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => page),
-    );
-  }
+  final ValueChanged<Widget> onOpenPage;
 
   @override
   Widget build(BuildContext context) {
@@ -600,13 +631,13 @@ class _WebStaffSidebar extends StatelessWidget {
                       dense: true,
                       leading: const Icon(Icons.notifications_outlined),
                       title: const Text('Notifications'),
-                      onTap: () => _open(context, const NotificationsPage()),
+                      onTap: () => onOpenPage(const NotificationsPage()),
                     ),
                     ListTile(
                       dense: true,
                       leading: const Icon(Icons.settings_outlined),
                       title: const Text('Settings'),
-                      onTap: () => _open(context, const SettingsPage()),
+                      onTap: () => onOpenPage(const SettingsPage()),
                     ),
                   ],
                 ),

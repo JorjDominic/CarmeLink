@@ -39,7 +39,7 @@ void main() {
       );
       expect(
         source.contains(
-          'webPortal && MediaQuery.sizeOf(context).width >= 1200',
+          'webPortal && MediaQuery.sizeOf(context).width >= 1024',
         ),
         isTrue,
       );
