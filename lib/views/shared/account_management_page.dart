@@ -10,6 +10,7 @@ import '../../services/account_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/tenant_service.dart';
 import '../owner/contracts_page.dart';
+import '../owner/onboarding_invitation_page.dart';
 
 /// Client-side filtering only; the account list and permissions still come
 /// exclusively from the existing authenticated manage-user Edge Function.
@@ -256,11 +257,13 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
         ),
       );
 
+
   Future<void> _offerContractDraft(CreatedAccount account) async {
     final createNow = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.person_add_alt_1_outlined),
         title: const Text('Tenant account created'),
         content: Text(
           '${account.fullName} can now be added to a draft contract. '
@@ -283,13 +286,60 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
       showAppSnackBar(context, 'Tenant account created successfully.');
       return;
     }
-    await showContractEditor(
+
+    // Phase 2 – Draft the contract (tenant locked to the just-created account).
+    final contractCreated = await showContractEditor(
       context,
       initialTenantId: account.id,
       initialTenantName: account.fullName,
       lockTenant: true,
     );
+    if (!mounted) return;
+    if (contractCreated != true) {
+      showAppSnackBar(context, 'Tenant account created. Contract skipped.');
+      return;
+    }
+
+    // Phase 3 – Offer to issue the QR / profile onboarding invitation.
+    final offerInvite = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.assignment_ind_outlined),
+        title: const Text('Contract saved'),
+        content: Text(
+          'Send ${account.fullName} an onboarding invitation so they can '
+          'submit their emergency contact and profile information, or enter '
+          'their details manually.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Skip for now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Set up onboarding'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (offerInvite == true) {
+      await showOnboardingInvitations(
+        context,
+        tenantId: account.id,
+        tenantName: account.fullName,
+      );
+    }
+    if (mounted) {
+      showAppSnackBar(
+        context,
+        'Tenant onboarding initiated for ${account.fullName}.',
+      );
+    }
   }
+
 
   String _roleLabel(String role) => switch (role) {
         'owner' => 'Owner',
