@@ -8345,17 +8345,32 @@ class OwnerMessagingPage extends StatefulWidget {
 
 class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
   final _searchController = TextEditingController();
+  ConversationRecord? _deepLinkedConversation;
+  bool _deepLinkLoading = false;
+  bool _deepLinkMissing = false;
 
   @override
   void initState() {
     super.initState();
+    final initialConversationId = widget.initialConversationId;
+    _deepLinkLoading =
+        initialConversationId != null && initialConversationId.isNotEmpty;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final conversationId = widget.initialConversationId;
       if (conversationId == null || conversationId.isEmpty) {
         await MessagingController.instance.loadConversations();
-      } else {
-        await MessagingController.instance.openConversationById(conversationId);
+        return;
       }
+      final opened =
+          await MessagingController.instance.openConversationById(conversationId);
+      if (!mounted) return;
+      setState(() {
+        _deepLinkLoading = false;
+        _deepLinkMissing = !opened;
+        _deepLinkedConversation = opened
+            ? MessagingController.instance.activeConversation
+            : null;
+      });
     });
   }
 
@@ -8368,6 +8383,25 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
   @override
   Widget build(BuildContext context) {
     final messaging = MessagingController.instance;
+    final requestedConversationId = widget.initialConversationId;
+    if (requestedConversationId != null && requestedConversationId.isNotEmpty) {
+      if (_deepLinkLoading) {
+        return const PageFrame(
+          title: 'Messages',
+          subtitle: 'Opening conversation',
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        );
+      }
+      final deepLinked = _deepLinkedConversation;
+      if (deepLinked != null) {
+        return OwnerConversationPage(record: deepLinked);
+      }
+    }
 
     return PageFrame(
       title: 'Messages',
@@ -8381,6 +8415,22 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_deepLinkMissing) ...[
+                const CarmelitaCard(
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'That conversation is no longer available. Showing your message inbox instead.',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               // Search bar
               TextField(
                 controller: _searchController,
@@ -8537,7 +8587,6 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
     final text = message.text.trim();
     if (text.isEmpty) return;
     message.clear();
-
     if (widget.record != null) {
       await MessagingController.instance.sendMessage(text);
     }
@@ -8556,14 +8605,13 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
       title: title,
       subtitle: subtitle,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 780),
+        constraints: const BoxConstraints(maxWidth: 980),
         child: AnimatedBuilder(
           animation: messaging,
           builder: (context, _) {
             final messagesList = widget.record != null
                 ? messaging.activeMessages
                 : (widget.conversation?.messages ?? []);
-
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -8577,105 +8625,23 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
                       ),
                 ),
                 const SizedBox(height: 8),
-                CarmelitaCard(
-                  padding: const EdgeInsets.all(12),
-                  child: messagesList.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Center(
-                            child: Text(
-                              'No messages yet. Send a message to start.',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ),
-                        )
-                      : Column(
-                          children: messagesList.map((item) {
-                            final isStaff = item.senderRole == 'owner' ||
-                                item.senderRole == 'caretaker' ||
-                                item.senderRole == 'ownerCaretaker';
-
-                            return Align(
-                              alignment: isStaff
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
-                              child: Container(
-                                constraints:
-                                    const BoxConstraints(maxWidth: 560),
-                                margin: const EdgeInsets.symmetric(vertical: 6),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 9,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isStaff
-                                      ? const Color(0xFF627FA8)
-                                          .withValues(alpha: .10)
-                                      : Theme.of(context)
-                                          .colorScheme
-                                          .surfaceContainerHighest
-                                          .withValues(alpha: .55),
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(15),
-                                    topRight: const Radius.circular(15),
-                                    bottomLeft:
-                                        Radius.circular(isStaff ? 15 : 4),
-                                    bottomRight:
-                                        Radius.circular(isStaff ? 4 : 15),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: isStaff
-                                      ? CrossAxisAlignment.end
-                                      : CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.senderName,
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      item.body,
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    MessageDeliveryMeta(
-                                      message: item,
-                                      isMine: item.isMine(SessionController
-                                          .instance.currentUser?.id),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: message,
-                  enabled: !messaging.sendingMessage,
-                  decoration: InputDecoration(
-                    hintText: 'Write a message...',
-                    prefixIcon: const Icon(Icons.chat_bubble_outline),
-                    suffixIcon: messaging.sendingMessage
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : IconButton(
-                            onPressed: _handleSend,
-                            icon: const Icon(Icons.send_outlined),
-                          ),
-                  ),
-                  onSubmitted: (_) => _handleSend(),
+                ConversationThreadPanel(
+                  messages: messagesList,
+                  composerController: message,
+                  sending: messaging.sendingMessage,
+                  emptyMessage: 'No messages yet. Send a message to start.',
+                  hintText: 'Write a message...',
+                  onSend: _handleSend,
+                  isMine: (item) {
+                    if (widget.record != null) {
+                      return item.isMine(
+                        SessionController.instance.currentUser?.id,
+                      );
+                    }
+                    return item.senderRole == 'owner' ||
+                        item.senderRole == 'caretaker' ||
+                        item.senderRole == 'ownerCaretaker';
+                  },
                 ),
               ],
             );

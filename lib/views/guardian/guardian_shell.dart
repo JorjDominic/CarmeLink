@@ -3,6 +3,7 @@ import '../../controllers/guardian_controller.dart';
 import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
+import '../../services/app_notification_service.dart';
 import '../shared/shared_views.dart';
 import 'guardian_pages.dart';
 
@@ -21,11 +22,29 @@ class _GuardianShellState extends State<GuardianShell> {
     GuardianController.instance.loadCurfewRequests();
   }
 
+
+  Widget? _notificationDestination(AppNotificationItem notification) {
+    final routeType = notification.routeType?.trim();
+    final route = (routeType == null || routeType.isEmpty
+            ? notification.notificationType.trim()
+            : routeType)
+        .toLowerCase();
+    return switch (route) {
+      'message' || 'conversation' => const GuardianConversationPage(),
+      'payment' => const GuardianPaymentStatusPage(),
+      'curfew' || 'gate' || 'gate_event' || 'safety' =>
+        const GuardianPresenceMonitoringPage(),
+      'announcement' => const GuardianAnnouncementsPage(),
+      _ => null,
+    };
+  }
+
   @override
-  Widget build(BuildContext context) => const RoleGuard(
+  Widget build(BuildContext context) => RoleGuard(
         allowedRoles: {UserRole.guardian},
         child: AdaptiveRoleShell(
           roleLabel: 'Guardian',
+          notificationPageBuilder: _notificationDestination,
           messagePage: GuardianMessagesPage(),
           destinations: [
             AppDestination(

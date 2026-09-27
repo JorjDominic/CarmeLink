@@ -178,6 +178,29 @@ class MessagingService {
     }
   }
 
+  Future<ConversationRecord?> fetchConversationById(
+    String conversationId, {
+    String? currentRole,
+  }) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null || conversationId.isEmpty) return null;
+    try {
+      final row = await client
+          .from('conversations')
+          .select(_conversationColumns)
+          .eq('id', conversationId)
+          .maybeSingle();
+      if (row == null) return null;
+      return ConversationRecord.fromRow(
+        row,
+        currentRole: currentRole ?? 'owner',
+      );
+    } catch (e) {
+      debugPrint('Error fetching conversation by ID: $e');
+      return null;
+    }
+  }
+
   /// Lists all conversations for the Owner / Caretaker management inbox.
   Future<List<ConversationRecord>> fetchConversations({
     String? filterType,
@@ -201,12 +224,41 @@ class MessagingService {
         rows = await query.order('last_message_at', ascending: false);
       }
 
-      return (rows as List<dynamic>)
-          .map<ConversationRecord>((row) => ConversationRecord.fromRow(
-                row as Map<String, dynamic>,
-                currentRole: currentRole ?? 'owner',
-              ))
-          .toList(growable: false);
+      final currentUid = client.auth.currentUser?.id ?? '';
+      final unreadCounts = <String, int>{};
+      if (currentUid.isNotEmpty) {
+        try {
+          final unreadRows = await client
+              .from('messages')
+              .select('conversation_id, sender_id')
+              .eq('is_read', false);
+          for (final raw in unreadRows as List<dynamic>) {
+            final row = raw as Map<String, dynamic>;
+            if (row['sender_id'] == currentUid) continue;
+            final conversationId = row['conversation_id']?.toString();
+            if (conversationId == null || conversationId.isEmpty) continue;
+            unreadCounts.update(
+              conversationId,
+              (count) => count + 1,
+              ifAbsent: () => 1,
+            );
+          }
+        } catch (error) {
+          // Inbox content must remain usable even if an older deployment has
+          // not granted access to the unread-count query yet.
+          debugPrint('Unable to load message unread counts: $error');
+        }
+      }
+
+      return (rows as List<dynamic>).map<ConversationRecord>((raw) {
+        final row = Map<String, dynamic>.from(raw as Map<String, dynamic>);
+        final id = row['id']?.toString() ?? '';
+        row['unread_count'] = unreadCounts[id] ?? 0;
+        return ConversationRecord.fromRow(
+          row,
+          currentRole: currentRole ?? 'owner',
+        );
+      }).toList(growable: false);
     } catch (e) {
       debugPrint('Error fetching conversations: $e');
       return const [];
@@ -236,6 +288,22 @@ class MessagingService {
     } catch (e) {
       debugPrint('Error fetching messages: $e');
       return const [];
+    }
+  }
+
+  Future<ChatMessage?> fetchMessageById(String messageId) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null || messageId.isEmpty) return null;
+    try {
+      final row = await client
+          .from('messages')
+          .select(_messageColumns)
+          .eq('id', messageId)
+          .maybeSingle();
+      return row == null ? null : ChatMessage.fromRow(row);
+    } catch (e) {
+      debugPrint('Error fetching realtime message detail: $e');
+      return null;
     }
   }
 
@@ -335,9 +403,11 @@ class MessagingService {
             ),
             callback: (payload) {
               final newRow = payload.newRecord;
-              if (newRow.isNotEmpty) {
-                onMessageReceived(ChatMessage.fromRow(newRow));
-              }
+              final messageId = newRow['id']?.toString() ?? '';
+              if (messageId.isEmpty) return;
+              unawaited(fetchMessageById(messageId).then((message) {
+                if (message != null) onMessageReceived(message);
+              }));
             },
           )
           .onPostgresChanges(
@@ -351,9 +421,11 @@ class MessagingService {
             ),
             callback: (payload) {
               final updatedRow = payload.newRecord;
-              if (updatedRow.isNotEmpty) {
-                onMessageUpdated(ChatMessage.fromRow(updatedRow));
-              }
+              final messageId = updatedRow['id']?.toString() ?? '';
+              if (messageId.isEmpty) return;
+              unawaited(fetchMessageById(messageId).then((message) {
+                if (message != null) onMessageUpdated(message);
+              }));
             },
           )
           .subscribe();
@@ -379,6 +451,12 @@ class MessagingService {
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'conversations',
+            callback: (_) => onConversationsUpdated(),
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'messages',
             callback: (_) => onConversationsUpdated(),
           )
           .subscribe();

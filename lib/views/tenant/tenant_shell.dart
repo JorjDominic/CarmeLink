@@ -4,6 +4,7 @@ import '../../controllers/tenant_controller.dart';
 import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
+import '../../services/app_notification_service.dart';
 import '../shared/shared_views.dart';
 import 'tenant_pages.dart';
 
@@ -26,13 +27,33 @@ class _TenantShellState extends State<TenantShell> {
     TenantController.instance.loadGateEvents();
   }
 
+
+  Widget? _notificationDestination(AppNotificationItem notification) {
+    final routeType = notification.routeType?.trim();
+    final route = (routeType == null || routeType.isEmpty
+            ? notification.notificationType.trim()
+            : routeType)
+        .toLowerCase();
+    return switch (route) {
+      'message' || 'conversation' => const TenantConversationPage(),
+      'payment' => const PaymentsPage(),
+      'maintenance' => const MaintenanceReportsPage(),
+      'visitor' => const VisitorRequestPage(),
+      'curfew' || 'gate' || 'gate_event' || 'safety' =>
+        const TenantPresencePage(),
+      'announcement' => const TenantAnnouncementsPage(),
+      _ => null,
+    };
+  }
+
   @override
-  Widget build(BuildContext context) => const RoleGuard(
+  Widget build(BuildContext context) => RoleGuard(
         allowedRoles: {
           UserRole.tenant,
         },
         child: AdaptiveRoleShell(
           roleLabel: 'Tenant',
+          notificationPageBuilder: _notificationDestination,
           messagePage: TenantMessagesPage(),
           destinations: [
             AppDestination(

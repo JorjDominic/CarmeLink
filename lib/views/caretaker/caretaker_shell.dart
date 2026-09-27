@@ -4,6 +4,7 @@ import '../../controllers/owner_controller.dart';
 import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
+import '../../services/app_notification_service.dart';
 import '../owner/owner_pages.dart';
 import '../owner/room_monitoring_page.dart';
 import '../shared/shared_views.dart';
@@ -29,11 +30,33 @@ class _CaretakerShellState extends State<CaretakerShell> {
     OwnerController.instance.loadGateEvents();
   }
 
+
+  Widget? _notificationDestination(AppNotificationItem notification) {
+    final routeType = notification.routeType?.trim();
+    final route = (routeType == null || routeType.isEmpty
+            ? notification.notificationType.trim()
+            : routeType)
+        .toLowerCase();
+    return switch (route) {
+      'message' || 'conversation' => OwnerMessagingPage(
+          initialConversationId: notification.routeId,
+        ),
+      'payment' => const PaymentVerificationPage(),
+      'maintenance' => const MaintenanceManagementPage(),
+      'visitor' => const VisitorManagementPage(),
+      'curfew' || 'gate' || 'gate_event' => const GeofenceMonitoringPage(),
+      'announcement' => const AnnouncementsManagementPage(),
+      'inspection' => const RoomMonitoringPage(),
+      _ => null,
+    };
+  }
+
   @override
-  Widget build(BuildContext context) => const RoleGuard(
+  Widget build(BuildContext context) => RoleGuard(
         allowedRoles: {UserRole.caretaker},
         child: AdaptiveRoleShell(
           roleLabel: 'Caretaker',
+          notificationPageBuilder: _notificationDestination,
           messagePage: OwnerMessagingPage(),
           webDestinations: [
             AppDestination(

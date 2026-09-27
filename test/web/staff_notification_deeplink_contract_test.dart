@@ -10,7 +10,7 @@ void main() {
       ).readAsStringSync();
 
       expect(source.contains('this.onOpenNotification'), isTrue);
-      expect(source.contains('await _service.markAsRead(item.id)'), isTrue);
+      expect(source.contains('unawaited(_markRead(item))'), isTrue);
       expect(source.contains('await widget.onOpenNotification?.call(item)'), isTrue);
       expect(source.contains('Icons.chevron_right_rounded'), isTrue);
     });
@@ -23,6 +23,7 @@ void main() {
       expect(source.contains('onOpenNotification: _openNotificationDestination'), isTrue);
       expect(source.contains('widget.notificationPageBuilder?.call(item)'), isTrue);
       expect(source.contains('_openWebWorkspacePage(destination)'), isTrue);
+      expect(source.contains('Navigator.of(context).push'), isTrue);
       expect(source.contains('onTap: onOpenNotifications'), isTrue);
     });
 
@@ -34,6 +35,9 @@ void main() {
       expect(source.contains('notification.notificationType.trim().toLowerCase()'), isTrue);
       expect(source.contains("'message' || 'conversation' => OwnerMessagingPage("), isTrue);
       expect(source.contains('initialConversationId: notification.routeId'), isTrue);
+      final owner = File('lib/views/owner/owner_pages.dart').readAsStringSync();
+      expect(owner.contains('return OwnerConversationPage(record: deepLinked)'), isTrue);
+      expect(owner.contains('fetchConversationById'), isFalse);
     });
   });
 }

@@ -54,7 +54,7 @@ void main() {
 
       expect(source.contains('streamMyNotifications(limit: 60)'), isTrue);
       expect(source.contains('fetchMyNotifications(limit: 60)'), isTrue);
-      expect(source.contains('Duration(seconds: 15)'), isTrue);
+      expect(source.contains('Duration(seconds: 5)'), isTrue);
       expect(source.contains("label: 'View'"), isTrue);
       expect(source.contains('_UnreadCountBadge'), isTrue);
       expect(source.contains('openNotifications: _openNotifications'), isTrue);

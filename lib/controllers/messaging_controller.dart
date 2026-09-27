@@ -21,6 +21,7 @@ class MessagingController extends ChangeNotifier {
   bool _sendingMessage = false;
   String? _messagesError;
   RealtimeChannel? _activeMessageChannel;
+  bool _activeThreadOpen = false;
 
   // Management inbox state (Owner / Caretaker)
   List<ConversationRecord> _conversations = [];
@@ -49,6 +50,46 @@ class MessagingController extends ChangeNotifier {
         0,
         (sum, item) => sum + item.unreadCount,
       );
+
+  int get unreadMessageCount {
+    final currentUid = SupabaseConfig.clientSafe?.auth.currentUser?.id ??
+        SessionController.instance.currentUser?.id ??
+        '';
+    final role = SessionController.instance.currentUser?.role.name ?? '';
+    if (role == 'owner' || role == 'caretaker') {
+      return totalUnreadCount;
+    }
+    if (currentUid.isEmpty) return 0;
+    return _activeMessages
+        .where((message) =>
+            message.senderId != currentUid && !message.isRead)
+        .length;
+  }
+
+  Future<void> startForCurrentRole({bool force = false}) async {
+    final user = SessionController.instance.currentUser;
+    final uid = SupabaseConfig.clientSafe?.auth.currentUser?.id ?? user?.id ?? '';
+    if (user == null || uid.isEmpty) return;
+    switch (user.role.name) {
+      case 'owner':
+      case 'caretaker':
+        await loadConversations(force: force);
+        break;
+      case 'tenant':
+        if (force || _activeConversation == null || _activeThreadOpen) {
+          await loadTenantConversation(uid, openThread: false);
+        }
+        break;
+      case 'guardian':
+        if (force || _activeConversation == null || _activeThreadOpen) {
+          await loadGuardianConversation(
+            guardianId: uid,
+            openThread: false,
+          );
+        }
+        break;
+    }
+  }
 
   List<ConversationRecord> get filteredConversations {
     return _conversations.where((conv) {
@@ -95,6 +136,7 @@ class MessagingController extends ChangeNotifier {
     String tenantId, {
     bool openThread = false,
   }) async {
+    _activeThreadOpen = openThread;
     _loadingMessages = true;
     _messagesError = null;
     notifyListeners();
@@ -119,7 +161,7 @@ class MessagingController extends ChangeNotifier {
         _activeConversation = conv;
         await _fetchMessagesForActiveConversation(
           markAsRead: openThread,
-          subscribe: openThread,
+          subscribe: true,
         );
       } else {
         _activeConversation = null;
@@ -143,6 +185,7 @@ class MessagingController extends ChangeNotifier {
     String? tenantId,
     bool openThread = false,
   }) async {
+    _activeThreadOpen = openThread;
     _loadingMessages = true;
     _messagesError = null;
     notifyListeners();
@@ -169,7 +212,7 @@ class MessagingController extends ChangeNotifier {
         _activeConversation = conv;
         await _fetchMessagesForActiveConversation(
           markAsRead: openThread,
-          subscribe: openThread,
+          subscribe: true,
         );
       } else {
         _activeConversation = null;
@@ -189,6 +232,7 @@ class MessagingController extends ChangeNotifier {
 
   /// Opens an existing conversation from the Owner/Caretaker inbox.
   Future<void> openConversation(ConversationRecord conversation) async {
+    _activeThreadOpen = true;
     _activeConversation = conversation;
     _loadingMessages = true;
     _messagesError = null;
@@ -206,7 +250,17 @@ class MessagingController extends ChangeNotifier {
   }
 
   Future<bool> openConversationById(String conversationId) async {
-    await loadConversations();
+    if (conversationId.isEmpty) return false;
+    final role = SessionController.instance.currentUser?.role.name ?? 'owner';
+    final direct = await _service.fetchConversationById(
+      conversationId,
+      currentRole: role,
+    );
+    if (direct != null) {
+      await openConversation(direct);
+      return true;
+    }
+    await loadConversations(force: true);
     for (final conversation in _conversations) {
       if (conversation.id == conversationId) {
         await openConversation(conversation);
@@ -218,7 +272,7 @@ class MessagingController extends ChangeNotifier {
 
   /// Loads inbox conversations for Owner and Caretaker.
   Future<void> loadConversations({bool force = false}) async {
-    if (_loadingConversations && !force) return;
+    if (_loadingConversations) return;
     if (_conversationsLoadedOnce && !force) return;
 
     _loadingConversations = true;
@@ -324,6 +378,10 @@ class MessagingController extends ChangeNotifier {
                 : message)
             .toList();
       }
+      final role = SessionController.instance.currentUser?.role.name ?? '';
+      if (role == 'owner' || role == 'caretaker') {
+        await loadConversations(force: true);
+      }
     }
 
     // 3. Subscribe to live incoming messages
@@ -332,7 +390,8 @@ class MessagingController extends ChangeNotifier {
 
   void _subscribeToActiveConversation(String conversationId) {
     _disposeActiveChannel();
-    PushNotificationService.instance.activeConversationId = conversationId;
+    PushNotificationService.instance.activeConversationId =
+        _activeThreadOpen ? conversationId : null;
     _activeMessageChannel = _service.subscribeToConversation(
       conversationId: conversationId,
       onMessageReceived: (incoming) {
@@ -342,7 +401,8 @@ class MessagingController extends ChangeNotifier {
         }
         final currentUid = SupabaseConfig.clientSafe?.auth.currentUser?.id ??
             SessionController.instance.currentUser?.id;
-        if (currentUid != null &&
+        if (_activeThreadOpen &&
+            currentUid != null &&
             currentUid.isNotEmpty &&
             incoming.senderId != currentUid) {
           _markActiveConversationRead(conversationId, currentUid);
@@ -411,10 +471,21 @@ class MessagingController extends ChangeNotifier {
   }
 
   void closeActiveConversation() {
+    _activeThreadOpen = false;
     _disposeActiveChannel();
     PushNotificationService.instance.activeConversationId = null;
     _activeConversation = null;
     _activeMessages = [];
+    notifyListeners();
+  }
+
+  void leaveActiveThread() {
+    _activeThreadOpen = false;
+    PushNotificationService.instance.activeConversationId = null;
+    final conversationId = _activeConversation?.id;
+    if (conversationId != null && conversationId.isNotEmpty) {
+      _subscribeToActiveConversation(conversationId);
+    }
     notifyListeners();
   }
 
@@ -425,6 +496,7 @@ class MessagingController extends ChangeNotifier {
       _service.disposeChannel(_inboxChannel);
       _inboxChannel = null;
     }
+    _activeThreadOpen = false;
     _activeConversation = null;
     _activeMessages = [];
     _conversations = [];

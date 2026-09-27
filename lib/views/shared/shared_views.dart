@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
@@ -22,10 +24,12 @@ class NotificationsPage extends StatefulWidget {
   const NotificationsPage({
     super.key,
     this.onOpenNotification,
+    this.onNotificationsChanged,
   });
 
   final Future<void> Function(AppNotificationItem notification)?
       onOpenNotification;
+  final ValueChanged<List<AppNotificationItem>>? onNotificationsChanged;
 
   @override
   State<NotificationsPage> createState() => _NotificationsPageState();
@@ -33,6 +37,108 @@ class NotificationsPage extends StatefulWidget {
 
 class _NotificationsPageState extends State<NotificationsPage> {
   final _service = AppNotificationService.instance;
+  StreamSubscription<List<AppNotificationItem>>? _subscription;
+  Timer? _pollTimer;
+  List<AppNotificationItem> _notifications = const [];
+  bool _loading = true;
+  bool _refreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+  }
+
+  Future<void> _start() async {
+    await _refresh();
+    if (!mounted) return;
+    _subscription = _service.streamMyNotifications(limit: 60).listen(
+      _applySnapshot,
+      onError: (_) {},
+    );
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => unawaited(_refresh()),
+    );
+  }
+
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+    _refreshing = true;
+    try {
+      final latest = await _service.fetchMyNotifications(limit: 60);
+      if (!mounted) return;
+      if (latest.isEmpty && _notifications.isNotEmpty) {
+        setState(() => _loading = false);
+        return;
+      }
+      _applySnapshot(latest);
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  void _applySnapshot(List<AppNotificationItem> notifications) {
+    if (!mounted) return;
+    final snapshot = List<AppNotificationItem>.unmodifiable(notifications);
+    setState(() {
+      _notifications = snapshot;
+      _loading = false;
+    });
+    widget.onNotificationsChanged?.call(snapshot);
+  }
+
+  void _notifyOptimisticSnapshot() {
+    widget.onNotificationsChanged?.call(
+      List<AppNotificationItem>.unmodifiable(_notifications),
+    );
+  }
+
+  AppNotificationItem _withReadAt(
+    AppNotificationItem item,
+    DateTime readAt,
+  ) =>
+      AppNotificationItem(
+        id: item.id,
+        recipientId: item.recipientId,
+        notificationType: item.notificationType,
+        title: item.title,
+        body: item.body,
+        routeType: item.routeType,
+        routeId: item.routeId,
+        data: item.data,
+        createdAt: item.createdAt,
+        readAt: readAt,
+      );
+
+  Future<void> _markRead(AppNotificationItem item) async {
+    if (item.isRead) return;
+    final now = DateTime.now();
+    if (mounted) {
+      setState(() {
+        _notifications = _notifications
+            .map((entry) => entry.id == item.id ? _withReadAt(entry, now) : entry)
+            .toList(growable: false);
+      });
+      _notifyOptimisticSnapshot();
+    }
+    await _service.markAsRead(item.id);
+    await _refresh();
+  }
+
+  Future<void> _markAllRead() async {
+    final now = DateTime.now();
+    if (mounted) {
+      setState(() {
+        _notifications = _notifications
+            .map((entry) => entry.isRead ? entry : _withReadAt(entry, now))
+            .toList(growable: false);
+      });
+      _notifyOptimisticSnapshot();
+    }
+    await _service.markAllAsRead();
+    await _refresh();
+  }
 
   IconData _iconForType(String type) => switch (type.toLowerCase()) {
         'announcement' => Icons.campaign_outlined,
@@ -61,28 +167,39 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<AppNotificationItem>>(
-      stream: _service.streamMyNotifications(),
-      builder: (context, snapshot) {
-        final notifications = snapshot.data ?? [];
-        final hasUnread = notifications.any((n) => !n.isRead);
+  void dispose() {
+    _pollTimer?.cancel();
+    unawaited(_subscription?.cancel());
+    super.dispose();
+  }
 
-        return PageFrame(
-          title: 'Notifications',
-          subtitle: hasUnread
-              ? 'You have unread updates'
-              : 'All updates and security alerts',
-          actions: hasUnread
-              ? [
-                  TextButton.icon(
-                    onPressed: () => _service.markAllAsRead(),
-                    icon: const Icon(Icons.done_all_rounded, size: 18),
-                    label: const Text('Mark all read'),
-                  ),
-                ]
-              : null,
-          child: notifications.isEmpty
+  @override
+  Widget build(BuildContext context) {
+    final notifications = _notifications;
+    final hasUnread = notifications.any((n) => !n.isRead);
+
+    return PageFrame(
+      title: 'Notifications',
+      subtitle: hasUnread
+          ? 'You have unread updates'
+          : 'All updates and security alerts',
+      actions: hasUnread
+          ? [
+              TextButton.icon(
+                onPressed: _markAllRead,
+                icon: const Icon(Icons.done_all_rounded, size: 18),
+                label: const Text('Mark all read'),
+              ),
+            ]
+          : null,
+      child: _loading && notifications.isEmpty
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          : notifications.isEmpty
               ? const EmptyState(
                   icon: Icons.notifications_none_rounded,
                   title: 'No notifications yet',
@@ -91,6 +208,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 )
               : CarmelitaCard(
                   child: ListView.separated(
+                    key: const Key('live-notifications-list'),
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: notifications.length,
@@ -100,6 +218,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       final iconColor =
                           _colorForType(context, item.notificationType);
                       return ListTile(
+                        key: Key('notification-${item.id}'),
                         leading: CircleAvatar(
                           backgroundColor: iconColor.withValues(alpha: 0.12),
                           foregroundColor: iconColor,
@@ -138,12 +257,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           ),
                         ),
                         isThreeLine: true,
-                        trailing: item.routeType?.trim().isNotEmpty == true
+                        trailing: widget.onOpenNotification != null
                             ? const Icon(Icons.chevron_right_rounded)
                             : null,
                         onTap: () async {
                           if (!item.isRead) {
-                            await _service.markAsRead(item.id);
+                            unawaited(_markRead(item));
                           }
                           await widget.onOpenNotification?.call(item);
                         },
@@ -151,8 +270,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     },
                   ),
                 ),
-        );
-      },
     );
   }
 }

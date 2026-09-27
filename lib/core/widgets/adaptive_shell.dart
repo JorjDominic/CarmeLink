@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../controllers/messaging_controller.dart';
 import '../../controllers/session_controller.dart';
 import '../../views/shared/shared_views.dart';
 import '../../services/app_notification_service.dart';
@@ -30,6 +31,8 @@ class CarmelitaNavScope extends InheritedWidget {
     required this.openMenu,
     this.openMessages,
     this.openNotifications,
+    this.unreadMessageCount = 0,
+    this.unreadNotificationCount = 0,
     required this.selectIndex,
     required super.child,
     super.key,
@@ -38,6 +41,8 @@ class CarmelitaNavScope extends InheritedWidget {
   final Future<void> Function() openMenu;
   final VoidCallback? openMessages;
   final VoidCallback? openNotifications;
+  final int unreadMessageCount;
+  final int unreadNotificationCount;
   final ValueChanged<int> selectIndex;
 
   static CarmelitaNavScope? maybeOf(
@@ -53,6 +58,8 @@ class CarmelitaNavScope extends InheritedWidget {
     return openMenu != oldWidget.openMenu ||
         openMessages != oldWidget.openMessages ||
         openNotifications != oldWidget.openNotifications ||
+        unreadMessageCount != oldWidget.unreadMessageCount ||
+        unreadNotificationCount != oldWidget.unreadNotificationCount ||
         selectIndex != oldWidget.selectIndex;
   }
 }
@@ -75,9 +82,9 @@ class AdaptiveRoleShell extends StatefulWidget {
   /// Mobile destinations and the in-app backend services stay unchanged.
   final List<AppDestination> webDestinations;
 
-  /// Browser staff portals can provide a role-aware route for live in-app
-  /// notifications. Mobile shells leave this null and keep their existing
-  /// navigation behavior unchanged.
+  /// Role-aware destination resolver for live in-app notifications. Web keeps
+  /// the destination inside the persistent workspace; mobile pushes it on the
+  /// role shell navigator.
   final Widget? Function(AppNotificationItem notification)?
       notificationPageBuilder;
 
@@ -117,14 +124,31 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   final Set<String> _seenNotificationIds = <String>{};
   bool _notificationsSeeded = false;
   int _unreadNotificationCount = 0;
+  bool _messagingStarted = false;
   GlobalKey<NavigatorState> _webWorkspaceNavigatorKey =
       GlobalKey<NavigatorState>();
 
   @override
+  void initState() {
+    super.initState();
+    MessagingController.instance.addListener(_onMessagingChanged);
+  }
+
+  void _onMessagingChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _ensureMessagingStarted() async {
+    if (_messagingStarted) return;
+    _messagingStarted = true;
+    await MessagingController.instance.startForCurrentRole();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final shouldListen = CarmeLinkSurfaceScope.isWebPortal(context) &&
-        widget.notificationPageBuilder != null;
+    unawaited(_ensureMessagingStarted());
+    final shouldListen = SessionController.instance.currentUser != null;
     if (shouldListen &&
         _notificationSubscription == null &&
         !_notificationStartInFlight) {
@@ -152,7 +176,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       // "new" popups when the staff portal opens.
       final initial = await AppNotificationService.instance
           .fetchMyNotifications(limit: 60);
-      if (!mounted || widget.notificationPageBuilder == null) return;
+      if (!mounted) return;
       _onNotificationSnapshot(initial);
 
       _notificationSubscription = AppNotificationService.instance
@@ -163,7 +187,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       // every deployed environment yet. Polling is a catch-up fallback only;
       // Realtime still delivers immediately wherever it is enabled.
       _notificationPollTimer = Timer.periodic(
-        const Duration(seconds: 15),
+        const Duration(seconds: 5),
         (_) => unawaited(_pollNotifications()),
       );
     } finally {
@@ -172,7 +196,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   }
 
   Future<void> _pollNotifications() async {
-    if (!mounted || widget.notificationPageBuilder == null) return;
+    if (!mounted) return;
     final latest =
         await AppNotificationService.instance.fetchMyNotifications(limit: 60);
     if (mounted) _onNotificationSnapshot(latest);
@@ -181,8 +205,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   Future<void> _restartNotificationStream() async {
     await _stopNotificationStream();
     if (!mounted) return;
-    if (CarmeLinkSurfaceScope.isWebPortal(context) &&
-        widget.notificationPageBuilder != null) {
+    if (SessionController.instance.currentUser != null) {
       await _startNotificationStream();
     }
   }
@@ -244,12 +267,19 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 
   NotificationsPage _notificationsPage() => NotificationsPage(
         onOpenNotification: _openNotificationDestination,
+        onNotificationsChanged: _onNotificationSnapshot,
       );
 
   Future<void> _openNotificationDestination(AppNotificationItem item) async {
     final destination = widget.notificationPageBuilder?.call(item);
     if (!mounted || destination == null) return;
-    _openWebWorkspacePage(destination);
+    if (CarmeLinkSurfaceScope.isWebPortal(context)) {
+      _openWebWorkspacePage(destination);
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => destination),
+    );
   }
 
   void _showRealtimeNotificationBatch(int count) {
@@ -262,7 +292,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
         content: Text('$count new CarmeLink updates received.'),
         action: SnackBarAction(
           label: 'View',
-          onPressed: () => _openWebWorkspacePage(_notificationsPage()),
+          onPressed: _openNotifications,
         ),
       ),
     );
@@ -298,9 +328,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
           label: 'View',
           onPressed: () {
             if (destination != null) {
-              _openWebWorkspacePage(destination);
+              unawaited(_openNotificationDestination(item));
             } else {
-              _openWebWorkspacePage(_notificationsPage());
+              _openNotifications();
             }
             if (!item.isRead) {
               unawaited(AppNotificationService.instance.markAsRead(item.id));
@@ -313,6 +343,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 
   @override
   void dispose() {
+    MessagingController.instance.removeListener(_onMessagingChanged);
     _notificationPollTimer?.cancel();
     unawaited(_notificationSubscription?.cancel());
     super.dispose();
@@ -389,6 +420,13 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                           Navigator.of(dialogContext).pop();
                           _openMessages();
                         },
+                        onOpenNotifications: () {
+                          Navigator.of(dialogContext).pop();
+                          _openNotifications();
+                        },
+                        unreadMessageCount:
+                            MessagingController.instance.unreadMessageCount,
+                        unreadNotificationCount: _unreadNotificationCount,
                         onSelect: (value) {
                           Navigator.of(dialogContext).pop();
                           _select(value);
@@ -458,6 +496,13 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                       Navigator.of(dialogContext).pop();
                       _openMessages();
                     },
+                    onOpenNotifications: () {
+                      Navigator.of(dialogContext).pop();
+                      _openNotifications();
+                    },
+                    unreadMessageCount:
+                        MessagingController.instance.unreadMessageCount,
+                    unreadNotificationCount: _unreadNotificationCount,
                     onSelect: (value) {
                       Navigator.of(dialogContext).pop();
                       _select(value);
@@ -501,6 +546,13 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                     Navigator.of(sheetContext).pop();
                     _openMessages();
                   },
+                  onOpenNotifications: () {
+                    Navigator.of(sheetContext).pop();
+                    _openNotifications();
+                  },
+                  unreadMessageCount:
+                      MessagingController.instance.unreadMessageCount,
+                  unreadNotificationCount: _unreadNotificationCount,
                   onSelect: (value) {
                     Navigator.of(sheetContext).pop();
                     _select(value);
@@ -520,7 +572,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       return;
     }
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
+      MaterialPageRoute<void>(builder: (_) => _notificationsPage()),
     );
   }
 
@@ -545,6 +597,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
         ? [...widget.destinations, ...widget.webDestinations]
         : widget.destinations;
     final activeIndex = index < activeDestinations.length ? index : 0;
+    final unreadMessageCount = MessagingController.instance.unreadMessageCount;
     final destination = activeDestinations[activeIndex];
     final page = RepaintBoundary(
       child: KeyedSubtree(
@@ -557,6 +610,8 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       openMenu: _openMenu,
       openMessages: _openMessages,
       openNotifications: _openNotifications,
+      unreadMessageCount: unreadMessageCount,
+      unreadNotificationCount: _unreadNotificationCount,
       selectIndex: _select,
       child: Scaffold(
         extendBody: !webPortal,
@@ -566,6 +621,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                     children: [
                       _WebStaffSidebar(
                         roleLabel: widget.roleLabel,
+                        unreadMessageCount: unreadMessageCount,
                         unreadNotificationCount: _unreadNotificationCount,
                         destinations: activeDestinations,
                         mainDestinationCount: widget.destinations.length,
@@ -583,7 +639,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                     children: [
                       _CompactWebNavigationBar(
                         roleLabel: widget.roleLabel,
+                        unreadMessageCount: unreadMessageCount,
                         unreadNotificationCount: _unreadNotificationCount,
+                        onMessages: _openMessages,
                         onNotifications: _openNotifications,
                         onMenu: _openMenu,
                       ),
@@ -601,6 +659,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                     child: _FloatingIslandNavigation(
                       destinations: widget.destinations,
                       selectedIndex: activeIndex,
+                      unreadMessageCount: unreadMessageCount,
                       onSelected: _select,
                     ),
                   ),
@@ -615,13 +674,17 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 class _CompactWebNavigationBar extends StatefulWidget {
   const _CompactWebNavigationBar({
     required this.roleLabel,
+    required this.unreadMessageCount,
     required this.unreadNotificationCount,
+    required this.onMessages,
     required this.onNotifications,
     required this.onMenu,
   });
 
   final String roleLabel;
+  final int unreadMessageCount;
   final int unreadNotificationCount;
+  final VoidCallback onMessages;
   final VoidCallback onNotifications;
   final Future<void> Function() onMenu;
 
@@ -712,6 +775,12 @@ class _CompactWebNavigationBarState extends State<_CompactWebNavigationBar>
                   ),
                 ),
               ),
+              _CountedIconButton(
+                tooltip: 'Messages',
+                icon: Icons.chat_bubble_outline,
+                unreadCount: widget.unreadMessageCount,
+                onPressed: widget.onMessages,
+              ),
               _NotificationIconButton(
                 unreadCount: widget.unreadNotificationCount,
                 onPressed: widget.onNotifications,
@@ -749,6 +818,7 @@ class _CompactWebNavigationBarState extends State<_CompactWebNavigationBar>
 class _WebStaffSidebar extends StatelessWidget {
   const _WebStaffSidebar({
     required this.roleLabel,
+    required this.unreadMessageCount,
     required this.unreadNotificationCount,
     required this.destinations,
     required this.mainDestinationCount,
@@ -760,6 +830,7 @@ class _WebStaffSidebar extends StatelessWidget {
   });
 
   final String roleLabel;
+  final int unreadMessageCount;
   final int unreadNotificationCount;
   final List<AppDestination> destinations;
   final int mainDestinationCount;
@@ -880,6 +951,12 @@ class _WebStaffSidebar extends StatelessWidget {
                       dense: true,
                       leading: const Icon(Icons.chat_bubble_outline),
                       title: const Text('Messages'),
+                      trailing: unreadMessageCount > 0
+                          ? _UnreadCountBadge(
+                              count: unreadMessageCount,
+                              compact: true,
+                            )
+                          : null,
                       onTap: onOpenMessages,
                     ),
                     ListTile(
@@ -888,7 +965,10 @@ class _WebStaffSidebar extends StatelessWidget {
                       leading: const Icon(Icons.notifications_outlined),
                       title: const Text('Notifications'),
                       trailing: unreadNotificationCount > 0
-                          ? _UnreadCountBadge(count: unreadNotificationCount)
+                          ? _UnreadCountBadge(
+                              count: unreadNotificationCount,
+                              compact: true,
+                            )
                           : null,
                       onTap: onOpenNotifications,
                     ),
@@ -915,6 +995,38 @@ class _WebStaffSidebar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CountedIconButton extends StatelessWidget {
+  const _CountedIconButton({
+    required this.tooltip,
+    required this.icon,
+    required this.unreadCount,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final int unreadCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            tooltip: tooltip,
+            onPressed: onPressed,
+            icon: Icon(icon),
+          ),
+          if (unreadCount > 0)
+            Positioned(
+              right: 2,
+              top: 2,
+              child: _UnreadCountBadge(count: unreadCount, compact: true),
+            ),
+        ],
+      );
 }
 
 class _NotificationIconButton extends StatelessWidget {
@@ -982,11 +1094,13 @@ class _FloatingIslandNavigation extends StatelessWidget {
   const _FloatingIslandNavigation({
     required this.destinations,
     required this.selectedIndex,
+    required this.unreadMessageCount,
     required this.onSelected,
   });
 
   final List<AppDestination> destinations;
   final int selectedIndex;
+  final int unreadMessageCount;
   final ValueChanged<int> onSelected;
 
   @override
@@ -1045,6 +1159,9 @@ class _FloatingIslandNavigation extends StatelessWidget {
                     selectedIcon: item.selectedIcon,
                     selected: selected,
                     isWorkInProgress: item.isWorkInProgress,
+                    unreadCount: item.label.toLowerCase() == 'messages'
+                        ? unreadMessageCount
+                        : 0,
                     onTap: () => onSelected(navIndex),
                   ),
                 );
@@ -1065,6 +1182,7 @@ class _IslandItem extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.isWorkInProgress = false,
+    this.unreadCount = 0,
   });
 
   final String label;
@@ -1073,6 +1191,7 @@ class _IslandItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final bool isWorkInProgress;
+  final int unreadCount;
 
   @override
   Widget build(BuildContext context) {
@@ -1114,6 +1233,15 @@ class _IslandItem extends StatelessWidget {
                       ? scheme.primary
                       : scheme.onSurface.withValues(alpha: .56),
                 ),
+                if (unreadCount > 0)
+                  Positioned(
+                    right: -9,
+                    top: -8,
+                    child: _UnreadCountBadge(
+                      count: unreadCount,
+                      compact: true,
+                    ),
+                  ),
                 if (isWorkInProgress)
                   Positioned(
                     right: -16,
@@ -1135,6 +1263,9 @@ class _RoleMenu extends StatelessWidget {
     required this.destinations,
     required this.currentIndex,
     required this.onOpenMessages,
+    required this.onOpenNotifications,
+    required this.unreadMessageCount,
+    required this.unreadNotificationCount,
     required this.onSelect,
   });
 
@@ -1142,6 +1273,9 @@ class _RoleMenu extends StatelessWidget {
   final List<AppDestination> destinations;
   final int currentIndex;
   final VoidCallback onOpenMessages;
+  final VoidCallback onOpenNotifications;
+  final int unreadMessageCount;
+  final int unreadNotificationCount;
   final ValueChanged<int> onSelect;
 
   @override
@@ -1279,22 +1413,22 @@ class _RoleMenu extends StatelessWidget {
             minTileHeight: 54,
             leading: const Icon(Icons.chat_bubble_outline),
             title: const Text('Messages'),
-            trailing: const Icon(Icons.chevron_right_rounded),
+            trailing: unreadMessageCount > 0
+                ? _UnreadCountBadge(count: unreadMessageCount, compact: true)
+                : const Icon(Icons.chevron_right_rounded),
             onTap: onOpenMessages,
           ),
           ListTile(
             minTileHeight: 54,
             leading: const Icon(Icons.notifications_outlined),
             title: const Text('Notifications'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const NotificationsPage(),
-                ),
-              );
-            },
+            trailing: unreadNotificationCount > 0
+                ? _UnreadCountBadge(
+                    count: unreadNotificationCount,
+                    compact: true,
+                  )
+                : const Icon(Icons.chevron_right_rounded),
+            onTap: onOpenNotifications,
           ),
           ListTile(
             minTileHeight: 54,
