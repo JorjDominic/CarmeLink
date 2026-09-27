@@ -222,6 +222,46 @@ class PushNotificationService {
     _openedController.add(Map<String, dynamic>.from(data));
   }
 
+  /// Shows an immediate local notification without going through FCM.
+  ///
+  /// Useful for on-device events (e.g. geofence crossings detected in the
+  /// foreground) where the app already knows what to display and FCM round-trip
+  /// latency or foreground suppression would otherwise prevent delivery.
+  ///
+  /// [id] should be a stable integer so repeated crossings replace the
+  /// previous notification instead of stacking (e.g. 1001 for IN, 1002 for OUT).
+  Future<void> showLocalNotification({
+    required int id,
+    required String title,
+    required String body,
+    Map<String, dynamic>? payload,
+  }) async {
+    if (!_available) return;
+    try {
+      await _local.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'carmelink_updates',
+            'CarmeLink updates',
+            channelDescription:
+                'Account, safety, payment, and dormitory updates.',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: 'ic_stat_carmelink',
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        payload: payload == null ? null : jsonEncode(payload),
+      );
+    } catch (error) {
+      debugPrint(
+          '[PushNotificationService] showLocalNotification failed: $error');
+    }
+  }
+
   Future<void> dispose() async {
     await _foregroundSubscription?.cancel();
     await _openedSubscription?.cancel();

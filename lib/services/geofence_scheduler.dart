@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../services/gate_service.dart';
 import 'geofence_service.dart';
+import 'push_notification_service.dart';
 import 'tripwire_geofence_service.dart';
 
 /// Owns native tripwire registration and foreground position monitoring for
@@ -145,8 +146,10 @@ class GeofenceScheduler with WidgetsBindingObserver {
 
     if (newDirection == _lastKnownDirection) return; // No crossing detected.
 
-    // Direction changed — record the transition.
+    // Direction changed — show an immediate local notification so the tenant
+    // is aware the crossing was detected, then record it in the background.
     _lastKnownDirection = newDirection;
+    _showCrossingNotification(newDirection);
     _processingTransition = true;
     _recordForegroundTransition(newDirection).then((_) {
       _processingTransition = false;
@@ -154,6 +157,25 @@ class GeofenceScheduler with WidgetsBindingObserver {
       _processingTransition = false;
       debugPrint('[GeofenceScheduler] Foreground transition error: $error');
     });
+  }
+
+  /// Shows a local push notification when a boundary crossing is detected.
+  ///
+  /// Runs fire-and-forget; any failure is swallowed so it never blocks the
+  /// DB write or disrupts the position stream.
+  void _showCrossingNotification(String direction) {
+    final isEntry = direction == 'IN';
+    final title = isEntry ? '🏠 Entered dormitory' : '🚪 Left dormitory';
+    final body = isEntry
+        ? 'Your entry was detected. Welcome home!'
+        : 'Your departure was detected. Stay safe!';
+
+    PushNotificationService.instance.showLocalNotification(
+      id: isEntry ? 1001 : 1002,
+      title: title,
+      body: body,
+      payload: {'route_type': 'gate', 'direction': direction},
+    ).ignore();
   }
 
   Future<void> _recordForegroundTransition(String direction) async {
@@ -165,7 +187,8 @@ class GeofenceScheduler with WidgetsBindingObserver {
         clientEventId: _uniqueId(),
         observedAt: DateTime.now().toUtc(),
       );
-      debugPrint('[GeofenceScheduler] Foreground crossing recorded: $direction');
+      debugPrint(
+          '[GeofenceScheduler] Foreground crossing recorded: $direction');
     } catch (error) {
       debugPrint('[GeofenceScheduler] Could not record crossing: $error');
       rethrow;

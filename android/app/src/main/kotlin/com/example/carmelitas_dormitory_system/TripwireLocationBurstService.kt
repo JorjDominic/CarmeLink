@@ -3,6 +3,7 @@ package com.example.carmelitas_dormitory_system
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -25,7 +26,10 @@ import com.google.android.gms.location.Priority
 class TripwireLocationBurstService : Service() {
     companion object {
         private const val CHANNEL_ID = "carmelink_tripwire_monitoring"
+        private const val UPDATES_CHANNEL_ID = "carmelink_updates"
         private const val NOTIFICATION_ID = 9108
+        private const val ENTRY_NOTIFICATION_ID = 1001
+        private const val EXIT_NOTIFICATION_ID = 1002
         private const val MAX_DURATION_MILLIS = 120_000L
     }
 
@@ -42,6 +46,9 @@ class TripwireLocationBurstService : Service() {
                         direction,
                         location.time,
                     )
+                    if (!MainActivity.isInForeground) {
+                        showCrossingNotification(direction)
+                    }
                     stopBurst()
                     return
                 }
@@ -132,6 +139,45 @@ class TripwireLocationBurstService : Service() {
                     description = "Shown briefly while CarmeLink confirms a gate crossing."
                 },
             )
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    UPDATES_CHANNEL_ID,
+                    "CarmeLink updates",
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply {
+                    description = "Account, safety, payment, and dormitory updates."
+                },
+            )
         }
+    }
+
+    private fun showCrossingNotification(direction: String) {
+        val isEntry = direction == "IN"
+        val launchIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("route_type", "gate")
+            putExtra("direction", direction)
+        }
+        val contentIntent = PendingIntent.getActivity(
+            this,
+            if (isEntry) ENTRY_NOTIFICATION_ID else EXIT_NOTIFICATION_ID,
+            launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(this, UPDATES_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_carmelink)
+            .setContentTitle(if (isEntry) "Entered dormitory" else "Left dormitory")
+            .setContentText(
+                if (isEntry) "Your entry was detected. Welcome home!"
+                else "Your departure was detected. Stay safe!",
+            )
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(contentIntent)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(
+            if (isEntry) ENTRY_NOTIFICATION_ID else EXIT_NOTIFICATION_ID,
+            notification,
+        )
     }
 }

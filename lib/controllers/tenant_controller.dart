@@ -8,6 +8,7 @@ import '../services/gate_service.dart';
 import '../services/geofence_service.dart';
 import '../services/maintenance_service.dart';
 import '../services/payment_service.dart';
+import '../services/push_notification_service.dart';
 import '../services/room_service.dart';
 import '../services/visitor_service.dart';
 
@@ -693,10 +694,24 @@ class TenantController extends ChangeNotifier {
         previousDirection: previous,
       );
 
+      final newDirection = result.isUnavailable ? null : result.direction;
       _currentGateStatus = result.isUnavailable
           ? 'UNAVAILABLE'
           : (result.direction ?? 'UNAVAILABLE');
       _lastGateEventAt = DateTime.now();
+
+      // Notify the tenant when the on-demand check detects a crossing.
+      if (newDirection != null && newDirection != previous) {
+        final isEntry = newDirection == 'IN';
+        PushNotificationService.instance.showLocalNotification(
+          id: isEntry ? 1001 : 1002,
+          title: isEntry ? '🏠 Entered dormitory' : '🚪 Left dormitory',
+          body: isEntry
+              ? 'Your entry was detected. Welcome home!'
+              : 'Your departure was detected. Stay safe!',
+          payload: {'route_type': 'gate', 'direction': newDirection},
+        ).ignore();
+      }
 
       final client = SupabaseConfig.clientSafe;
       final uid = client?.auth.currentUser?.id;

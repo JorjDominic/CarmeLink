@@ -5,6 +5,22 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    companion object {
+        @Volatile
+        var isInForeground: Boolean = false
+            private set
+    }
+
+    override fun onStart() {
+        super.onStart()
+        isInForeground = true
+    }
+
+    override fun onStop() {
+        isInForeground = false
+        super.onStop()
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "carmelitas/tripwire_geofence")
