@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/models.dart';
+import '../services/app_notification_service.dart';
 import '../services/curfew_service.dart';
 import '../services/confidential_report_service.dart';
 import '../services/contract_service.dart';
@@ -10,6 +14,7 @@ import '../services/room_service.dart';
 import '../services/staff_maintenance_service.dart';
 import '../services/tenant_service.dart';
 import '../services/visitor_service.dart';
+
 
 class OwnerController extends ChangeNotifier {
   OwnerController._();
@@ -247,11 +252,88 @@ class OwnerController extends ChangeNotifier {
         ..clear()
         ..addAll(list);
       _paymentsLoadedOnce = true;
+      unawaited(checkAndNotifyDuePayments());
     } catch (e) {
       _paymentsError = e.toString();
     } finally {
       _paymentsLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// Checks active payments for charges that are due today or overdue,
+  /// and automatically dispatches FCM push alerts to owners and caretakers.
+  ///
+  /// Deduplicated daily using SharedPreferences to avoid repeatedly sending
+  /// notifications on every page refresh or app reload. Pass [force: true]
+  /// to manually trigger alerts on demand.
+  Future<int> checkAndNotifyDuePayments({bool force = false}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+      final todayStr =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final todayKey = 'notified_due_date_staff_$todayStr';
+
+      if (!force && (prefs.getBool(todayKey) ?? false)) {
+        return 0;
+      }
+
+      final overduePayments = _payments
+          .where((p) => p.isOverdue && !p.isVerified && !p.isVoided)
+          .toList();
+      final dueTodayPayments = _payments
+          .where((p) =>
+              p.isDueNow && !p.isOverdue && !p.isVerified && !p.isVoided)
+          .toList();
+
+      final totalCount = overduePayments.length + dueTodayPayments.length;
+      if (totalCount == 0) return 0;
+
+      final totalUncollected = [...overduePayments, ...dueTodayPayments]
+          .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
+
+      // Notify individually if small batch (<= 3 overdue, <= 2 due today)
+      if (overduePayments.isNotEmpty && overduePayments.length <= 3) {
+        for (final payment in overduePayments) {
+          await AppNotificationService.instance.notifyPaymentDueToStaff(
+            tenantName: payment.tenantName ?? 'Tenant',
+            paymentTitle: payment.label,
+            amount: payment.outstandingAmount,
+            dueDate: payment.dueDate,
+            isOverdue: true,
+            paymentId: payment.id,
+          );
+        }
+      }
+
+      if (dueTodayPayments.isNotEmpty && dueTodayPayments.length <= 2) {
+        for (final payment in dueTodayPayments) {
+          await AppNotificationService.instance.notifyPaymentDueToStaff(
+            tenantName: payment.tenantName ?? 'Tenant',
+            paymentTitle: payment.label,
+            amount: payment.outstandingAmount,
+            dueDate: payment.dueDate,
+            isOverdue: false,
+            paymentId: payment.id,
+          );
+        }
+      }
+
+      // If large batch, dispatch a clear summary alert to owners/caretakers
+      if (overduePayments.length > 3 || dueTodayPayments.length > 2) {
+        await AppNotificationService.instance.notifyPaymentDueSummaryToStaff(
+          dueTodayCount: dueTodayPayments.length,
+          overdueCount: overduePayments.length,
+          totalUncollectedAmount: totalUncollected,
+        );
+      }
+
+      await prefs.setBool(todayKey, true);
+      return totalCount;
+    } catch (e) {
+      debugPrint('[OwnerController] checkAndNotifyDuePayments error: $e');
+      return 0;
     }
   }
 

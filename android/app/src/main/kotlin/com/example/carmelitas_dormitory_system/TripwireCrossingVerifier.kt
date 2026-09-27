@@ -22,7 +22,10 @@ object TripwireCrossingVerifier {
         if (polygon.size < 3) return null
 
         val gateEnabled = prefs.getBoolean("gate_enabled", false)
-        val previousDirection = prefs.getString("confirmed_direction", null)
+        // Pending events represent the latest physical state, but are not
+        // promoted to confirmed_direction until the server stores them.
+        val previousDirection = prefs.getString(TripwireGeofenceManager.QUEUED_DIRECTION, null)
+            ?: prefs.getString("confirmed_direction", null)
 
         val inside = pointInPolygon(location.latitude, location.longitude, polygon)
         val edgeBuffer = prefs.getFloat("edge_buffer_meters", 3f).toDouble()

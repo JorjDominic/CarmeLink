@@ -294,6 +294,117 @@ class AppNotificationService {
     );
   }
 
+  Future<void> notifyPaymentDueToStaff({
+    required String tenantName,
+    required String paymentTitle,
+    required double amount,
+    required DateTime dueDate,
+    required bool isOverdue,
+    String? paymentId,
+  }) async {
+    final formattedAmount = '₱${amount.toStringAsFixed(2)}';
+    final formattedDate =
+        '${dueDate.year}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}';
+    final title = isOverdue
+        ? '⚠️ Overdue Payment: $tenantName'
+        : '📅 Payment Due: $tenantName';
+    final body = isOverdue
+        ? '$tenantName has an overdue payment for "$paymentTitle" of $formattedAmount (Due: $formattedDate).'
+        : '$tenantName has a payment for "$paymentTitle" of $formattedAmount due today ($formattedDate).';
+
+    await sendNotification(
+      title: title,
+      body: body,
+      notificationType: 'payment',
+      recipientRole: 'staff',
+      routeType: 'payment',
+      routeId: paymentId,
+      data: {
+        if (paymentId != null) 'payment_id': paymentId,
+        'tenant_name': tenantName,
+        'amount': amount.toString(),
+        'due_date': formattedDate,
+        'is_overdue': isOverdue.toString(),
+      },
+    );
+  }
+
+  Future<void> notifyPaymentDueSummaryToStaff({
+    required int dueTodayCount,
+    required int overdueCount,
+    required double totalUncollectedAmount,
+  }) async {
+    final formattedAmount = '₱${totalUncollectedAmount.toStringAsFixed(2)}';
+    String title;
+    String body;
+
+    if (overdueCount > 0 && dueTodayCount > 0) {
+      title =
+          '⚠️ Payment Due Alert: $overdueCount Overdue, $dueTodayCount Due Today';
+      body =
+          'Total uncollected: $formattedAmount across active dormitory charges.';
+    } else if (overdueCount > 0) {
+      title = '⚠️ Payment Alert: $overdueCount Overdue Payments';
+      body =
+          'There are $overdueCount overdue payments totaling $formattedAmount requiring review.';
+    } else {
+      title = '📅 Payment Reminder: $dueTodayCount Payments Due Today';
+      body =
+          '$dueTodayCount tenant charges totaling $formattedAmount are due for collection today.';
+    }
+
+    await sendNotification(
+      title: title,
+      body: body,
+      notificationType: 'payment',
+      recipientRole: 'staff',
+      routeType: 'payment',
+      data: {
+        'due_today_count': dueTodayCount.toString(),
+        'overdue_count': overdueCount.toString(),
+        'total_amount': totalUncollectedAmount.toString(),
+      },
+    );
+  }
+
+  // ==========================================
+  // MODULE: GATE & GEOFENCE CROSSINGS
+  // ==========================================
+  Future<void> notifyGateCrossing({
+    required String tenantId,
+    required String tenantName,
+    required String direction,
+    bool isFlagged = false,
+    String? eventId,
+  }) async {
+    final isEntry = direction == 'IN';
+    final title = isFlagged
+        ? '⚠️ Curfew Alert: $tenantName'
+        : (isEntry
+            ? '🏠 Dorm Arrival: $tenantName'
+            : '🚪 Dorm Departure: $tenantName');
+    final body = isFlagged
+        ? '$tenantName was detected outside during curfew hours.'
+        : '$tenantName has ${isEntry ? "entered" : "left"} the dormitory premises.';
+
+    // Dispatches to linked guardians for this tenant
+    await sendNotification(
+      title: title,
+      body: body,
+      notificationType: 'gate',
+      tenantId: tenantId,
+      notifyGuardians: true,
+      routeType: 'gate_event',
+      routeId: eventId,
+      data: {
+        'tenant_id': tenantId,
+        'direction': direction,
+        'is_flagged': isFlagged.toString(),
+        if (eventId != null) 'event_id': eventId,
+      },
+    );
+  }
+
   // ==========================================
   // MODULE: VISITOR PASSES
   // ==========================================

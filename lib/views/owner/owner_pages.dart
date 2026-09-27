@@ -2476,6 +2476,27 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
       onRefresh: () => OwnerController.instance.loadPayments(force: true),
       actions: [
         IconButton(
+          tooltip: 'Send payment due alerts to staff',
+          icon: const Icon(Icons.notifications_active_outlined),
+          onPressed: controller.paymentsLoading
+              ? null
+              : () async {
+                  final count =
+                      await controller.checkAndNotifyDuePayments(force: true);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          count > 0
+                              ? 'Dispatched due date alert for $count charge(s) to owners & caretakers.'
+                              : 'No payments currently due or overdue.',
+                        ),
+                      ),
+                    );
+                  }
+                },
+        ),
+        IconButton(
           tooltip: 'Refresh payments',
           icon: controller.paymentsLoading
               ? const SizedBox(
