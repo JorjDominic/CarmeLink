@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../controllers/tenant_controller.dart';
 import '../services/gate_service.dart';
 import 'geofence_service.dart';
 import 'push_notification_service.dart';
@@ -189,6 +190,11 @@ class GeofenceScheduler with WidgetsBindingObserver {
       );
       debugPrint(
           '[GeofenceScheduler] Foreground crossing recorded: $direction');
+
+      // Push the new direction into TenantController immediately so the
+      // curfew/presence UI reflects the crossing without waiting for the
+      // next manual check-in.
+      TenantController.instance.applyGeofenceCrossing(direction);
     } catch (error) {
       debugPrint('[GeofenceScheduler] Could not record crossing: $error');
       rethrow;

@@ -252,15 +252,22 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       return
     }
     let previousDirection = defaults.string(forKey: "tripwire_confirmed_direction")
-    guard previousDirection != direction, let previousLocation = previousLocation,
-          movementCrossesGate(from: previousLocation, to: location) else { return }
+    // When gate line is enabled, additionally require the movement path to
+    // cross the gate segment. Without a gate line, polygon evaluation alone
+    // is sufficient to confirm a crossing.
+    guard previousDirection != direction else { return }
+    guard movementCrossesGate(from: previousLocation ?? location, to: location) else { return }
     append(direction: direction)
     stopLocationBurst()
   }
 
+  // ─── Fine-accuracy location burst ─────────────────────────────────────────
+
   private func startLocationBurst() {
-    guard defaults.bool(forKey: registeredKey),
-          defaults.bool(forKey: "tripwire_gate_enabled") else { return }
+    guard defaults.bool(forKey: registeredKey) else { return }
+    // Always start a fine-accuracy burst whenever the coarse CLCircularRegion
+    // fires — we need an accurate fix to confirm direction via polygon
+    // evaluation, regardless of whether the virtual gate line is configured.
     burstTimeout?.cancel()
     burstActive = true
     manager.desiredAccuracy = kCLLocationAccuracyBest
@@ -280,6 +287,8 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     manager.distanceFilter = kCLDistanceFilterNone
   }
 
+  // ─── Geometry helpers ─────────────────────────────────────────────────────
+
   private struct Point { let lat: Double; let lng: Double }
 
   private func polygon() -> [Point] {
@@ -289,9 +298,17 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     }
   }
 
+  /// Evaluates whether [location] is inside the dormitory polygon using the
+  /// even-odd ray-casting rule, with edge-buffer hysteresis.
+  ///
+  /// Returns the crossing direction ("IN"/"OUT"), or nil if the polygon is
+  /// too small or unavailable.
+  ///
+  /// NOTE: This is intentionally gate-agnostic. The polygon check is the
+  /// primary boundary test on iOS and runs for every accurate GPS fix.
   private func verifiedDirection(for location: CLLocation) -> String? {
-    guard defaults.bool(forKey: "tripwire_gate_enabled") else { return nil }
-    let points = polygon(); guard points.count >= 3 else { return nil }
+    let points = polygon()
+    guard points.count >= 3 else { return nil }
     let p = Point(lat: location.coordinate.latitude, lng: location.coordinate.longitude)
     var inside = false; var j = points.count - 1
     for i in points.indices {
@@ -300,14 +317,30 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
           p.lng < (b.lng - a.lng) * (p.lat - a.lat) / (b.lat - a.lat) + a.lng { inside.toggle() }
       j = i
     }
-    let edgeDistance = points.indices.map { pointSegmentDistance(p, points[$0], points[($0 + 1) % points.count]) }.min() ?? .greatestFiniteMagnitude
+    let edgeDistance = points.indices.map {
+      pointSegmentDistance(p, points[$0], points[($0 + 1) % points.count])
+    }.min() ?? .greatestFiniteMagnitude
+    // Hysteresis: if we're within the edge buffer, keep the last known direction.
     if edgeDistance <= defaults.double(forKey: "tripwire_edge_buffer"),
        let previous = defaults.string(forKey: "tripwire_confirmed_direction") { return previous }
     return inside ? "IN" : "OUT"
   }
 
+  /// Returns true when the movement path between two fixes should be treated
+  /// as a confirmed boundary crossing.
+  ///
+  /// When the virtual gate line IS configured, we also require the movement
+  /// vector to intersect (or come within tolerance of) the gate segment —
+  /// this prevents false triggers from someone standing near the boundary.
+  ///
+  /// When the gate line is NOT configured (gateEnabled = false), polygon
+  /// evaluation in verifiedDirection() is the sole arbiter, so we always
+  /// return true here to let it through.
   private func movementCrossesGate(from: CLLocation, to: CLLocation) -> Bool {
-    guard defaults.bool(forKey: "tripwire_gate_enabled") else { return false }
+    guard defaults.bool(forKey: "tripwire_gate_enabled") else {
+      // No gate line — polygon direction change is sufficient.
+      return true
+    }
     let start = Point(lat: defaults.double(forKey: "tripwire_gate_start_lat"), lng: defaults.double(forKey: "tripwire_gate_start_lng"))
     let end = Point(lat: defaults.double(forKey: "tripwire_gate_end_lat"), lng: defaults.double(forKey: "tripwire_gate_end_lng"))
     let a = Point(lat: from.coordinate.latitude, lng: from.coordinate.longitude)
@@ -339,6 +372,8 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
                pointSegmentDistance(c,a,b), pointSegmentDistance(d,a,b))
   }
 
+  // ─── CLLocationManagerDelegate — auth & errors ────────────────────────────
+
   func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
     if manager.authorizationStatus == .authorizedAlways {
       restoreIfNeeded()
@@ -366,6 +401,8 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       error.localizedDescription
     )
   }
+
+  // ─── Event queue ──────────────────────────────────────────────────────────
 
   private func append(direction: String) {
     guard let tenantId = defaults.string(forKey: "tripwire_tenant_id") else { return }

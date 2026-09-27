@@ -777,6 +777,23 @@ class TenantController extends ChangeNotifier {
     }
   }
 
+  /// Immediately applies a confirmed geofence crossing direction to the
+  /// in-memory state and notifies listeners so the curfew/presence UI
+  /// updates without waiting for the next full [loadGateEvents] call.
+  ///
+  /// Called by [GeofenceScheduler] after a foreground crossing is recorded
+  /// and by [TripwireGeofenceService] after background events are synced.
+  void applyGeofenceCrossing(String direction) {
+    if (direction != 'IN' && direction != 'OUT') return;
+    _currentGateStatus = direction;
+    _lastGateEventAt = DateTime.now();
+    notifyListeners();
+
+    // Reload gate events in the background to refresh the history list.
+    // Fire-and-forget — the UI already shows the correct status above.
+    loadGateEvents(force: true).ignore();
+  }
+
   @visibleForTesting
   void setGateEventsForTesting(List<GateEvent> events) {
     _gateEvents
