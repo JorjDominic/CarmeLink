@@ -76,6 +76,12 @@ class AdaptiveRoleShell extends StatefulWidget {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
   }
 
+  static void openNotifications(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
+    );
+  }
+
   @override
   State<AdaptiveRoleShell> createState() => _AdaptiveRoleShellState();
 }

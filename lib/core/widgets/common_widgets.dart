@@ -742,9 +742,7 @@ class PageFrame extends StatelessWidget {
           )
         : basePageChild;
 
-    void openNotifications() => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const _GlobalNotificationsPage()),
-        );
+    void openNotifications() => AdaptiveRoleShell.openNotifications(context);
 
     void openMessages() {
       if (navScope?.openMessages != null) {
@@ -952,48 +950,6 @@ class _PageEntranceState extends State<_PageEntrance>
       child: SlideTransition(
         position: position,
         child: widget.child,
-      ),
-    );
-  }
-}
-
-class _GlobalNotificationsPage extends StatelessWidget {
-  const _GlobalNotificationsPage();
-
-  @override
-  Widget build(BuildContext context) {
-    final ranked = <AppNotification>[];
-    if (ranked.isEmpty) {
-      return const PageFrame(
-        title: 'Notifications',
-        subtitle: 'Persistent notifications are not connected yet',
-        child: EmptyState(
-          icon: Icons.notifications_none_rounded,
-          title: 'No notification service',
-          message: 'Updates remain available in their source modules.',
-        ),
-      );
-    }
-    return PageFrame(
-      title: 'Notifications',
-      subtitle: 'Updates ranked by urgency',
-      child: CarmelitaCard(
-        child: Column(
-          children: ranked
-              .map((notification) => TimelineTile(
-                    icon: notification.type == 'Payment'
-                        ? Icons.payments_outlined
-                        : (notification.type == 'Gate' ||
-                                notification.type == 'Geofence' ||
-                                notification.type == 'Presence')
-                            ? Icons.location_on_outlined
-                            : Icons.build_outlined,
-                    title: notification.title,
-                    subtitle:
-                        '${notification.body}\n${shortDate(notification.time)} • ${timeText(notification.time)}',
-                  ))
-              .toList(),
-        ),
       ),
     );
   }
