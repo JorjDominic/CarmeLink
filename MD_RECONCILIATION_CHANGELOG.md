@@ -2,7 +2,22 @@
 
 Original audited base: `main` at `13b5b28` (`MD file updated`)
 
-Current recheck: `main` at `514d116` on September 27, 2026.
+Current recheck: `main` at `5ecba11` on September 27, 2026.
+
+## `5ecba11` build and requested-backlog reconciliation
+
+- Re-ran local verification: `flutter analyze` passes with no issues and all 459
+  automated tests pass.
+- Recorded progress in adaptive layouts, simplified/persistent staff navigation,
+  live notification/messaging refresh, payment UI, and tenant/guardian contract
+  document access.
+- Added the requested backlog: no tenant deposit charge, complete web/mobile
+  responsive coverage, curfew UX improvements, early unsigned-contract access,
+  profile-update backend, staff payment UI improvements, Operations
+  consolidation, and intuitive owner/caretaker navigation.
+- Clarified partial states: deposits are excluded from due calculations but the
+  billing RPC still generates them; early contract views exist but need explicit
+  lifecycle/access tests; profile display helpers are not an editable backend.
 
 ## Current-build recheck
 

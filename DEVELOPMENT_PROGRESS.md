@@ -2,8 +2,8 @@
 
 Last updated: September 27, 2026
 
-Current build reviewed at `514d116`. `flutter analyze` passes with no issues and
-all 427 tests pass. Recent completed source work includes authenticated FCM token
+Current build reviewed at `5ecba11`. `flutter analyze` passes with no issues and
+all 459 tests pass. Recent completed source work includes authenticated FCM token
 claiming, direct/resumable onboarding and electronic signatures, Android/iOS
 polygon plus official-gate confirmation, narrowed gate-corridor configuration,
 and defensive iOS permission/error handling. Remote deployment and physical
@@ -27,6 +27,35 @@ targets; a feature is not release-complete until its platform-specific behavior
 has either been validated on both or is explicitly tracked as blocked.
 
 ## Immediate agenda
+
+### September 27, 2026 — Product UX and policy backlog
+
+- [ ] Remove security-deposit charging from the tenant payment lifecycle. The
+  client excludes deposits from due/overdue metrics, but contract activation
+  still creates a ledger charge. Update the RPC, legacy-row treatment, reports,
+  UI, and tests as one financial change.
+- [ ] Finish route-by-route responsive coverage for every web/mobile page,
+  dialog, data state, text scale, orientation, and supported breakpoint.
+- [ ] Redesign tenant/guardian/owner/caretaker curfew surfaces for clear status,
+  approval stage, actions, history, filters, and gate-context separation.
+- [ ] Guarantee tenant and authorized guardian access to the latest generated
+  contract during draft/unsigned/pending-review onboarding. Build on the current
+  views/RLS and add clear lifecycle labels plus complete state/access tests.
+- [ ] Implement self-service profile persistence: role-specific editable fields,
+  validation, protected RPC/service, RLS, audit, refresh/failure handling, tests.
+- [ ] Improve owner/caretaker payment review around pending work, receipt/audit
+  context, terminology, filtering, density, and responsive action placement.
+- [ ] Continue simplifying Operations by merging genuinely related destinations,
+  removing duplicate entry points, and using progressive disclosure without an
+  overloaded all-in-one page.
+- [ ] Complete owner/caretaker navigation information architecture: stable
+  primary destinations, grouped/searchable secondary tools, consistent labels,
+  breadcrumbs on wide layouts, predictable back behavior, and task-based tests.
+
+Current foundations include adaptive shells, a simplified staff workspace and
+operations menu, a persistent web sidebar, merged room list/floor-plan views,
+responsive payment tests, and early contract-document access. They remain
+partial until the acceptance work above is complete.
 
 ### September 25, 2026 — Today's implementation agenda
 

@@ -1,7 +1,7 @@
 # CarmeLink Module and Feature Status
 
-> Reviewed against current source at `514d116` on September 27, 2026.
-> `flutter analyze`: pass. `flutter test`: 427/427 pass. “Implemented” below is
+> Reviewed against current source at `5ecba11` on September 27, 2026.
+> `flutter analyze`: pass. `flutter test`: 459/459 pass. “Implemented” below is
 > not equivalent to deployed or physically verified.
 
 ## Current build changes
@@ -110,6 +110,7 @@ These are pending improvements, not claims about the current build.
 | Feature | State | Current processing flow | Remaining risk/gap |
 |---|---|---|---|
 | Contract billing | Implemented, verify live | Active contracts generate `billing_charges`; later synchronization covers upcoming charges. | Reconcile charges through contract edits/renewals. |
+| Deposit charging policy | Change required | Tenant totals exclude deposits, but contract activation still creates a `deposit` ledger charge. | Stop tenant-payable deposit generation, define non-destructive legacy-row treatment, and update reports/tests. |
 | Tenant payment list | Implemented | Tenant reads own charges/transactions and derived balances/statuses. | Confirm legacy `payments` versus current transaction model is consistently handled. |
 | Payment-proof submission | Implemented, verify live | Tenant selects/captures receipt, reviews data, uploads media, then calls `submit_payment_transaction`. Failed registration attempts media cleanup. | Test large files, retries, duplicate references, and offline interruption. |
 | Receipt OCR | Implemented as assistance | Google ML Kit runs on-device and suggests amount, method, and reference. User reviews before submission. | Not authoritative; accuracy must not be claimed as verification. |
@@ -117,6 +118,7 @@ These are pending improvements, not claims about the current build.
 | Utility charge | Implemented, verify live | Staff creates single charges or sends cart JSON to transactional batch RPC with allocations. | Verify rounding, occupant snapshots, and rollback on one invalid item. |
 | Rent override | Implemented, verify live | Audited RPC creates future rate override/adjustment rather than rewriting prior ledger facts. | Verify effective-date and contract interactions. |
 | Finance summary | Implemented | Owner summaries and PDF reports aggregate controller payment data. | Reconcile report totals against backend ledger before production use. |
+| Staff payment-review UX | Improvement requested | Owner/caretaker verification metrics, filters, and responsive layouts exist. | Reduce density, prioritize pending work, clarify ledger terms, and surface receipt/audit context consistently. |
 
 ## Maintenance and media
 
@@ -235,7 +237,7 @@ These are pending improvements, not claims about the current build.
 
 ```text
 flutter analyze             PASS — no issues
-flutter test                PASS — 427 tests
+flutter test                PASS — 459 tests
 flutter build apk --debug   PASS
 Remote migration parity     NOT VERIFIED
 Remote RLS/Storage tests    NOT VERIFIED

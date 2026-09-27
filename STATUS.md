@@ -1,9 +1,77 @@
 # CarmeLink Living Status and Gap Tracker
 
-> Current-build review: September 27, 2026 at `514d116` (`IOS Permission crashing`).
+> Current-build review: September 27, 2026 at `5ecba11` (`Vercel Deployment Fix`).
 > Repository verification: `flutter analyze` passes with no issues and
-> `flutter test` passes all 427 tests. Deployment, RLS, and physical-device
+> `flutter test` passes all 459 tests. Deployment, RLS, and physical-device
 > results are separate and remain open where listed below.
+
+## Requested product backlog — September 27, 2026
+
+These items are the next product-policy and UX workstream. Existing partial
+implementations must be audited and refined rather than counted complete merely
+because a page or service exists.
+
+- [ ] **Do not charge tenants a security deposit through Payments** — High
+  - Current evidence: tenant calculations exclude `deposit` rows from amount
+    due, next due, and overdue totals, but
+    `generate_contract_billing_charges` still creates a deposit ledger charge
+    during contract activation.
+  - Required outcome: contract wording may retain a deposit field if legally
+    required, but activation must not create a tenant-payable deposit and no
+    payment page or report may ask the tenant to pay it.
+  - Define non-destructive handling for existing deposit rows (void, archive,
+    or reclassify; never silently delete paid history), then update the RPC,
+    views, reports, UI, and activation/balance/legacy-data tests together.
+
+- [ ] **Complete dynamic/responsive UI coverage across web and mobile** — High
+  - Adaptive shells and narrow-screen tests exist, but not every route, dialog,
+    data state, orientation, and text scale is covered.
+  - Audit tenant, guardian, owner, and caretaker pages at 320/375/768/1024/1440
+    px with loading/empty/error/long-data states; eliminate overflow, clipped
+    actions, fixed-size assumptions, and unreachable navigation.
+
+- [ ] **Improve all curfew experiences** — High
+  - Consolidate status, next action, request history, approval stage, filters,
+    empty/error states, and relevant gate context across tenant, guardian,
+    owner, and caretaker pages.
+  - Use plain workflow labels and keep curfew requests visibly distinct from
+    live gate/geofence evidence.
+
+- [ ] **Keep contracts visible throughout onboarding** — High
+  - Current evidence: tenant draft lookup/generated-document preview, guardian
+    read-only documents, and resident/guardian document RLS are implemented.
+  - Required outcome: once management generates a contract, the tenant and an
+    authorized linked guardian can open the latest version while it is draft,
+    unsigned, or pending review. Show version/date/status and an explicit “not
+    yet signed/final” label; do not require activation or completed onboarding.
+  - Test draft, generated unsigned, tenant-signed pending review, verified,
+    replaced version, unlinked guardian, and no-document states.
+
+- [ ] **Implement profile editing backend and persistence** — High
+  - Current evidence: `ProfileService` resolves room/link summaries and the
+    profile UI mainly displays session/profile values; there is no complete
+    self-service update workflow.
+  - Define editable fields per role, validation, protected RPC/service, RLS and
+    auditing, refresh/error behavior, and tests. Identity, role, and verification
+    fields remain staff-controlled.
+
+- [ ] **Improve owner/caretaker Payments UI** — Medium
+  - Build on the existing metrics, filters, and responsive work: prioritize
+    pending review, clarify charge/payment/adjustment terminology, expose receipt
+    and audit context, reduce density, and keep common actions easy to reach.
+
+- [ ] **Simplify Operations and merge overlapping staff pages** — High
+  - The staff workspace/operations menu was recently reduced and room list/floor
+    plan views are merged, but the remaining catalog is still too broad.
+  - Inventory destinations by task; merge only pages sharing data and actions,
+    remove duplicate entry points, and use tabs or progressive detail without
+    producing one overloaded “everything” page.
+
+- [ ] **Make owner/caretaker navigation intuitive on web and mobile** — High
+  - Keep stable primary destinations, consistent labels/icons/order, clear
+    current-location state, predictable back behavior, wide-layout breadcrumbs,
+    grouped/searchable secondary tools, and role-appropriate quick actions.
+  - Validate common end-to-end tasks separately with owner and caretaker roles.
 
 ## Current-build delta — September 27, 2026
 
@@ -200,7 +268,7 @@ If the team chooses to implement one of these in Capstone 1, move it into the cu
 | Check | Last result | Date |
 |---|---|---|
 | `flutter analyze` | Pass — no issues | 2026-09-27 |
-| `flutter test` | Pass — 427 tests | 2026-09-27 |
+| `flutter test` | Pass — 459 tests | 2026-09-27 |
 | `flutter build apk --debug` | Pass | 2026-09-25 |
 | Remote migration parity | Not verified | — |
 | Remote role/RLS matrix | Not verified | — |
