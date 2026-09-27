@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../controllers/owner_controller.dart';
@@ -5,6 +7,7 @@ import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../../services/app_notification_service.dart';
+import '../../services/table_refresh_subscription.dart';
 import '../owner/owner_pages.dart';
 import '../owner/room_monitoring_page.dart';
 import '../shared/shared_views.dart';
@@ -19,6 +22,10 @@ class CaretakerShell extends StatefulWidget {
 }
 
 class _CaretakerShellState extends State<CaretakerShell> {
+  TableRefreshSubscription? _liveDataSubscription;
+  bool _refreshInFlight = false;
+  bool _refreshAgain = false;
+
   @override
   void initState() {
     super.initState();
@@ -28,8 +35,57 @@ class _CaretakerShellState extends State<CaretakerShell> {
     OwnerController.instance.loadStaffMaintenance();
     OwnerController.instance.loadTenants();
     OwnerController.instance.loadGateEvents();
+    OwnerController.instance.loadVisitors();
+    _liveDataSubscription = TableRefreshSubscription(
+      'caretaker-shell-live-data',
+      const [
+        'profiles',
+        'tenant_details',
+        'guardian_tenant_links',
+        'tenant_assignments',
+        'bed_spaces',
+        'rooms',
+        'payments',
+        'maintenance_reports',
+        'maintenance_staff_history',
+        'visitor_requests',
+        'visitor_events',
+        'curfew_requests',
+        'gate_events',
+      ],
+      () => unawaited(_refreshLiveData()),
+    );
   }
 
+  Future<void> _refreshLiveData() async {
+    if (_refreshInFlight) {
+      _refreshAgain = true;
+      return;
+    }
+
+    do {
+      _refreshAgain = false;
+      _refreshInFlight = true;
+      try {
+      final controller = OwnerController.instance;
+      await controller.loadRooms(force: true);
+      await controller.loadPayments(force: true);
+      await controller.loadCurfewRequests(force: true);
+      await controller.loadStaffMaintenance(force: true);
+      await controller.loadTenants(force: true);
+      await controller.loadGateEvents(force: true);
+      await controller.loadVisitors(force: true);
+      } finally {
+        _refreshInFlight = false;
+      }
+    } while (_refreshAgain && mounted);
+  }
+
+  @override
+  void dispose() {
+    unawaited(_liveDataSubscription?.dispose());
+    super.dispose();
+  }
 
   Widget? _notificationDestination(AppNotificationItem notification) {
     final routeType = notification.routeType?.trim();

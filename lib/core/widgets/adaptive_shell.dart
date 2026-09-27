@@ -949,27 +949,21 @@ class _WebStaffSidebar extends StatelessWidget {
                     ListTile(
                       key: const Key('web-staff-messages'),
                       dense: true,
-                      leading: const Icon(Icons.chat_bubble_outline),
+                      leading: _MenuIconWithBadge(
+                        icon: Icons.chat_bubble_outline,
+                        count: unreadMessageCount,
+                      ),
                       title: const Text('Messages'),
-                      trailing: unreadMessageCount > 0
-                          ? _UnreadCountBadge(
-                              count: unreadMessageCount,
-                              compact: true,
-                            )
-                          : null,
                       onTap: onOpenMessages,
                     ),
                     ListTile(
                       key: const Key('web-staff-notifications'),
                       dense: true,
-                      leading: const Icon(Icons.notifications_outlined),
+                      leading: _MenuIconWithBadge(
+                        icon: Icons.notifications_outlined,
+                        count: unreadNotificationCount,
+                      ),
                       title: const Text('Notifications'),
-                      trailing: unreadNotificationCount > 0
-                          ? _UnreadCountBadge(
-                              count: unreadNotificationCount,
-                              compact: true,
-                            )
-                          : null,
                       onTap: onOpenNotifications,
                     ),
                     ListTile(
@@ -1057,6 +1051,32 @@ class _NotificationIconButton extends StatelessWidget {
       );
 }
 
+class _MenuIconWithBadge extends StatelessWidget {
+  const _MenuIconWithBadge({required this.icon, required this.count});
+
+  final IconData icon;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 28,
+        height: 28,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Icon(icon, size: 21),
+            if (count > 0)
+              Positioned(
+                right: -4,
+                top: -4,
+                child: _UnreadCountBadge(count: count, compact: true),
+              ),
+          ],
+        ),
+      );
+}
+
 class _UnreadCountBadge extends StatelessWidget {
   const _UnreadCountBadge({required this.count, this.compact = false});
 
@@ -1069,20 +1089,21 @@ class _UnreadCountBadge extends StatelessWidget {
     final label = count > 99 ? '99+' : '$count';
     return Container(
       constraints: BoxConstraints(
-        minWidth: compact ? 17 : 24,
-        minHeight: compact ? 17 : 20,
+        minWidth: compact ? 16 : 24,
+        minHeight: compact ? 16 : 20,
       ),
       padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 7),
-      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: scheme.error,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
+        textAlign: TextAlign.center,
         style: TextStyle(
           color: scheme.onError,
           fontSize: compact ? 9 : 11,
+          height: 1.2,
           fontWeight: FontWeight.w900,
         ),
       ),
@@ -1411,23 +1432,22 @@ class _RoleMenu extends StatelessWidget {
           const Divider(),
           ListTile(
             minTileHeight: 54,
-            leading: const Icon(Icons.chat_bubble_outline),
+            leading: _MenuIconWithBadge(
+              icon: Icons.chat_bubble_outline,
+              count: unreadMessageCount,
+            ),
             title: const Text('Messages'),
-            trailing: unreadMessageCount > 0
-                ? _UnreadCountBadge(count: unreadMessageCount, compact: true)
-                : const Icon(Icons.chevron_right_rounded),
+            trailing: const Icon(Icons.chevron_right_rounded),
             onTap: onOpenMessages,
           ),
           ListTile(
             minTileHeight: 54,
-            leading: const Icon(Icons.notifications_outlined),
+            leading: _MenuIconWithBadge(
+              icon: Icons.notifications_outlined,
+              count: unreadNotificationCount,
+            ),
             title: const Text('Notifications'),
-            trailing: unreadNotificationCount > 0
-                ? _UnreadCountBadge(
-                    count: unreadNotificationCount,
-                    compact: true,
-                  )
-                : const Icon(Icons.chevron_right_rounded),
+            trailing: const Icon(Icons.chevron_right_rounded),
             onTap: onOpenNotifications,
           ),
           ListTile(

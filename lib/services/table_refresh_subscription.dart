@@ -11,9 +11,11 @@ class TableRefreshSubscription {
     Iterable<String> tables,
     void Function() refresh, {
     Duration debounceDuration = const Duration(milliseconds: 500),
+    Duration? catchUpInterval = const Duration(seconds: 30),
   }) {
     _refresh = refresh;
     _debounceDuration = debounceDuration;
+    _catchUpInterval = catchUpInterval;
 
     try {
       final client = SupabaseConfig.clientSafe;
@@ -34,6 +36,13 @@ class TableRefreshSubscription {
         );
       }
       channel = builder.subscribe();
+      final catchUpInterval = _catchUpInterval;
+      if (catchUpInterval != null) {
+        _catchUpTimer = Timer.periodic(
+          catchUpInterval,
+          (_) => _triggerDebouncedRefresh(),
+        );
+      }
     } catch (_) {
       // Ignored when offline or uninitialized
     }
@@ -56,7 +65,9 @@ class TableRefreshSubscription {
   RealtimeChannel? channel;
   late final void Function() _refresh;
   late final Duration _debounceDuration;
+  late final Duration? _catchUpInterval;
   Timer? _debounceTimer;
+  Timer? _catchUpTimer;
 
   void _triggerDebouncedRefresh() {
     _debounceTimer?.cancel();
@@ -67,6 +78,7 @@ class TableRefreshSubscription {
 
   Future<void> dispose() async {
     _debounceTimer?.cancel();
+    _catchUpTimer?.cancel();
     final c = channel;
     if (c != null) {
       try {

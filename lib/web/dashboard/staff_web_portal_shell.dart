@@ -107,6 +107,7 @@ class _StaffWebPortalShellState extends State<StaffWebPortalShell>
       _liveStaffTables,
       () => unawaited(_refreshLiveData()),
       debounceDuration: const Duration(milliseconds: 700),
+      catchUpInterval: null,
     );
     _catchUpTimer = Timer.periodic(
       const Duration(seconds: 60),
