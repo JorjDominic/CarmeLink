@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/services/geofence_service.dart';
+import 'package:carmelitas_dormitory_system/services/boundary_config_service.dart';
 
 void main() {
   setUp(() {
@@ -34,7 +35,9 @@ void main() {
       expect(poly[3].longitude, 120.88454200910613);
     });
 
-    test('perimeter measurements match dormitory lot dimensions (~110-120m perimeter)', () {
+    test(
+        'perimeter measurements match dormitory lot dimensions (~110-120m perimeter)',
+        () {
       final poly = GeofenceLocationService.productionDormitoryPolygon;
       double totalPerimeter = 0.0;
       for (int i = 0; i < poly.length; i++) {
@@ -59,7 +62,8 @@ void main() {
       // Lot center point
       const centerLat = 14.949396;
       const centerLng = 120.884694;
-      expect(GeofenceLocationService.isWithinDormBoundary(centerLat, centerLng), isTrue);
+      expect(GeofenceLocationService.isWithinDormBoundary(centerLat, centerLng),
+          isTrue);
 
       final result = GeofenceLocationService.evaluateCoordinates(
         latitude: centerLat,
@@ -75,7 +79,9 @@ void main() {
       // Distant point in Baliwag
       const distantLat = 14.954200;
       const distantLng = 120.900800;
-      expect(GeofenceLocationService.isWithinDormBoundary(distantLat, distantLng), isFalse);
+      expect(
+          GeofenceLocationService.isWithinDormBoundary(distantLat, distantLng),
+          isFalse);
 
       final result = GeofenceLocationService.evaluateCoordinates(
         latitude: distantLat,
@@ -86,10 +92,13 @@ void main() {
       expect(result.isOutside, isTrue);
     });
 
-    test('isWithinDormBoundary works cleanly with only (lat, lng) parameters', () {
+    test('isWithinDormBoundary works cleanly with only (lat, lng) parameters',
+        () {
       // Interface verification: bool isWithinDormBoundary(double lat, double lng)
-      final inside = GeofenceLocationService.isWithinDormBoundary(14.949396, 120.884694);
-      final outside = GeofenceLocationService.isWithinDormBoundary(14.949400, 120.885500);
+      final inside =
+          GeofenceLocationService.isWithinDormBoundary(14.949396, 120.884694);
+      final outside =
+          GeofenceLocationService.isWithinDormBoundary(14.949400, 120.885500);
 
       expect(inside, isTrue);
       expect(outside, isFalse);
@@ -97,7 +106,9 @@ void main() {
   });
 
   group('Edge Hysteresis Debouncing Buffer (±3.0m default)', () {
-    test('maintains IN direction when resident is just inside or just outside the edge within 3m', () {
+    test(
+        'maintains IN direction when resident is just inside or just outside the edge within 3m',
+        () {
       final poly = GeofenceLocationService.productionDormitoryPolygon;
 
       // Find an interior point that is very close to the northern edge (within ~1.5m)
@@ -111,7 +122,8 @@ void main() {
       const justInsideLat = midNorthLat - 0.00001;
       const justInsideLng = midNorthLng;
 
-      final distToEdgeInside = GeofenceLocationService.distanceToPolygonEdgeMeters(
+      final distToEdgeInside =
+          GeofenceLocationService.distanceToPolygonEdgeMeters(
         justInsideLat,
         justInsideLng,
         poly,
@@ -138,7 +150,8 @@ void main() {
       const justOutsideLat = midNorthLat + 0.00001;
       const justOutsideLng = midNorthLng;
 
-      final distToEdgeOutside = GeofenceLocationService.distanceToPolygonEdgeMeters(
+      final distToEdgeOutside =
+          GeofenceLocationService.distanceToPolygonEdgeMeters(
         justOutsideLat,
         justOutsideLng,
         poly,
@@ -162,7 +175,9 @@ void main() {
       expect(keptOutOutside, isFalse);
     });
 
-    test('deep interior and exterior points bypass hysteresis regardless of previous direction', () {
+    test(
+        'deep interior and exterior points bypass hysteresis regardless of previous direction',
+        () {
       // Center of property is ~10m from all edges
       const centerLat = 14.949396;
       const centerLng = 120.884694;
@@ -192,7 +207,9 @@ void main() {
   });
 
   group('Zero-Coordinate Persistence Guarantee', () {
-    test('GeofenceCheckResult contains no persistent latitude, longitude, or distance', () {
+    test(
+        'GeofenceCheckResult contains no persistent latitude, longitude, or distance',
+        () {
       final result = GeofenceLocationService.evaluateCoordinates(
         latitude: 14.949396,
         longitude: 120.884694,
@@ -204,7 +221,9 @@ void main() {
       expect(result.errorMessage, isNull);
     });
 
-    test('GateEvent strictly discards raw coordinate data and only serializes presence state', () {
+    test(
+        'GateEvent strictly discards raw coordinate data and only serializes presence state',
+        () {
       final now = DateTime.now();
       final event = GateEvent(
         id: 'event-uuid-test',
@@ -239,9 +258,43 @@ void main() {
     });
   });
 
+  group('Official Gate Configuration', () {
+    test('parses an enabled gate corridor from the boundary row', () {
+      final snapshot = BoundaryConfigService.configFromRow({
+        'gate_enabled': true,
+        'gate_start_latitude': 14.9494,
+        'gate_start_longitude': 120.8845,
+        'gate_end_latitude': 14.94941,
+        'gate_end_longitude': 120.88455,
+        'gate_tolerance_meters': 12,
+        'config_version': 4,
+        'polygon_points': const <dynamic>[],
+      });
+
+      expect(snapshot.gateEnabled, isTrue);
+      expect(snapshot.gateStart, const LatLngPoint(14.9494, 120.8845));
+      expect(snapshot.gateEnd, const LatLngPoint(14.94941, 120.88455));
+      expect(snapshot.gateToleranceMeters, 12);
+      expect(snapshot.configVersion, 4);
+    });
+
+    test('defaults to a disabled gate when legacy rows have no gate fields',
+        () {
+      final snapshot = BoundaryConfigService.configFromRow({
+        'polygon_points': const <dynamic>[],
+      });
+      expect(snapshot.gateEnabled, isFalse);
+      expect(snapshot.gateStart, isNull);
+      expect(snapshot.gateEnd, isNull);
+    });
+  });
+
   group('Isolated In-Memory Test Override Panel Behavior', () {
-    test('setting test polygon override affects active evaluation without modifying production constant', () {
-      final originalProduction = GeofenceLocationService.productionDormitoryPolygon;
+    test(
+        'setting test polygon override affects active evaluation without modifying production constant',
+        () {
+      final originalProduction =
+          GeofenceLocationService.productionDormitoryPolygon;
 
       // Define an arbitrary small test polygon around coordinates (0.0, 0.0)
       const testPolygon = [
@@ -257,30 +310,40 @@ void main() {
 
       expect(GeofenceLocationService.hasActiveTestOverride, isTrue);
       expect(GeofenceLocationService.activePolygon.length, 4);
-      expect(GeofenceLocationService.activePolygon[0], const LatLngPoint(0.0, 0.0));
+      expect(GeofenceLocationService.activePolygon[0],
+          const LatLngPoint(0.0, 0.0));
 
       // The production constant remains untouched
       expect(originalProduction[0].latitude, 14.949435124962447);
-      expect(GeofenceLocationService.productionDormitoryPolygon[0].latitude, 14.949435124962447);
+      expect(GeofenceLocationService.productionDormitoryPolygon[0].latitude,
+          14.949435124962447);
 
       // Coordinate (0.5, 0.5) is inside test polygon
       expect(GeofenceLocationService.isWithinDormBoundary(0.5, 0.5), isTrue);
 
       // Coordinate at actual dorm center (14.949396, 120.884694) is OUT of this test polygon
-      expect(GeofenceLocationService.isWithinDormBoundary(14.949396, 120.884694), isFalse);
+      expect(
+          GeofenceLocationService.isWithinDormBoundary(14.949396, 120.884694),
+          isFalse);
 
       // Reset override
       GeofenceLocationService.resetTestOverride();
       expect(GeofenceLocationService.hasActiveTestOverride, isFalse);
-      expect(GeofenceLocationService.activePolygon[0].latitude, 14.949435124962447);
+      expect(GeofenceLocationService.activePolygon[0].latitude,
+          14.949435124962447);
 
       // Dorm center is once again IN
-      expect(GeofenceLocationService.isWithinDormBoundary(14.949396, 120.884694), isTrue);
+      expect(
+          GeofenceLocationService.isWithinDormBoundary(14.949396, 120.884694),
+          isTrue);
     });
 
-    test('setting test radius override alters circular evaluation in circular mode', () {
+    test(
+        'setting test radius override alters circular evaluation in circular mode',
+        () {
       GeofenceLocationService.usePolygonBoundary = false;
-      GeofenceLocationService.setTestRadiusOverride(10.0); // very small 10m radius
+      GeofenceLocationService.setTestRadiusOverride(
+          10.0); // very small 10m radius
 
       expect(GeofenceLocationService.hasActiveTestOverride, isTrue);
 
@@ -308,4 +371,3 @@ void main() {
     });
   });
 }
-

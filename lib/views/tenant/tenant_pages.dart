@@ -785,29 +785,31 @@ class _TenantOnboardingBanner extends StatefulWidget {
 class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
   final _service = const OnboardingInvitationService();
   final _docService = const ContractOnboardingService();
-  late Future<({
-    bool needsOnboarding,
-    bool needsEmergency,
-    bool needsDocuments,
-    String? token,
-    String title,
-    String reason,
-    TenantContract? contract,
-    List<ContractRequirement> requirements,
-    List<ContractSigner> signers,
-  })> _future = _load();
+  late Future<
+      ({
+        bool needsOnboarding,
+        bool needsEmergency,
+        bool needsDocuments,
+        String? token,
+        String title,
+        String reason,
+        TenantContract? contract,
+        List<ContractRequirement> requirements,
+        List<ContractSigner> signers,
+      })> _future = _load();
 
-  Future<({
-    bool needsOnboarding,
-    bool needsEmergency,
-    bool needsDocuments,
-    String? token,
-    String title,
-    String reason,
-    TenantContract? contract,
-    List<ContractRequirement> requirements,
-    List<ContractSigner> signers,
-  })> _load() async {
+  Future<
+      ({
+        bool needsOnboarding,
+        bool needsEmergency,
+        bool needsDocuments,
+        String? token,
+        String title,
+        String reason,
+        TenantContract? contract,
+        List<ContractRequirement> requirements,
+        List<ContractSigner> signers,
+      })> _load() async {
     try {
       final details = await _service.getMyTenantDetails();
       final ecName =
@@ -940,7 +942,10 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
           : (color: const Color(0xFFE65100), text: 'Missing • Action required');
     }
     if (req.physicalCopyReceived) {
-      return (color: const Color(0xFF2E7D32), text: 'Hard copy received at desk');
+      return (
+        color: const Color(0xFF2E7D32),
+        text: 'Hard copy received at desk'
+      );
     }
     if (req.isVerified) {
       return (color: const Color(0xFF2E7D32), text: 'Verified & Approved');
@@ -948,7 +953,8 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
     if (req.isPendingReview) {
       return (
         color: const Color(0xFF1565C0),
-        text: 'Uploaded (${req.originalFilename ?? "Document"}) • Pending Review'
+        text:
+            'Uploaded (${req.originalFilename ?? "Document"}) • Pending Review'
       );
     }
     if (req.status == 'rejected') {
@@ -960,7 +966,10 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
     if (!req.isRequired) {
       return (color: Colors.grey, text: 'Optional (Not submitted)');
     }
-    return (color: const Color(0xFFE65100), text: 'Not uploaded yet (Action required)');
+    return (
+      color: const Color(0xFFE65100),
+      text: 'Not uploaded yet (Action required)'
+    );
   }
 
   ({Color color, String text}) _getSignerStatus(ContractSigner? signer) {
@@ -971,7 +980,10 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
       );
     }
     if (signer.isVerified) {
-      return (color: const Color(0xFF2E7D32), text: 'Signature verified by staff');
+      return (
+        color: const Color(0xFF2E7D32),
+        text: 'Signature verified by staff'
+      );
     }
     if (signer.status == 'signed') {
       return (
@@ -995,17 +1007,18 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<({
-      bool needsOnboarding,
-      bool needsEmergency,
-      bool needsDocuments,
-      String? token,
-      String title,
-      String reason,
-      TenantContract? contract,
-      List<ContractRequirement> requirements,
-      List<ContractSigner> signers,
-    })>(
+    return FutureBuilder<
+        ({
+          bool needsOnboarding,
+          bool needsEmergency,
+          bool needsDocuments,
+          String? token,
+          String title,
+          String reason,
+          TenantContract? contract,
+          List<ContractRequirement> requirements,
+          List<ContractSigner> signers,
+        })>(
       future: _future,
       builder: (context, snapshot) {
         final info = snapshot.data;
@@ -1028,8 +1041,7 @@ class _TenantOnboardingBannerState extends State<_TenantOnboardingBanner> {
             signers.where((s) => s.role == 'tenant').firstOrNull;
 
         final tenantIdStatus = _getReqStatus(tenantIdReq);
-        final guardianIdStatus =
-            _getReqStatus(guardianIdReq, isOptional: true);
+        final guardianIdStatus = _getReqStatus(guardianIdReq, isOptional: true);
         final signedDocStatus = _getReqStatus(signedReq);
         final signatureStatus = _getSignerStatus(tenantSigner);
 
@@ -1311,7 +1323,8 @@ class _BannerDocRow extends StatelessWidget {
             ),
             if (trailingActionText != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primary,
                   borderRadius: BorderRadius.circular(8),
@@ -1326,7 +1339,8 @@ class _BannerDocRow extends StatelessWidget {
                 ),
               )
             else
-              const Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 18, color: Colors.grey),
           ],
         ),
       ),
@@ -5409,8 +5423,8 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
     final controller = TenantController.instance;
 
     return PageFrame(
-      title: 'Curfew',
-      subtitle: 'Automatic boundary crossings and exception requests',
+      title: 'Presence & Curfew',
+      subtitle: 'Your gate status, monitoring, and exceptions',
       maxWidth: 720,
       actions: [
         IconButton(
@@ -5451,6 +5465,8 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
           final visibleEvents =
               showAllPresenceRecords ? events : events.take(5).toList();
           final monitoringActive = _monitoringStatus['registered'] == true;
+          final gateConfigured = _monitoringStatus['gateEnabled'] == true;
+          final automaticReady = monitoringActive && gateConfigured;
           final pendingTransitions =
               (_monitoringStatus['pendingCount'] as num?)?.toInt() ?? 0;
 
@@ -5480,7 +5496,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const WorkInProgressNotice(),
+              const TripwireFlowCard(compact: true),
               const SizedBox(height: 16),
               const TenantEmployeeCurfewProfileCard(),
               const SizedBox(height: 16),
@@ -5574,7 +5590,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: (monitoringActive
+                          color: (automaticReady
                                   ? const Color(0xFF56886B)
                                   : const Color(0xFFC77800))
                               .withValues(alpha: 0.09),
@@ -5583,10 +5599,10 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                         child: Row(
                           children: [
                             Icon(
-                              monitoringActive
+                              automaticReady
                                   ? Icons.sensors_rounded
                                   : Icons.sensors_off_rounded,
-                              color: monitoringActive
+                              color: automaticReady
                                   ? const Color(0xFF56886B)
                                   : const Color(0xFFC77800),
                             ),
@@ -5596,8 +5612,8 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    monitoringActive
-                                        ? 'Automatic logging active'
+                                    automaticReady
+                                        ? 'Dual-geofence monitoring active'
                                         : 'Automatic logging needs attention',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w700,
@@ -5606,9 +5622,11 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                                   Text(
                                     pendingTransitions > 0
                                         ? '$pendingTransitions crossing event(s) waiting to sync.'
-                                        : monitoringActive
-                                            ? 'Crossings are monitored automatically. You can also manually check in below.'
-                                            : 'Enable Always / Allow all the time location access.',
+                                        : automaticReady
+                                            ? 'Wake-up and Point 1 → Point 2 gate detection are registered.'
+                                            : !gateConfigured
+                                                ? 'The official gate configuration has not reached this device yet.'
+                                                : 'Enable Always / Allow all the time location access.',
                                     style:
                                         Theme.of(context).textTheme.bodySmall,
                                   ),
@@ -5743,7 +5761,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                   ),
                 ),
               ],
-              if (!monitoringActive) ...[
+              if (!automaticReady) ...[
                 const SizedBox(height: 12),
                 Container(
                   width: double.infinity,
@@ -5773,8 +5791,10 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                               ),
                             ),
                             const SizedBox(height: 2),
-                            const Text(
-                              'Turn on location services and grant Always / Allow all the time access so crossings can be logged while CarmeLink is closed.',
+                            Text(
+                              !gateConfigured
+                                  ? 'Refresh monitoring after the Point 1 → Point 2 gate configuration is deployed.'
+                                  : 'Turn on location services and grant Always / Allow all the time access so crossings can be logged while CarmeLink is closed.',
                               style: TextStyle(fontSize: 13),
                             ),
                             const SizedBox(height: 8),
@@ -5833,14 +5853,16 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                   ),
                   MutedDashboardItem(
                     label: 'Detection signal',
-                    value: monitoringActive ? 'Active' : 'Needs attention',
-                    detail: monitoringActive
-                        ? 'Native background monitoring'
-                        : 'Check Always location access',
-                    icon: !monitoringActive
+                    value: automaticReady ? 'Active' : 'Needs attention',
+                    detail: automaticReady
+                        ? 'Wake circle + Point 1 → Point 2 gate'
+                        : !gateConfigured
+                            ? 'Gate configuration pending'
+                            : 'Check Always location access',
+                    icon: !automaticReady
                         ? Icons.location_disabled_outlined
                         : Icons.gps_fixed_outlined,
-                    color: !monitoringActive
+                    color: !automaticReady
                         ? const Color(0xFFB03A2E)
                         : const Color(0xFF627FA8),
                   ),

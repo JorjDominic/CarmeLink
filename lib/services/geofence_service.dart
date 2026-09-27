@@ -153,6 +153,10 @@ class GeofenceLocationService {
           : (_remotePolygon ?? productionDormitoryPolygon);
 
   static double get activeEdgeBufferMeters => _remoteEdgeBufferMeters;
+  static double get activeRadiusMeters =>
+      (_useTestOverride && _testRadiusOverride != null)
+          ? _testRadiusOverride!
+          : (_remoteRadiusMeters ?? geofenceRadiusMeters);
 
   /// Applies the active server-owned boundary without retaining tenant location.
   static void applyBoundaryConfiguration(Map<String, dynamic> row) {
@@ -306,9 +310,7 @@ class GeofenceLocationService {
       return inside;
     } else {
       // Legacy circular boundary check with hysteresis
-      final radius = (_useTestOverride && _testRadiusOverride != null)
-          ? _testRadiusOverride!
-          : (_remoteRadiusMeters ?? geofenceRadiusMeters);
+      final radius = activeRadiusMeters;
       final distance = Geolocator.distanceBetween(
         lat,
         lng,

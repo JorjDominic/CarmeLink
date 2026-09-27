@@ -4787,7 +4787,12 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     super.initState();
     OwnerController.instance.loadGateEvents();
     OwnerController.instance.loadTenants();
-    const BoundaryConfigService().loadActiveConfig();
+    _refreshBoundary();
+  }
+
+  Future<void> _refreshBoundary() async {
+    await const BoundaryConfigService().loadActiveConfig();
+    if (mounted) setState(() {});
   }
 
   void _openManualLogDialog({TenantDirectoryEntry? preselected}) {
@@ -4797,12 +4802,13 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     );
   }
 
-  void _openBoundaryEditor() {
-    showDialog(
+  Future<void> _openBoundaryEditor() async {
+    final changed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (_) => const _EditBoundaryDialog(),
     );
+    if (changed == true) await _refreshBoundary();
   }
 
   @override
@@ -4812,8 +4818,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
         SessionController.instance.currentUser?.role == UserRole.owner;
 
     return PageFrame(
-      title: 'Curfew',
-      subtitle: 'Automatic dormitory entry and exit records',
+      title: 'Presence & Curfew',
+      subtitle: 'Gate crossings, resident status, and exceptions',
       maxWidth: 780,
       actions: [
         IconButton(
@@ -4830,7 +4836,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
               : () {
                   controller.loadGateEvents(force: true);
                   controller.loadTenants(force: true);
-                  const BoundaryConfigService().loadActiveConfig();
+                  _refreshBoundary();
                 },
         ),
         PopupMenuButton<String>(
@@ -4913,7 +4919,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const WorkInProgressNotice(),
+              const TripwireFlowCard(),
               const SizedBox(height: 16),
               // ── Owner-only Location Test Panel ───────────────────────
               if (isOwner && _showTestPanel) ...[
@@ -4941,10 +4947,10 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                     icon: Icons.location_off_outlined,
                   ),
                   const MetricCard(
-                    label: 'Dormitory perimeter',
-                    value: 'Polygon Lot',
-                    detail: '4 Measured Corners (Baliwag)',
-                    icon: Icons.polyline_outlined,
+                    label: 'Official gate',
+                    value: 'Point 1 → 2',
+                    detail: '15 m corridor on polygon edge',
+                    icon: Icons.door_front_door_outlined,
                   ),
                 ],
               ),
@@ -5228,7 +5234,7 @@ class _StaffManualLogDialogState extends State<_StaffManualLogDialog> {
       );
 
       if (mounted) {
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -5947,8 +5953,10 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
   final _p3LngCtrl = TextEditingController();
   final _p4LatCtrl = TextEditingController();
   final _p4LngCtrl = TextEditingController();
+  final _gateToleranceCtrl = TextEditingController(text: '15.0');
 
   String _mode = 'polygon';
+  bool _gateEnabled = true;
   bool _loading = true;
   bool _saving = false;
   bool _fetchingGps = false;
@@ -5975,6 +5983,7 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
     _p3LngCtrl.dispose();
     _p4LatCtrl.dispose();
     _p4LngCtrl.dispose();
+    _gateToleranceCtrl.dispose();
     super.dispose();
   }
 
@@ -5990,6 +5999,8 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
         _radiusCtrl.text = snap.radiusMeters.toStringAsFixed(1);
         _bufferCtrl.text = snap.edgeBufferMeters.toStringAsFixed(1);
         _mode = snap.boundaryMode;
+        _gateEnabled = snap.gateEnabled;
+        _gateToleranceCtrl.text = snap.gateToleranceMeters.toStringAsFixed(1);
         _populatePolygonCorners(snap.polygonPoints);
       } else {
         // Fallback to compiled-in defaults
@@ -6002,6 +6013,8 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
         _bufferCtrl.text =
             GeofenceLocationService.debounceBufferMeters.toStringAsFixed(1);
         _mode = 'polygon';
+        _gateEnabled = true;
+        _gateToleranceCtrl.text = '15.0';
         _populatePolygonCorners(
             GeofenceLocationService.productionDormitoryPolygon);
       }
@@ -6015,6 +6028,8 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
           GeofenceLocationService.geofenceRadiusMeters.toStringAsFixed(1);
       _bufferCtrl.text =
           GeofenceLocationService.debounceBufferMeters.toStringAsFixed(1);
+      _gateEnabled = true;
+      _gateToleranceCtrl.text = '15.0';
       _populatePolygonCorners(
           GeofenceLocationService.productionDormitoryPolygon);
     } finally {
@@ -6116,6 +6131,7 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
     final lng = double.tryParse(_lngCtrl.text.trim());
     final radius = double.tryParse(_radiusCtrl.text.trim());
     final buffer = double.tryParse(_bufferCtrl.text.trim());
+    final gateTolerance = double.tryParse(_gateToleranceCtrl.text.trim());
 
     if (lat == null || lng == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -6126,6 +6142,14 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
     if (radius != null && radius < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Radius must be at least 10 metres.')),
+      );
+      return;
+    }
+    if (gateTolerance == null || gateTolerance < 3 || gateTolerance > 50) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gate tolerance must be between 3 and 50 metres.'),
+        ),
       );
       return;
     }
@@ -6176,12 +6200,27 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
         boundaryMode: _mode,
         polygonPoints: newPolygon,
       );
+      final effectivePolygon =
+          newPolygon ?? _current?.polygonPoints ?? const <LatLngPoint>[];
+      final gateEnabled = _gateEnabled && _mode == 'polygon';
+      await _service.updateGateConfig(
+        enabled: gateEnabled,
+        start: gateEnabled && effectivePolygon.length >= 2
+            ? effectivePolygon[0]
+            : null,
+        end: gateEnabled && effectivePolygon.length >= 2
+            ? effectivePolygon[1]
+            : null,
+        toleranceMeters: gateTolerance,
+      );
 
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Boundary configuration saved and applied.'),
+            content: Text(
+              'Boundary and Point 1 → Point 2 gate saved and applied.',
+            ),
           ),
         );
       }
@@ -6287,9 +6326,8 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        'Changes take effect immediately for all users. '
-                        'You can fine-tune all 4 corner coordinates of the polygon below, '
-                        'or auto-calculate them from the center & radius.',
+                        'Saved settings become authoritative immediately; tenant devices refresh native monitoring on app resume. '
+                        'Fine-tune all 4 polygon corners below or auto-calculate them from the center and radius.',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -6452,6 +6490,60 @@ class _EditBoundaryDialogState extends State<_EditBoundaryDialog> {
                           'Corner 3 (SW / West)', _p3LatCtrl, _p3LngCtrl),
                       _buildCornerRow(
                           'Corner 4 (NW / North)', _p4LatCtrl, _p4LngCtrl),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .secondaryContainer
+                              .withValues(alpha: .35),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .secondary
+                                .withValues(alpha: .25),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              value: _gateEnabled,
+                              onChanged: (value) =>
+                                  setState(() => _gateEnabled = value),
+                              title: const Text(
+                                'Official gate tripwire',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              subtitle: const Text(
+                                'Uses the full boundary edge from Point 1 to Point 2.',
+                              ),
+                            ),
+                            if (_gateEnabled) ...[
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _gateToleranceCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Gate tolerance (metres)',
+                                  helperText:
+                                      'GPS corridor around the Point 1–2 edge',
+                                  prefixIcon:
+                                      Icon(Icons.door_front_door_outlined),
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
 
                     // Updated at

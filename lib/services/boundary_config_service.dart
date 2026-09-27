@@ -78,6 +78,28 @@ class BoundaryConfigService {
     await loadActiveConfig();
   }
 
+  /// Configures the official gate corridor used by the second-stage verifier.
+  /// Passing [enabled] as false safely disables automatic crossing events.
+  Future<void> updateGateConfig({
+    required bool enabled,
+    LatLngPoint? start,
+    LatLngPoint? end,
+    double toleranceMeters = 15,
+  }) async {
+    if (enabled && (start == null || end == null)) {
+      throw ArgumentError('Both gate endpoints are required when enabled.');
+    }
+    await SupabaseConfig.client.rpc('update_dorm_gate_config', params: {
+      'p_enabled': enabled,
+      'p_start_lat': start?.latitude,
+      'p_start_lng': start?.longitude,
+      'p_end_lat': end?.latitude,
+      'p_end_lng': end?.longitude,
+      'p_tolerance_meters': toleranceMeters,
+    });
+    await loadActiveConfig();
+  }
+
   /// Extracts a typed summary from a raw `dorm_boundary_config` row map.
   static BoundarySnapshot configFromRow(Map<String, dynamic> row) {
     final rawPoints = row['polygon_points'];
@@ -103,6 +125,24 @@ class BoundaryConfigService {
           GeofenceLocationService.debounceBufferMeters,
       boundaryMode: row['boundary_mode'] as String? ?? 'polygon',
       polygonPoints: points,
+      gateEnabled: row['gate_enabled'] == true,
+      gateStart: row['gate_start_latitude'] is num &&
+              row['gate_start_longitude'] is num
+          ? LatLngPoint(
+              (row['gate_start_latitude'] as num).toDouble(),
+              (row['gate_start_longitude'] as num).toDouble(),
+            )
+          : null,
+      gateEnd:
+          row['gate_end_latitude'] is num && row['gate_end_longitude'] is num
+              ? LatLngPoint(
+                  (row['gate_end_latitude'] as num).toDouble(),
+                  (row['gate_end_longitude'] as num).toDouble(),
+                )
+              : null,
+      gateToleranceMeters:
+          (row['gate_tolerance_meters'] as num?)?.toDouble() ?? 15,
+      configVersion: (row['config_version'] as num?)?.toInt() ?? 1,
       updatedAt: row['updated_at'] == null
           ? null
           : DateTime.tryParse(row['updated_at'] as String)?.toLocal(),
@@ -119,6 +159,11 @@ class BoundarySnapshot {
     required this.edgeBufferMeters,
     required this.boundaryMode,
     required this.polygonPoints,
+    required this.gateEnabled,
+    required this.gateStart,
+    required this.gateEnd,
+    required this.gateToleranceMeters,
+    required this.configVersion,
     this.updatedAt,
   });
 
@@ -130,6 +175,11 @@ class BoundarySnapshot {
   /// `'polygon'` or `'circle'`.
   final String boundaryMode;
   final List<LatLngPoint> polygonPoints;
+  final bool gateEnabled;
+  final LatLngPoint? gateStart;
+  final LatLngPoint? gateEnd;
+  final double gateToleranceMeters;
+  final int configVersion;
   final DateTime? updatedAt;
 
   bool get isPolygon => boundaryMode == 'polygon';

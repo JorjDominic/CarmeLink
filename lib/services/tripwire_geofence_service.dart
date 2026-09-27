@@ -43,12 +43,33 @@ class TripwireGeofenceService {
       final baseline = await _locationService.checkCurrentPresence();
       final session = SupabaseConfig.client.auth.currentSession;
       if (session == null) return;
+      final rawPolygon = row['polygon_points'];
+      final polygon = rawPolygon is List
+          ? rawPolygon
+              .whereType<Map>()
+              .map((point) => <String, double>{
+                    'lat': (point['lat'] as num).toDouble(),
+                    'lng': (point['lng'] as num).toDouble(),
+                  })
+              .toList()
+          : const <Map<String, double>>[];
       await _channel.invokeMethod<void>('register', {
         'tenantId': tenantId,
         'latitude': (row['center_latitude'] as num).toDouble(),
         'longitude': (row['center_longitude'] as num).toDouble(),
         'radiusMeters': (row['radius_meters'] as num).toDouble(),
         'initialDirection': baseline.isUnavailable ? null : baseline.direction,
+        'polygon': polygon,
+        'edgeBufferMeters':
+            (row['edge_buffer_meters'] as num?)?.toDouble() ?? 3.0,
+        'gateEnabled': row['gate_enabled'] == true,
+        'gateStartLatitude': row['gate_start_latitude'],
+        'gateStartLongitude': row['gate_start_longitude'],
+        'gateEndLatitude': row['gate_end_latitude'],
+        'gateEndLongitude': row['gate_end_longitude'],
+        'gateToleranceMeters':
+            (row['gate_tolerance_meters'] as num?)?.toDouble() ?? 15.0,
+        'configVersion': (row['config_version'] as num?)?.toInt() ?? 1,
         'accessToken': session.accessToken,
         'refreshToken': session.refreshToken,
         'supabaseUrl': SupabaseConfig.url,

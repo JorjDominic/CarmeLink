@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../controllers/session_controller.dart';
 import '../../models/models.dart';
@@ -7,6 +10,7 @@ import '../constants/app_colors.dart';
 import '../responsive/breakpoints.dart';
 import '../runtime/app_surface.dart';
 import '../theme/app_theme.dart';
+import '../../services/geofence_service.dart';
 import 'adaptive_shell.dart';
 
 Color mutedAccentForIcon(BuildContext context, IconData icon) {
@@ -2011,6 +2015,254 @@ class WorkInProgressNotice extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Responsive explanation of the privacy-preserving dual-geofence pipeline.
+class TripwireFlowCard extends StatelessWidget {
+  const TripwireFlowCard({
+    this.compact = false,
+    this.gateLabel = 'Point 1 → Point 2',
+    super.key,
+  });
+
+  final bool compact;
+  final String gateLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    Widget legend(Color color, String title, String detail) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 11,
+                height: 11,
+                margin: const EdgeInsets.only(top: 3),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '$title — ',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      TextSpan(text: detail),
+                    ],
+                  ),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
+          ),
+        );
+
+    final diagram = Semantics(
+      label:
+          'Diagram showing the outer circular wake zone, four-corner property polygon, and Point 1 to Point 2 gate on the polygon edge.',
+      child: Container(
+        height: compact ? 190 : 215,
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest.withValues(alpha: .32),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const _ActualGeofenceMap(
+          key: const Key('dual-geofence-diagram'),
+        ),
+      ),
+    );
+
+    final explanation = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        legend(scheme.primary, 'Wake circle',
+            'low-power OS region that starts verification.'),
+        legend(const Color(0xFF56886B), 'Property polygon',
+            'the four measured corners decide inside or outside.'),
+        legend(const Color(0xFFC77800), 'Official gate',
+            '$gateLabel is the only edge that records IN or OUT.'),
+        const Divider(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.lock_outline_rounded,
+                size: 16, color: scheme.onSurfaceVariant),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                'Coordinates stay on the phone; only confirmed events are uploaded.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    return CarmelitaCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.location_searching_rounded,
+                  size: 20, color: scheme.primary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('How automatic crossing detection works',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final vertical = compact || constraints.maxWidth < 620;
+              if (vertical) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    diagram,
+                    const SizedBox(height: 12),
+                    explanation,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 6, child: diagram),
+                  const SizedBox(width: 16),
+                  Expanded(flex: 5, child: explanation),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActualGeofenceMap extends StatelessWidget {
+  const _ActualGeofenceMap({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final points = GeofenceLocationService.activePolygon
+        .map((point) => LatLng(point.latitude, point.longitude))
+        .toList(growable: false);
+    final center = LatLng(
+      GeofenceLocationService.activeCenterLatitude,
+      GeofenceLocationService.activeCenterLongitude,
+    );
+    final gate = points.length >= 2 ? points.take(2).toList() : <LatLng>[];
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: FlutterMap(
+        options: MapOptions(
+          initialCenter: center,
+          initialZoom: 18.5,
+          minZoom: 16,
+          maxZoom: 21,
+          interactionOptions: const InteractionOptions(
+            flags: InteractiveFlag.drag |
+                InteractiveFlag.pinchZoom |
+                InteractiveFlag.doubleTapZoom,
+          ),
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.carmelita.carmelink',
+            maxNativeZoom: 19,
+          ),
+          CircleLayer(
+            circles: [
+              CircleMarker(
+                point: center,
+                radius: GeofenceLocationService.activeRadiusMeters,
+                useRadiusInMeter: true,
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: .08),
+                borderColor: Theme.of(context).colorScheme.primary,
+                borderStrokeWidth: 2,
+              ),
+            ],
+          ),
+          if (points.length >= 3)
+            PolygonLayer(
+              polygons: [
+                Polygon(
+                  points: points,
+                  color: const Color(0xFF56886B).withValues(alpha: .22),
+                  borderColor: const Color(0xFF2F6D4A),
+                  borderStrokeWidth: 3,
+                ),
+              ],
+            ),
+          if (gate.length == 2)
+            PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: gate,
+                  color: const Color(0xFFC77800).withValues(alpha: .22),
+                  strokeWidth: 30,
+                  useStrokeWidthInMeter: true,
+                ),
+                Polyline(
+                  points: gate,
+                  color: const Color(0xFFC77800),
+                  strokeWidth: 4,
+                ),
+              ],
+            ),
+          MarkerLayer(
+            markers: [
+              for (var index = 0; index < points.length; index++)
+                Marker(
+                  point: points[index],
+                  width: 26,
+                  height: 26,
+                  child: CircleAvatar(
+                    backgroundColor: const Color(0xFF2F6D4A),
+                    foregroundColor: Colors.white,
+                    child: Text(
+                      '${index + 1}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          RichAttributionWidget(
+            attributions: [
+              TextSourceAttribution(
+                'OpenStreetMap contributors',
+                onTap: () => launchUrl(
+                  Uri.parse('https://www.openstreetmap.org/copyright'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

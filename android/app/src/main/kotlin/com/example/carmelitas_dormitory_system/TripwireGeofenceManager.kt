@@ -22,6 +22,7 @@ class TripwireGeofenceManager(private val context: Context) {
     companion object {
         const val PREFS = "carmelink_tripwire"
         const val REGION_ID = "carmelita_dormitory"
+        const val GATE_REGION_ID = "carmelita_official_gate"
         private const val QUEUE = "pending_events"
 
         fun appendEvent(context: Context, direction: String, observedAt: Long = System.currentTimeMillis()) {
@@ -76,6 +77,15 @@ class TripwireGeofenceManager(private val context: Context) {
         radiusMeters: Float,
         tenantId: String,
         initialDirection: String?,
+        polygon: List<Map<String, Any>>,
+        edgeBufferMeters: Float,
+        gateEnabled: Boolean,
+        gateStartLatitude: Double?,
+        gateStartLongitude: Double?,
+        gateEndLatitude: Double?,
+        gateEndLongitude: Double?,
+        gateToleranceMeters: Float,
+        configVersion: Int,
         accessToken: String,
         refreshToken: String,
         supabaseUrl: String,
@@ -107,6 +117,18 @@ class TripwireGeofenceManager(private val context: Context) {
             .putString("refresh_token", refreshToken)
             .putString("supabase_url", supabaseUrl)
             .putString("publishable_key", publishableKey)
+            .putString("polygon", JSONArray(polygon).toString())
+            .putFloat("edge_buffer_meters", edgeBufferMeters)
+            .putBoolean("gate_enabled", gateEnabled)
+            .putFloat("gate_tolerance_meters", gateToleranceMeters)
+            .putInt("config_version", configVersion)
+        if (gateStartLatitude != null && gateStartLongitude != null &&
+            gateEndLatitude != null && gateEndLongitude != null) {
+            editor.putLong("gate_start_latitude_bits", gateStartLatitude.toBits())
+                .putLong("gate_start_longitude_bits", gateStartLongitude.toBits())
+                .putLong("gate_end_latitude_bits", gateEndLatitude.toBits())
+                .putLong("gate_end_longitude_bits", gateEndLongitude.toBits())
+        }
         if (previousTenant != tenantId) {
             editor.remove(QUEUE)
             editor.remove("confirmed_direction")
@@ -116,12 +138,27 @@ class TripwireGeofenceManager(private val context: Context) {
         }
         editor.apply()
 
+        // Seed the movement segment without creating an event. The next OS
+        // callback can then prove which part of the boundary was crossed.
+        try {
+            LocationServices.getFusedLocationProviderClient(context).lastLocation
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        prefs.edit()
+                            .putLong("last_latitude_bits", location.latitude.toBits())
+                            .putLong("last_longitude_bits", location.longitude.toBits())
+                            .putLong("last_location_at", location.time)
+                            .apply()
+                    }
+                }
+        } catch (_: SecurityException) { }
+
         // The low-power hardware geofence (Wi-Fi/cell-based) on Android needs
         // at least 100 m to fire reliably.  The on-device polygon in the
         // Flutter layer makes the final IN/OUT decision — this larger circle
         // only wakes the BroadcastReceiver so the polygon can be evaluated.
         val wakeUpRadius = radiusMeters.coerceAtLeast(100f)
-        val geofence = Geofence.Builder()
+        val geofences = mutableListOf(Geofence.Builder()
             .setRequestId(REGION_ID)
             .setCircularRegion(latitude, longitude, wakeUpRadius)
             .setExpirationDuration(Geofence.NEVER_EXPIRE)
@@ -129,14 +166,28 @@ class TripwireGeofenceManager(private val context: Context) {
             // 30 s is the minimum Android enforces; keeps the responsiveness
             // window small so the BroadcastReceiver fires promptly.
             .setNotificationResponsiveness(30_000)
-            .build()
+            .build())
+        if (gateEnabled && gateStartLatitude != null && gateStartLongitude != null &&
+            gateEndLatitude != null && gateEndLongitude != null) {
+            geofences.add(Geofence.Builder()
+                .setRequestId(GATE_REGION_ID)
+                .setCircularRegion(
+                    (gateStartLatitude + gateEndLatitude) / 2.0,
+                    (gateStartLongitude + gateEndLongitude) / 2.0,
+                    maxOf(25f, gateToleranceMeters * 2f),
+                )
+                .setExpirationDuration(Geofence.NEVER_EXPIRE)
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT)
+                .setNotificationResponsiveness(10_000)
+                .build())
+        }
         val request = GeofencingRequest.Builder()
             // INITIAL_TRIGGER_ENTER tells Play Services to immediately report
             // whether the device is already inside when monitoring starts.
             // Without this the first EXIT event after a cold-start is often
             // skipped, causing the native queue to miss the student leaving.
             .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER or GeofencingRequest.INITIAL_TRIGGER_EXIT)
-            .addGeofence(geofence)
+            .addGeofences(geofences)
             .build()
 
         client.removeGeofences(pendingIntent).addOnCompleteListener {
@@ -160,7 +211,18 @@ class TripwireGeofenceManager(private val context: Context) {
         val latitude = Double.fromBits(prefs.getLong("latitude_bits", 0L))
         val longitude = Double.fromBits(prefs.getLong("longitude_bits", 0L))
         val radius = prefs.getFloat("radius_meters", 50f)
+        val polygonArray = try { JSONArray(prefs.getString("polygon", "[]")) } catch (_: Exception) { JSONArray() }
+        val polygon = (0 until polygonArray.length()).map { index ->
+            val item = polygonArray.getJSONObject(index)
+            mapOf<String, Any>("lat" to item.getDouble("lat"), "lng" to item.getDouble("lng"))
+        }
         register(latitude, longitude, radius, tenantId, prefs.getString("confirmed_direction", null),
+            polygon, prefs.getFloat("edge_buffer_meters", 3f), prefs.getBoolean("gate_enabled", false),
+            if (prefs.contains("gate_start_latitude_bits")) Double.fromBits(prefs.getLong("gate_start_latitude_bits", 0)) else null,
+            if (prefs.contains("gate_start_longitude_bits")) Double.fromBits(prefs.getLong("gate_start_longitude_bits", 0)) else null,
+            if (prefs.contains("gate_end_latitude_bits")) Double.fromBits(prefs.getLong("gate_end_latitude_bits", 0)) else null,
+            if (prefs.contains("gate_end_longitude_bits")) Double.fromBits(prefs.getLong("gate_end_longitude_bits", 0)) else null,
+            prefs.getFloat("gate_tolerance_meters", 15f), prefs.getInt("config_version", 1),
             prefs.getString("access_token", null) ?: return,
             prefs.getString("refresh_token", null) ?: return,
             prefs.getString("supabase_url", null) ?: return,
@@ -212,6 +274,8 @@ class TripwireGeofenceManager(private val context: Context) {
 
     fun status(): Map<String, Any?> = mapOf(
         "registered" to prefs.getBoolean("registered", false),
+        "gateEnabled" to prefs.getBoolean("gate_enabled", false),
+        "configVersion" to prefs.getInt("config_version", 1),
         "direction" to prefs.getString("confirmed_direction", null),
         "pendingCount" to try { JSONArray(prefs.getString(QUEUE, "[]")).length() } catch (_: Exception) { 0 },
     )

@@ -83,7 +83,12 @@ begin
       coalesce(p_center_lng, 120.884676),
       coalesce(p_radius_meters, 50.0),
       coalesce(p_edge_buffer_meters, 3.0),
-      coalesce(v_parsed_polygon, '[{"lat": 14.949435, "lng": 120.884892}]'::jsonb),
+      coalesce(v_parsed_polygon, '[
+        {"lat": 14.949435124962447, "lng": 120.88489213696135},
+        {"lat": 14.949251893796628, "lng": 120.88482211758398},
+        {"lat": 14.949350151678374, "lng": 120.88452020740704},
+        {"lat": 14.949547385390431, "lng": 120.88454200910613}
+      ]'::jsonb),
       true,
       now()
     ) returning id into v_active_id;

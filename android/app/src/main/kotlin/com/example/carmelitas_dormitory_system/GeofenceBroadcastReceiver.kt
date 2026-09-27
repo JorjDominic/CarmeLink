@@ -5,16 +5,23 @@ import android.content.Context
 import android.content.Intent
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
+import androidx.core.content.ContextCompat
 
 class GeofenceBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val event = GeofencingEvent.fromIntent(intent) ?: return
         if (event.hasError()) return
-        val direction = when (event.geofenceTransition) {
-            Geofence.GEOFENCE_TRANSITION_ENTER -> "IN"
-            Geofence.GEOFENCE_TRANSITION_EXIT -> "OUT"
-            else -> return
+        if (event.geofenceTransition != Geofence.GEOFENCE_TRANSITION_ENTER &&
+            event.geofenceTransition != Geofence.GEOFENCE_TRANSITION_EXIT) return
+        try {
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, TripwireLocationBurstService::class.java),
+            )
+        } catch (_: RuntimeException) {
+            // The OS can deny background foreground-service starts under
+            // exceptional battery or policy restrictions. Monitoring health
+            // will recover on the next eligible geofence callback/app resume.
         }
-        TripwireGeofenceManager.appendEvent(context, direction)
     }
 }

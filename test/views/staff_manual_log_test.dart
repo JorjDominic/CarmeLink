@@ -78,7 +78,8 @@ void main() {
   ];
 
   group('GeofenceMonitoringPage Widget Tests', () {
-    testWidgets('renders metric cards, perimeter radius, and filter chips', (tester) async {
+    testWidgets('renders metric cards, perimeter radius, and filter chips',
+        (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -96,8 +97,13 @@ void main() {
       expect(find.text('Inside'), findsWidgets);
       expect(find.text('Outside'), findsWidgets);
       expect(find.text('Unavailable'), findsWidgets);
-      // Polygon model replaced '50m Radius' with 'Polygon Lot'
-      expect(find.text('Polygon Lot'), findsOneWidget);
+      expect(find.text('Point 1 → 2'), findsOneWidget);
+      expect(
+          find.text('How automatic crossing detection works'), findsOneWidget);
+      expect(find.textContaining('Wake circle'), findsOneWidget);
+      expect(find.textContaining('Property polygon'), findsOneWidget);
+      expect(find.textContaining('Official gate'), findsWidgets);
+      expect(find.byKey(const Key('dual-geofence-diagram')), findsOneWidget);
 
       // Verify filter chips
       expect(find.text('All (3)'), findsOneWidget);
@@ -140,7 +146,9 @@ void main() {
       expect(find.text('Anna Dela Cruz'), findsNothing);
     });
 
-    testWidgets('tapping quick manual log icon opens dialog with preselected tenant', (tester) async {
+    testWidgets(
+        'tapping quick manual log icon opens dialog with preselected tenant',
+        (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -171,7 +179,9 @@ void main() {
   });
 
   group('Staff Manual Log Dialog Validation Tests', () {
-    testWidgets('rejects submission with empty observation notes (mandatory constraint)', (tester) async {
+    testWidgets(
+        'rejects submission with empty observation notes (mandatory constraint)',
+        (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -207,7 +217,8 @@ void main() {
       );
     });
 
-    testWidgets('accepts submission with valid observation notes', (tester) async {
+    testWidgets('accepts submission with valid observation notes',
+        (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {

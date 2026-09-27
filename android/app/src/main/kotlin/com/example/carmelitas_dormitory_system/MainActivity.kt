@@ -20,6 +20,7 @@ class MainActivity : FlutterActivity() {
                         val supabaseUrl = call.argument<String>("supabaseUrl")
                         val publishableKey = call.argument<String>("publishableKey")
                         val initialDirection = call.argument<String>("initialDirection")
+                        val polygon = call.argument<List<Map<String, Any>>>("polygon")
                         if (latitude == null || longitude == null || radius == null || tenantId == null ||
                             accessToken == null || refreshToken == null || supabaseUrl == null ||
                             publishableKey == null
@@ -28,6 +29,15 @@ class MainActivity : FlutterActivity() {
                         } else {
                             TripwireGeofenceManager(applicationContext).register(
                                 latitude, longitude, radius.toFloat(), tenantId, initialDirection,
+                                polygon ?: emptyList(),
+                                call.argument<Double>("edgeBufferMeters")?.toFloat() ?: 3f,
+                                call.argument<Boolean>("gateEnabled") ?: false,
+                                call.argument<Double>("gateStartLatitude"),
+                                call.argument<Double>("gateStartLongitude"),
+                                call.argument<Double>("gateEndLatitude"),
+                                call.argument<Double>("gateEndLongitude"),
+                                call.argument<Double>("gateToleranceMeters")?.toFloat() ?: 15f,
+                                call.argument<Int>("configVersion") ?: 1,
                                 accessToken, refreshToken, supabaseUrl, publishableKey, result,
                             )
                         }
