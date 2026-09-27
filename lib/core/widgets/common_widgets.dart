@@ -205,6 +205,72 @@ class RecordListToolbar extends StatelessWidget {
       );
 }
 
+/// Shared hierarchy for tenant reporting workflows: purpose, audience, and action.
+class ReportWorkflowIntroCard extends StatelessWidget {
+  const ReportWorkflowIntroCard({
+    required this.title,
+    required this.purpose,
+    required this.audience,
+    required this.icon,
+    this.action,
+    super.key,
+  });
+
+  final String title;
+  final String purpose;
+  final String audience;
+  final IconData icon;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) => CarmelitaCard(
+        emphasis: true,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              backgroundColor:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: .10),
+              foregroundColor: Theme.of(context).colorScheme.primary,
+              child: Icon(icon, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(purpose),
+                  const SizedBox(height: 6),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.visibility_outlined, size: 16),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          audience,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (action != null) ...[
+                    const SizedBox(height: 10),
+                    action!,
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
 /// Keeps explanatory text available without letting it dominate repeat visits.
 class CollapsibleInfoCard extends StatelessWidget {
   const CollapsibleInfoCard({
@@ -240,11 +306,19 @@ class PagedRecordList extends StatefulWidget {
   const PagedRecordList({
     required this.children,
     this.pageSize = 6,
+    this.loadMoreLabel = 'Show more',
+    this.showVisibleCount = false,
+    this.showEndState = false,
+    this.endLabel = 'End of records',
     super.key,
   });
 
   final List<Widget> children;
   final int pageSize;
+  final String loadMoreLabel;
+  final bool showVisibleCount;
+  final bool showEndState;
+  final String endLabel;
 
   @override
   State<PagedRecordList> createState() => _PagedRecordListState();
@@ -265,15 +339,27 @@ class _PagedRecordListState extends State<PagedRecordList> {
   Widget build(BuildContext context) {
     final count = visibleCount.clamp(0, widget.children.length);
     final hasMore = count < widget.children.length;
+    final total = widget.children.length;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ...widget.children.take(count),
-        if (hasMore || count > widget.pageSize)
+        if (widget.showVisibleCount && total > 0)
           Padding(
             padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Showing $count of $total records',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        if (hasMore || count > widget.pageSize)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
             child: Wrap(
               alignment: WrapAlignment.center,
               spacing: 8,
+              runSpacing: 6,
               children: [
                 if (hasMore)
                   OutlinedButton.icon(
@@ -282,7 +368,7 @@ class _PagedRecordListState extends State<PagedRecordList> {
                             .clamp(0, widget.children.length)),
                     icon: const Icon(Icons.expand_more),
                     label: Text(
-                      'Show more (${widget.children.length - count} remaining)',
+                      '${widget.loadMoreLabel} (${total - count} remaining)',
                     ),
                   ),
                 if (count > widget.pageSize)
@@ -293,6 +379,15 @@ class _PagedRecordListState extends State<PagedRecordList> {
                     label: const Text('Show fewer'),
                   ),
               ],
+            ),
+          ),
+        if (widget.showEndState && !hasMore && total > widget.pageSize)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              widget.endLabel,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
       ],

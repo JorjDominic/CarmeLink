@@ -779,6 +779,7 @@ class _TenantCleaningSchedulePageState
               : _TenantCleaningBody(
                   data: data,
                   errorMessage: errorMessage,
+                  onReportMissedDuty: _reportMissedDuty,
                 ),
     );
   }
@@ -788,10 +789,12 @@ class _TenantCleaningBody extends StatefulWidget {
   const _TenantCleaningBody({
     required this.data,
     required this.errorMessage,
+    required this.onReportMissedDuty,
   });
 
   final TenantCleaningContext data;
   final String? errorMessage;
+  final VoidCallback onReportMissedDuty;
 
   @override
   State<_TenantCleaningBody> createState() => _TenantCleaningBodyState();
@@ -831,6 +834,21 @@ class _TenantCleaningBodyState extends State<_TenantCleaningBody> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        ReportWorkflowIntroCard(
+          title: 'Missed cleaning duty',
+          purpose:
+              'Review your room cleaning rota and privately report a roommate duty that was not completed.',
+          audience:
+              'Reports are restricted to authorized staff; roommates do not see who submitted them.',
+          icon: Icons.cleaning_services_outlined,
+          action: OutlinedButton.icon(
+            onPressed:
+                data.schedules.isEmpty ? null : widget.onReportMissedDuty,
+            icon: const Icon(Icons.report_outlined),
+            label: const Text('Report privately'),
+          ),
+        ),
+        const SizedBox(height: 12),
         CarmelitaCard(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
