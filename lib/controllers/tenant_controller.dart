@@ -83,31 +83,46 @@ class TenantController extends ChangeNotifier {
   double get outstandingBalance {
     final list = payments;
     return list
-        .where((p) => p.isDue || p.isPending || p.isRejected)
+        .where((p) =>
+            !p.isDeposit &&
+            !(p.isRent && !p.isDueNow) &&
+            (p.isDue || p.isPending || p.isRejected))
         .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
   }
 
   double get outstandingRent => payments
-      .where((p) => p.isRent && (p.isDue || p.isPending || p.isRejected))
+      .where((p) =>
+          p.isRent && p.isDueNow && (p.isDue || p.isPending || p.isRejected))
       .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
 
   double get outstandingUtilities => payments
       .where((p) => p.isUtility && (p.isDue || p.isPending || p.isRejected))
       .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
 
+  double get securityDepositBalance => payments
+      .where((p) => p.isDeposit)
+      .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
+
+  double get scheduledFutureRent => payments
+      .where((p) => p.isRent && !p.isDueNow)
+      .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
+
   Payment? get nextDuePayment {
-    final due = payments.where((p) => p.isDue || p.isUpcoming).toList()
+    final due = payments
+        .where((p) => !p.isDeposit && (p.isDue || p.isUpcoming))
+        .toList()
       ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
     return due.isNotEmpty ? due.first : null;
   }
 
-  List<Payment> get duePayments => payments.where((p) => p.isDue).toList();
+  List<Payment> get duePayments =>
+      payments.where((p) => !p.isDeposit && p.isDue).toList();
   List<Payment> get pendingPayments =>
       payments.where((p) => p.isPending).toList();
   List<Payment> get verifiedPayments =>
       payments.where((p) => p.isVerified).toList();
   List<Payment> get overduePayments =>
-      payments.where((p) => p.isOverdue).toList();
+      payments.where((p) => !p.isDeposit && p.isOverdue).toList();
 
   List<MaintenanceReport> get maintenance => List.unmodifiable(_maintenance);
 
@@ -763,6 +778,23 @@ class TenantController extends ChangeNotifier {
       _checkingPresence = false;
       notifyListeners();
     }
+  }
+
+  /// Immediately applies a confirmed geofence crossing direction to the
+  /// in-memory state and notifies listeners so the curfew/presence UI
+  /// updates without waiting for the next full [loadGateEvents] call.
+  ///
+  /// Called by [GeofenceScheduler] after a foreground crossing is recorded
+  /// and by [TripwireGeofenceService] after background events are synced.
+  void applyGeofenceCrossing(String direction) {
+    if (direction != 'IN' && direction != 'OUT') return;
+    _currentGateStatus = direction;
+    _lastGateEventAt = DateTime.now();
+    notifyListeners();
+
+    // Reload gate events in the background to refresh the history list.
+    // Fire-and-forget — the UI already shows the correct status above.
+    loadGateEvents(force: true).ignore();
   }
 
   @visibleForTesting

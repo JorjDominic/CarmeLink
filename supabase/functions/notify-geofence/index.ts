@@ -16,7 +16,14 @@ Deno.serve(async (request) => {
       .select('id, tenant_id, direction, status, verification_method, checked_at, created_by')
       .eq('id', eventId).single()
     if (eventError) throw new Error(`Unable to load gate event: ${eventError.message}`)
-    if (!event || event.created_by !== auth.user.id) return json({ error: 'Event not found' }, 404)
+    if (!event) return json({ error: 'Event not found' }, 404)
+
+    const { data: actor } = await auth.admin.from('profiles').select('id, role').eq('id', auth.user.id).single()
+    const isStaff = actor?.role === 'owner' || actor?.role === 'caretaker'
+    if (!isStaff && event.created_by !== auth.user.id && event.tenant_id !== auth.user.id) {
+      return json({ error: 'Unauthorized to notify for this event' }, 403)
+    }
+
     if (event.direction !== 'IN' && event.direction !== 'OUT') {
       return json({ delivered: 0, recipients: 0, reason: 'no_presence_transition' })
     }
@@ -34,7 +41,14 @@ Deno.serve(async (request) => {
       return json({ delivered: 0, recipients: 0, reason: 'unchanged_presence' })
     }
 
+    // Load tenant name so notifications are clear and personalized for guardians and staff
+    const { data: tenantProfile } = await auth.admin.from('profiles')
+      .select('full_name').eq('id', event.tenant_id).maybeSingle()
+    const tenantName = tenantProfile?.full_name?.trim() || 'A tenant'
+
     const recipients = new Set<string>()
+    const guardianIds = new Set<string>()
+
     const { data: staff, error: staffError } = await auth.admin.from('profiles')
       .select('id').in('role', ['owner', 'caretaker'])
     if (staffError) throw new Error(`Unable to load staff recipients: ${staffError.message}`)
@@ -43,23 +57,48 @@ Deno.serve(async (request) => {
     const { data: guardianLinks, error: guardianError } = await auth.admin
       .from('guardian_tenant_links').select('guardian_id').eq('tenant_id', event.tenant_id)
     if (guardianError) throw new Error(`Unable to load guardian recipients: ${guardianError.message}`)
-    guardianLinks?.forEach((link) => recipients.add(link.guardian_id))
+    guardianLinks?.forEach((link) => {
+      recipients.add(link.guardian_id)
+      guardianIds.add(link.guardian_id)
+    })
 
     if (event.verification_method === 'Staff Manual Log') recipients.add(event.tenant_id)
     recipients.delete(auth.user.id)
     if (!recipients.size) return json({ delivered: 0, recipients: 0 })
 
     const flagged = event.status === 'Flagged'
-    const title = flagged ? 'Curfew presence alert' : 'Dormitory presence update'
-    const notificationBody = flagged
-      ? 'A tenant was detected outside during curfew.'
-      : event.direction === 'IN'
-        ? 'A tenant entered the dormitory premises.'
-        : 'A tenant left the dormitory premises.'
     const authorization = await fcmAccessToken()
     let delivered = 0
 
     for (const recipientId of recipients) {
+      const isGuardian = guardianIds.has(recipientId)
+      let title: string
+      let notificationBody: string
+
+      if (isGuardian) {
+        if (flagged) {
+          title = `⚠️ Curfew Alert: ${tenantName}`
+          notificationBody = `${tenantName} was detected outside during curfew hours.`
+        } else if (event.direction === 'IN') {
+          title = `🏠 Dorm Arrival: ${tenantName}`
+          notificationBody = `${tenantName} has arrived and entered Carmelita's Dormitory.`
+        } else {
+          title = `🚪 Dorm Departure: ${tenantName}`
+          notificationBody = `${tenantName} has left Carmelita's Dormitory premises.`
+        }
+      } else {
+        if (flagged) {
+          title = `⚠️ Curfew Alert: ${tenantName}`
+          notificationBody = `${tenantName} was recorded outside during curfew hours.`
+        } else if (event.direction === 'IN') {
+          title = `🏠 Gate Entry: ${tenantName}`
+          notificationBody = `${tenantName} entered the dormitory premises.`
+        } else {
+          title = `🚪 Gate Exit: ${tenantName}`
+          notificationBody = `${tenantName} left the dormitory premises.`
+        }
+      }
+
       const { data: existing } = await auth.admin.from('app_notifications')
         .select('id').eq('recipient_id', recipientId).eq('notification_type', 'gate')
         .eq('route_type', 'gate_event').eq('route_id', event.id).maybeSingle()
@@ -73,7 +112,12 @@ Deno.serve(async (request) => {
           body: notificationBody,
           route_type: 'gate_event',
           route_id: event.id,
-          data: { direction: event.direction, status: event.status },
+          data: {
+            direction: event.direction,
+            status: event.status,
+            tenant_id: event.tenant_id,
+            tenant_name: tenantName,
+          },
         }).select('id').single()
       if (insertError || !notification) continue
 
@@ -87,6 +131,8 @@ Deno.serve(async (request) => {
           notification_type: 'gate',
           route_type: 'gate_event',
           route_id: event.id,
+          tenant_id: event.tenant_id,
+          direction: event.direction,
         })
         if (response.ok) {
           recipientDelivered++

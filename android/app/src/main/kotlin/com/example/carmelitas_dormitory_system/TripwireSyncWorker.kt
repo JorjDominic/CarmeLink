@@ -64,14 +64,22 @@ class TripwireSyncWorker(context: Context, params: WorkerParameters) : Worker(co
                 // let WorkManager retry when connectivity is restored.
                 for (pending in index until queue.length()) remaining.put(queue.get(pending))
                 persist(remaining)
+                recordError("Network error while syncing gate event: ${e.message ?: "unknown error"}")
                 return Result.retry()
             }
 
             if (response.first !in 200..299) {
                 for (pending in index until queue.length()) remaining.put(queue.get(pending))
                 persist(remaining)
+                recordError("Gate event sync failed (${response.first}): ${response.second.take(500)}")
                 return if (response.first in 400..499) Result.failure() else Result.retry()
             }
+
+            prefs.edit()
+                .putString("confirmed_direction", event.getString("direction"))
+                .putLong("last_synced_at", System.currentTimeMillis())
+                .remove("last_sync_error")
+                .apply()
 
             val eventId = response.second.trim().removeSurrounding("\"")
             if (eventId.isNotBlank()) {
@@ -83,14 +91,17 @@ class TripwireSyncWorker(context: Context, params: WorkerParameters) : Worker(co
                         JSONObject().put("event_id", eventId),
                     ).first
                 } catch (_: IOException) {
-                    for (pending in index until queue.length()) remaining.put(queue.get(pending))
-                    persist(remaining)
-                    return Result.retry()
+                    // The gate event is already safely stored. Notification
+                    // delivery must not cause the same event to remain pending.
+                    -1
                 }
                 if (notificationResponse !in 200..299) {
-                    for (pending in index until queue.length()) remaining.put(queue.get(pending))
-                    persist(remaining)
-                    return if (notificationResponse in 400..499) Result.failure() else Result.retry()
+                    prefs.edit().putString(
+                        "last_notification_error",
+                        "Notification delivery failed ($notificationResponse)",
+                    ).apply()
+                } else {
+                    prefs.edit().remove("last_notification_error").apply()
                 }
             }
         }
@@ -167,7 +178,20 @@ class TripwireSyncWorker(context: Context, params: WorkerParameters) : Worker(co
     }
 
     private fun persist(events: JSONArray) {
-        prefs.edit().putString("pending_events", events.toString()).apply()
+        val editor = prefs.edit().putString("pending_events", events.toString())
+        if (events.length() == 0) {
+            editor.remove(TripwireGeofenceManager.QUEUED_DIRECTION)
+        } else {
+            editor.putString(
+                TripwireGeofenceManager.QUEUED_DIRECTION,
+                events.getJSONObject(events.length() - 1).getString("direction"),
+            )
+        }
+        editor.apply()
+    }
+
+    private fun recordError(message: String) {
+        prefs.edit().putString("last_sync_error", message).apply()
     }
 
     private fun isoTimestamp(milliseconds: Long): String =

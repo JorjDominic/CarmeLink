@@ -41,12 +41,15 @@ class TripwireLocationBurstService : Service() {
             for (location in result.locations) {
                 val direction = TripwireCrossingVerifier.accept(this@TripwireLocationBurstService, location)
                 if (direction != null) {
-                    TripwireGeofenceManager.appendEvent(
+                    val queued = TripwireGeofenceManager.appendEvent(
                         this@TripwireLocationBurstService,
                         direction,
-                        location.time,
+                        // Use the detection time. Some Android providers and
+                        // emulators expose a stale fix timestamp even though
+                        // this high-accuracy callback has just been delivered.
+                        System.currentTimeMillis(),
                     )
-                    if (!MainActivity.isInForeground) {
+                    if (queued && !MainActivity.isInForeground) {
                         showCrossingNotification(direction)
                     }
                     stopBurst()
@@ -78,12 +81,9 @@ class TripwireLocationBurstService : Service() {
     }
 
     private fun startBurst() {
-        if (!getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE)
-                .getBoolean("gate_enabled", false)
-        ) {
-            stopSelf()
-            return
-        }
+        // Always start a high-accuracy burst whenever the coarse OS geofence
+        // fires — TripwireCrossingVerifier needs a precise GPS fix to evaluate
+        // the polygon, regardless of whether the virtual gate line is configured.
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) !=
             PackageManager.PERMISSION_GRANTED
         ) {
@@ -166,10 +166,10 @@ class TripwireLocationBurstService : Service() {
         )
         val notification = NotificationCompat.Builder(this, UPDATES_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_carmelink)
-            .setContentTitle(if (isEntry) "Entered dormitory" else "Left dormitory")
+            .setContentTitle(if (isEntry) "Entry detected" else "Exit detected")
             .setContentText(
-                if (isEntry) "Your entry was detected. Welcome home!"
-                else "Your departure was detected. Stay safe!",
+                if (isEntry) "CarmeLink is syncing your entry."
+                else "CarmeLink is syncing your departure.",
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)

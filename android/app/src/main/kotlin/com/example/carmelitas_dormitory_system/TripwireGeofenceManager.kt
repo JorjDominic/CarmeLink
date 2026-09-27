@@ -24,12 +24,14 @@ class TripwireGeofenceManager(private val context: Context) {
         const val REGION_ID = "carmelita_dormitory"
         const val GATE_REGION_ID = "carmelita_official_gate"
         private const val QUEUE = "pending_events"
+        const val QUEUED_DIRECTION = "queued_direction"
 
-        fun appendEvent(context: Context, direction: String, observedAt: Long = System.currentTimeMillis()) {
+        fun appendEvent(context: Context, direction: String, observedAt: Long = System.currentTimeMillis()): Boolean {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val tenantId = prefs.getString("tenant_id", null) ?: return
-            val previous = prefs.getString("confirmed_direction", null)
-            if (previous == direction) return
+            val tenantId = prefs.getString("tenant_id", null) ?: return false
+            val previous = prefs.getString(QUEUED_DIRECTION, null)
+                ?: prefs.getString("confirmed_direction", null)
+            if (previous == direction) return false
 
             val queue = try {
                 JSONArray(prefs.getString(QUEUE, "[]"))
@@ -49,7 +51,9 @@ class TripwireGeofenceManager(private val context: Context) {
             for (index in start until queue.length()) bounded.put(queue.get(index))
             prefs.edit()
                 .putString(QUEUE, bounded.toString())
-                .putString("confirmed_direction", direction)
+                // A detected crossing is only pending until Supabase accepts it.
+                // Keep it separate from the last server-confirmed direction.
+                .putString(QUEUED_DIRECTION, direction)
                 .apply()
             WorkManager.getInstance(context).enqueueUniqueWork(
                 "carmelink-tripwire-sync",
@@ -58,6 +62,7 @@ class TripwireGeofenceManager(private val context: Context) {
                     .setConstraints(TripwireSyncWorker.constraints)
                     .build(),
             )
+            return true
         }
     }
 
@@ -132,6 +137,7 @@ class TripwireGeofenceManager(private val context: Context) {
         if (previousTenant != tenantId) {
             editor.remove(QUEUE)
             editor.remove("confirmed_direction")
+            editor.remove(QUEUED_DIRECTION)
         }
         if (initialDirection == "IN" || initialDirection == "OUT") {
             editor.putString("confirmed_direction", initialDirection)
@@ -265,11 +271,23 @@ class TripwireGeofenceManager(private val context: Context) {
     fun acknowledge(eventId: String) {
         val queue = try { JSONArray(prefs.getString(QUEUE, "[]")) } catch (_: Exception) { JSONArray() }
         val remaining = JSONArray()
+        var acknowledgedDirection: String? = null
         for (index in 0 until queue.length()) {
             val item = queue.getJSONObject(index)
-            if (item.optString("event_id") != eventId) remaining.put(item)
+            if (item.optString("event_id") != eventId) {
+                remaining.put(item)
+            } else {
+                acknowledgedDirection = item.optString("direction").takeIf { it == "IN" || it == "OUT" }
+            }
         }
-        prefs.edit().putString(QUEUE, remaining.toString()).apply()
+        val editor = prefs.edit().putString(QUEUE, remaining.toString())
+        acknowledgedDirection?.let { editor.putString("confirmed_direction", it) }
+        if (remaining.length() == 0) {
+            editor.remove(QUEUED_DIRECTION)
+        } else {
+            editor.putString(QUEUED_DIRECTION, remaining.getJSONObject(remaining.length() - 1).getString("direction"))
+        }
+        editor.apply()
     }
 
     fun status(): Map<String, Any?> = mapOf(
@@ -277,6 +295,9 @@ class TripwireGeofenceManager(private val context: Context) {
         "gateEnabled" to prefs.getBoolean("gate_enabled", false),
         "configVersion" to prefs.getInt("config_version", 1),
         "direction" to prefs.getString("confirmed_direction", null),
+        "pendingDirection" to prefs.getString(QUEUED_DIRECTION, null),
         "pendingCount" to try { JSONArray(prefs.getString(QUEUE, "[]")).length() } catch (_: Exception) { 0 },
+        "lastSyncError" to prefs.getString("last_sync_error", null),
+        "lastSyncedAt" to prefs.getLong("last_synced_at", 0L).takeIf { it > 0L },
     )
 }

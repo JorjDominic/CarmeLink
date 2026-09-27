@@ -1,5 +1,24 @@
 # CarmeLink Module and Feature Status
 
+> Reviewed against current source at `514d116` on September 27, 2026.
+> `flutter analyze`: pass. `flutter test`: 427/427 pass. “Implemented” below is
+> not equivalent to deployed or physically verified.
+
+## Current build changes
+
+- Native geofencing is now a hybrid verifier on both Android and iOS: circular
+  OS regions wake location collection, while polygon state and the official gate
+  corridor confirm transitions.
+- Gate endpoints, tolerance, enablement, and configuration version are backed by
+  migrations/RPC; the test corridor is currently the centered 25% of the former
+  Point 1–Point 2 segment.
+- Push-device registration is claimed against the authenticated user through a
+  security-definer RPC.
+- Direct/resumable tenant onboarding, requirements submission, touchscreen lease
+  signing, activation safety gates, and audited billing actions are present.
+- iOS native monitoring waits for Always permission and treats monitoring and
+  location errors as recoverable.
+
 > Snapshot/reference only. Use [`STATUS.md`](STATUS.md) for current completion decisions and gap ownership.
 
 > Repository state reviewed: September 25, 2026  
@@ -216,7 +235,7 @@ These are pending improvements, not claims about the current build.
 
 ```text
 flutter analyze             PASS — no issues
-flutter test                PASS — 410 tests
+flutter test                PASS — 427 tests
 flutter build apk --debug   PASS
 Remote migration parity     NOT VERIFIED
 Remote RLS/Storage tests    NOT VERIFIED

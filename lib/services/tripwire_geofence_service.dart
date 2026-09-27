@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../controllers/tenant_controller.dart';
 import '../core/config/supabase_config.dart';
 import 'gate_service.dart';
 import 'geofence_service.dart';
@@ -76,6 +77,9 @@ class TripwireGeofenceService {
         'publishableKey': SupabaseConfig.publishableKey,
       }).timeout(_platformTimeout);
       await syncPending();
+      // Native iOS may have completed the upload itself while Flutter was
+      // suspended, so always reconcile the visible presence state on resume.
+      await TenantController.instance.loadGateEvents(force: true);
     } on MissingPluginException {
       // Desktop and unsupported test platforms do not install native adapters.
     } catch (error) {
@@ -111,6 +115,7 @@ class TripwireGeofenceService {
         ..sort((a, b) =>
             (a['observed_at'] as num).compareTo(b['observed_at'] as num));
 
+      String? lastSyncedDirection;
       for (final event in events) {
         if (event['tenant_id'] != activeTenant) continue;
         final eventId = event['event_id'] as String;
@@ -126,10 +131,17 @@ class TripwireGeofenceService {
           await _channel.invokeMethod<void>('acknowledge', {
             'eventId': eventId,
           }).timeout(_platformTimeout);
+          lastSyncedDirection = event['direction'] as String?;
         } catch (error) {
           debugPrint('Native tripwire event remains queued: $error');
           break;
         }
+      }
+
+      // After syncing background events, update TenantController so the
+      // curfew/presence UI shows the correct IN/OUT state immediately.
+      if (lastSyncedDirection != null) {
+        TenantController.instance.applyGeofenceCrossing(lastSyncedDirection);
       }
     } on MissingPluginException {
       // No native adapter on this platform.

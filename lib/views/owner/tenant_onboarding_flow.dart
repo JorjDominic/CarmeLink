@@ -19,8 +19,35 @@ Future<void> continueTenantOnboarding(
               icon: const Icon(Icons.task_alt_rounded),
               title: Text(
                   fromSavedContract ? 'Contract saved' : 'Continue onboarding'),
-              content: Text(
-                'Continue $tenantName\'s onboarding with room and bed assignment, then guardian linking.',
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                      'Continue $tenantName\'s onboarding. Your current position and every remaining step are shown below.'),
+                  const SizedBox(height: 16),
+                  const _OnboardingStepSummary(
+                    number: 1,
+                    title: 'Contract draft',
+                    detail:
+                        'Agreement details saved and contract number assigned.',
+                    complete: true,
+                  ),
+                  const _OnboardingStepSummary(
+                    number: 2,
+                    title: 'Room and bed',
+                    detail: 'Choose one currently available bed.',
+                  ),
+                  const _OnboardingStepSummary(
+                    number: 3,
+                    title: 'Guardian link',
+                    detail:
+                        'Select the guardian, relationship, and primary contact.',
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                      'Documents and digital signatures are completed from the contract checklist before activation.'),
+                ],
               ),
               actions: [
                 TextButton(
@@ -36,6 +63,11 @@ Future<void> continueTenantOnboarding(
           ) ==
           true;
   if (proceed != true || !context.mounted) return;
+
+  // Let the confirmation route finish removing its inherited dependencies
+  // before presenting the first onboarding sheet.
+  await Future<void>.delayed(const Duration(milliseconds: 250));
+  if (!context.mounted) return;
 
   await _assignBedStep(context, tenantId: tenantId, tenantName: tenantName);
   if (!context.mounted) return;
@@ -193,7 +225,9 @@ class _BedAssignmentSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Assign room and bed',
+              const _StepPosition(current: 2, total: 3),
+              const SizedBox(height: 8),
+              Text('Step 2: Assign room and bed',
                   style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 4),
               Text('Select an available bed for $tenantName.'),
@@ -304,7 +338,9 @@ class _GuardianLinkStepState extends State<_GuardianLinkStep> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Link guardian',
+              const _StepPosition(current: 3, total: 3),
+              const SizedBox(height: 8),
+              Text('Step 3: Link guardian',
                   style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 4),
               Text('Choose the guardian for ${widget.tenantName}.'),
@@ -365,5 +401,59 @@ class _GuardianLinkStepState extends State<_GuardianLinkStep> {
             ],
           ),
         ),
+      );
+}
+
+class _StepPosition extends StatelessWidget {
+  const _StepPosition({required this.current, required this.total});
+  final int current;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('ONBOARDING · STEP $current OF $total',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  )),
+          const SizedBox(height: 6),
+          LinearProgressIndicator(value: current / total),
+        ],
+      );
+}
+
+class _OnboardingStepSummary extends StatelessWidget {
+  const _OnboardingStepSummary({
+    required this.number,
+    required this.title,
+    required this.detail,
+    this.complete = false,
+  });
+  final int number;
+  final String title;
+  final String detail;
+  final bool complete;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          CircleAvatar(
+            radius: 14,
+            child: complete
+                ? const Icon(Icons.check, size: 17)
+                : Text('$number', style: const TextStyle(fontSize: 12)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(detail, style: Theme.of(context).textTheme.bodySmall),
+            ]),
+          ),
+        ]),
       );
 }

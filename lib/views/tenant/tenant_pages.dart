@@ -51,9 +51,11 @@ class TenantDashboardPage extends StatelessWidget {
           final firstName =
               session.currentUser?.name.trim().split(' ').first ?? 'Resident';
 
+          final nonDepositPayments =
+              controller.payments.where((p) => !p.isDeposit).toList();
           final nextDue = controller.nextDuePayment ??
-              (controller.payments.isNotEmpty
-                  ? controller.payments.first
+              (nonDepositPayments.isNotEmpty
+                  ? nonDepositPayments.first
                   : null);
           final outstanding = controller.outstandingBalance;
           final maintenance = controller.maintenance.isEmpty
@@ -1663,20 +1665,26 @@ class TenantBillingDetailsPage extends StatelessWidget {
           final openBills = payments
               .where((p) => !p.isVoided && p.outstandingAmount > 0)
               .toList();
+          final dueNowBills = openBills
+              .where((p) => !p.isDeposit && !(p.isRent && !p.isDueNow))
+              .toList();
+          final depositBills = openBills.where((p) => p.isDeposit).toList();
+          final futureRentBills =
+              openBills.where((p) => p.isRent && !p.isDueNow).toList();
           final completedBills = payments
               .where((p) => p.isVoided || p.outstandingAmount <= 0)
               .toList();
-          final rent = openBills
+          final rent = dueNowBills
               .where((p) => p.isRent)
               .fold<double>(0, (sum, p) => sum + p.outstandingAmount);
-          final utilities = openBills
+          final utilities = dueNowBills
               .where((p) => p.isUtility)
               .fold<double>(0, (sum, p) => sum + p.outstandingAmount);
-          final other = openBills
-              .where((p) => !p.isRent && !p.isUtility)
+          final other = dueNowBills
+              .where((p) => !p.isRent && !p.isUtility && !p.isDeposit)
               .fold<double>(0, (sum, p) => sum + p.outstandingAmount);
           final nextDue = openBills
-              .where((p) => p.isDue || p.isUpcoming)
+              .where((p) => !p.isDeposit && (p.isDue || p.isUpcoming))
               .toList()
             ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
@@ -1704,6 +1712,21 @@ class TenantBillingDetailsPage extends StatelessWidget {
                     if (other > 0)
                       _BillingBreakdownRow(
                           label: 'Other approved charges', amount: other),
+                    const Divider(height: 24),
+                    _BillingBreakdownRow(
+                      label: 'Refundable security deposit',
+                      amount: depositBills.fold<double>(
+                          0, (sum, p) => sum + p.outstandingAmount),
+                    ),
+                    _BillingBreakdownRow(
+                      label: 'Future scheduled rent',
+                      amount: futureRentBills.fold<double>(
+                          0, (sum, p) => sum + p.outstandingAmount),
+                    ),
+                    Text(
+                      'Deposit and future rent are shown separately and are not included in Total outstanding.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                     const SizedBox(height: 8),
                     _CompactPaymentSummaryRow(
                       label: 'Next due',
@@ -1716,19 +1739,48 @@ class TenantBillingDetailsPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              SectionTitle('Open bills (${openBills.length})'),
+              SectionTitle('Due now (${dueNowBills.length})'),
               const SizedBox(height: 10),
-              if (openBills.isEmpty)
+              if (dueNowBills.isEmpty)
                 const EmptyState(
                   icon: Icons.task_alt_rounded,
-                  title: 'No outstanding bills',
-                  message: 'Your account currently has no unpaid balance.',
+                  title: 'Nothing due now',
+                  message: 'Deposit and future rent are listed separately.',
                 )
               else
-                ...openBills.map((payment) => Padding(
+                ...dueNowBills.map((payment) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _TenantPaymentCard(payment: payment),
                     )),
+              if (depositBills.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                SectionTitle('Security deposit (${depositBills.length})'),
+                const SizedBox(height: 6),
+                Text(
+                  'Held separately and refundable after the lease, subject to documented deductions.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                ...depositBills.map((payment) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _TenantPaymentCard(payment: payment),
+                    )),
+              ],
+              if (futureRentBills.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                SectionTitle(
+                    'Future scheduled rent (${futureRentBills.length})'),
+                const SizedBox(height: 6),
+                Text(
+                  'Scheduled contract installments. These are not included in the amount due now.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                ...futureRentBills.map((payment) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _TenantPaymentCard(payment: payment),
+                    )),
+              ],
               const SizedBox(height: 12),
               SectionTitle('Completed and voided (${completedBills.length})'),
               const SizedBox(height: 10),
@@ -2020,34 +2072,59 @@ class _TenantPaymentCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Flexible(
-                    child: payment.isOverdue
+                    child: payment.isDeposit
                         ? Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.red.shade50,
+                              color: const Color(0xFF627FA8)
+                                  .withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.red.shade300),
                             ),
                             child: Text(
-                              'Overdue • Due ${shortDate(payment.dueDate)}',
+                              payment.isVerified
+                                  ? 'Deposit held on account'
+                                  : 'Refundable security deposit',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.red.shade800,
+                                color: Color(0xFF2C4A6F),
                               ),
                             ),
                           )
-                        : Text(
-                            'Due ${shortDate(payment.dueDate)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                        : payment.isOverdue
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border:
+                                      Border.all(color: Colors.red.shade300),
+                                ),
+                                child: Text(
+                                  'Overdue • Due ${shortDate(payment.dueDate)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.red.shade800,
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                'Due ${shortDate(payment.dueDate)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
                   ),
                 ],
               ),

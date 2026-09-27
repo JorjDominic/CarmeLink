@@ -321,5 +321,36 @@ void main() {
       expect(controller.payments.single.status, 'Due');
       expect(controller.paymentsError, isNotNull);
     });
+
+    test('security deposit is excluded from duePayments, nextDuePayment, and overduePayments', () {
+      final depositPayment = Payment(
+        id: 'p-deposit',
+        label: 'Security Deposit',
+        category: 'deposit',
+        amount: 3000.0,
+        dueDate: DateTime.now().subtract(const Duration(days: 5)),
+        status: 'Due',
+      );
+      final rentPayment = Payment(
+        id: 'p-rent',
+        label: 'Monthly Rent',
+        category: 'rent',
+        amount: 3500.0,
+        dueDate: DateTime.now().add(const Duration(days: 3)),
+        status: 'Due',
+      );
+
+      expect(depositPayment.isDeposit, isTrue);
+      expect(depositPayment.isOverdue, isFalse,
+          reason: 'Security deposits should never be marked as overdue debt');
+
+      controller.setPaymentsForTesting([depositPayment, rentPayment]);
+
+      expect(controller.duePayments.map((p) => p.id), contains('p-rent'));
+      expect(controller.duePayments.map((p) => p.id), isNot(contains('p-deposit')));
+      expect(controller.nextDuePayment?.id, 'p-rent');
+      expect(controller.overduePayments, isEmpty);
+      expect(controller.securityDepositBalance, 3000.0);
+    });
   });
 }

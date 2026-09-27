@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../controllers/tenant_controller.dart';
 import '../services/gate_service.dart';
 import 'geofence_service.dart';
 import 'push_notification_service.dart';
@@ -148,10 +150,10 @@ class GeofenceScheduler with WidgetsBindingObserver {
 
     // Direction changed — show an immediate local notification so the tenant
     // is aware the crossing was detected, then record it in the background.
-    _lastKnownDirection = newDirection;
-    _showCrossingNotification(newDirection);
     _processingTransition = true;
     _recordForegroundTransition(newDirection).then((_) {
+      _lastKnownDirection = newDirection;
+      _showCrossingNotification(newDirection);
       _processingTransition = false;
     }).catchError((Object error) {
       _processingTransition = false;
@@ -189,6 +191,11 @@ class GeofenceScheduler with WidgetsBindingObserver {
       );
       debugPrint(
           '[GeofenceScheduler] Foreground crossing recorded: $direction');
+
+      // Push the new direction into TenantController immediately so the
+      // curfew/presence UI reflects the crossing without waiting for the
+      // next manual check-in.
+      TenantController.instance.applyGeofenceCrossing(direction);
     } catch (error) {
       debugPrint('[GeofenceScheduler] Could not record crossing: $error');
       rethrow;
@@ -197,7 +204,14 @@ class GeofenceScheduler with WidgetsBindingObserver {
 
   String _uniqueId() {
     // UUID v4-style using Dart's random — no crypto dependency needed.
-    final rng = DateTime.now().microsecondsSinceEpoch;
-    return 'fg-${rng.toRadixString(16)}';
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final value =
+        bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+    return '${value.substring(0, 8)}-${value.substring(8, 12)}-'
+        '${value.substring(12, 16)}-${value.substring(16, 20)}-'
+        '${value.substring(20)}';
   }
 }

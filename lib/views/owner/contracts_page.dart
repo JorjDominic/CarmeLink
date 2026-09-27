@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:printing/printing.dart';
 
 import '../../controllers/owner_controller.dart';
@@ -11,10 +10,9 @@ import '../../models/models.dart';
 import '../../services/contract_document_service.dart';
 import '../../services/contract_onboarding_service.dart';
 import '../../services/guardian_link_service.dart';
-import '../../services/onboarding_invitation_service.dart';
 import '../../services/tenant_service.dart';
-import 'onboarding_invitation_page.dart';
 import 'contract_onboarding_checklist_page.dart';
+import 'onboarding_invitation_page.dart';
 import 'tenant_onboarding_flow.dart';
 import 'rent_adjustment_dialog.dart';
 
@@ -356,7 +354,6 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
     final results = await Future.wait<dynamic>([
       const TenantService().loadTenants(forceRefresh: true),
       const GuardianLinkService().listLinks(),
-      const OnboardingInvitationService().listInvitations(tenantId: tenantId),
       SupabaseConfig.client
           .from('profiles')
           .select('email_verified_at')
@@ -373,11 +370,10 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
     ]);
     final tenants = results[0] as List<TenantDirectoryEntry>;
     final links = results[1] as List<Map<String, dynamic>>;
-    final invitations = results[2] as List<OnboardingInvitation>;
-    final profile = results[3] as Map<String, dynamic>?;
-    final requirements = results[4] as List<ContractRequirement>;
-    final signers = results[5] as List<ContractSigner>;
-    final tenantDetails = results[6] as Map<String, dynamic>?;
+    final profile = results[2] as Map<String, dynamic>?;
+    final requirements = results[3] as List<ContractRequirement>;
+    final signers = results[4] as List<ContractSigner>;
+    final tenantDetails = results[5] as Map<String, dynamic>?;
     final emergencyName =
         tenantDetails?['emergency_contact_name']?.toString().trim() ?? '';
     final emergencyPhone =
@@ -389,7 +385,6 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
     return _OnboardingNeeds(
       needsBed: tenant?.assignmentId == null,
       needsGuardian: !links.any((link) => link['tenant_id'] == tenantId),
-      invitationCompleted: invitations.any((inv) => inv.isCompleted),
       emailVerified: profile?['email_verified_at'] != null,
       emergencyContactComplete: emergencyName.length >= 2 &&
           emergencyPhone.length >= 7 &&
@@ -398,7 +393,9 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
           .where((item) => item.isRequired)
           .every((item) => item.isVerified),
       requiredSignersVerified: signers
-          .where((item) => item.isRequired)
+          .where((item) =>
+              item.isRequired &&
+              (item.role == 'tenant' || item.role == 'lessor'))
           .every((item) => item.isVerified),
     );
   }
@@ -432,39 +429,6 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
       }
     } catch (error) {
       if (mounted) showAppSnackBar(context, 'Could not generate PDF: $error');
-    } finally {
-      if (mounted) setState(() => _working = false);
-    }
-  }
-
-  Future<void> _uploadSigned(int version) async {
-    final file = await FilePicker.pickFile(
-      type: FileType.custom,
-      allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
-    );
-    if (file == null || !mounted) return;
-    final bytes = await file.readAsBytes();
-    final extension = file.extension?.toLowerCase();
-    final mimeType = switch (extension) {
-      'pdf' => 'application/pdf',
-      'png' => 'image/png',
-      _ => 'image/jpeg',
-    };
-    setState(() => _working = true);
-    try {
-      await _service.uploadSigned(
-        contract: widget.contract,
-        version: version,
-        filename: file.name,
-        mimeType: mimeType,
-        bytes: bytes,
-      );
-      if (mounted) {
-        showAppSnackBar(context, 'Signed contract uploaded for review.');
-        _reload();
-      }
-    } catch (error) {
-      if (mounted) showAppSnackBar(context, 'Upload failed: $error');
     } finally {
       if (mounted) setState(() => _working = false);
     }
@@ -614,7 +578,6 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
         }
         final documents = snapshot.data ?? const [];
         final generated = documents.where((item) => item.isGenerated).toList();
-        final signed = documents.where((item) => item.isSigned).toList();
         final latestVersion = generated.isEmpty
             ? null
             : generated.map((e) => e.version).reduce((a, b) => a > b ? a : b);
@@ -671,34 +634,6 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
                   ? 'Generate printable PDF'
                   : 'Printable contract already generated'),
             ),
-            // QR onboarding invitation button — always visible
-            const SizedBox(height: 10),
-            FutureBuilder<_OnboardingNeeds>(
-              future: _onboardingNeeds,
-              builder: (context, snap) {
-                final completed =
-                    (snap.data?.emergencyContactComplete ?? false) ||
-                        (snap.data?.invitationCompleted ?? false);
-                return OutlinedButton.icon(
-                  onPressed: _working
-                      ? null
-                      : () async {
-                          await showOnboardingInvitations(
-                            context,
-                            tenantId: widget.contract.tenantId,
-                            tenantName: widget.contract.tenantName,
-                          );
-                          _reloadOnboardingNeeds();
-                        },
-                  icon: Icon(completed
-                      ? Icons.check_circle_outline_rounded
-                      : Icons.assignment_ind_outlined),
-                  label: Text(completed
-                      ? 'Tenant profile & emergency contact completed'
-                      : 'Tenant profile & emergency contact pending'),
-                );
-              },
-            ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: _working
@@ -713,14 +648,18 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
               icon: const Icon(Icons.fact_check_outlined),
               label: const Text('Required documents & signers'),
             ),
-            if (latestVersion != null && signed.isEmpty) ...[
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: _working ? null : () => _uploadSigned(latestVersion),
-                icon: const Icon(Icons.upload_file_outlined),
-                label: Text('Upload signed copy for version $latestVersion'),
-              ),
-            ],
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _working
+                  ? null
+                  : () => showOnboardingInvitations(
+                        context,
+                        tenantId: widget.contract.tenantId,
+                        tenantName: widget.contract.tenantName,
+                      ),
+              icon: const Icon(Icons.qr_code_2_outlined),
+              label: const Text('Tenant profile & onboarding QR'),
+            ),
             // Activate contract — only shown for draft contracts
             if (widget.contract.status == 'draft') ...[
               const SizedBox(height: 10),
@@ -741,31 +680,31 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
                 },
               ),
             ],
-            if (latestSigned?.reviewStatus == 'verified') ...[
-              const SizedBox(height: 10),
-              FutureBuilder<_OnboardingNeeds>(
-                future: _onboardingNeeds,
-                builder: (context, onboardingSnapshot) {
-                  final needs = onboardingSnapshot.data;
-                  if (needs != null && !needs.hasRemainingSteps) {
-                    return const SizedBox.shrink();
-                  }
-                  final label = needs == null
-                      ? 'Checking onboarding status...'
-                      : needs.needsBed && needs.needsGuardian
-                          ? 'Continue tenant onboarding'
-                          : needs.needsBed
-                              ? 'Continue room assignment'
-                              : 'Continue guardian linking';
-                  return FilledButton.tonalIcon(
+            FutureBuilder<_OnboardingNeeds>(
+              future: _onboardingNeeds,
+              builder: (context, onboardingSnapshot) {
+                final needs = onboardingSnapshot.data;
+                if (needs != null && !needs.hasRemainingSteps) {
+                  return const SizedBox.shrink();
+                }
+                final label = needs == null
+                    ? 'Checking onboarding status...'
+                    : needs.needsBed && needs.needsGuardian
+                        ? 'Continue tenant onboarding'
+                        : needs.needsBed
+                            ? 'Continue room assignment'
+                            : 'Continue guardian linking';
+                return Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: FilledButton.tonalIcon(
                     onPressed:
                         _working || needs == null ? null : _continueOnboarding,
                     icon: const Icon(Icons.arrow_forward_rounded),
                     label: Text(label),
-                  );
-                },
-              ),
-            ],
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: 24),
             Text('Document history',
                 style: Theme.of(context)
@@ -817,7 +756,7 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
         child: Column(children: [
           ListTile(
             title: const Text('Contract documents'),
-            subtitle: const Text('Generate, upload, and verify signed copies'),
+            subtitle: const Text('Generate, e-sign, verify, and activate'),
             trailing: IconButton(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.close)),
@@ -842,7 +781,6 @@ class _OnboardingNeeds {
   const _OnboardingNeeds({
     required this.needsBed,
     required this.needsGuardian,
-    this.invitationCompleted = false,
     this.emailVerified = false,
     this.emergencyContactComplete = false,
     this.requiredDocumentsVerified = false,
@@ -851,7 +789,6 @@ class _OnboardingNeeds {
 
   final bool needsBed;
   final bool needsGuardian;
-  final bool invitationCompleted;
   final bool emailVerified;
   final bool emergencyContactComplete;
   final bool requiredDocumentsVerified;
@@ -877,22 +814,13 @@ class _ActivateContractSheet extends StatefulWidget {
 class _ActivateContractSheetState extends State<_ActivateContractSheet> {
   bool _working = false;
 
-  bool get _hasVerifiedSignedDocument {
-    final generatedVersions = widget.documents
-        .where((item) => item.isGenerated)
-        .map((item) => item.version);
-    if (generatedVersions.isEmpty) return false;
-    final latestVersion = generatedVersions.reduce((a, b) => a > b ? a : b);
-    return widget.documents.any((item) =>
-        item.isSigned &&
-        item.version == latestVersion &&
-        item.reviewStatus == 'verified');
-  }
+  bool get _hasGeneratedContract =>
+      widget.documents.any((item) => item.isGenerated);
 
   bool get _canActivate =>
       widget.needs?.emailVerified == true &&
       widget.needs?.emergencyContactComplete == true &&
-      _hasVerifiedSignedDocument &&
+      _hasGeneratedContract &&
       widget.needs?.requiredDocumentsVerified == true &&
       widget.needs?.requiredSignersVerified == true;
 
@@ -955,8 +883,8 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
             requiredForActivation: true,
           ),
           _ActivationRequirement(
-            complete: _hasVerifiedSignedDocument,
-            label: 'Latest signed contract verified',
+            complete: _hasGeneratedContract,
+            label: 'Official contract PDF generated',
             requiredForActivation: true,
           ),
           _ActivationRequirement(
@@ -968,10 +896,6 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
             complete: needs?.requiredSignersVerified == true,
             label: 'Every required signer independently verified',
             requiredForActivation: true,
-          ),
-          _ActivationRequirement(
-            complete: needs?.invitationCompleted == true,
-            label: 'QR onboarding information submitted',
           ),
           _ActivationRequirement(
             complete: needs?.needsBed == false,
@@ -1364,7 +1288,6 @@ class _ContractEditor extends StatefulWidget {
 
 class _ContractEditorState extends State<_ContractEditor> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _number;
   late final TextEditingController _rent;
   late final TextEditingController _deposit;
   late final TextEditingController _notes;
@@ -1378,7 +1301,6 @@ class _ContractEditorState extends State<_ContractEditor> {
   void initState() {
     super.initState();
     final value = widget.contract;
-    _number = TextEditingController(text: value?.contractNumber ?? '');
     _rent = TextEditingController(
         text: value?.monthlyRent.toStringAsFixed(2) ?? '2500.00');
     _deposit = TextEditingController(
@@ -1392,7 +1314,6 @@ class _ContractEditorState extends State<_ContractEditor> {
 
   @override
   void dispose() {
-    _number.dispose();
     _rent.dispose();
     _deposit.dispose();
     _notes.dispose();
@@ -1542,17 +1463,15 @@ class _ContractEditorState extends State<_ContractEditor> {
             ),
           ],
           const SizedBox(height: 14),
-          TextFormField(
-            controller: _number,
-            textInputAction: TextInputAction.next,
+          InputDecorator(
             decoration: const InputDecoration(
               labelText: 'Contract number',
-              hintText: 'e.g. CTR-2026-001',
-              prefixIcon: Icon(Icons.tag_outlined),
+              prefixIcon: Icon(Icons.auto_awesome_outlined),
             ),
-            validator: (value) => (value?.trim().length ?? 0) < 3
-                ? 'Enter at least 3 characters'
-                : null,
+            child: Text(
+              widget.contract?.contractNumber ??
+                  'Generated automatically when this draft is saved',
+            ),
           ),
           const SizedBox(height: 28),
           const _FormSectionHeading(
@@ -1665,7 +1584,6 @@ class _ContractEditorState extends State<_ContractEditor> {
       if (existing == null) {
         saved = await controller.createContract(
           tenantId: _tenantId!,
-          contractNumber: _number.text,
           startsOn: _start,
           endsOn: _end,
           monthlyRent: double.parse(_rent.text),
@@ -1684,7 +1602,7 @@ class _ContractEditorState extends State<_ContractEditor> {
         saved = await controller.updateContract(existing.copyWith(
           tenantId: _tenantId!,
           tenantName: tenant?.name ?? existing.tenantName,
-          contractNumber: _number.text,
+          contractNumber: existing.contractNumber,
           startsOn: _start,
           endsOn: _end,
           monthlyRent: double.parse(_rent.text),

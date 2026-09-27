@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
+import 'app_notification_service.dart';
 
 /// Backend service interfacing with the public.gate_events table
 /// and secure SECURITY DEFINER RPCs.
@@ -214,7 +215,32 @@ class GateService {
       );
       debugPrint('Geofence notification dispatch: ${response.data}');
     } catch (error) {
-      debugPrint('Gate event saved but notification dispatch failed: $error');
+      debugPrint('notify-geofence invocation failed: $error; attempting direct fallback...');
+      try {
+        final row = await _client
+            .from('gate_events')
+            .select('tenant_id, direction, status, profiles!tenant_id(full_name)')
+            .eq('id', eventId)
+            .maybeSingle();
+        if (row != null && row['direction'] != null) {
+          final tenantId = row['tenant_id'] as String;
+          final direction = row['direction'] as String;
+          final status = row['status'] as String? ?? 'Verified';
+          final profileObj = row['profiles'] as Map<String, dynamic>?;
+          final tenantName = profileObj?['full_name'] as String? ?? 'Tenant';
+
+          await AppNotificationService.instance.notifyGateCrossing(
+            tenantId: tenantId,
+            tenantName: tenantName,
+            direction: direction,
+            isFlagged: status == 'Flagged',
+            eventId: eventId,
+          );
+          debugPrint('Fallback guardian notification dispatched for $tenantName ($direction)');
+        }
+      } catch (fallbackError) {
+        debugPrint('Direct fallback notification also failed: $fallbackError');
+      }
     }
   }
 }

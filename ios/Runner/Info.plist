@@ -60,6 +60,8 @@
 	<string>CarmeLink requires location access to verify your presence at the dormitory perimeter for curfew checks.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>CarmeLink uses location in the background for dormitory perimeter and curfew safety checks.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>CarmeLink uses location in the background for dormitory perimeter and curfew safety checks.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

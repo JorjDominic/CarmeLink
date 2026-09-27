@@ -30,6 +30,7 @@ import 'staff_maintenance_page.dart';
 import 'room_monitoring_page.dart';
 import 'geofence_dev_dashboard_page.dart';
 import 'contracts_page.dart';
+import 'contract_onboarding_checklist_page.dart';
 import 'onboarding_invitation_page.dart';
 import 'tenant_onboarding_flow.dart';
 import 'utility_charge_cart_dialog.dart';
@@ -912,20 +913,30 @@ class TenantDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isOwnerWeb = kIsWeb &&
-        SessionController.instance.currentUser?.role == UserRole.owner;
-    final isStaffWeb = kIsWeb &&
-        {UserRole.owner, UserRole.caretaker}.contains(
-          SessionController.instance.currentUser?.role,
-        );
+    final isStaff = {UserRole.owner, UserRole.caretaker}.contains(
+      SessionController.instance.currentUser?.role,
+    );
     final needsContract = tenant.hasContract == false;
     final needsBed = tenant.assignmentId == null;
-    final needsGuardian = tenant.guardianName == 'Not assigned';
+    final needsGuardian = tenant.guardianName == 'Not assigned' ||
+        tenant.guardianName.trim().isEmpty;
+
+    final contracts = OwnerController.instance.contracts
+        .where((c) => c.tenantId == tenant.id)
+        .toList();
+    final draftContract =
+        contracts.where((c) => c.status == 'draft').firstOrNull;
+    final activeContract =
+        contracts.where((c) => c.status == 'active').firstOrNull;
+    final hasActiveContract =
+        activeContract != null || tenant.hasContract == true;
+    final showChecklist =
+        needsContract || needsBed || needsGuardian || draftContract != null;
 
     return PageFrame(
       title: tenant.name,
       subtitle: 'Tenant details',
-      actions: isStaffWeb
+      actions: isStaff
           ? [
               IconButton(
                 tooltip: 'Edit or delete tenant account',
@@ -1000,20 +1011,78 @@ class TenantDetailsPage extends StatelessWidget {
               ],
             ),
           ),
-          if (isOwnerWeb && (needsContract || needsBed || needsGuardian)) ...[
+          if (showChecklist) ...[
             const SizedBox(height: 14),
             CarmelitaCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SectionTitle('Onboarding checklist'),
-                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.assignment_turned_in_outlined,
+                          size: 20, color: Color(0xFF627FA8)),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: SectionTitle('Onboarding checklist'),
+                      ),
+                      StatusPill(hasActiveContract &&
+                              !needsBed &&
+                              !needsGuardian
+                          ? 'Complete'
+                          : 'In progress'),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
                   Text(
-                      'Contract: ${needsContract ? 'Not created' : 'Created'}'),
-                  Text('Bed: ${needsBed ? 'Not assigned' : 'Assigned'}'),
-                  Text('Primary guardian: '
-                      '${needsGuardian ? 'Not assigned' : 'Assigned'}'),
-                  const SizedBox(height: 12),
+                    'Contract: ${hasActiveContract ? 'Active' : draftContract != null ? 'Draft (${draftContract.contractNumber})' : 'Not created'}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: hasActiveContract
+                          ? const Color(0xFF56886B)
+                          : draftContract != null
+                              ? const Color(0xFF627FA8)
+                              : const Color(0xFFB3261E),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Room & Bed: ${needsBed ? 'Not assigned' : '${tenant.room} • ${tenant.bedSpace}'}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: needsBed
+                          ? const Color(0xFFB3261E)
+                          : const Color(0xFF56886B),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Primary guardian: ${needsGuardian ? 'Not assigned' : tenant.guardianName}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: needsGuardian
+                          ? const Color(0xFFB3261E)
+                          : const Color(0xFF56886B),
+                    ),
+                  ),
+                  if (draftContract != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Signatures: ${switch (draftContract.signatureStatus) {
+                        'signed' || 'verified' => 'Signatures verified',
+                        'pending_tenant' => 'Awaiting tenant signature',
+                        'pending_guardian' => 'Awaiting guardian signature',
+                        'not_generated' => 'Signatures pending',
+                        _ => draftContract.signatureStatus,
+                      }}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: draftContract.signatureStatus == 'verified'
+                            ? const Color(0xFF56886B)
+                            : const Color(0xFF627FA8),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
                   if (needsContract)
                     FilledButton.icon(
                       key: const Key('web-tenant-onboarding-action'),
@@ -1025,16 +1094,57 @@ class TenantDetailsPage extends StatelessWidget {
                           lockTenant: true,
                         );
                         if (saved == true && context.mounted) {
-                          Navigator.pop(context);
+                          TenantService.invalidateCache();
+                          await OwnerController.instance
+                              .loadContracts(force: true);
+                          await OwnerController.instance
+                              .loadTenants(force: true);
+                          if (!context.mounted) return;
+                          final proceed = await showDialog<bool>(
+                            context: context,
+                            builder: (dialogCtx) => AlertDialog(
+                              icon: const Icon(Icons.check_circle_outline,
+                                  color: Color(0xFF56886B)),
+                              title: const Text('Contract draft saved'),
+                              content: Text(
+                                'Draft contract saved for ${tenant.name}. Proceed to room assignment and guardian linking now?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(dialogCtx, false),
+                                  child: const Text('Finish later'),
+                                ),
+                                FilledButton(
+                                  onPressed: () =>
+                                      Navigator.pop(dialogCtx, true),
+                                  child: const Text('Continue onboarding'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (proceed == true && context.mounted) {
+                            await continueTenantOnboarding(
+                              context,
+                              tenantId: tenant.id,
+                              tenantName: tenant.name,
+                              showConfirmation: false,
+                            );
+                            if (context.mounted) {
+                              await OwnerController.instance
+                                  .loadTenants(force: true);
+                              await OwnerController.instance
+                                  .loadContracts(force: true);
+                            }
+                          }
                         }
                       },
                       icon: const Icon(Icons.description_outlined),
                       label: const Text('Create draft contract'),
                     ),
-                  if (needsContract && (needsBed || needsGuardian))
-                    const SizedBox(height: 8),
-                  if (needsBed || needsGuardian)
-                    OutlinedButton.icon(
+                  if (needsBed || needsGuardian) ...[
+                    if (needsContract) const SizedBox(height: 8),
+                    FilledButton.icon(
                       key: const Key('web-tenant-residency-setup-action'),
                       onPressed: () async {
                         await continueTenantOnboarding(
@@ -1042,8 +1152,15 @@ class TenantDetailsPage extends StatelessWidget {
                           tenantId: tenant.id,
                           tenantName: tenant.name,
                           fromSavedContract: false,
+                          showConfirmation: false,
                         );
-                        if (context.mounted) Navigator.pop(context);
+                        if (context.mounted) {
+                          TenantService.invalidateCache();
+                          await OwnerController.instance
+                              .loadTenants(force: true);
+                          await OwnerController.instance
+                              .loadContracts(force: true);
+                        }
                       },
                       icon: const Icon(Icons.bed_outlined),
                       label: Text(needsBed && needsGuardian
@@ -1052,6 +1169,28 @@ class TenantDetailsPage extends StatelessWidget {
                               ? 'Assign room and bed'
                               : 'Link guardian'),
                     ),
+                  ],
+                  if (draftContract != null) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => showContractOnboardingChecklist(
+                        context,
+                        contract: draftContract,
+                      ),
+                      icon: const Icon(Icons.fact_check_outlined),
+                      label: const Text('Required documents & signers'),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => showOnboardingInvitations(
+                      context,
+                      tenantId: tenant.id,
+                      tenantName: tenant.name,
+                    ),
+                    icon: const Icon(Icons.qr_code_2_outlined),
+                    label: const Text('Onboarding QR & profile'),
+                  ),
                 ],
               ),
             ),
@@ -2527,6 +2666,27 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
       onRefresh: () => OwnerController.instance.loadPayments(force: true),
       actions: [
         IconButton(
+          tooltip: 'Send payment due alerts to staff',
+          icon: const Icon(Icons.notifications_active_outlined),
+          onPressed: controller.paymentsLoading
+              ? null
+              : () async {
+                  final count =
+                      await controller.checkAndNotifyDuePayments(force: true);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          count > 0
+                              ? 'Dispatched due date alert for $count charge(s) to owners & caretakers.'
+                              : 'No payments currently due or overdue.',
+                        ),
+                      ),
+                    );
+                  }
+                },
+        ),
+        IconButton(
           tooltip: 'Refresh payments',
           icon: controller.paymentsLoading
               ? const SizedBox(
@@ -2547,8 +2707,9 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
           final pendingCount = controller.pendingPaymentProofs;
           final overdueCount = controller.overduePaymentCount;
           final verifiedCount = allPayments.where((p) => p.isVerified).length;
-          final dueCount =
-              allPayments.where((p) => p.isDue && !p.isOverdue).length;
+          final dueCount = allPayments
+              .where((p) => !p.isDeposit && p.isDue && !p.isOverdue)
+              .length;
           final rejectedCount = allPayments.where((p) => p.isRejected).length;
 
           final totalCollected = controller.totalCollectedRevenue;
@@ -2599,9 +2760,12 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
               : allPayments;
           final filteredByTab = switch (_filter) {
             'pending' => allPayments.where((p) => p.isPending).toList(),
-            'due' =>
-              workspacePayments.where((p) => p.isDue && !p.isOverdue).toList(),
-            'overdue' => workspacePayments.where((p) => p.isOverdue).toList(),
+            'due' => workspacePayments
+                .where((p) => !p.isDeposit && p.isDue && !p.isOverdue)
+                .toList(),
+            'overdue' => workspacePayments
+                .where((p) => !p.isDeposit && p.isOverdue)
+                .toList(),
             'verified' => workspacePayments.where((p) => p.isVerified).toList(),
             'rejected' => workspacePayments.where((p) => p.isRejected).toList(),
             'voided' => workspacePayments.where((p) => p.isVoided).toList(),
@@ -3957,14 +4121,20 @@ class _PaymentReviewCard extends StatelessWidget {
               );
 
               final dueDateText = Text(
-                'Due: ${_dateOrNone(payment.dueDate)}',
+                payment.isDeposit
+                    ? (payment.isVerified
+                        ? 'Deposit held on account'
+                        : 'Refundable deposit')
+                    : 'Due: ${_dateOrNone(payment.dueDate)}',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight:
                       payment.isOverdue ? FontWeight.w700 : FontWeight.w500,
                   color: payment.isOverdue
                       ? const Color(0xFFB3261E)
-                      : theme.colorScheme.onSurfaceVariant,
+                      : (payment.isDeposit
+                          ? const Color(0xFF627FA8)
+                          : theme.colorScheme.onSurfaceVariant),
                 ),
               );
 

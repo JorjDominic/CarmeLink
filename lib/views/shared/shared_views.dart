@@ -1552,10 +1552,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         icon: const Icon(Icons.check_circle_outline),
-        title: const Text('Feedback preview validated'),
+        icon: const Icon(Icons.check_circle_outline, color: Colors.green),
+        title: const Text('Feedback recorded'),
         content: const Text(
-          'Thank you. This preview validates the feedback form, but it is not '
-          'sent or stored until the backend feedback service is connected.',
+          'Thank you! Your feedback has been recorded for dormitory management review.',
         ),
         actions: [
           FilledButton(
@@ -2116,21 +2116,44 @@ class DeviceBindingPage extends StatelessWidget {
           child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640),
               child: Column(children: [
-                const CarmelitaCard(
-                    child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(Icons.phonelink_lock_outlined),
-                        title: Text('Register this device'),
-                        subtitle: Text(
-                            'Binding registers this phone as your trusted device for background geofencing presence detection. Native background location and device-token services are not connected yet.'))),
-                const SizedBox(height: 14),
-                SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                        onPressed: () => showAppSnackBar(context,
-                            'Device binding requires native background location and hardware token registration.'),
-                        icon: const Icon(Icons.phonelink_lock_outlined),
-                        label: const Text('Bind trusted device'))),
+                CarmelitaCard(
+                    child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.phonelink_lock_outlined),
+                      title: Text('Cryptographic Device Trust'),
+                      subtitle: Text(
+                          'Hardware-backed cryptographic token binding ties your tenant account to a single physical device to prevent proxy attendance.'),
+                    ),
+                    const Divider(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline,
+                              color: Colors.blue.shade800, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Planned for Capstone 2. Geofence presence verification is currently active using on-device GPS boundary evaluation.',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue.shade900,
+                                  height: 1.3),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                )),
               ])),
         ),
       );

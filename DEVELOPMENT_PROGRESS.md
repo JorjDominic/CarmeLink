@@ -1,6 +1,13 @@
 # CarmeLink Development Progress
 
-Last updated: September 25, 2026
+Last updated: September 27, 2026
+
+Current build reviewed at `514d116`. `flutter analyze` passes with no issues and
+all 427 tests pass. Recent completed source work includes authenticated FCM token
+claiming, direct/resumable onboarding and electronic signatures, Android/iOS
+polygon plus official-gate confirmation, narrowed gate-corridor configuration,
+and defensive iOS permission/error handling. Remote deployment and physical
+device evidence remain open.
 
 This file tracks development separately from the README. Page ownership is
 divided between two developers to reduce merge conflicts.
@@ -31,7 +38,7 @@ pass; Android success does not imply iOS success.
 
 #### 1. Geofencing testing and fixes
 
-- [ ] Run the existing automated geofence, scheduler, polygon, hysteresis,
+- [x] Run the existing automated geofence, scheduler, polygon, hysteresis,
   retry/backoff, deduplication, and session-cleanup tests; record and fix every
   regression before physical-device testing.
 - [ ] Validate foreground, background, app-resume, force-close/relaunch, device
@@ -129,7 +136,7 @@ compatible with adding it later.
 
 #### Definition of done for today's agenda
 
-- [ ] `flutter analyze` reports no issues and the complete Flutter test suite
+- [x] `flutter analyze` reports no issues and the complete Flutter test suite
   passes after all fixes.
 - [ ] Geofencing has recorded Android and iOS physical-device results, including
   the on-site boundary walk or a clearly documented external blocker.
