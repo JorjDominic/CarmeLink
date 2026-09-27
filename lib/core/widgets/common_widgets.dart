@@ -865,7 +865,7 @@ class PageFrame extends StatelessWidget {
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     child: ResponsiveContent(
-                      maxWidth: maxWidth,
+                      maxWidth: maxWidth ?? (webPortal ? double.infinity : null),
                       padding: EdgeInsets.fromLTRB(
                         AppBreakpoints.horizontalPadding(context),
                         6,
@@ -881,7 +881,7 @@ class PageFrame extends StatelessWidget {
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   child: ResponsiveContent(
-                    maxWidth: maxWidth,
+                    maxWidth: maxWidth ?? (webPortal ? double.infinity : null),
                     padding: EdgeInsets.fromLTRB(
                       AppBreakpoints.horizontalPadding(context),
                       6,
