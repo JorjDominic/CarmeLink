@@ -13,7 +13,6 @@ import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/announcement_service.dart';
 import '../../services/geofence_service.dart';
-import '../../services/geofence_scheduler.dart';
 import '../../services/receipt_ocr_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/tripwire_geofence_service.dart';
@@ -5351,12 +5350,17 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
       // Re-register the native tripwire now that background permission exists.
       final uid = SessionController.instance.currentUser?.id;
       if (uid != null) {
-        await GeofenceScheduler.instance.start(uid);
+        await TripwireGeofenceService.instance.start(uid);
       }
       _loadMonitoringStatus(sync: true);
     } else {
-      // User declined — direct them to App Settings to change it manually.
-      GeofenceLocationService.openAppSettings();
+      // iOS commonly grants "While Using the App" first and offers the
+      // "Always" upgrade separately. Keep CarmeLink open instead of
+      // unexpectedly sending the user to Settings.
+      showAppSnackBar(
+        context,
+        'Location access was saved. Background monitoring still needs "Always" access; you can enable it later in Settings.',
+      );
     }
   }
 

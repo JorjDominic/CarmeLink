@@ -135,12 +135,17 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       defaults.set(initialDirection, forKey: "tripwire_confirmed_direction")
     }
 
-    manager.requestAlwaysAuthorization()
-    startMonitoring(latitude: latitude, longitude: longitude, radius: radius)
+    // Flutter owns the user-facing permission flow. Starting native region
+    // monitoring before iOS finishes the Always-authorization upgrade can
+    // produce failures immediately after the permission sheet closes.
+    if manager.authorizationStatus == .authorizedAlways {
+      startMonitoring(latitude: latitude, longitude: longitude, radius: radius)
+    }
   }
 
   func restoreIfNeeded() {
-    guard defaults.bool(forKey: registeredKey) else { return }
+    guard defaults.bool(forKey: registeredKey),
+          manager.authorizationStatus == .authorizedAlways else { return }
     startMonitoring(
       latitude: defaults.double(forKey: "tripwire_latitude"),
       longitude: defaults.double(forKey: "tripwire_longitude"),
@@ -337,7 +342,29 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
     if manager.authorizationStatus == .authorizedAlways {
       restoreIfNeeded()
+    } else if manager.authorizationStatus == .denied ||
+                manager.authorizationStatus == .restricted {
+      stopLocationBurst()
     }
+  }
+
+  func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+    // Permission denial, disabled Location Services, and temporary position
+    // failures are recoverable states. Do not let them destabilize the app.
+    NSLog("CarmeLink location update failed: %@", error.localizedDescription)
+    stopLocationBurst()
+  }
+
+  func locationManager(
+    _ manager: CLLocationManager,
+    monitoringDidFailFor region: CLRegion?,
+    withError error: Error
+  ) {
+    NSLog(
+      "CarmeLink region monitoring failed for %@: %@",
+      region?.identifier ?? "unknown",
+      error.localizedDescription
+    )
   }
 
   private func append(direction: String) {
