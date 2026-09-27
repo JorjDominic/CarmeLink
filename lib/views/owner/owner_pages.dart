@@ -31,6 +31,7 @@ import 'staff_maintenance_page.dart';
 import 'room_monitoring_page.dart';
 import 'geofence_dev_dashboard_page.dart';
 import 'contracts_page.dart';
+import 'onboarding_invitation_page.dart';
 import 'tenant_onboarding_flow.dart';
 import 'utility_charge_cart_dialog.dart';
 import '../../services/dormitory_report_service.dart';
@@ -326,6 +327,54 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
   String residencyFilter = 'all';
   bool _creatingTenant = false;
 
+  Future<void> _showOnboardingGuide() => showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          icon: const Icon(Icons.route_outlined),
+          title: const Text('Tenant onboarding steps'),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Complete tenant setup in one guided flow.'),
+              SizedBox(height: 16),
+              _OnboardingGuideStep(
+                number: 1,
+                title: 'Account',
+                detail: 'Create the tenant login and basic profile.',
+              ),
+              _OnboardingGuideStep(
+                number: 2,
+                title: 'Contract',
+                detail: 'Prepare and save the tenant contract.',
+              ),
+              _OnboardingGuideStep(
+                number: 3,
+                title: 'Profile',
+                detail: 'Collect or review onboarding information.',
+              ),
+              _OnboardingGuideStep(
+                number: 4,
+                title: 'Room',
+                detail: 'Assign an available room and bed.',
+              ),
+              _OnboardingGuideStep(
+                number: 5,
+                title: 'Guardian',
+                detail: 'Link an existing guardian when applicable.',
+                showConnector: false,
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Got it'),
+            ),
+          ],
+        ),
+      );
+
   Future<void> _createTenant() async {
     if (_creatingTenant) return;
     setState(() => _creatingTenant = true);
@@ -339,35 +388,49 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
       await OwnerController.instance.loadTenants(force: true);
       if (!mounted) return;
       if (SessionController.instance.currentUser?.role == UserRole.owner) {
-        final createContract = await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('Tenant account created'),
-            content:
-                Text('Create a draft contract for ${created.fullName} now? '
-                    'You can also do this later from the tenant details.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Do this later'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Create contract'),
-              ),
-            ],
-          ),
+        showAppSnackBar(
+          context,
+          'Step 1 of 5 complete: tenant account created.',
         );
-        if (createContract == true && mounted) {
-          await showContractEditor(
+        final contractCreated = await showContractEditor(
+          context,
+          initialTenantId: created.id,
+          initialTenantName: created.fullName,
+          lockTenant: true,
+        );
+        if (!mounted) return;
+        if (contractCreated != true) {
+          showAppSnackBar(
             context,
-            initialTenantId: created.id,
-            initialTenantName: created.fullName,
-            lockTenant: true,
+            'Account saved. Resume onboarding from this tenant\'s details.',
           );
-          if (!mounted) return;
-          await _fetchTenants(showSpinner: false);
+          return;
         }
+        showAppSnackBar(context, 'Step 2 of 5 complete: contract saved.');
+
+        await showOnboardingInvitations(
+          context,
+          tenantId: created.id,
+          tenantName: created.fullName,
+        );
+        if (!mounted) return;
+        showAppSnackBar(
+          context,
+          'Step 3 of 5 complete: profile onboarding reviewed.',
+        );
+
+        await continueTenantOnboarding(
+          context,
+          tenantId: created.id,
+          tenantName: created.fullName,
+          showConfirmation: false,
+        );
+        if (!mounted) return;
+        await _fetchTenants(showSpinner: false);
+        showAppSnackBar(
+          context,
+          'Onboarding flow finished. Review the tenant record for any skipped steps.',
+        );
       } else {
         showAppSnackBar(context, 'Tenant account created.');
       }
@@ -657,15 +720,24 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
       subtitle: kIsWeb
           ? 'Search and manage tenant records'
           : 'Search and view tenant records',
-      floatingActionButton: kIsWeb
-          ? FloatingActionButton.extended(
-              key: const Key('web-create-tenant'),
-              onPressed: _creatingTenant ? null : _createTenant,
-              icon: const Icon(Icons.person_add_outlined),
-              label: Text(_creatingTenant ? 'Creating...' : 'Add tenant'),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton.extended(
+        key: const Key('web-create-tenant'),
+        onPressed: _creatingTenant ? null : _createTenant,
+        icon: _creatingTenant
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.person_add_outlined),
+        label: Text(_creatingTenant ? 'Starting...' : 'Create tenant'),
+      ),
       actions: [
+        IconButton(
+          key: const Key('tenant-onboarding-guide'),
+          tooltip: 'How tenant onboarding works',
+          onPressed: _showOnboardingGuide,
+          icon: const Icon(Icons.help_outline_rounded),
+        ),
         IconButton(
           tooltip: 'Refresh',
           onPressed: () => _fetchTenants(showSpinner: currentTenants == null),
@@ -675,6 +747,55 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
       child: body,
     );
   }
+}
+
+class _OnboardingGuideStep extends StatelessWidget {
+  const _OnboardingGuideStep({
+    required this.number,
+    required this.title,
+    required this.detail,
+    this.showConnector = true,
+  });
+
+  final int number;
+  final String title;
+  final String detail;
+  final bool showConnector;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Column(
+              children: [
+                CircleAvatar(
+                  radius: 13,
+                  child: Text('$number', style: const TextStyle(fontSize: 12)),
+                ),
+                if (showConnector)
+                  Container(
+                    width: 2,
+                    height: 22,
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text(detail, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 // Only preview and navigation here. Changes still go through the existing

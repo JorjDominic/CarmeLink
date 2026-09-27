@@ -23,6 +23,33 @@ void main() {
     'analytics': const ReportsAnalyticsPage(),
   };
 
+  testWidgets('tenant directory starts tenant creation from a visible button',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: TenantDirectoryPage()),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.text('Create tenant'), findsOneWidget);
+    expect(find.byKey(const Key('web-create-tenant')), findsOneWidget);
+    expect(find.text('Tenant onboarding steps'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('tenant-onboarding-guide')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tenant onboarding steps'), findsOneWidget);
+    expect(
+      find.text('Create the tenant login and basic profile.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   for (final entry in pages.entries) {
     testWidgets('${entry.key} has no narrow-screen overlap', (tester) async {
       tester.view.devicePixelRatio = 1;

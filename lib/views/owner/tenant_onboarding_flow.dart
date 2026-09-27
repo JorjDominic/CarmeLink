@@ -9,28 +9,32 @@ Future<void> continueTenantOnboarding(
   required String tenantId,
   required String tenantName,
   bool fromSavedContract = true,
+  bool showConfirmation = true,
 }) async {
-  final proceed = await showDialog<bool>(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) => AlertDialog(
-      icon: const Icon(Icons.task_alt_rounded),
-      title: Text(fromSavedContract ? 'Contract saved' : 'Continue onboarding'),
-      content: Text(
-        'Continue $tenantName\'s onboarding with room and bed assignment, then guardian linking.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext, false),
-          child: const Text('Finish later'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('Continue onboarding'),
-        ),
-      ],
-    ),
-  );
+  final proceed = !showConfirmation ||
+      await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (dialogContext) => AlertDialog(
+              icon: const Icon(Icons.task_alt_rounded),
+              title: Text(
+                  fromSavedContract ? 'Contract saved' : 'Continue onboarding'),
+              content: Text(
+                'Continue $tenantName\'s onboarding with room and bed assignment, then guardian linking.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Finish later'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('Continue onboarding'),
+                ),
+              ],
+            ),
+          ) ==
+          true;
   if (proceed != true || !context.mounted) return;
 
   await _assignBedStep(context, tenantId: tenantId, tenantName: tenantName);
