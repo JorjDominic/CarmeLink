@@ -78,12 +78,9 @@ class TripwireLocationBurstService : Service() {
     }
 
     private fun startBurst() {
-        if (!getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE)
-                .getBoolean("gate_enabled", false)
-        ) {
-            stopSelf()
-            return
-        }
+        // Always start a high-accuracy burst whenever the coarse OS geofence
+        // fires — TripwireCrossingVerifier needs a precise GPS fix to evaluate
+        // the polygon, regardless of whether the virtual gate line is configured.
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) !=
             PackageManager.PERMISSION_GRANTED
         ) {
