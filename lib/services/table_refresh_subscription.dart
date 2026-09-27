@@ -19,8 +19,13 @@ class TableRefreshSubscription {
       final client = SupabaseConfig.clientSafe;
       if (client == null) return;
 
-      var builder = client.channel('refresh-$name');
+      final expandedTables = <String>{};
       for (final table in tables) {
+        expandedTables.addAll(_expandedTables(table));
+      }
+
+      var builder = client.channel('refresh-$name');
+      for (final table in expandedTables) {
         builder = builder.onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
@@ -31,6 +36,20 @@ class TableRefreshSubscription {
       channel = builder.subscribe();
     } catch (_) {
       // Ignored when offline or uninitialized
+    }
+  }
+
+  static Iterable<String> _expandedTables(String table) sync* {
+    yield table;
+
+    // The app now reads billing from billing_charge_summaries, whose live
+    // rows are backed by billing_charges and payment_transactions. Keep the
+    // legacy payments listener for compatibility, but also listen to the
+    // authoritative billing tables so older page subscriptions stay live.
+    if (table == 'payments') {
+      yield 'billing_charges';
+      yield 'payment_transactions';
+      yield 'billing_charge_actions';
     }
   }
 

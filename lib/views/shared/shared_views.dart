@@ -19,7 +19,13 @@ import '../tenant/tenant_requirements_page.dart';
 import 'signature_pad_dialog.dart';
 
 class NotificationsPage extends StatefulWidget {
-  const NotificationsPage({super.key});
+  const NotificationsPage({
+    super.key,
+    this.onOpenNotification,
+  });
+
+  final Future<void> Function(AppNotificationItem notification)?
+      onOpenNotification;
 
   @override
   State<NotificationsPage> createState() => _NotificationsPageState();
@@ -132,10 +138,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           ),
                         ),
                         isThreeLine: true,
-                        onTap: () {
+                        trailing: item.routeType?.trim().isNotEmpty == true
+                            ? const Icon(Icons.chevron_right_rounded)
+                            : null,
+                        onTap: () async {
                           if (!item.isRead) {
-                            _service.markAsRead(item.id);
+                            await _service.markAsRead(item.id);
                           }
+                          await widget.onOpenNotification?.call(item);
                         },
                       );
                     },

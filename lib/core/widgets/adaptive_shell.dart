@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
 import '../../views/shared/shared_views.dart';
+import '../../services/app_notification_service.dart';
 import 'common_widgets.dart';
 
 import '../runtime/app_surface.dart';
@@ -26,6 +29,7 @@ class CarmelitaNavScope extends InheritedWidget {
   const CarmelitaNavScope({
     required this.openMenu,
     this.openMessages,
+    this.openNotifications,
     required this.selectIndex,
     required super.child,
     super.key,
@@ -33,6 +37,7 @@ class CarmelitaNavScope extends InheritedWidget {
 
   final Future<void> Function() openMenu;
   final VoidCallback? openMessages;
+  final VoidCallback? openNotifications;
   final ValueChanged<int> selectIndex;
 
   static CarmelitaNavScope? maybeOf(
@@ -47,6 +52,7 @@ class CarmelitaNavScope extends InheritedWidget {
   ) {
     return openMenu != oldWidget.openMenu ||
         openMessages != oldWidget.openMessages ||
+        openNotifications != oldWidget.openNotifications ||
         selectIndex != oldWidget.selectIndex;
   }
 }
@@ -57,6 +63,7 @@ class AdaptiveRoleShell extends StatefulWidget {
     required this.roleLabel,
     required this.messagePage,
     this.webDestinations = const [],
+    this.notificationPageBuilder,
     super.key,
   });
 
@@ -68,15 +75,31 @@ class AdaptiveRoleShell extends StatefulWidget {
   /// Mobile destinations and the in-app backend services stay unchanged.
   final List<AppDestination> webDestinations;
 
+  /// Browser staff portals can provide a role-aware route for live in-app
+  /// notifications. Mobile shells leave this null and keep their existing
+  /// navigation behavior unchanged.
+  final Widget? Function(AppNotificationItem notification)?
+      notificationPageBuilder;
+
   static Widget? activeMessagePage;
 
   static void openActiveMessages(BuildContext context) {
+    final scopedAction = CarmelitaNavScope.maybeOf(context)?.openMessages;
+    if (scopedAction != null) {
+      scopedAction();
+      return;
+    }
     final page = activeMessagePage;
     if (page == null) return;
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
   }
 
   static void openNotifications(BuildContext context) {
+    final scopedAction = CarmelitaNavScope.maybeOf(context)?.openNotifications;
+    if (scopedAction != null) {
+      scopedAction();
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
     );
@@ -88,8 +111,212 @@ class AdaptiveRoleShell extends StatefulWidget {
 
 class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   int index = 0;
+  StreamSubscription<List<AppNotificationItem>>? _notificationSubscription;
+  Timer? _notificationPollTimer;
+  bool _notificationStartInFlight = false;
+  final Set<String> _seenNotificationIds = <String>{};
+  bool _notificationsSeeded = false;
+  int _unreadNotificationCount = 0;
   GlobalKey<NavigatorState> _webWorkspaceNavigatorKey =
       GlobalKey<NavigatorState>();
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final shouldListen = CarmeLinkSurfaceScope.isWebPortal(context) &&
+        widget.notificationPageBuilder != null;
+    if (shouldListen &&
+        _notificationSubscription == null &&
+        !_notificationStartInFlight) {
+      unawaited(_startNotificationStream());
+    } else if (!shouldListen && _notificationSubscription != null) {
+      unawaited(_stopNotificationStream());
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AdaptiveRoleShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final hadRealtimeNotifications = oldWidget.notificationPageBuilder != null;
+    final hasRealtimeNotifications = widget.notificationPageBuilder != null;
+    if (hadRealtimeNotifications != hasRealtimeNotifications) {
+      unawaited(_restartNotificationStream());
+    }
+  }
+
+  Future<void> _startNotificationStream() async {
+    if (_notificationStartInFlight) return;
+    _notificationStartInFlight = true;
+    try {
+      // Seed first so existing unread history never appears as a burst of
+      // "new" popups when the staff portal opens.
+      final initial = await AppNotificationService.instance
+          .fetchMyNotifications(limit: 60);
+      if (!mounted || widget.notificationPageBuilder == null) return;
+      _onNotificationSnapshot(initial);
+
+      _notificationSubscription = AppNotificationService.instance
+          .streamMyNotifications(limit: 60)
+          .listen(_onNotificationSnapshot);
+
+      // app_notifications may not be enabled in the Realtime publication on
+      // every deployed environment yet. Polling is a catch-up fallback only;
+      // Realtime still delivers immediately wherever it is enabled.
+      _notificationPollTimer = Timer.periodic(
+        const Duration(seconds: 15),
+        (_) => unawaited(_pollNotifications()),
+      );
+    } finally {
+      _notificationStartInFlight = false;
+    }
+  }
+
+  Future<void> _pollNotifications() async {
+    if (!mounted || widget.notificationPageBuilder == null) return;
+    final latest =
+        await AppNotificationService.instance.fetchMyNotifications(limit: 60);
+    if (mounted) _onNotificationSnapshot(latest);
+  }
+
+  Future<void> _restartNotificationStream() async {
+    await _stopNotificationStream();
+    if (!mounted) return;
+    if (CarmeLinkSurfaceScope.isWebPortal(context) &&
+        widget.notificationPageBuilder != null) {
+      await _startNotificationStream();
+    }
+  }
+
+  Future<void> _stopNotificationStream() async {
+    _notificationPollTimer?.cancel();
+    _notificationPollTimer = null;
+    await _notificationSubscription?.cancel();
+    _notificationSubscription = null;
+    _seenNotificationIds.clear();
+    _notificationsSeeded = false;
+    if (mounted && _unreadNotificationCount != 0) {
+      setState(() => _unreadNotificationCount = 0);
+    }
+  }
+
+  void _onNotificationSnapshot(List<AppNotificationItem> notifications) {
+    if (!mounted) return;
+    if (_notificationsSeeded &&
+        notifications.isEmpty &&
+        _seenNotificationIds.isNotEmpty) {
+      // fetchMyNotifications returns an empty list on network errors. Keep the
+      // last known badge state instead of briefly pretending everything read.
+      return;
+    }
+
+    final unreadCount = notifications.where((item) => !item.isRead).length;
+    if (!_notificationsSeeded) {
+      _seenNotificationIds.addAll(notifications.map((item) => item.id));
+      _notificationsSeeded = true;
+      if (_unreadNotificationCount != unreadCount) {
+        setState(() => _unreadNotificationCount = unreadCount);
+      }
+      return;
+    }
+
+    final fresh = notifications
+        .where((item) => !_seenNotificationIds.contains(item.id))
+        .toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    _seenNotificationIds.addAll(notifications.map((item) => item.id));
+
+    if (_unreadNotificationCount != unreadCount) {
+      setState(() => _unreadNotificationCount = unreadCount);
+    }
+    if (fresh.isEmpty) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (fresh.length > 3) {
+        _showRealtimeNotificationBatch(fresh.length);
+        return;
+      }
+      for (final item in fresh) {
+        _showRealtimeNotification(item);
+      }
+    });
+  }
+
+  NotificationsPage _notificationsPage() => NotificationsPage(
+        onOpenNotification: _openNotificationDestination,
+      );
+
+  Future<void> _openNotificationDestination(AppNotificationItem item) async {
+    final destination = widget.notificationPageBuilder?.call(item);
+    if (!mounted || destination == null) return;
+    _openWebWorkspacePage(destination);
+  }
+
+  void _showRealtimeNotificationBatch(int count) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 6),
+        content: Text('$count new CarmeLink updates received.'),
+        action: SnackBarAction(
+          label: 'View',
+          onPressed: () => _openWebWorkspacePage(_notificationsPage()),
+        ),
+      ),
+    );
+  }
+
+  void _showRealtimeNotification(AppNotificationItem item) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    final destination = widget.notificationPageBuilder?.call(item);
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 6),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+            if (item.body.trim().isNotEmpty)
+              Text(
+                item.body,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+          ],
+        ),
+        action: SnackBarAction(
+          label: 'View',
+          onPressed: () {
+            if (destination != null) {
+              _openWebWorkspacePage(destination);
+            } else {
+              _openWebWorkspacePage(_notificationsPage());
+            }
+            if (!item.isRead) {
+              unawaited(AppNotificationService.instance.markAsRead(item.id));
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _notificationPollTimer?.cancel();
+    unawaited(_notificationSubscription?.cancel());
+    super.dispose();
+  }
 
   void _select(int value) {
     if (value == index) {
@@ -287,6 +514,16 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     );
   }
 
+  void _openNotifications() {
+    if (CarmeLinkSurfaceScope.isWebPortal(context)) {
+      _openWebWorkspacePage(_notificationsPage());
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
+    );
+  }
+
   void _openMessages() {
     if (CarmeLinkSurfaceScope.isWebPortal(context)) {
       _openWebWorkspacePage(widget.messagePage);
@@ -319,6 +556,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     return CarmelitaNavScope(
       openMenu: _openMenu,
       openMessages: _openMessages,
+      openNotifications: _openNotifications,
       selectIndex: _select,
       child: Scaffold(
         extendBody: !webPortal,
@@ -328,11 +566,13 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                     children: [
                       _WebStaffSidebar(
                         roleLabel: widget.roleLabel,
+                        unreadNotificationCount: _unreadNotificationCount,
                         destinations: activeDestinations,
                         mainDestinationCount: widget.destinations.length,
                         selectedIndex: activeIndex,
                         onSelected: _select,
                         onOpenMessages: _openMessages,
+                        onOpenNotifications: _openNotifications,
                         onOpenPage: _openWebWorkspacePage,
                       ),
                       const VerticalDivider(width: 1),
@@ -343,6 +583,8 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                     children: [
                       _CompactWebNavigationBar(
                         roleLabel: widget.roleLabel,
+                        unreadNotificationCount: _unreadNotificationCount,
+                        onNotifications: _openNotifications,
                         onMenu: _openMenu,
                       ),
                       Expanded(child: _webWorkspace(page, activeIndex)),
@@ -373,10 +615,14 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 class _CompactWebNavigationBar extends StatefulWidget {
   const _CompactWebNavigationBar({
     required this.roleLabel,
+    required this.unreadNotificationCount,
+    required this.onNotifications,
     required this.onMenu,
   });
 
   final String roleLabel;
+  final int unreadNotificationCount;
+  final VoidCallback onNotifications;
   final Future<void> Function() onMenu;
 
   @override
@@ -466,6 +712,11 @@ class _CompactWebNavigationBarState extends State<_CompactWebNavigationBar>
                   ),
                 ),
               ),
+              _NotificationIconButton(
+                unreadCount: widget.unreadNotificationCount,
+                onPressed: widget.onNotifications,
+              ),
+              const SizedBox(width: 4),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 11,
@@ -498,20 +749,24 @@ class _CompactWebNavigationBarState extends State<_CompactWebNavigationBar>
 class _WebStaffSidebar extends StatelessWidget {
   const _WebStaffSidebar({
     required this.roleLabel,
+    required this.unreadNotificationCount,
     required this.destinations,
     required this.mainDestinationCount,
     required this.selectedIndex,
     required this.onSelected,
     required this.onOpenMessages,
+    required this.onOpenNotifications,
     required this.onOpenPage,
   });
 
   final String roleLabel;
+  final int unreadNotificationCount;
   final List<AppDestination> destinations;
   final int mainDestinationCount;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final VoidCallback onOpenMessages;
+  final VoidCallback onOpenNotifications;
   final ValueChanged<Widget> onOpenPage;
 
   @override
@@ -628,10 +883,14 @@ class _WebStaffSidebar extends StatelessWidget {
                       onTap: onOpenMessages,
                     ),
                     ListTile(
+                      key: const Key('web-staff-notifications'),
                       dense: true,
                       leading: const Icon(Icons.notifications_outlined),
                       title: const Text('Notifications'),
-                      onTap: () => onOpenPage(const NotificationsPage()),
+                      trailing: unreadNotificationCount > 0
+                          ? _UnreadCountBadge(count: unreadNotificationCount)
+                          : null,
+                      onTap: onOpenNotifications,
                     ),
                     ListTile(
                       dense: true,
@@ -652,6 +911,67 @@ class _WebStaffSidebar extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationIconButton extends StatelessWidget {
+  const _NotificationIconButton({
+    required this.unreadCount,
+    required this.onPressed,
+  });
+
+  final int unreadCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            tooltip: 'Notifications',
+            onPressed: onPressed,
+            icon: const Icon(Icons.notifications_outlined),
+          ),
+          if (unreadCount > 0)
+            Positioned(
+              right: 2,
+              top: 2,
+              child: _UnreadCountBadge(count: unreadCount, compact: true),
+            ),
+        ],
+      );
+}
+
+class _UnreadCountBadge extends StatelessWidget {
+  const _UnreadCountBadge({required this.count, this.compact = false});
+
+  final int count;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final label = count > 99 ? '99+' : '$count';
+    return Container(
+      constraints: BoxConstraints(
+        minWidth: compact ? 17 : 24,
+        minHeight: compact ? 17 : 20,
+      ),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 7),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: scheme.error,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: scheme.onError,
+          fontSize: compact ? 9 : 11,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
