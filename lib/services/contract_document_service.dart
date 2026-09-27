@@ -120,6 +120,68 @@ class ContractDocumentService {
     }
   }
 
+  /// Builds and registers the immutable execution copy after every required
+  /// signer has been independently verified. No manual signed-file upload is
+  /// involved in the digital workflow.
+  Future<ContractDocument?> finalizeDigitalExecution(
+      TenantContract contract) async {
+    final signerRows = await _client
+        .from('contract_signers')
+        .select()
+        .eq('contract_id', contract.id);
+    final signers = signerRows.map(ContractSigner.fromRow).toList();
+    final required = signers
+        .where((item) =>
+            item.isRequired && (item.role == 'tenant' || item.role == 'lessor'))
+        .toList();
+    if (required.isEmpty || required.any((item) => !item.isVerified)) {
+      return null;
+    }
+    final documents = await listDocuments(contract.id);
+    final existing = documents.where((item) => item.isSigned).firstOrNull;
+    if (existing != null) return existing;
+    final generated = documents.where((item) => item.isGenerated).firstOrNull;
+    if (generated == null) return null;
+
+    final signatureImages = <String, Uint8List>{};
+    final signerNames = <String, String>{};
+    final signedDates = <String, DateTime>{};
+    for (final signer in signers) {
+      if (signer.signerName?.isNotEmpty == true) {
+        signerNames[signer.role] = signer.signerName!;
+      }
+      if (signer.signedAt != null) signedDates[signer.role] = signer.signedAt!;
+      final path = signer.signatureStoragePath;
+      if (path != null) {
+        signatureImages[signer.role] =
+            await _client.storage.from(_bucket).download(path);
+      }
+    }
+    final roomNumber = await _assignedRoomNumber(contract.tenantId);
+    final bytes = await buildPdfBytes(
+      contract,
+      generated.version,
+      roomNumber: roomNumber,
+      signatureImages: signatureImages,
+      signerNames: signerNames,
+      signedDates: signedDates,
+      digitallyExecuted: true,
+    );
+    final signed = await uploadSigned(
+      contract: contract,
+      version: generated.version,
+      filename: '${contract.contractNumber}-executed-v${generated.version}.pdf',
+      mimeType: 'application/pdf',
+      bytes: bytes,
+    );
+    return reviewSignedDocument(
+      documentId: signed.id,
+      approve: true,
+      notes:
+          'Automatically assembled from independently verified digital signatures.',
+    );
+  }
+
   Future<ContractDocument> reviewSignedDocument({
     required String documentId,
     required bool approve,
@@ -221,6 +283,10 @@ class ContractDocumentService {
     TenantContract contract,
     int version, {
     String? roomNumber,
+    Map<String, Uint8List> signatureImages = const {},
+    Map<String, String> signerNames = const {},
+    Map<String, DateTime> signedDates = const {},
+    bool digitallyExecuted = false,
   }) async {
     final document = pw.Document(
       version: PdfVersion.pdf_1_5,
@@ -350,16 +416,23 @@ class ContractDocumentService {
         ),
         pw.SizedBox(height: 56),
         pw.Row(children: [
-          pw.Expanded(child: _signatureLine('Tenant signature and date')),
+          pw.Expanded(
+              child: _signatureBlock('tenant', 'Tenant', signatureImages,
+                  signerNames, signedDates)),
           pw.SizedBox(width: 36),
-          pw.Expanded(child: _signatureLine('Owner signature and date')),
+          pw.Expanded(
+              child: _signatureBlock('lessor', 'Owner', signatureImages,
+                  signerNames, signedDates)),
         ]),
         pw.SizedBox(height: 44),
         pw.Row(children: [
           pw.Expanded(
-              child: _signatureLine('Parent/guardian signature and date')),
+              child: _signatureBlock('guardian', 'Parent / guardian',
+                  signatureImages, signerNames, signedDates)),
           pw.SizedBox(width: 36),
-          pw.Expanded(child: _signatureLine('Witness (optional) and date')),
+          pw.Expanded(
+              child: _signatureBlock('witness', 'Witness (optional)',
+                  signatureImages, signerNames, signedDates)),
         ]),
         pw.SizedBox(height: 44),
         pw.Container(
@@ -367,8 +440,9 @@ class ContractDocumentService {
           padding: const pw.EdgeInsets.all(12),
           color: PdfColors.grey200,
           child: pw.Text(
-            'Document version $version is immutable in CarmeLink. Signed scans '
-            'must be uploaded against this exact version and verified by the owner.',
+            digitallyExecuted
+                ? 'Digitally executed version $version. Signature images, signer identities, timestamps, and hashes are retained as immutable CarmeLink evidence.'
+                : 'Document version $version is immutable in CarmeLink. Required parties sign on-screen; verified signatures are assembled into a final digital execution copy.',
             style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
           ),
         ),
@@ -439,4 +513,33 @@ class ContractDocumentService {
         ),
         pw.Text(label, style: const pw.TextStyle(fontSize: 9)),
       ]);
+
+  pw.Widget _signatureBlock(
+    String role,
+    String label,
+    Map<String, Uint8List> images,
+    Map<String, String> names,
+    Map<String, DateTime> dates,
+  ) {
+    final image = images[role];
+    final name = names[role];
+    final date = dates[role];
+    if (image == null && name == null)
+      return _signatureLine('$label signature and date');
+    final dateText = date == null
+        ? ''
+        : '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    return pw.Column(children: [
+      pw.SizedBox(
+        height: 42,
+        child: image == null
+            ? pw.SizedBox()
+            : pw.Image(pw.MemoryImage(image), fit: pw.BoxFit.contain),
+      ),
+      pw.Divider(),
+      pw.Text(name ?? label,
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+      pw.Text('$label · $dateText', style: const pw.TextStyle(fontSize: 8)),
+    ]);
+  }
 }

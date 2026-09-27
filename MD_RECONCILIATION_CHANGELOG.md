@@ -1,6 +1,25 @@
 # CarmeLink Markdown Reconciliation — September 27, 2026
 
-Audited base: `main` at `13b5b28` (`MD file updated`)
+Original audited base: `main` at `13b5b28` (`MD file updated`)
+
+Current recheck: `main` at `514d116` on September 27, 2026.
+
+## Current-build recheck
+
+The following later commits/features were reconciled into the maintained docs:
+
+- Android/iOS native polygon and official-gate crossing confirmation
+- Editable/versioned gate-corridor configuration and 75% corridor reduction
+- Authenticated-user FCM token claim RPC
+- Direct/resumable tenant onboarding, safety gates, document submission,
+  touchscreen signature, and audited billing actions
+- iOS permission timing and recoverable native location error handling
+- Local verification refreshed to zero analyzer issues and 427 passing tests
+
+The recheck also confirms that the obsolete shared-header notification page,
+device-binding placeholder, feedback persistence, phone launcher placeholder,
+branch-locked readiness script, remote security matrix, release signing, and
+physical-device verification remain open.
 
 ## Purpose
 
@@ -69,4 +88,6 @@ The reconciliation does not reassign or modify Jorj Dominic's reserved workstrea
 - Cross-checked relevant Flutter services/pages, Supabase migrations, tests, and tooling
 - `git diff --check` passes for the Markdown changes
 
-Flutter tests, live Supabase checks, and physical-device tests were not rerun in the audit container; those remain separate verification tasks where the trackers say so.
+Flutter analysis and the complete test suite were rerun on September 27, 2026
+and passed (427 tests). Live Supabase checks and physical-device tests were not
+run and remain separate verification tasks where the trackers say so.

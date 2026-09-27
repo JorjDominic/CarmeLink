@@ -83,16 +83,28 @@ class TenantController extends ChangeNotifier {
   double get outstandingBalance {
     final list = payments;
     return list
-        .where((p) => p.isDue || p.isPending || p.isRejected)
+        .where((p) =>
+            !p.isDeposit &&
+            !(p.isRent && !p.isDueNow) &&
+            (p.isDue || p.isPending || p.isRejected))
         .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
   }
 
   double get outstandingRent => payments
-      .where((p) => p.isRent && (p.isDue || p.isPending || p.isRejected))
+      .where((p) =>
+          p.isRent && p.isDueNow && (p.isDue || p.isPending || p.isRejected))
       .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
 
   double get outstandingUtilities => payments
       .where((p) => p.isUtility && (p.isDue || p.isPending || p.isRejected))
+      .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
+
+  double get securityDepositBalance => payments
+      .where((p) => p.isDeposit)
+      .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
+
+  double get scheduledFutureRent => payments
+      .where((p) => p.isRent && !p.isDueNow)
       .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
 
   Payment? get nextDuePayment {

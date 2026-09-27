@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/contract_onboarding_service.dart';
+import '../../services/contract_document_service.dart';
 import '../shared/signature_pad_dialog.dart';
 
 /// Tenant-facing page for viewing and submitting required onboarding documents
@@ -25,6 +26,7 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
         TenantContract? contract,
         List<ContractRequirement> requirements,
         List<ContractSigner> signers,
+        List<ContractDocument> documents,
       })> _future = _load();
   bool _working = false;
 
@@ -33,6 +35,7 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
         TenantContract? contract,
         List<ContractRequirement> requirements,
         List<ContractSigner> signers,
+        List<ContractDocument> documents,
       })> _load() async {
     final contract = await _service.getMyContract();
     if (contract == null) {
@@ -40,11 +43,19 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
         contract: null,
         requirements: <ContractRequirement>[],
         signers: <ContractSigner>[],
+        documents: <ContractDocument>[],
       );
     }
     final reqs = await _service.listRequirements(contract.id);
     final signers = await _service.listSigners(contract.id);
-    return (contract: contract, requirements: reqs, signers: signers);
+    final documents =
+        await const ContractDocumentService().listDocuments(contract.id);
+    return (
+      contract: contract,
+      requirements: reqs,
+      signers: signers,
+      documents: documents,
+    );
   }
 
   void _reload() {
@@ -168,6 +179,7 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
               TenantContract? contract,
               List<ContractRequirement> requirements,
               List<ContractSigner> signers,
+              List<ContractDocument> documents,
             })>(
           future: _future,
           builder: (context, snapshot) {
@@ -209,6 +221,7 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
             final data = snapshot.data;
             final contract = data?.contract;
             final requirements = data?.requirements ?? const [];
+            final documents = data?.documents ?? const <ContractDocument>[];
 
             if (contract == null) {
               return Center(
@@ -317,6 +330,47 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 16),
+                          Text('Contract files',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  )),
+                          const SizedBox(height: 8),
+                          if (documents.isEmpty)
+                            const Text(
+                                'No generated contract file is available yet.')
+                          else
+                            ...documents.map((document) => ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading:
+                                      const Icon(Icons.picture_as_pdf_outlined),
+                                  title: Text(document.isSigned
+                                      ? 'Executed digital contract'
+                                      : 'Official contract PDF'),
+                                  subtitle: Text(document.originalFilename),
+                                  trailing:
+                                      const Icon(Icons.visibility_outlined),
+                                  onTap: _working
+                                      ? null
+                                      : () async {
+                                          setState(() => _working = true);
+                                          try {
+                                            final bytes =
+                                                await const ContractDocumentService()
+                                                    .downloadDocument(
+                                                        document.storagePath);
+                                            if (!mounted) return;
+                                            await Printing.layoutPdf(
+                                                onLayout: (_) async => bytes);
+                                          } finally {
+                                            if (mounted)
+                                              setState(() => _working = false);
+                                          }
+                                        },
+                                )),
                           const SizedBox(height: 16),
                           // Verification progress
                           Row(

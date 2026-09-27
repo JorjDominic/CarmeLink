@@ -31,11 +31,12 @@ workflows:
 
       - name: Create IPA container
         script: |
+          rm -rf build/ios/ipa
           mkdir -p build/ios/ipa/Payload
           cp -R build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
           cd build/ios/ipa
-          zip -r Carmelitas_Dormitory.ipa Payload
+          zip -qry Carmelitas_Dormitory.ipa Payload
+          test -f Carmelitas_Dormitory.ipa
 
     artifacts:
       - build/ios/ipa/Carmelitas_Dormitory.ipa
-      - build/ios/iphoneos/Runner.app

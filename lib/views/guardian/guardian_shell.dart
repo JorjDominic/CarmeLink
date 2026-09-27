@@ -5,6 +5,7 @@ import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../shared/shared_views.dart';
 import 'guardian_pages.dart';
+import 'guardian_documents_page.dart';
 
 class GuardianShell extends StatefulWidget {
   const GuardianShell({super.key});
@@ -44,6 +45,11 @@ class _GuardianShellState extends State<GuardianShell> {
                 icon: Icons.campaign_outlined,
                 selectedIcon: Icons.campaign,
                 page: GuardianAnnouncementsPage()),
+            AppDestination(
+                label: 'Documents',
+                icon: Icons.folder_outlined,
+                selectedIcon: Icons.folder,
+                page: GuardianDocumentsPage()),
             AppDestination(
                 label: 'Messages',
                 icon: Icons.chat_bubble_outline,

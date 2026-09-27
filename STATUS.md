@@ -1,5 +1,33 @@
 # CarmeLink Living Status and Gap Tracker
 
+> Current-build review: September 27, 2026 at `514d116` (`IOS Permission crashing`).
+> Repository verification: `flutter analyze` passes with no issues and
+> `flutter test` passes all 427 tests. Deployment, RLS, and physical-device
+> results are separate and remain open where listed below.
+
+## Current-build delta — September 27, 2026
+
+Changes completed after the earlier Markdown reconciliation:
+
+- [x] Android and iOS native region events now act as wake-up hints. A fresh,
+  accurate location is checked against the configured polygon, edge buffer, and
+  official gate corridor before an IN/OUT transition is queued.
+- [x] The official gate corridor is stored in `dorm_boundary_config`, is editable
+  through an authorized RPC, and has versioned device configuration. The active
+  corridor was narrowed to the centered 25% of the original Point 1–Point 2
+  segment, with a minimum 3 m tolerance, for field testing.
+- [x] FCM token registration now uses `register_current_push_device`, which binds
+  the token to `auth.uid()` server-side instead of trusting a client-supplied
+  user identifier.
+- [x] Tenant onboarding received direct/resumable workflow, safety-gate,
+  document-submission, electronic-signature, and audited billing-action work.
+- [x] iOS tripwire startup now waits for Always authorization and handles location
+  and region-monitoring failures as recoverable states.
+
+These checks prove source-level behavior and automated regressions only. They do
+not prove that migrations/functions are deployed, that APNs/FCM succeeds on real
+devices, or that killed-app geofencing works reliably at the property.
+
 > **Canonical status file.** Update this file when scope or implementation changes.  
 > Last ownership update: 2026-09-26
 > Owners: assign each open item to one of the three team members before work begins.  
@@ -171,8 +199,8 @@ If the team chooses to implement one of these in Capstone 1, move it into the cu
 
 | Check | Last result | Date |
 |---|---|---|
-| `flutter analyze` | Pass — no issues | 2026-09-25 |
-| `flutter test` | Pass — 421 tests | 2026-09-26 |
+| `flutter analyze` | Pass — no issues | 2026-09-27 |
+| `flutter test` | Pass — 427 tests | 2026-09-27 |
 | `flutter build apk --debug` | Pass | 2026-09-25 |
 | Remote migration parity | Not verified | — |
 | Remote role/RLS matrix | Not verified | — |
@@ -394,13 +422,16 @@ under **Must verify before production data** where applicable.
 
 ## Must resolve for defense claims
 
-- [ ] **Native circle bypasses polygon semantics**
+- [x] **Native polygon and gate-corridor confirmation implemented in source**
   - Owner: Jorj Dominic
   - Target: Defense
   - Due: TBD
-  - Current state: Foreground checks support polygon geometry, but Android/iOS native monitors use a circle and directly queue IN/OUT. Android expands the native radius to at least 100 m.
-  - Decision: Implement coordinate-aware polygon confirmation before recording native events, standardize the official model as circular, or explicitly present native polygon confirmation as Capstone 2.
-  - Acceptance for a “hybrid polygon” claim: native-triggered records are confirmed against the same polygon/edge-buffer rules and physical tests cover polygon corners, edges, false wakeups, killed app, and offline sync.
+  - Current state: Implemented on Android and iOS. Native circles wake the app;
+    current location, polygon/edge-buffer state, direction change, and movement
+    through the configured gate corridor determine whether an event is queued.
+  - Remaining verification: physical tests must still cover polygon corners,
+    edges, false wakeups, killed app, offline sync, sparse fixes, and both gate
+    directions before this is described as production-proven.
 
 - [ ] **Simulation is stored as a staff manual log**
   - Owner: Jorj Dominic

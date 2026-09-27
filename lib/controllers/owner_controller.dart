@@ -196,11 +196,14 @@ class OwnerController extends ChangeNotifier {
       payments.where((payment) => payment.isOverdue).length;
 
   double get totalCollectedRevenue => payments
-      .where((payment) => payment.isVerified)
+      .where((payment) => payment.isVerified && !payment.isDeposit)
       .fold<double>(0.0, (sum, p) => sum + p.amount);
 
   double get totalOutstandingRevenue => payments
-      .where((payment) => payment.isDue || payment.isPending)
+      .where((payment) =>
+          !payment.isDeposit &&
+          !(payment.isRent && !payment.isDueNow) &&
+          (payment.isDue || payment.isPending))
       .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
 
   int get openMaintenance => _maintenanceLoadedOnce
@@ -671,7 +674,6 @@ class OwnerController extends ChangeNotifier {
 
   Future<TenantContract> createContract({
     required String tenantId,
-    required String contractNumber,
     required DateTime startsOn,
     required DateTime endsOn,
     required double monthlyRent,
@@ -681,7 +683,6 @@ class OwnerController extends ChangeNotifier {
   }) async {
     final item = await _contractService.createContract(
       tenantId: tenantId,
-      contractNumber: contractNumber,
       startsOn: startsOn,
       endsOn: endsOn,
       monthlyRent: monthlyRent,

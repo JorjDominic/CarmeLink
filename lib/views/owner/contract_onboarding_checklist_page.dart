@@ -7,6 +7,8 @@ import 'package:printing/printing.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/contract_onboarding_service.dart';
+import '../../services/contract_document_service.dart';
+import '../shared/signature_pad_dialog.dart';
 
 Future<void> showContractOnboardingChecklist(
   BuildContext context, {
@@ -175,6 +177,8 @@ class _ContractOnboardingChecklistPageState
         notes: result.notes,
         required: result.required,
       );
+      await const ContractDocumentService()
+          .finalizeDigitalExecution(widget.contract);
       if (mounted) {
         showAppSnackBar(context, '${signer.label} updated.');
         _reload();
@@ -186,35 +190,90 @@ class _ContractOnboardingChecklistPageState
     }
   }
 
-  Future<String?> _prompt(
-      {required String title, required String label}) async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          minLines: 2,
-          maxLines: 4,
-          decoration: InputDecoration(labelText: label),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final value = controller.text.trim();
-              if (value.length >= 3) Navigator.pop(context, value);
-            },
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
+  Future<void> _reviewSigner(ContractSigner signer, bool approve) async {
+    final notes = await _prompt(
+      title: approve ? 'Verify ${signer.label}?' : 'Reject ${signer.label}?',
+      label: approve ? 'Verification notes' : 'Reason for rejection',
     );
-    controller.dispose();
-    return result;
+    if (notes == null || !mounted) return;
+    setState(() => _working = true);
+    try {
+      await _service.updateSigner(
+        signer: signer,
+        status: approve ? 'verified' : 'rejected',
+        signerName: signer.signerName,
+        notes: notes,
+        required: signer.isRequired,
+      );
+      await const ContractDocumentService()
+          .finalizeDigitalExecution(widget.contract);
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          approve ? '${signer.label} verified.' : '${signer.label} rejected.',
+        );
+        _reload();
+      }
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Signer review failed: $error');
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _signAsOwner(ContractSigner signer) async {
+    final bytes = await showSignaturePadDialog(
+      context,
+      signerName: signer.signerName ?? 'Dormitory owner',
+      contractNumber: widget.contract.contractNumber,
+    );
+    if (bytes == null || !mounted) return;
+    setState(() => _working = true);
+    try {
+      await _service.submitOwnerElectronicSignature(
+        contractId: widget.contract.id,
+        signatureBytes: bytes,
+      );
+      await const ContractDocumentService()
+          .finalizeDigitalExecution(widget.contract);
+      if (mounted) {
+        showAppSnackBar(context, 'Owner signature recorded and verified.');
+        _reload();
+      }
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Signature failed: $error');
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _viewSignature(ContractSigner signer) async {
+    final path = signer.signatureStoragePath;
+    if (path == null) return;
+    setState(() => _working = true);
+    try {
+      final bytes = await _service.downloadSignature(path);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => _RequirementViewer(
+          title: '${signer.label} signature evidence',
+          mimeType: 'image/png',
+          bytes: bytes,
+        ),
+      );
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Could not open signature: $error');
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<String?> _prompt({required String title, required String label}) {
+    return showDialog<String>(
+      context: context,
+      builder: (_) => _ReviewNotesDialog(title: title, label: label),
+    );
   }
 
   String _mimeType(String? extension) => switch (extension?.toLowerCase()) {
@@ -243,9 +302,16 @@ class _ContractOnboardingChecklistPageState
         }
         final data = snapshot.data!;
         final requiredDocuments = data.requirements.where((e) => e.isRequired);
-        final requiredSigners = data.signers.where((e) => e.isRequired);
+        final requiredSigners = data.signers.where(
+            (e) => e.isRequired && (e.role == 'tenant' || e.role == 'lessor'));
         final complete = requiredDocuments.every((e) => e.isVerified) &&
             requiredSigners.every((e) => e.isVerified);
+        final completedDocuments =
+            requiredDocuments.where((e) => e.isVerified).length;
+        final completedSigners =
+            requiredSigners.where((e) => e.isVerified).length;
+        final total = requiredDocuments.length + requiredSigners.length;
+        final completed = completedDocuments + completedSigners;
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
@@ -278,26 +344,37 @@ class _ContractOnboardingChecklistPageState
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+            _ChecklistProgress(
+              completed: completed,
+              total: total,
+              documentsComplete: completedDocuments,
+              documentsTotal: requiredDocuments.length,
+              signersComplete: completedSigners,
+              signersTotal: requiredSigners.length,
+            ),
             const SizedBox(height: 22),
-            Text('Required documents',
+            Text('Step 1 of 2 · Review required documents',
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            ...data.requirements.map((item) => _RequirementCard(
-                  item: item,
-                  working: _working,
-                  onUpload: () => _upload(item),
-                  onOpen: () => _open(item),
-                  onApprove: () => _review(item, true),
-                  onReject: () => _review(item, false),
-                  onRequiredChanged: item.type == 'guardian_identity'
-                      ? (value) => _toggleGuardianRequirement(item, value)
-                      : null,
-                )),
+            ...data.requirements
+                .where((item) => item.type != 'signed_photocopies')
+                .map((item) => _RequirementCard(
+                      item: item,
+                      working: _working,
+                      onUpload: () => _upload(item),
+                      onOpen: () => _open(item),
+                      onApprove: () => _review(item, true),
+                      onReject: () => _review(item, false),
+                      onRequiredChanged: item.type == 'guardian_identity'
+                          ? (value) => _toggleGuardianRequirement(item, value)
+                          : null,
+                    )),
             const SizedBox(height: 22),
-            Text('Contract signers',
+            Text('Step 2 of 2 · Verify digital signers',
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium
@@ -307,6 +384,18 @@ class _ContractOnboardingChecklistPageState
                   signer: item,
                   working: _working,
                   onConfigure: () => _configureSigner(item),
+                  onVerify: item.status == 'signed'
+                      ? () => _reviewSigner(item, true)
+                      : null,
+                  onReject: item.status == 'signed'
+                      ? () => _reviewSigner(item, false)
+                      : null,
+                  onSign: item.role == 'lessor' && !item.isVerified
+                      ? () => _signAsOwner(item)
+                      : null,
+                  onView: item.signatureStoragePath == null
+                      ? null
+                      : () => _viewSignature(item),
                 )),
           ],
         );
@@ -445,10 +534,20 @@ class _RequirementCard extends StatelessWidget {
 
 class _SignerCard extends StatelessWidget {
   const _SignerCard(
-      {required this.signer, required this.working, required this.onConfigure});
+      {required this.signer,
+      required this.working,
+      required this.onConfigure,
+      this.onVerify,
+      this.onReject,
+      this.onSign,
+      this.onView});
   final ContractSigner signer;
   final bool working;
   final VoidCallback onConfigure;
+  final VoidCallback? onVerify;
+  final VoidCallback? onReject;
+  final VoidCallback? onSign;
+  final VoidCallback? onView;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -472,12 +571,138 @@ class _SignerCard extends StatelessWidget {
                   ],
                 ),
               ),
-              TextButton(
-                  onPressed: working ? null : onConfigure,
-                  child: const Text('Update')),
+              Column(children: [
+                if (onView != null)
+                  TextButton(
+                    onPressed: working ? null : onView,
+                    child: const Text('View'),
+                  ),
+                if (onSign != null)
+                  FilledButton.tonalIcon(
+                    onPressed: working ? null : onSign,
+                    icon: const Icon(Icons.draw_rounded),
+                    label: const Text('Sign'),
+                  )
+                else if (onVerify != null) ...[
+                  FilledButton.tonal(
+                    onPressed: working ? null : onVerify,
+                    child: const Text('Verify'),
+                  ),
+                  TextButton(
+                    onPressed: working ? null : onReject,
+                    child: const Text('Reject'),
+                  ),
+                ] else
+                  TextButton(
+                    onPressed: working ? null : onConfigure,
+                    child: const Text('Update'),
+                  ),
+              ]),
             ],
           ),
         ),
+      );
+}
+
+class _ChecklistProgress extends StatelessWidget {
+  const _ChecklistProgress({
+    required this.completed,
+    required this.total,
+    required this.documentsComplete,
+    required this.documentsTotal,
+    required this.signersComplete,
+    required this.signersTotal,
+  });
+
+  final int completed;
+  final int total;
+  final int documentsComplete;
+  final int documentsTotal;
+  final int signersComplete;
+  final int signersTotal;
+
+  @override
+  Widget build(BuildContext context) => CarmelitaCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(
+              child: Text('Onboarding progress',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      )),
+            ),
+            Text('$completed of $total complete'),
+          ]),
+          const SizedBox(height: 10),
+          LinearProgressIndicator(value: total == 0 ? 1 : completed / total),
+          const SizedBox(height: 12),
+          Text('1. Documents: $documentsComplete of $documentsTotal verified'),
+          const SizedBox(height: 4),
+          Text(
+              '2. Digital signers: $signersComplete of $signersTotal verified'),
+          const SizedBox(height: 8),
+          Text(
+            completed == total
+                ? 'All checklist items are complete. Return to Contract documents to activate the contract.'
+                : 'Open each pending item below, review its evidence, then verify or reject it.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ]),
+      );
+}
+
+class _ReviewNotesDialog extends StatefulWidget {
+  const _ReviewNotesDialog({required this.title, required this.label});
+  final String title;
+  final String label;
+
+  @override
+  State<_ReviewNotesDialog> createState() => _ReviewNotesDialogState();
+}
+
+class _ReviewNotesDialogState extends State<_ReviewNotesDialog> {
+  final _controller = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _confirm() {
+    final value = _controller.text.trim();
+    if (value.length < 3) {
+      setState(() => _error = 'Enter at least 3 characters.');
+      return;
+    }
+    Navigator.pop(context, value);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text(widget.title),
+        content: TextField(
+          controller: _controller,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 4,
+          decoration: InputDecoration(
+            labelText: widget.label,
+            errorText: _error,
+          ),
+          onSubmitted: (_) => _confirm(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _confirm,
+            child: const Text('Confirm'),
+          ),
+        ],
       );
 }
 
@@ -560,23 +785,13 @@ class _SignerDialogState extends State<_SignerDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (widget.signer.isConfigurable)
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Required for activation'),
-                  value: _required,
-                  onChanged: (value) => setState(() {
-                    _required = value;
-                    if (!value && _status == 'pending') _status = 'waived';
-                    if (value && _status == 'waived') _status = 'pending';
-                  }),
-                ),
               TextField(
                   controller: _name,
                   decoration: const InputDecoration(labelText: 'Signer name')),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _status,
+                isExpanded: true,
                 decoration:
                     const InputDecoration(labelText: 'Signature status'),
                 items: [
@@ -592,6 +807,16 @@ class _SignerDialogState extends State<_SignerDialog> {
                   if (!_required)
                     const DropdownMenuItem(
                         value: 'waived', child: Text('Not required / waived')),
+                ],
+                selectedItemBuilder: (context) => [
+                  const Text('Pending', overflow: TextOverflow.ellipsis),
+                  const Text('Signed — awaiting verification',
+                      overflow: TextOverflow.ellipsis),
+                  const Text('Verified', overflow: TextOverflow.ellipsis),
+                  const Text('Rejected', overflow: TextOverflow.ellipsis),
+                  if (!_required)
+                    const Text('Not required / waived',
+                        overflow: TextOverflow.ellipsis),
                 ],
                 onChanged: (value) =>
                     setState(() => _status = value ?? _status),

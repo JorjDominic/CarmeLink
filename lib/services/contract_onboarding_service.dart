@@ -20,6 +20,21 @@ class ContractOnboardingService {
     return data.isEmpty ? null : TenantContract.fromRow(data);
   }
 
+  /// Returns a linked resident's current contract. Database policies ensure
+  /// guardians can only request tenants connected to their own account.
+  Future<TenantContract?> getContractForTenant(String tenantId) async {
+    final row = await _client
+        .from('tenant_contracts')
+        .select(
+            'id, tenant_id, contract_number, starts_on, ends_on, monthly_rent, security_deposit, status, notes, created_at, updated_at, signature_status, profiles!tenant_contracts_tenant_id_fkey(full_name)')
+        .eq('tenant_id', tenantId)
+        .inFilter('status', const ['draft', 'active'])
+        .order('starts_on', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    return row == null ? null : TenantContract.fromRow(row);
+  }
+
   Future<List<ContractRequirement>> listRequirements(String contractId) async {
     final rows = await _client
         .from('contract_requirements')
@@ -121,7 +136,7 @@ class ContractOnboardingService {
       'p_signer_id': signer.id,
       'p_status': status,
       'p_signer_name': signerName,
-      'p_signature_method': 'physical_upload',
+      'p_signature_method': signer.signatureMethod ?? 'electronic',
       'p_notes': notes,
       'p_required': required,
     });
@@ -163,4 +178,41 @@ class ContractOnboardingService {
       rethrow;
     }
   }
+
+  Future<ContractSigner> submitOwnerElectronicSignature({
+    required String contractId,
+    required Uint8List signatureBytes,
+  }) async {
+    if (signatureBytes.isEmpty || signatureBytes.length > 2 * 1024 * 1024) {
+      throw Exception('Signature image must be 2 MB or smaller.');
+    }
+    final path = '$contractId/signatures/lessor-'
+        '${DateTime.now().toUtc().microsecondsSinceEpoch}.png';
+    await _client.storage.from(_bucket).uploadBinary(
+          path,
+          signatureBytes,
+          fileOptions: const FileOptions(
+            contentType: 'image/png',
+            upsert: false,
+          ),
+        );
+    try {
+      final row = await _client.rpc(
+        'submit_owner_electronic_signature',
+        params: {
+          'p_contract_id': contractId,
+          'p_storage_path': path,
+          'p_size_bytes': signatureBytes.length,
+          'p_sha256': sha256.convert(signatureBytes).toString(),
+        },
+      );
+      return ContractSigner.fromRow(Map<String, dynamic>.from(row as Map));
+    } catch (_) {
+      await _client.storage.from(_bucket).remove([path]);
+      rethrow;
+    }
+  }
+
+  Future<Uint8List> downloadSignature(String storagePath) =>
+      _client.storage.from(_bucket).download(storagePath);
 }

@@ -154,6 +154,7 @@ class Payment {
   final String source;
 
   bool get isRent => category.toLowerCase().trim() == 'rent';
+  bool get isDeposit => category.toLowerCase().trim() == 'deposit';
   bool get isUtility => const {
         'electricity',
         'water',
@@ -169,6 +170,13 @@ class Payment {
   bool get isUpcoming => status.toLowerCase().contains('upcoming');
   bool get isVoided => status.toLowerCase() == 'voided';
   bool get isDue => status.toLowerCase() == 'due' || isPartiallyPaid;
+  bool get isDueNow {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    return !due.isAfter(today);
+  }
+
   double get outstandingAmount => remainingBalance ?? (isVerified ? 0 : amount);
 
   bool get isOverdue {
@@ -1232,6 +1240,7 @@ class ContractSigner {
     required this.status,
     this.signerName,
     this.signatureMethod,
+    this.signatureStoragePath,
     this.signedAt,
     this.verifiedAt,
     this.notes,
@@ -1245,6 +1254,7 @@ class ContractSigner {
         status: row['status'] as String,
         signerName: row['signer_name'] as String?,
         signatureMethod: row['signature_method'] as String?,
+        signatureStoragePath: row['signature_storage_path'] as String?,
         signedAt: row['signed_at'] == null
             ? null
             : DateTime.parse(row['signed_at'] as String).toLocal(),
@@ -1261,6 +1271,7 @@ class ContractSigner {
   final String status;
   final String? signerName;
   final String? signatureMethod;
+  final String? signatureStoragePath;
   final DateTime? signedAt;
   final DateTime? verifiedAt;
   final String? notes;

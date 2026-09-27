@@ -1,5 +1,35 @@
 # CarmeLink System Completion Audit
 
+> Current-build addendum — September 27, 2026 (`514d116`): analysis passes and
+> all 427 tests pass. Since the original snapshot, source now includes native
+> polygon plus official-gate confirmation on Android/iOS, server-owned FCM token
+> claiming, expanded direct/resumable tenant onboarding, electronic signatures,
+> and safer iOS authorization/error handling. These are implemented but still
+> require remote deployment and real-device proof.
+
+## Current major gaps
+
+No primary role portal is wholly absent. The largest missing or incomplete
+capabilities are:
+
+1. **Move-out and settlement lifecycle:** no complete notice, final inspection,
+   balance/deposit settlement, room release, archival, and closeout workflow.
+2. **Trusted-device binding:** the Settings action is still a placeholder; there
+   is no production-grade device trust, replacement, or recovery lifecycle.
+3. **Notification preferences and full navigation:** delivery preferences are
+   not persisted/enforced, and the shared header still opens an obsolete empty
+   notification page even though the live page exists.
+4. **Feedback and phone actions:** feedback is not persisted and at least one
+   staff call action remains a launcher placeholder.
+5. **Automated retention:** configuration/audit exists, but destructive deletion
+   or anonymization is deliberately disabled pending policy and recovery design.
+6. **Employee-curfew enforcement:** profiles are stored and displayed but do not
+   alter server gate/curfew classification.
+7. **Production verification/operations:** remote migration parity, multi-role
+   RLS/Storage/Realtime negative tests, Edge Function secrets/deployment, signed
+   Android/iOS releases, APNs setup, monitoring, backup/restore, and incident
+   runbooks remain unproven.
+
 > Snapshot only. Use [`STATUS.md`](STATUS.md) for the maintained status and acceptance tracker.
 
 > Audited from the repository on September 25, 2026.  
@@ -168,7 +198,7 @@ After prototype cleanup:
 
 ```text
 flutter analyze                  PASS (no issues)
-flutter test                     PASS (410 tests)
+flutter test                     PASS (427 tests)
 flutter build apk --debug        PASS
 Android Firebase config          PRESENT
 iOS Firebase config              MISSING

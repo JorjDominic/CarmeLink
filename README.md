@@ -657,6 +657,12 @@ For implementation details, see the official [Supabase user invitation guide](ht
 
 ## Implementation status
 
+Current local baseline (September 27, 2026, `514d116`): `flutter analyze`
+passes and all 427 tests pass. Native Android/iOS tripwires use circular OS
+regions as wake-up hints, then require polygon direction and official gate
+corridor confirmation before queueing a transition. This behavior is not yet
+production-proven on physical devices.
+
 - Authentication uses Supabase Auth. Role routing is based on a protected
   profile record rather than email text or client metadata.
 - Core operational records use Supabase-backed services/RPCs; explicit
@@ -664,15 +670,16 @@ For implementation details, see the official [Supabase user invitation guide](ht
   emergency-contact Call action.
 - Receipt OCR uses on-device text recognition and remains a suggestion rather
   than authoritative payment evidence.
-- Foreground geofencing and native circular tripwires exist, but polygon/circle
-  semantics and physical background behavior remain under validation.
+- Foreground geofencing and native hybrid tripwires exist. Polygon/corridor
+  semantics are implemented; physical background behavior remains under
+  validation.
 - Secure media paths support protected Supabase Storage and Cloudinary-backed
   references where configured.
 - Core notification events are wired for messages, announcements, gate events,
   payments/utilities, maintenance, visitors, curfew, conduct/appeals, and
   inspection completion. Secondary module hooks, preferences, and live device
   delivery are incomplete or unverified.
-- Current local verification: `flutter analyze` passes and all 410 tests pass.
+- Current local verification: `flutter analyze` passes and all 427 tests pass.
 
 Before release, synchronize migrations to clean staging, complete the negative
 role/RLS/Storage matrix, deploy and verify Edge Function secrets, configure

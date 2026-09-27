@@ -138,7 +138,7 @@ void main() {
 
       expect(find.text('Billing details'), findsOneWidget);
       expect(find.text('TOTAL OUTSTANDING'), findsOneWidget);
-      expect(find.text('Open bills (2)'), findsOneWidget);
+      expect(find.text('Due now (2)'), findsOneWidget);
       expect(find.text('Completed and voided (1)'), findsOneWidget);
       expect(find.text('Rent'), findsOneWidget);
       expect(find.text('Utilities'), findsOneWidget);

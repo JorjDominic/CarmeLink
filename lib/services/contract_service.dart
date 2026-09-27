@@ -20,7 +20,6 @@ class ContractService {
 
   Future<TenantContract> createContract({
     required String tenantId,
-    required String contractNumber,
     required DateTime startsOn,
     required DateTime endsOn,
     required double monthlyRent,
@@ -32,7 +31,6 @@ class ContractService {
         .from('tenant_contracts')
         .insert({
           'tenant_id': tenantId,
-          'contract_number': contractNumber.trim(),
           'starts_on': _date(startsOn),
           'ends_on': _date(endsOn),
           'monthly_rent': monthlyRent,
