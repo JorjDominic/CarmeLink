@@ -16,15 +16,18 @@ else
       https://github.com/flutter/flutter.git \
       "${CARMELINK_FLUTTER_ROOT}"
   fi
+  export PATH="${CARMELINK_FLUTTER_ROOT}/bin:${PATH}"
   CARMELINK_FLUTTER_BIN="${CARMELINK_FLUTTER_ROOT}/bin/flutter"
 fi
 
 "${CARMELINK_FLUTTER_BIN}" config --no-analytics
+"${CARMELINK_FLUTTER_BIN}" config --enable-web
 "${CARMELINK_FLUTTER_BIN}" pub get
 
 CARMELINK_BUILD_ARGS=(
   build web
   --release
+  --no-wasm-dry-run
   --target lib/main_web.dart
 )
 

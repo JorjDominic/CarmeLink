@@ -11,7 +11,6 @@ import '../responsive/breakpoints.dart';
 import '../runtime/app_surface.dart';
 import '../theme/app_theme.dart';
 import '../../services/geofence_service.dart';
-import '../../views/shared/shared_views.dart';
 import 'adaptive_shell.dart';
 
 
