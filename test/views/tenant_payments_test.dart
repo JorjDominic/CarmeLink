@@ -117,6 +117,39 @@ void main() {
       expect(find.text('August Water Bill'), findsOneWidget);
     });
 
+    testWidgets('shows 10 payments first and loads the remaining records',
+        (tester) async {
+      final manyPayments = List.generate(
+        12,
+        (index) => Payment(
+          id: 'page-$index',
+          label: 'Payment ${index + 1}',
+          amount: 100 + index.toDouble(),
+          dueDate: DateTime(2026, 9, index + 1),
+          status: 'Due',
+          category: 'rent',
+        ),
+      );
+      TenantController.instance.setPaymentsForTesting(manyPayments);
+
+      await tester.pumpWidget(buildTestable(const PaymentsPage()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Showing 10 of 12 records'), findsOneWidget);
+      expect(find.textContaining('Load more (2 remaining)'), findsOneWidget);
+      expect(find.text('Payment 1'), findsNothing);
+
+      final loadMore = find.textContaining('Load more (2 remaining)');
+      await tester.ensureVisible(loadMore);
+      await tester.pumpAndSettle();
+      await tester.tap(loadMore);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Showing 12 of 12 records'), findsOneWidget);
+      expect(find.text('End of payment records'), findsOneWidget);
+      expect(find.text('Payment 1'), findsOneWidget);
+    });
+
     testWidgets('account summary opens complete billing details',
         (tester) async {
       tester.view.physicalSize = const Size(800, 1200);

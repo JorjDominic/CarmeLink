@@ -20,13 +20,11 @@ import '../../services/payment_service.dart';
 import '../../services/tenant_service.dart';
 import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
-import '../widgets/feature_widgets.dart';
 import '../shared/account_management_page.dart';
 import '../shared/staff_quick_panel.dart';
 import '../shared/employee_curfew_profile_pages.dart';
 import '../shared/conduct_case_pages.dart';
 import '../shared/retention_settings_page.dart';
-import 'floor_plan_page.dart';
 import 'guardian_link_management_page.dart';
 import 'staff_maintenance_page.dart';
 import 'room_monitoring_page.dart';
@@ -65,7 +63,29 @@ void _ownerPush(BuildContext context, Widget page) {
   );
 }
 
-// Suppress redundant legacy warning box in favor of the structured onboarding card
+Future<void> _openPhoneDialer(BuildContext context, String phone) async {
+  final cleanPhone = phone.trim().replaceAll(RegExp(r'[^0-9+]'), '');
+  if (cleanPhone.isEmpty) {
+    showAppSnackBar(context, 'No phone number is available.');
+    return;
+  }
+
+  try {
+    final opened = await launchUrl(
+      Uri(scheme: 'tel', path: cleanPhone),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && context.mounted) {
+      showAppSnackBar(context, 'Could not open phone dialer.');
+    }
+  } catch (_) {
+    if (context.mounted) {
+      showAppSnackBar(context, 'Could not open phone dialer.');
+    }
+  }
+}
+
+// Temporarily hidden until the full contract-onboarding flow is resumed.
 const _showOnboardingIncomplete = false;
 
 class OwnerDashboardPage extends StatelessWidget {
@@ -849,10 +869,16 @@ class TenantQuickPreview extends StatelessWidget {
             value: '${tenant.room} • ${tenant.bedSpace}',
             icon: Icons.bed_outlined,
           ),
-          InfoRow(
-            label: 'Phone',
-            value: tenant.phone,
-            icon: Icons.phone_outlined,
+          Material(
+            type: MaterialType.transparency,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.phone_outlined),
+              title: const Text('Phone'),
+              subtitle: Text(tenant.phone),
+              trailing: const Icon(Icons.call_outlined),
+              onTap: () => _openPhoneDialer(context, tenant.phone),
+            ),
           ),
           InfoRow(
             label: 'Guardian',
@@ -943,20 +969,32 @@ class TenantDetailsPage extends StatelessWidget {
                   value: '${tenant.room} • ${tenant.bedSpace}',
                   icon: Icons.meeting_room_outlined,
                 ),
-                InfoRow(
-                  label: 'Phone',
-                  value: tenant.phone,
-                  icon: Icons.phone_outlined,
+                Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.phone_outlined),
+                    title: const Text('Phone'),
+                    subtitle: Text(tenant.phone),
+                    trailing: const Icon(Icons.call_outlined),
+                    onTap: () => _openPhoneDialer(context, tenant.phone),
+                  ),
                 ),
                 InfoRow(
                   label: 'Guardian',
                   value: tenant.guardianName,
                   icon: Icons.family_restroom_outlined,
                 ),
-                InfoRow(
-                  label: 'Guardian phone',
-                  value: tenant.guardianPhone,
-                  icon: Icons.contact_phone_outlined,
+                Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.contact_phone_outlined),
+                    title: const Text('Guardian phone'),
+                    subtitle: Text(tenant.guardianPhone),
+                    trailing: const Icon(Icons.call_outlined),
+                    onTap: () => _openPhoneDialer(context, tenant.guardianPhone),
+                  ),
                 ),
                 InfoRow(
                     label: 'Residency status',
@@ -1698,7 +1736,6 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
     'Conduct & cases',
     'Payments',
     'Report management',
-    'Floor plan',
   };
   String query = '';
 
@@ -1809,18 +1846,31 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                     Icons.location_on_outlined,
                     const Color(0xFF4C8C65)),
               ];
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: constraints.maxWidth < 600 ? 2 : 4,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                  mainAxisExtent: 110 + ((textScale - 1).clamp(0, 1) * 65),
+              final cardHeight =
+                  110.0 + ((textScale - 1).clamp(0, 1) * 65);
+              const spacing = 8.0;
+              final fittedWidth =
+                  (constraints.maxWidth - (spacing * (cards.length - 1))) /
+                      cards.length;
+              final cardWidth = fittedWidth >= 180 ? fittedWidth : 190.0;
+              return SingleChildScrollView(
+                key: const Key('operations-summary-row'),
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: List.generate(
+                    cards.length,
+                    (index) => Padding(
+                      padding: EdgeInsets.only(
+                        right: index == cards.length - 1 ? 0 : spacing,
+                      ),
+                      child: SizedBox(
+                        width: cardWidth,
+                        height: cardHeight,
+                        child: _OperationsStatusCard(data: cards[index]),
+                      ),
+                    ),
+                  ),
                 ),
-                itemCount: cards.length,
-                itemBuilder: (context, index) =>
-                    _OperationsStatusCard(data: cards[index]),
               );
             }),
             const SizedBox(height: 18),
@@ -1927,14 +1977,14 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
   String? _categoryBadge(
       _OperationCategory category, OwnerController controller) {
     switch (category.title) {
-      case 'Property':
+      case 'Rooms & Facilities':
         return controller.openMaintenance == 0
             ? null
             : '${controller.openMaintenance} open';
-      case 'Tenants & safety':
+      case 'Access & Visitors':
         final total = controller.pendingVisitors;
         return total == 0 ? null : '$total pending';
-      case 'Finance & contracts':
+      case 'Billing & Payments':
         return controller.pendingPaymentProofs == 0
             ? null
             : '${controller.pendingPaymentProofs} review';
@@ -2019,15 +2069,17 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
 
 const _operationCategories = [
   _OperationCategory(
-    'Accounts & access',
-    'Create users and manage system access',
-    Icons.manage_accounts_outlined,
-    Color(0xFF7D70A0),
+    'Residents',
+    'Resident records, accounts, and guardian access',
+    Icons.groups_outlined,
+    Color(0xFF56886B),
     [
+      _OperationItem('Tenant directory', 'Review resident records and assignments',
+          Icons.groups_outlined, TenantDirectoryPage()),
       _OperationItem(
         'User accounts',
         'Create and review role-based accounts',
-        Icons.person_add_alt_1_outlined,
+        Icons.manage_accounts_outlined,
         AccountManagementPage(),
       ),
       _OperationItem(
@@ -2040,15 +2092,13 @@ const _operationCategories = [
     ],
   ),
   _OperationCategory(
-    'Property',
-    'Rooms, floor plan, maintenance and devices',
+    'Rooms & Facilities',
+    'Rooms, maintenance, cleaning, and inspections',
     Icons.apartment_outlined,
-    Color(0xFF56886B),
+    Color(0xFF568F8E),
     [
-      _OperationItem('Rooms', 'Manage room occupancy', Icons.bed_outlined,
-          RoomMonitoringPage()),
-      _OperationItem('Floor plan', 'Explore the interactive room map',
-          Icons.map_outlined, AdminFloorPlanPage()),
+      _OperationItem('Room monitoring', 'Occupancy and interactive floor plan',
+          Icons.bed_outlined, RoomMonitoringPage()),
       _OperationItem('Maintenance', 'Manage repair requests',
           Icons.build_outlined, MaintenanceManagementPage()),
       _OperationItem(
@@ -2061,47 +2111,11 @@ const _operationCategories = [
           'Open a room to review inspection notices and findings',
           Icons.fact_check_outlined,
           RoomMonitoringPage()),
-      _OperationItem(
-          'Report management',
-          'Maintenance, confidential, and cleaning reports',
-          Icons.assignment_outlined,
-          ReportManagementPage()),
     ],
   ),
   _OperationCategory(
-    'Tenants & safety',
-    'People, access, conduct and private reports',
-    Icons.health_and_safety_outlined,
-    Color(0xFF627FA8),
-    [
-      _OperationItem(
-          'Geofence presence',
-          'Review live tenant presence and boundary',
-          Icons.location_on_outlined,
-          GeofenceMonitoringPage()),
-      _OperationItem(
-          'Employee curfew profiles',
-          'Manage approved employment-based curfew schedules',
-          Icons.badge_outlined,
-          EmployeeCurfewProfilesPage()),
-      _OperationItem('Visitors', 'Manage visitor requests',
-          Icons.people_outline, VisitorManagementPage()),
-      _OperationItem(
-          'Conduct & cases',
-          'Review incidents, responses, warnings and appeals',
-          Icons.gavel_outlined,
-          StaffConductCasesPage()),
-      _OperationItem('Confidential reports', 'Review private reports',
-          Icons.shield_outlined, ConfidentialReportsPage(),
-          ownerOnly: true),
-      _OperationItem('Disciplinary records', 'Manage violations',
-          Icons.gavel_outlined, DisciplinaryRecordsPage(),
-          ownerOnly: true),
-    ],
-  ),
-  _OperationCategory(
-    'Finance & contracts',
-    'Payments, accounting, renewals and reports',
+    'Billing & Payments',
+    'Payment verification, finances, and contracts',
     Icons.account_balance_wallet_outlined,
     Color(0xFFAA8A45),
     [
@@ -2113,17 +2127,33 @@ const _operationCategories = [
       _OperationItem('Contracts', 'Create contracts and track renewals',
           Icons.event_busy_outlined, ContractsPage(),
           ownerOnly: true),
-      _OperationItem('Analytics', 'View operational metrics and trends',
-          Icons.analytics_outlined, ReportsAnalyticsPage(),
-          ownerOnly: true),
     ],
   ),
   _OperationCategory(
-    'Administration',
-    'Privacy, security and operational configuration',
-    Icons.admin_panel_settings_outlined,
+    'Reports & Cases',
+    'Operational reports, conduct cases, and privacy records',
+    Icons.assignment_outlined,
     Color(0xFF7D70A0),
     [
+      _OperationItem(
+          'Report management',
+          'Maintenance, confidential, and cleaning reports',
+          Icons.assignment_outlined,
+          ReportManagementPage()),
+      _OperationItem(
+          'Conduct & cases',
+          'Review incidents, responses, warnings and appeals',
+          Icons.gavel_outlined,
+          StaffConductCasesPage()),
+      _OperationItem('Confidential reports', 'Review private reports',
+          Icons.shield_outlined, ConfidentialReportsPage(),
+          ownerOnly: true),
+      _OperationItem('Disciplinary records', 'Manage violations',
+          Icons.rule_outlined, DisciplinaryRecordsPage(),
+          ownerOnly: true),
+      _OperationItem('Analytics', 'View operational metrics and trends',
+          Icons.analytics_outlined, ReportsAnalyticsPage(),
+          ownerOnly: true),
       _OperationItem(
           'Security & retention',
           'Review sensitive-record retention settings',
@@ -2132,10 +2162,30 @@ const _operationCategories = [
     ],
   ),
   _OperationCategory(
+    'Access & Visitors',
+    'Visitor access and curfew-related staff tools',
+    Icons.sensor_door_outlined,
+    Color(0xFF627FA8),
+    [
+      _OperationItem('Visitors', 'Manage visitor requests',
+          Icons.people_outline, VisitorManagementPage()),
+      _OperationItem(
+          'Geofence presence',
+          'Review tenant presence and boundary records',
+          Icons.location_on_outlined,
+          GeofenceMonitoringPage()),
+      _OperationItem(
+          'Employee curfew profiles',
+          'Manage approved employment-based curfew schedules',
+          Icons.badge_outlined,
+          EmployeeCurfewProfilesPage()),
+    ],
+  ),
+  _OperationCategory(
     'Communication',
-    'Announcements, messages and important contacts',
+    'Announcements, messages, and contact directory',
     Icons.forum_outlined,
-    Color(0xFF7D70A0),
+    Color(0xFFB47A52),
     [
       _OperationItem('Announcements', 'Post updates', Icons.campaign_outlined,
           AnnouncementsManagementPage()),
@@ -5050,19 +5100,6 @@ class MaintenanceManagementPage extends StatelessWidget {
   }
 }
 
-class FloorPlanMonitoringPage extends StatelessWidget {
-  const FloorPlanMonitoringPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const PageFrame(
-      title: 'Floor plan monitoring',
-      subtitle: 'Maintenance concerns by location',
-      child: FloorPlanCanvas(monitorMode: true),
-    );
-  }
-}
-
 class GeofenceMonitoringPage extends StatefulWidget {
   const GeofenceMonitoringPage({super.key});
 
@@ -5112,7 +5149,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     return PageFrame(
       title: 'Presence & Curfew',
       subtitle: 'Gate crossings, resident status, and exceptions',
-      maxWidth: 780,
+      maxWidth: kIsWeb ? 1400 : 780,
       actions: [
         IconButton(
           tooltip: 'Refresh presence & events',
@@ -8478,17 +8515,32 @@ class OwnerMessagingPage extends StatefulWidget {
 
 class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
   final _searchController = TextEditingController();
+  ConversationRecord? _deepLinkedConversation;
+  bool _deepLinkLoading = false;
+  bool _deepLinkMissing = false;
 
   @override
   void initState() {
     super.initState();
+    final initialConversationId = widget.initialConversationId;
+    _deepLinkLoading =
+        initialConversationId != null && initialConversationId.isNotEmpty;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final conversationId = widget.initialConversationId;
       if (conversationId == null || conversationId.isEmpty) {
         await MessagingController.instance.loadConversations();
-      } else {
-        await MessagingController.instance.openConversationById(conversationId);
+        return;
       }
+      final opened =
+          await MessagingController.instance.openConversationById(conversationId);
+      if (!mounted) return;
+      setState(() {
+        _deepLinkLoading = false;
+        _deepLinkMissing = !opened;
+        _deepLinkedConversation = opened
+            ? MessagingController.instance.activeConversation
+            : null;
+      });
     });
   }
 
@@ -8501,6 +8553,25 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
   @override
   Widget build(BuildContext context) {
     final messaging = MessagingController.instance;
+    final requestedConversationId = widget.initialConversationId;
+    if (requestedConversationId != null && requestedConversationId.isNotEmpty) {
+      if (_deepLinkLoading) {
+        return const PageFrame(
+          title: 'Messages',
+          subtitle: 'Opening conversation',
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        );
+      }
+      final deepLinked = _deepLinkedConversation;
+      if (deepLinked != null) {
+        return OwnerConversationPage(record: deepLinked);
+      }
+    }
 
     return PageFrame(
       title: 'Messages',
@@ -8514,6 +8585,22 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_deepLinkMissing) ...[
+                const CarmelitaCard(
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'That conversation is no longer available. Showing your message inbox instead.',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               // Search bar
               TextField(
                 controller: _searchController,
@@ -8670,7 +8757,6 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
     final text = message.text.trim();
     if (text.isEmpty) return;
     message.clear();
-
     if (widget.record != null) {
       await MessagingController.instance.sendMessage(text);
     }
@@ -8689,14 +8775,13 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
       title: title,
       subtitle: subtitle,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 780),
+        constraints: const BoxConstraints(maxWidth: 980),
         child: AnimatedBuilder(
           animation: messaging,
           builder: (context, _) {
             final messagesList = widget.record != null
                 ? messaging.activeMessages
                 : (widget.conversation?.messages ?? []);
-
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -8710,105 +8795,23 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
                       ),
                 ),
                 const SizedBox(height: 8),
-                CarmelitaCard(
-                  padding: const EdgeInsets.all(12),
-                  child: messagesList.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Center(
-                            child: Text(
-                              'No messages yet. Send a message to start.',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ),
-                        )
-                      : Column(
-                          children: messagesList.map((item) {
-                            final isStaff = item.senderRole == 'owner' ||
-                                item.senderRole == 'caretaker' ||
-                                item.senderRole == 'ownerCaretaker';
-
-                            return Align(
-                              alignment: isStaff
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
-                              child: Container(
-                                constraints:
-                                    const BoxConstraints(maxWidth: 560),
-                                margin: const EdgeInsets.symmetric(vertical: 6),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 9,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isStaff
-                                      ? const Color(0xFF627FA8)
-                                          .withValues(alpha: .10)
-                                      : Theme.of(context)
-                                          .colorScheme
-                                          .surfaceContainerHighest
-                                          .withValues(alpha: .55),
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(15),
-                                    topRight: const Radius.circular(15),
-                                    bottomLeft:
-                                        Radius.circular(isStaff ? 15 : 4),
-                                    bottomRight:
-                                        Radius.circular(isStaff ? 4 : 15),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: isStaff
-                                      ? CrossAxisAlignment.end
-                                      : CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.senderName,
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      item.body,
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    MessageDeliveryMeta(
-                                      message: item,
-                                      isMine: item.isMine(SessionController
-                                          .instance.currentUser?.id),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: message,
-                  enabled: !messaging.sendingMessage,
-                  decoration: InputDecoration(
-                    hintText: 'Write a message...',
-                    prefixIcon: const Icon(Icons.chat_bubble_outline),
-                    suffixIcon: messaging.sendingMessage
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : IconButton(
-                            onPressed: _handleSend,
-                            icon: const Icon(Icons.send_outlined),
-                          ),
-                  ),
-                  onSubmitted: (_) => _handleSend(),
+                ConversationThreadPanel(
+                  messages: messagesList,
+                  composerController: message,
+                  sending: messaging.sendingMessage,
+                  emptyMessage: 'No messages yet. Send a message to start.',
+                  hintText: 'Write a message...',
+                  onSend: _handleSend,
+                  isMine: (item) {
+                    if (widget.record != null) {
+                      return item.isMine(
+                        SessionController.instance.currentUser?.id,
+                      );
+                    }
+                    return item.senderRole == 'owner' ||
+                        item.senderRole == 'caretaker' ||
+                        item.senderRole == 'ownerCaretaker';
+                  },
                 ),
               ],
             );
@@ -8833,51 +8836,41 @@ class EmergencyContactsPage extends StatelessWidget {
         child: Column(
           children: controller.tenants
               .map(
-                (tenant) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    child: Icon(
-                      Icons.contact_phone_outlined,
+                (tenant) => Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(
+                      child: Icon(
+                        Icons.contact_phone_outlined,
+                      ),
                     ),
-                  ),
-                  title: Text(
-                    tenant.guardianName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
+                    title: Text(
+                      tenant.guardianName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  subtitle: Text(
-                    '${tenant.name} • '
-                    '${tenant.guardianPhone}',
-                  ),
-                  trailing: IconButton(
-                    tooltip: 'Call ${tenant.guardianName}',
-                    onPressed: () async {
-                      final clean = tenant.guardianPhone
-                          .replaceAll(RegExp(r'[^\d+]'), '');
-                      if (clean.isEmpty) {
-                        showAppSnackBar(
-                            context, 'No valid phone number available');
-                        return;
-                      }
-                      final uri = Uri.parse('tel:$clean');
-                      try {
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri);
-                        } else if (context.mounted) {
-                          showAppSnackBar(
-                              context, 'Could not open phone dialer for $clean');
-                        }
-                      } catch (_) {
-                        if (context.mounted) {
-                          showAppSnackBar(
-                              context, 'Could not open phone dialer for $clean');
-                        }
-                      }
-                    },
-                    icon: const Icon(
-                      Icons.call_outlined,
+                    subtitle: Text(
+                      '${tenant.name} • '
+                      '${tenant.guardianPhone}',
                     ),
+                    trailing: IconButton(
+                      tooltip: 'Call ${tenant.guardianName}',
+                      onPressed: tenant.guardianPhone.trim().isEmpty
+                          ? null
+                          : () => _openPhoneDialer(
+                                context,
+                                tenant.guardianPhone,
+                              ),
+                      icon: const Icon(Icons.call_outlined),
+                    ),
+                    onTap: tenant.guardianPhone.trim().isEmpty
+                        ? null
+                        : () => _openPhoneDialer(
+                              context,
+                              tenant.guardianPhone,
+                            ),
                   ),
                 ),
               )

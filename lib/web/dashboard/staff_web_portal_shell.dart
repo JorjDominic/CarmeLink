@@ -1,18 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../controllers/owner_controller.dart';
 import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
-import '../../views/owner/contracts_page.dart';
-import '../../views/owner/guardian_link_management_page.dart';
+import '../../services/app_notification_service.dart';
+import '../../services/table_refresh_subscription.dart';
 import '../../views/owner/owner_pages.dart';
 import '../../views/owner/room_monitoring_page.dart';
-import '../../views/shared/account_management_page.dart';
-import '../../views/shared/shared_views.dart';
 import '../../views/shared/conduct_case_pages.dart';
-import '../../views/shared/employee_curfew_profile_pages.dart';
-import '../../views/shared/retention_settings_page.dart';
+import '../../views/shared/shared_views.dart';
 import 'staff_overview_page.dart';
 
 /// A browser-only destination composition. Every management destination is
@@ -20,8 +19,7 @@ import 'staff_overview_page.dart';
 /// The separate mobile OwnerShell and CaretakerShell are not modified.
 abstract final class StaffWebDestinations {
   static List<AppDestination> primary(UserRole role) {
-    final owner = role == UserRole.owner;
-    assert(owner || role == UserRole.caretaker);
+    assert(role == UserRole.owner || role == UserRole.caretaker);
     return [
       AppDestination(
         label: 'Dashboard',
@@ -30,7 +28,7 @@ abstract final class StaffWebDestinations {
         page: StaffOverviewPage(role: role),
       ),
       const AppDestination(
-        label: 'Tenants',
+        label: 'Residents',
         icon: Icons.groups_outlined,
         selectedIcon: Icons.groups,
         page: TenantDirectoryPage(),
@@ -41,14 +39,6 @@ abstract final class StaffWebDestinations {
         selectedIcon: Icons.tune,
         page: OperationsHubPage(),
       ),
-      if (owner)
-        const AppDestination(
-          label: 'Curfew',
-          icon: Icons.schedule_outlined,
-          selectedIcon: Icons.schedule,
-          page: GeofenceMonitoringPage(),
-          isWorkInProgress: true,
-        ),
       const AppDestination(
         label: 'Profile',
         icon: Icons.person_outline,
@@ -58,70 +48,9 @@ abstract final class StaffWebDestinations {
     ];
   }
 
-  static List<AppDestination> desktopTools(UserRole role) => [
-        const AppDestination(
-          label: 'Rooms',
-          icon: Icons.meeting_room_outlined,
-          selectedIcon: Icons.meeting_room,
-          page: RoomMonitoringPage(),
-        ),
-        const AppDestination(
-          label: 'Accounts',
-          icon: Icons.manage_accounts_outlined,
-          selectedIcon: Icons.manage_accounts,
-          page: AccountManagementPage(),
-        ),
-        const AppDestination(
-          label: 'Cleaning',
-          icon: Icons.cleaning_services_outlined,
-          selectedIcon: Icons.cleaning_services,
-          page: RoomMonitoringPage(),
-        ),
-        const AppDestination(
-          label: 'Inspections',
-          icon: Icons.fact_check_outlined,
-          selectedIcon: Icons.fact_check,
-          page: RoomMonitoringPage(),
-        ),
-        const AppDestination(
-          label: 'Visitors',
-          icon: Icons.people_outline,
-          selectedIcon: Icons.people,
-          page: VisitorManagementPage(),
-        ),
-        const AppDestination(
-          label: 'Conduct & cases',
-          icon: Icons.gavel_outlined,
-          selectedIcon: Icons.gavel,
-          page: StaffConductCasesPage(),
-        ),
-        const AppDestination(
-          label: 'Employee curfew',
-          icon: Icons.badge_outlined,
-          selectedIcon: Icons.badge,
-          page: EmployeeCurfewProfilesPage(),
-        ),
-        const AppDestination(
-          label: 'Security & retention',
-          icon: Icons.security_outlined,
-          selectedIcon: Icons.security,
-          page: RetentionSettingsPage(),
-        ),
-        if (role == UserRole.owner) ...[
-          const AppDestination(
-            label: 'Guardian links',
-            icon: Icons.family_restroom_outlined,
-            selectedIcon: Icons.family_restroom,
-            page: GuardianLinkManagementPage(),
-          ),
-          const AppDestination(
-            label: 'Contracts',
-            icon: Icons.description_outlined,
-            selectedIcon: Icons.description,
-            page: ContractsPage(),
-          ),
-        ],
-      ];
+  /// Detailed staff modules now live inside the six Operations groups instead
+  /// of competing for permanent sidebar space.
+  static List<AppDestination> desktopTools(UserRole role) => const [];
 }
 
 /// RoleGuard remains in front of every route; Supabase RLS remains authoritative.
@@ -134,10 +63,59 @@ class StaffWebPortalShell extends StatefulWidget {
   State<StaffWebPortalShell> createState() => _StaffWebPortalShellState();
 }
 
-class _StaffWebPortalShellState extends State<StaffWebPortalShell> {
+class _StaffWebPortalShellState extends State<StaffWebPortalShell>
+    with WidgetsBindingObserver {
+  TableRefreshSubscription? _liveRefreshSubscription;
+  Timer? _catchUpTimer;
+  bool _refreshInFlight = false;
+  bool _refreshAgain = false;
+
+  static const _liveStaffTables = <String>[
+    'profiles',
+    'tenant_details',
+    'guardian_tenant_links',
+    'tenant_assignments',
+    'bed_spaces',
+    'rooms',
+    'payments',
+    'maintenance_reports',
+    'maintenance_staff_history',
+    'visitor_requests',
+    'visitor_events',
+    'curfew_requests',
+    'gate_events',
+    'confidential_reports',
+    'tenant_contracts',
+    'announcements',
+    'cleaning_schedules',
+    'cleaning_noncompliance_reports',
+    'room_inspections',
+    'room_inspection_findings',
+    'conduct_cases',
+    'conduct_case_events',
+    'conduct_case_appeals',
+    'employee_curfew_profiles',
+    'retention_policy_settings',
+  ];
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadInitialData();
+    _liveRefreshSubscription = TableRefreshSubscription(
+      'staff-web-live-sync',
+      _liveStaffTables,
+      () => unawaited(_refreshLiveData()),
+      debounceDuration: const Duration(milliseconds: 700),
+      catchUpInterval: null,
+    );
+    _catchUpTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => unawaited(_refreshLiveData()),
+    );
+  }
+
+  void _loadInitialData() {
     final data = OwnerController.instance;
     data.loadRooms();
     data.loadPayments();
@@ -145,15 +123,83 @@ class _StaffWebPortalShellState extends State<StaffWebPortalShell> {
     data.loadStaffMaintenance();
     data.loadTenants();
     data.loadGateEvents();
-    if (widget.role == UserRole.owner) data.loadContracts();
+    data.loadVisitors();
+    if (widget.role == UserRole.owner) {
+      data.loadConcerns();
+      data.loadContracts();
+    }
+  }
+
+  Future<void> _refreshLiveData() async {
+    if (_refreshInFlight) {
+      _refreshAgain = true;
+      return;
+    }
+
+    do {
+      _refreshAgain = false;
+      _refreshInFlight = true;
+      final data = OwnerController.instance;
+      try {
+        await data.loadRooms(force: true);
+        await data.loadPayments(force: true);
+        await data.loadCurfewRequests(force: true);
+        await data.loadStaffMaintenance(force: true);
+        await data.loadTenants(force: true);
+        await data.loadGateEvents(force: true);
+        await data.loadVisitors(force: true);
+        if (widget.role == UserRole.owner) {
+          await data.loadConcerns(force: true);
+          await data.loadContracts(force: true);
+        }
+      } finally {
+        _refreshInFlight = false;
+      }
+    } while (_refreshAgain && mounted);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshLiveData());
+    }
+  }
+
+  Widget? _notificationDestination(AppNotificationItem notification) {
+    final routeType = notification.routeType?.trim().toLowerCase();
+    final route = routeType == null || routeType.isEmpty
+        ? notification.notificationType.trim().toLowerCase()
+        : routeType;
+    return switch (route) {
+      'payment' => const PaymentVerificationPage(),
+      'maintenance' => const MaintenanceManagementPage(),
+      'visitor' => const VisitorManagementPage(),
+      'curfew' || 'gate' || 'gate_event' => const GeofenceMonitoringPage(),
+      'conduct_case' => const StaffConductCasesPage(),
+      'inspection' => const RoomMonitoringPage(),
+      'announcement' => const AnnouncementsManagementPage(),
+      'message' || 'conversation' => OwnerMessagingPage(
+          initialConversationId: notification.routeId,
+        ),
+      'onboarding' => const TenantDirectoryPage(),
+      _ => null,
+    };
   }
 
   @override
   void didUpdateWidget(covariant StaffWebPortalShell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.role != UserRole.owner && widget.role == UserRole.owner) {
-      OwnerController.instance.loadContracts();
+    if (oldWidget.role != widget.role) {
+      unawaited(_refreshLiveData());
     }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _catchUpTimer?.cancel();
+    unawaited(_liveRefreshSubscription?.dispose());
+    super.dispose();
   }
 
   @override
@@ -164,6 +210,7 @@ class _StaffWebPortalShellState extends State<StaffWebPortalShell> {
           messagePage: const OwnerMessagingPage(),
           destinations: StaffWebDestinations.primary(widget.role),
           webDestinations: StaffWebDestinations.desktopTools(widget.role),
+          notificationPageBuilder: _notificationDestination,
         ),
       );
 }

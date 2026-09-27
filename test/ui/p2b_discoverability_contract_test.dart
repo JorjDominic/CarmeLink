@@ -40,17 +40,32 @@ void main() {
       expect(source.contains('VisitorManagementPage()'), isTrue);
     });
 
-    test('web staff destinations expose direct staff tools', () {
-      final source = File(
+    test(
+        'web staff sidebar stays simplified while Operations exposes staff tools',
+        () {
+      final shell = File(
         'lib/web/dashboard/staff_web_portal_shell.dart',
       ).readAsStringSync();
+      final owner = File('lib/views/owner/owner_pages.dart').readAsStringSync();
 
-      expect(source.contains("label: 'Cleaning'"), isTrue);
-      expect(source.contains("label: 'Inspections'"), isTrue);
-      expect(source.contains("label: 'Visitors'"), isTrue);
-      expect(source.contains("label: 'Conduct & cases'"), isTrue);
-      expect(source.contains("label: 'Employee curfew'"), isTrue);
-      expect(source.contains("label: 'Security & retention'"), isTrue);
+      expect(shell.contains("label: 'Residents'"), isTrue);
+      expect(shell.contains("label: 'Operations'"), isTrue);
+      expect(shell.contains('desktopTools(UserRole role) => const []'), isTrue);
+
+      for (final label in [
+        'Cleaning schedules',
+        'Room inspections',
+        'Visitors',
+        'Conduct & cases',
+        'Employee curfew profiles',
+        'Security & retention',
+      ]) {
+        expect(
+          owner.contains(label),
+          isTrue,
+          reason: 'Operations hub is missing $label',
+        );
+      }
     });
   });
 }

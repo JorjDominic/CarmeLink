@@ -1532,33 +1532,49 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  FilterChip(
-                    selected: _selectedFilter == 'all',
-                    label: Text('All (${allPayments.length})'),
-                    onSelected: (_) => setState(() => _selectedFilter = 'all'),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      key: const Key('payment-filter-row'),
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          FilterChip(
+                            selected: _selectedFilter == 'all',
+                            label: Text('All (${allPayments.length})'),
+                            onSelected: (_) =>
+                                setState(() => _selectedFilter = 'all'),
+                          ),
+                          const SizedBox(width: 8),
+                          FilterChip(
+                            selected: _selectedFilter == 'due',
+                            label: Text('Due (${duePayments.length})'),
+                            onSelected: (_) =>
+                                setState(() => _selectedFilter = 'due'),
+                          ),
+                          const SizedBox(width: 8),
+                          FilterChip(
+                            selected: _selectedFilter == 'pending',
+                            label: Text('Pending (${pendingPayments.length})'),
+                            onSelected: (_) =>
+                                setState(() => _selectedFilter = 'pending'),
+                          ),
+                          const SizedBox(width: 8),
+                          FilterChip(
+                            selected: _selectedFilter == 'verified',
+                            label: Text('Verified (${verifiedPayments.length})'),
+                            onSelected: (_) =>
+                                setState(() => _selectedFilter = 'verified'),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  FilterChip(
-                    selected: _selectedFilter == 'due',
-                    label: Text('Due (${duePayments.length})'),
-                    onSelected: (_) => setState(() => _selectedFilter = 'due'),
-                  ),
-                  FilterChip(
-                    selected: _selectedFilter == 'pending',
-                    label: Text('Pending (${pendingPayments.length})'),
-                    onSelected: (_) =>
-                        setState(() => _selectedFilter = 'pending'),
-                  ),
-                  FilterChip(
-                    selected: _selectedFilter == 'verified',
-                    label: Text('Verified (${verifiedPayments.length})'),
-                    onSelected: (_) =>
-                        setState(() => _selectedFilter = 'verified'),
-                  ),
+                  const SizedBox(width: 6),
                   PopupMenuButton<RecordListSort>(
+                    key: const Key('payment-sort-menu'),
                     tooltip: 'Sort payment records',
                     initialValue: _paymentSort,
                     onSelected: (value) => setState(() => _paymentSort = value),
@@ -1575,15 +1591,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
                       PopupMenuItem(
                           value: RecordListSort.title, child: Text('Type A-Z')),
                     ],
-                    child: Chip(
-                      visualDensity: VisualDensity.compact,
-                      avatar: const Icon(Icons.sort_rounded, size: 17),
-                      label: Text(switch (_paymentSort) {
-                        RecordListSort.oldest => 'Oldest',
-                        RecordListSort.status => 'Status',
-                        RecordListSort.title => 'Type',
-                        _ => 'Newest',
-                      }),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(Icons.sort_rounded),
                     ),
                   ),
                 ],
@@ -1611,6 +1621,11 @@ class _PaymentsPageState extends State<PaymentsPage> {
               else
                 PagedRecordList(
                   key: ValueKey('payments-$_selectedFilter-$_paymentSort'),
+                  pageSize: 10,
+                  loadMoreLabel: 'Load more',
+                  showVisibleCount: true,
+                  showEndState: true,
+                  endLabel: 'End of payment records',
                   children: displayedPayments
                       .map((p) => _TenantPaymentCard(payment: p))
                       .toList(),
@@ -3808,6 +3823,24 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              ReportWorkflowIntroCard(
+                title: 'Maintenance issue',
+                purpose:
+                    'Report room, fixture, utility, or property problems and follow staff progress.',
+                audience:
+                    'Visible to you and authorized dormitory staff handling maintenance.',
+                icon: Icons.build_outlined,
+                action: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SubmitMaintenancePage(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Submit maintenance report'),
+                ),
+              ),
+              const SizedBox(height: 18),
               Text(
                 'REPORT SUMMARY',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -5197,6 +5230,7 @@ class _TenantMessagesPageState extends State<TenantMessagesPage> {
             lastMessageText: previewText,
             lastMessageTime:
                 lastMsg?.sentAt ?? messaging.activeConversation?.lastMessageAt,
+            unreadCount: messaging.unreadMessageCount,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => const TenantConversationPage(),
@@ -5229,7 +5263,7 @@ class _TenantConversationPageState extends State<TenantConversationPage> {
   @override
   void dispose() {
     message.dispose();
-    MessagingController.instance.closeActiveConversation();
+    MessagingController.instance.leaveActiveThread();
     super.dispose();
   }
 
@@ -5243,129 +5277,25 @@ class _TenantConversationPageState extends State<TenantConversationPage> {
   @override
   Widget build(BuildContext context) {
     final messaging = MessagingController.instance;
-
     return PageFrame(
       title: 'Dormitory Management',
       subtitle: 'Owner & Caretaker',
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 780),
+        constraints: const BoxConstraints(maxWidth: 980),
         child: AnimatedBuilder(
           animation: messaging,
-          builder: (context, _) {
-            final messagesList = messaging.activeMessages;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'CONVERSATION',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        letterSpacing: 1.3,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                CarmelitaCard(
-                  padding: const EdgeInsets.all(12),
-                  child: messagesList.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Center(
-                            child: Text(
-                              'No messages yet. Send a message to start chatting with dormitory management.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ),
-                        )
-                      : Column(
-                          children: messagesList.map((item) {
-                            final isMe = item.senderRole == 'tenant';
-                            return Align(
-                              alignment: isMe
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
-                              child: Container(
-                                constraints:
-                                    const BoxConstraints(maxWidth: 560),
-                                margin: const EdgeInsets.symmetric(vertical: 6),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 9,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isMe
-                                      ? const Color(0xFF627FA8)
-                                          .withValues(alpha: .10)
-                                      : Theme.of(context)
-                                          .colorScheme
-                                          .surfaceContainerHighest
-                                          .withValues(alpha: .55),
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(15),
-                                    topRight: const Radius.circular(15),
-                                    bottomLeft: Radius.circular(isMe ? 15 : 4),
-                                    bottomRight: Radius.circular(isMe ? 4 : 15),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: isMe
-                                      ? CrossAxisAlignment.end
-                                      : CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.senderName,
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      item.body,
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    MessageDeliveryMeta(
-                                      message: item,
-                                      isMine: item.isMine(SessionController
-                                          .instance.currentUser?.id),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: message,
-                  enabled: !messaging.sendingMessage,
-                  decoration: InputDecoration(
-                    hintText: 'Write a message to management...',
-                    prefixIcon: const Icon(Icons.chat_bubble_outline_rounded),
-                    suffixIcon: messaging.sendingMessage
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : IconButton(
-                            onPressed: _handleSend,
-                            icon: const Icon(Icons.send_outlined),
-                          ),
-                  ),
-                  onSubmitted: (_) => _handleSend(),
-                ),
-              ],
-            );
-          },
+          builder: (context, _) => ConversationThreadPanel(
+            messages: messaging.activeMessages,
+            composerController: message,
+            sending: messaging.sendingMessage,
+            emptyMessage:
+                'No messages yet. Send a message to start chatting with dormitory management.',
+            hintText: 'Write a message to management...',
+            onSend: _handleSend,
+            isMine: (item) => item.isMine(
+              SessionController.instance.currentUser?.id,
+            ),
+          ),
         ),
       ),
     );
@@ -7372,6 +7302,15 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const ReportWorkflowIntroCard(
+              title: 'Confidential concern',
+              purpose:
+                  'Report a safety, rules, or roommate concern without mixing it with maintenance records.',
+              audience:
+                  'Restricted record: your submitted history is visible only to you in the tenant app and authorized staff according to role access.',
+              icon: Icons.shield_outlined,
+            ),
+            const SizedBox(height: 14),
             Text(
               'CONFIDENTIAL REPORT',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(

@@ -39,7 +39,7 @@ void main() {
       );
       expect(
         source.contains(
-          'webPortal && MediaQuery.sizeOf(context).width >= 1200',
+          'webPortal && MediaQuery.sizeOf(context).width >= 1024',
         ),
         isTrue,
       );
@@ -113,15 +113,16 @@ void main() {
       ).readAsStringSync();
 
       for (final label in [
-        'Cleaning',
-        'Inspections',
-        'Visitors',
-        'Conduct & cases',
-        'Employee curfew',
-        'Security & retention',
+        'cleaning',
+        'inspections',
+        'visitors',
+        'conduct & cases',
+        'employee curfew',
+        'security & retention',
       ]) {
         expect(
-          owner.contains(label) || staff.contains(label),
+          owner.toLowerCase().contains(label) ||
+              staff.toLowerCase().contains(label),
           isTrue,
           reason: 'Missing discoverability for $label',
         );

@@ -2514,6 +2514,7 @@ class _GuardianMessagesPageState extends State<GuardianMessagesPage> {
             lastMessageText: previewText,
             lastMessageTime:
                 lastMsg?.sentAt ?? messaging.activeConversation?.lastMessageAt,
+            unreadCount: messaging.unreadMessageCount,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => const GuardianConversationPage(),
@@ -2550,7 +2551,7 @@ class _GuardianConversationPageState extends State<GuardianConversationPage> {
   @override
   void dispose() {
     message.dispose();
-    MessagingController.instance.closeActiveConversation();
+    MessagingController.instance.leaveActiveThread();
     super.dispose();
   }
 
@@ -2564,129 +2565,25 @@ class _GuardianConversationPageState extends State<GuardianConversationPage> {
   @override
   Widget build(BuildContext context) {
     final messaging = MessagingController.instance;
-
     return PageFrame(
       title: 'Dormitory Management',
       subtitle: 'Owner & Caretaker',
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 780),
+        constraints: const BoxConstraints(maxWidth: 980),
         child: AnimatedBuilder(
           animation: messaging,
-          builder: (context, _) {
-            final messagesList = messaging.activeMessages;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'CONVERSATION',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        letterSpacing: 1.3,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                CarmelitaCard(
-                  padding: const EdgeInsets.all(12),
-                  child: messagesList.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Center(
-                            child: Text(
-                              'No messages yet. Send a message to start chatting with dormitory management.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ),
-                        )
-                      : Column(
-                          children: messagesList.map((item) {
-                            final isMe = item.senderRole == 'guardian';
-                            return Align(
-                              alignment: isMe
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
-                              child: Container(
-                                constraints:
-                                    const BoxConstraints(maxWidth: 560),
-                                margin: const EdgeInsets.symmetric(vertical: 6),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 9,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isMe
-                                      ? const Color(0xFF627FA8)
-                                          .withValues(alpha: .10)
-                                      : Theme.of(context)
-                                          .colorScheme
-                                          .surfaceContainerHighest
-                                          .withValues(alpha: .55),
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(15),
-                                    topRight: const Radius.circular(15),
-                                    bottomLeft: Radius.circular(isMe ? 15 : 4),
-                                    bottomRight: Radius.circular(isMe ? 4 : 15),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: isMe
-                                      ? CrossAxisAlignment.end
-                                      : CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.senderName,
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      item.body,
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    MessageDeliveryMeta(
-                                      message: item,
-                                      isMine: item.isMine(SessionController
-                                          .instance.currentUser?.id),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: message,
-                  enabled: !messaging.sendingMessage,
-                  decoration: InputDecoration(
-                    hintText: 'Write a message to management...',
-                    prefixIcon: const Icon(Icons.chat_bubble_outline_rounded),
-                    suffixIcon: messaging.sendingMessage
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : IconButton(
-                            icon: const Icon(Icons.send_outlined),
-                            onPressed: _handleSend,
-                          ),
-                  ),
-                  onSubmitted: (_) => _handleSend(),
-                ),
-              ],
-            );
-          },
+          builder: (context, _) => ConversationThreadPanel(
+            messages: messaging.activeMessages,
+            composerController: message,
+            sending: messaging.sendingMessage,
+            emptyMessage:
+                'No messages yet. Send a message to start chatting with dormitory management.',
+            hintText: 'Write a message to management...',
+            onSend: _handleSend,
+            isMine: (item) => item.isMine(
+              SessionController.instance.currentUser?.id,
+            ),
+          ),
         ),
       ),
     );

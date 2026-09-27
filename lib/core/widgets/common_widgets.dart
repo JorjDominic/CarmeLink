@@ -207,6 +207,72 @@ class RecordListToolbar extends StatelessWidget {
       );
 }
 
+/// Shared hierarchy for tenant reporting workflows: purpose, audience, and action.
+class ReportWorkflowIntroCard extends StatelessWidget {
+  const ReportWorkflowIntroCard({
+    required this.title,
+    required this.purpose,
+    required this.audience,
+    required this.icon,
+    this.action,
+    super.key,
+  });
+
+  final String title;
+  final String purpose;
+  final String audience;
+  final IconData icon;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) => CarmelitaCard(
+        emphasis: true,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              backgroundColor:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: .10),
+              foregroundColor: Theme.of(context).colorScheme.primary,
+              child: Icon(icon, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(purpose),
+                  const SizedBox(height: 6),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.visibility_outlined, size: 16),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          audience,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (action != null) ...[
+                    const SizedBox(height: 10),
+                    action!,
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
 /// Keeps explanatory text available without letting it dominate repeat visits.
 class CollapsibleInfoCard extends StatelessWidget {
   const CollapsibleInfoCard({
@@ -242,11 +308,19 @@ class PagedRecordList extends StatefulWidget {
   const PagedRecordList({
     required this.children,
     this.pageSize = 6,
+    this.loadMoreLabel = 'Show more',
+    this.showVisibleCount = false,
+    this.showEndState = false,
+    this.endLabel = 'End of records',
     super.key,
   });
 
   final List<Widget> children;
   final int pageSize;
+  final String loadMoreLabel;
+  final bool showVisibleCount;
+  final bool showEndState;
+  final String endLabel;
 
   @override
   State<PagedRecordList> createState() => _PagedRecordListState();
@@ -267,15 +341,27 @@ class _PagedRecordListState extends State<PagedRecordList> {
   Widget build(BuildContext context) {
     final count = visibleCount.clamp(0, widget.children.length);
     final hasMore = count < widget.children.length;
+    final total = widget.children.length;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ...widget.children.take(count),
-        if (hasMore || count > widget.pageSize)
+        if (widget.showVisibleCount && total > 0)
           Padding(
             padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Showing $count of $total records',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        if (hasMore || count > widget.pageSize)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
             child: Wrap(
               alignment: WrapAlignment.center,
               spacing: 8,
+              runSpacing: 6,
               children: [
                 if (hasMore)
                   OutlinedButton.icon(
@@ -284,7 +370,7 @@ class _PagedRecordListState extends State<PagedRecordList> {
                             .clamp(0, widget.children.length)),
                     icon: const Icon(Icons.expand_more),
                     label: Text(
-                      'Show more (${widget.children.length - count} remaining)',
+                      '${widget.loadMoreLabel} (${total - count} remaining)',
                     ),
                   ),
                 if (count > widget.pageSize)
@@ -295,6 +381,15 @@ class _PagedRecordListState extends State<PagedRecordList> {
                     label: const Text('Show fewer'),
                   ),
               ],
+            ),
+          ),
+        if (widget.showEndState && !hasMore && total > widget.pageSize)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              widget.endLabel,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
       ],
@@ -329,6 +424,260 @@ class MessageDeliveryMeta extends StatelessWidget {
         const SizedBox(width: 3),
         Text(read ? 'Read' : 'Sent', style: style),
       ],
+    );
+  }
+}
+
+class ConversationThreadPanel extends StatefulWidget {
+  const ConversationThreadPanel({
+    required this.messages,
+    required this.composerController,
+    required this.isMine,
+    required this.onSend,
+    this.sending = false,
+    this.emptyMessage = 'No messages yet.',
+    this.hintText = 'Write a message...',
+    super.key,
+  });
+
+  final List<ChatMessage> messages;
+  final TextEditingController composerController;
+  final bool Function(ChatMessage message) isMine;
+  final Future<void> Function() onSend;
+  final bool sending;
+  final String emptyMessage;
+  final String hintText;
+
+  @override
+  State<ConversationThreadPanel> createState() => _ConversationThreadPanelState();
+}
+
+class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
+  final ScrollController _scrollController = ScrollController();
+  bool _showNewMessages = false;
+  int _previousMessageCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _previousMessageCount = widget.messages.length;
+    _scrollController.addListener(_handleScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToLatest());
+  }
+
+  @override
+  void didUpdateWidget(covariant ConversationThreadPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.messages.length == _previousMessageCount) return;
+    final wasNearBottom = _isNearBottom();
+    final grew = widget.messages.length > _previousMessageCount;
+    _previousMessageCount = widget.messages.length;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !grew) return;
+      if (wasNearBottom) {
+        _scrollToLatest();
+      } else if (!_showNewMessages) {
+        setState(() => _showNewMessages = true);
+      }
+    });
+  }
+
+  bool _isNearBottom() {
+    if (!_scrollController.hasClients) return true;
+    return (_scrollController.position.maxScrollExtent -
+            _scrollController.position.pixels) <=
+        96;
+  }
+
+  void _handleScroll() {
+    if (_showNewMessages && _isNearBottom() && mounted) {
+      setState(() => _showNewMessages = false);
+    }
+  }
+
+  void _jumpToLatest() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+  }
+
+  void _scrollToLatest() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+    if (_showNewMessages && mounted) {
+      setState(() => _showNewMessages = false);
+    }
+  }
+
+  Future<void> _send() async {
+    if (widget.sending || widget.composerController.text.trim().isEmpty) return;
+    await widget.onSend();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToLatest());
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_handleScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final desktop = media.size.width >= 900;
+    final keyboardInset = media.viewInsets.bottom;
+    final availableHeight = media.size.height - keyboardInset -
+        (desktop ? 220.0 : 176.0);
+    final panelHeight = availableHeight
+        .clamp(
+          desktop ? 430.0 : 340.0,
+          desktop ? 680.0 : 620.0,
+        )
+        .toDouble();
+
+    return SizedBox(
+      key: const Key('conversation-thread-panel'),
+      height: panelHeight,
+      child: CarmelitaCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  if (widget.messages.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          widget.emptyMessage,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    ListView.builder(
+                      key: const Key('conversation-message-scroll'),
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 18),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      itemCount: widget.messages.length,
+                      itemBuilder: (context, index) {
+                        final item = widget.messages[index];
+                        final mine = widget.isMine(item);
+                        return Align(
+                          alignment: mine
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: Container(
+                            constraints: const BoxConstraints(maxWidth: 560),
+                            margin: const EdgeInsets.symmetric(vertical: 5),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 9,
+                            ),
+                            decoration: BoxDecoration(
+                              color: mine
+                                  ? const Color(0xFF627FA8)
+                                      .withValues(alpha: .10)
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest
+                                      .withValues(alpha: .55),
+                              borderRadius: BorderRadius.only(
+                                topLeft: const Radius.circular(15),
+                                topRight: const Radius.circular(15),
+                                bottomLeft: Radius.circular(mine ? 15 : 4),
+                                bottomRight: Radius.circular(mine ? 4 : 15),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: mine
+                                  ? CrossAxisAlignment.end
+                                  : CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.senderName,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  item.body,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                                const SizedBox(height: 3),
+                                MessageDeliveryMeta(
+                                  message: item,
+                                  isMine: mine,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  if (_showNewMessages)
+                    Positioned(
+                      right: 14,
+                      bottom: 12,
+                      child: FilledButton.tonalIcon(
+                        key: const Key('conversation-new-messages-button'),
+                        onPressed: _scrollToLatest,
+                        icon: const Icon(Icons.arrow_downward_rounded, size: 17),
+                        label: const Text('New messages'),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                child: TextField(
+                  key: const Key('conversation-composer'),
+                  controller: widget.composerController,
+                  enabled: !widget.sending,
+                  minLines: 1,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    hintText: widget.hintText,
+                    prefixIcon: const Icon(Icons.chat_bubble_outline_rounded),
+                    suffixIcon: widget.sending
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            tooltip: 'Send message',
+                            onPressed: _send,
+                            icon: const Icon(Icons.send_outlined),
+                          ),
+                  ),
+                  onSubmitted: (_) => _send(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -649,9 +998,7 @@ class PageFrame extends StatelessWidget {
           )
         : basePageChild;
 
-    void openNotifications() => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const NotificationsPage()),
-        );
+    void openNotifications() => AdaptiveRoleShell.openNotifications(context);
 
     void openMessages() {
       if (navScope?.openMessages != null) {
@@ -661,16 +1008,59 @@ class PageFrame extends StatelessWidget {
       }
     }
 
-    final messageButton = IconButton(
+    Widget countedHeaderButton({
+      required String tooltip,
+      required IconData icon,
+      required int count,
+      required VoidCallback onPressed,
+    }) {
+      final label = count > 99 ? '99+' : '$count';
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            tooltip: tooltip,
+            onPressed: onPressed,
+            icon: Icon(icon),
+          ),
+          if (count > 0)
+            Positioned(
+              right: 1,
+              top: 1,
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.error,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onError,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+
+    final messageButton = countedHeaderButton(
       tooltip: 'Messages',
+      icon: Icons.chat_bubble_outline,
+      count: navScope?.unreadMessageCount ?? 0,
       onPressed: openMessages,
-      icon: const Icon(Icons.chat_bubble_outline),
     );
 
-    final notificationButton = IconButton(
+    final notificationButton = countedHeaderButton(
       tooltip: 'Notifications',
+      icon: Icons.notifications_outlined,
+      count: navScope?.unreadNotificationCount ?? 0,
       onPressed: openNotifications,
-      icon: const Icon(Icons.notifications_outlined),
     );
 
     Widget? resolvedFloatingActionButton = floatingActionButton;
@@ -774,7 +1164,7 @@ class PageFrame extends StatelessWidget {
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     child: ResponsiveContent(
-                      maxWidth: maxWidth,
+                      maxWidth: maxWidth ?? (webPortal ? double.infinity : null),
                       padding: EdgeInsets.fromLTRB(
                         AppBreakpoints.horizontalPadding(context),
                         6,
@@ -790,7 +1180,7 @@ class PageFrame extends StatelessWidget {
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   child: ResponsiveContent(
-                    maxWidth: maxWidth,
+                    maxWidth: maxWidth ?? (webPortal ? double.infinity : null),
                     padding: EdgeInsets.fromLTRB(
                       AppBreakpoints.horizontalPadding(context),
                       6,

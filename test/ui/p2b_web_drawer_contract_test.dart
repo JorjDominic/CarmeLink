@@ -11,7 +11,7 @@ void main() {
       source.contains('CarmeLinkSurfaceScope.isWebPortal(context)'),
       isTrue,
     );
-    expect(source.contains('MediaQuery.sizeOf(context).width >= 1200'), isTrue);
+    expect(source.contains('MediaQuery.sizeOf(context).width >= 1024'), isTrue);
     expect(source.contains('AnimatedIcons.menu_close'), isTrue);
   });
 
