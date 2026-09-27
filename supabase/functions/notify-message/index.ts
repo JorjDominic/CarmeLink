@@ -42,7 +42,7 @@ Deno.serve(async (request) => {
     const senderName = senderProfile?.full_name?.trim() || 'CarmeLink user'
     const title = 'New message'
     const notificationBody = `You have a new message from ${senderName}.`
-    const fcm = await fcmAccessToken()
+    let fcm: Awaited<ReturnType<typeof fcmAccessToken>> | null = null
     let delivered = 0
 
     for (const recipientId of recipients) {
@@ -57,8 +57,31 @@ Deno.serve(async (request) => {
       }).select('id').single()
       if (error || !notification) continue
 
-      const { data: devices } = await auth.admin.from('push_device_tokens')
+      const { data: devices, error: deviceError } = await auth.admin.from('push_device_tokens')
         .select('id, fcm_token').eq('user_id', recipientId).is('revoked_at', null)
+      if (deviceError) {
+        await auth.admin.from('app_notifications')
+          .update({ push_error: `Unable to load recipient devices: ${deviceError.message}`.slice(0, 500) })
+          .eq('id', notification.id)
+        continue
+      }
+      if (!devices?.length) {
+        await auth.admin.from('app_notifications')
+          .update({ push_error: 'Recipient has no active device token' })
+          .eq('id', notification.id)
+        continue
+      }
+      if (!fcm) {
+        try {
+          fcm = await fcmAccessToken()
+        } catch (fcmError) {
+          const detail = fcmError instanceof Error ? fcmError.message : 'FCM credentials unavailable'
+          await auth.admin.from('app_notifications')
+            .update({ push_error: detail.slice(0, 500) })
+            .eq('id', notification.id)
+          continue
+        }
+      }
       let recipientDelivered = 0
       const failures: string[] = []
       for (const device of devices ?? []) {

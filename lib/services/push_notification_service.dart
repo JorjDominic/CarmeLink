@@ -151,17 +151,26 @@ class PushNotificationService {
   Future<void> _registerToken(String userId, String token) async {
     final client = SupabaseConfig.clientSafe;
     if (client == null) return;
-    await client.from('push_device_tokens').upsert(
-      {
-        'user_id': userId,
-        'fcm_token': token,
-        'platform':
-            defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
-        'last_seen_at': DateTime.now().toUtc().toIso8601String(),
-        'revoked_at': null,
-      },
-      onConflict: 'fcm_token',
-    );
+    if (client.auth.currentUser?.id != userId) return;
+
+    Object? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        await client.rpc('register_current_push_device', params: {
+          'p_fcm_token': token,
+          'p_platform':
+              defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
+        });
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) {
+          await Future<void>.delayed(
+              Duration(milliseconds: 500 * (attempt + 1)));
+        }
+      }
+    }
+    throw lastError ?? StateError('Push token registration failed');
   }
 
   Future<void> revokeCurrentToken() async {
