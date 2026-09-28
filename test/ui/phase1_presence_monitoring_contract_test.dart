@@ -21,6 +21,10 @@ void main() {
     expect(pageReader.contains("from('gate_events')"), isTrue);
     expect(pageReader.contains('.range(from, to)'), isTrue);
     expect(pageReader.contains('CountOption.exact'), isTrue);
+    expect(
+      pageReader.indexOf('.range(from, to)'),
+      lessThan(pageReader.indexOf('.count(CountOption.exact)')),
+    );
     expect(pageReader.contains('.rpc('), isFalse);
   });
 
@@ -30,9 +34,14 @@ void main() {
 
     expect(owner.contains("Key('presence-search-field')"), isTrue);
     expect(owner.contains("Key('presence-room-filter')"), isTrue);
-    expect(owner.contains("Key('presence-bed-filter')"), isTrue);
+    expect(owner.contains("Key('presence-bed-filter')"), isFalse);
     expect(owner.contains("Key('presence-event-filter')"), isTrue);
     expect(owner.contains("Key('presence-date-filter')"), isTrue);
+    expect(owner.contains("Key('presence-sort-filter')"), isTrue);
+    expect(owner.contains('DateRangePickerDialog('), isTrue);
+    expect(owner.contains('showDateRangePicker('), isFalse);
+    expect(owner.contains("tooltip: 'Dismiss'"), isTrue);
+    expect(owner.contains('Icons.meeting_room_outlined'), isTrue);
     expect(owner.contains("Key('presence-page-"), isTrue);
     expect(owner.contains('Entered Dormitory Area'), isTrue);
     expect(owner.contains('Left Dormitory Area'), isTrue);

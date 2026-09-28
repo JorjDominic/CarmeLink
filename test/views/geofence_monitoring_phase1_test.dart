@@ -137,7 +137,10 @@ void main() {
 
     expect(find.byKey(const Key('presence-search-field')), findsOneWidget);
     expect(find.byKey(const Key('presence-room-filter')), findsOneWidget);
+    expect(find.byKey(const Key('presence-bed-filter')), findsNothing);
     expect(find.byKey(const Key('presence-event-filter')), findsOneWidget);
+    expect(find.byKey(const Key('presence-date-filter')), findsOneWidget);
+    expect(find.byKey(const Key('presence-sort-filter')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
