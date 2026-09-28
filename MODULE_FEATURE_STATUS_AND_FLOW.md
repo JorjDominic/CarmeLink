@@ -1,7 +1,7 @@
 # CarmeLink Module and Feature Status
 
 > Reviewed against current source at `5ecba11` on September 27, 2026.
-> `flutter analyze`: pass. `flutter test`: 459/459 pass. “Implemented” below is
+> `flutter analyze`: pass. `flutter test`: 460/460 pass. “Implemented” below is
 > not equivalent to deployed or physically verified.
 
 ## Current build changes
@@ -237,7 +237,7 @@ These are pending improvements, not claims about the current build.
 
 ```text
 flutter analyze             PASS — no issues
-flutter test                PASS — 459 tests
+flutter test                PASS — 460 tests
 flutter build apk --debug   PASS
 Remote migration parity     NOT VERIFIED
 Remote RLS/Storage tests    NOT VERIFIED

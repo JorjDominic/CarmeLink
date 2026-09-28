@@ -2,7 +2,7 @@
 
 > Current-build review: September 27, 2026 at `5ecba11` (`Vercel Deployment Fix`).
 > Repository verification: `flutter analyze` passes with no issues and
-> `flutter test` passes all 459 tests. Deployment, RLS, and physical-device
+> `flutter test` passes all 460 tests. Deployment, RLS, and physical-device
 > results are separate and remain open where listed below.
 
 ## Requested product backlog — September 27, 2026
@@ -10,6 +10,47 @@
 These items are the next product-policy and UX workstream. Existing partial
 implementations must be audited and refined rather than counted complete merely
 because a page or service exists.
+
+### UI and operations follow-up — September 28, 2026
+
+- [ ] **Fix duplicated “Bed” text on Profile** — High
+  - The profile assignment summary can render a duplicated label such as
+    “Bed Bed 1”. Normalize the stored bed label before presentation and ensure
+    the UI adds “Bed” exactly once.
+  - Acceptance: labels stored as `1`, `Bed 1`, or equivalent legacy values all
+    render consistently without duplicated words on tenant, guardian, and staff
+    profile surfaces.
+
+- [ ] **Automatically generate cleaning schedules per bed** — High
+  - Extend the existing bed-based cleaning module so each eligible/occupied bed
+    receives a schedule automatically under one documented rotation rule rather
+    than requiring staff to create every assignment manually.
+  - Preserve manual review/override, avoid duplicate active schedules, handle
+    assignment and occupancy changes, and show who/what generated each schedule.
+  - Acceptance: creation, reassignment, vacancy, rotation, override, and
+    idempotent regeneration are covered by service/database and UI tests.
+
+- [ ] **Remove the map icon from the room dropdown** — Low
+  - Use a neutral room/door icon only where an icon is still helpful. The room
+    selector must not imply that choosing a room opens a geographic map.
+  - Acceptance: the dropdown remains aligned and accessible on narrow and wide
+    layouts, with no map icon in its field or options.
+
+- [ ] **Fix the Cancel Request action** — High
+  - Reproduce the failure on the affected request workflow, confirm that only
+    cancellable states show an enabled action, persist cancellation through the
+    protected backend path, and refresh the screen from authoritative data.
+  - Acceptance: confirmation, success, permission denial, invalid state,
+    network failure, repeated tap, and post-cancellation UI are tested; no local
+    success is shown when the backend rejects the request.
+
+- [ ] **Fix font rendering and joined/overlapping text** — High
+  - Audit typography for incorrectly joined words, missing spacing, clipping,
+    overlap, fallback glyphs, and inconsistent font weight/line height across
+    web and mobile.
+  - Acceptance: representative pages pass at supported breakpoints, 1.0–2.0x
+    text scale, long names/content, and non-ASCII text without overlap or
+    unreadable word joining.
 
 - [ ] **Do not charge tenants a security deposit through Payments** — High
   - Current evidence: tenant calculations exclude `deposit` rows from amount
@@ -74,6 +115,26 @@ because a page or service exists.
   - Validate common end-to-end tasks separately with owner and caretaker roles.
 
 ## Current-build delta — September 27, 2026
+
+### Curfew ownership and guardian presence alerts — September 28, 2026
+
+- [x] Overnight leave now requires a linked guardian and the guardian's approve
+  or reject action is final. Owners/caretakers retain read access and receive
+  request/decision notifications, but the backend rejects staff attempts to
+  decide an overnight request. Late-return requests remain staff-reviewed.
+- [x] Guardian entry, exit, and outside-after-cutoff preferences are persisted
+  through protected RPCs instead of static process memory.
+- [x] `notify-geofence` sends linked-guardian FCM/in-app notifications for
+  entered/exited events while enforcing each guardian's entry/exit switches.
+- [x] `process-guardian-presence-alerts` creates a deduplicated daily alert and
+  FCM push when a linked resident remains outside after the selected cutoff.
+- [x] User-facing geofence wording now says “dormitory property,” “entered,” and
+  “exited”; technical geometry code may still use “perimeter” internally.
+- [ ] Deployment: apply migration
+  `202609280001_guardian_curfew_and_presence_preferences.sql`, deploy both
+  notification functions, set `GUARDIAN_ALERT_CRON_SECRET`, and invoke
+  `process-guardian-presence-alerts` every five minutes from the approved
+  scheduler. Verify guardian/staff delivery on physical devices.
 
 Changes completed after the earlier Markdown reconciliation:
 
@@ -268,7 +329,7 @@ If the team chooses to implement one of these in Capstone 1, move it into the cu
 | Check | Last result | Date |
 |---|---|---|
 | `flutter analyze` | Pass — no issues | 2026-09-27 |
-| `flutter test` | Pass — 459 tests | 2026-09-27 |
+| `flutter test` | Pass — 460 tests | 2026-09-28 |
 | `flutter build apk --debug` | Pass | 2026-09-25 |
 | Remote migration parity | Not verified | — |
 | Remote role/RLS matrix | Not verified | — |

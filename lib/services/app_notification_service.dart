@@ -385,7 +385,7 @@ class AppNotificationService {
             : '🚪 Dorm Departure: $tenantName');
     final body = isFlagged
         ? '$tenantName was detected outside during curfew hours.'
-        : '$tenantName has ${isEntry ? "entered" : "left"} the dormitory premises.';
+        : '$tenantName ${isEntry ? "entered" : "exited"} the dormitory property.';
 
     // Dispatches to linked guardians for this tenant
     await sendNotification(
@@ -497,6 +497,32 @@ class AppNotificationService {
         'request_id': requestId,
         'request_type': requestType,
         'status': status,
+      },
+    );
+  }
+
+  Future<void> notifyCurfewGuardianDecisionToStaff({
+    required String tenantId,
+    required String requestId,
+    required String requestType,
+    required bool approved,
+  }) async {
+    await sendNotification(
+      title: approved
+          ? 'Guardian approved overnight leave'
+          : 'Guardian declined overnight leave',
+      body: approved
+          ? 'The guardian approved the $requestType request. No staff approval is required.'
+          : 'The guardian declined the $requestType request.',
+      notificationType: 'curfew',
+      recipientRole: 'staff',
+      tenantId: tenantId,
+      routeType: 'curfew',
+      routeId: requestId,
+      data: {
+        'request_id': requestId,
+        'request_type': requestType,
+        'guardian_decision': approved ? 'approved' : 'rejected',
       },
     );
   }

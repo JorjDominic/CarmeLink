@@ -167,7 +167,9 @@ class GeofenceScheduler with WidgetsBindingObserver {
   /// DB write or disrupts the position stream.
   void _showCrossingNotification(String direction) {
     final isEntry = direction == 'IN';
-    final title = isEntry ? '🏠 Entered dormitory' : '🚪 Left dormitory';
+    final title = isEntry
+        ? '🏠 Entered dormitory property'
+        : '🚪 Exited dormitory property';
     final body = isEntry
         ? 'Your entry was detected. Welcome home!'
         : 'Your departure was detected. Stay safe!';

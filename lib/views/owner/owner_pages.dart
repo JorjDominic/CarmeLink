@@ -993,7 +993,8 @@ class TenantDetailsPage extends StatelessWidget {
                     title: const Text('Guardian phone'),
                     subtitle: Text(tenant.guardianPhone),
                     trailing: const Icon(Icons.call_outlined),
-                    onTap: () => _openPhoneDialer(context, tenant.guardianPhone),
+                    onTap: () =>
+                        _openPhoneDialer(context, tenant.guardianPhone),
                   ),
                 ),
                 InfoRow(
@@ -1025,11 +1026,10 @@ class TenantDetailsPage extends StatelessWidget {
                       const Expanded(
                         child: SectionTitle('Onboarding checklist'),
                       ),
-                      StatusPill(hasActiveContract &&
-                              !needsBed &&
-                              !needsGuardian
-                          ? 'Complete'
-                          : 'In progress'),
+                      StatusPill(
+                          hasActiveContract && !needsBed && !needsGuardian
+                              ? 'Complete'
+                              : 'In progress'),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -1841,13 +1841,12 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                     Icons.assignment_outlined,
                     const Color(0xFF627FA8)),
                 _OperationsStatus(
-                    'Inside perimeter',
+                    'Inside dormitory property',
                     '${controller.tenantsInsideCount}',
                     Icons.location_on_outlined,
                     const Color(0xFF4C8C65)),
               ];
-              final cardHeight =
-                  110.0 + ((textScale - 1).clamp(0, 1) * 65);
+              final cardHeight = 110.0 + ((textScale - 1).clamp(0, 1) * 65);
               const spacing = 8.0;
               final fittedWidth =
                   (constraints.maxWidth - (spacing * (cards.length - 1))) /
@@ -2074,8 +2073,11 @@ const _operationCategories = [
     Icons.groups_outlined,
     Color(0xFF56886B),
     [
-      _OperationItem('Tenant directory', 'Review resident records and assignments',
-          Icons.groups_outlined, TenantDirectoryPage()),
+      _OperationItem(
+          'Tenant directory',
+          'Review resident records and assignments',
+          Icons.groups_outlined,
+          TenantDirectoryPage()),
       _OperationItem(
         'User accounts',
         'Create and review role-based accounts',
@@ -5169,7 +5171,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                 },
         ),
         PopupMenuButton<String>(
-          tooltip: 'Perimeter & logging options',
+          tooltip: 'Dormitory property & logging options',
           icon: const Icon(Icons.more_vert_rounded),
           onSelected: (value) {
             if (value == 'dev_dashboard') {
@@ -5212,7 +5214,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(Icons.map_outlined),
-                  title: Text('Perimeter Visualizer'),
+                  title: Text('Dormitory Property Visualizer'),
                 ),
               ),
             ],
@@ -5301,7 +5303,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                                 ),
                               ),
                               icon: const Icon(Icons.map_outlined, size: 18),
-                              label: const Text('View Perimeter Map & Overlay'),
+                              label: const Text(
+                                  'View Dormitory Property Map & Overlay'),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -5329,7 +5332,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                               ),
                             ),
                             icon: const Icon(Icons.map_outlined, size: 18),
-                            label: const Text('View Perimeter Map & Overlay'),
+                            label: const Text(
+                                'View Dormitory Property Map & Overlay'),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -5498,7 +5502,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                                 ? const Color(0xFF627FA8)
                                 : const Color(0xFFC77800)),
                         title:
-                            '${event.person} • ${event.isUnavailable ? 'Presence unavailable' : (event.direction == 'IN' ? 'Entered perimeter' : 'Exited perimeter')}',
+                            '${event.person} • ${event.isUnavailable ? 'Presence unavailable' : (event.direction == 'IN' ? 'Entered dormitory property' : 'Exited dormitory property')}',
                         subtitle:
                             '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verificationMethod}${event.notes != null && event.notes!.isNotEmpty ? ' • "${event.notes}"' : ''}',
                         trailing: StatusPill(event.status),
@@ -5652,7 +5656,7 @@ class _StaffManualLogDialogState extends State<_StaffManualLogDialog> {
                 decoration: const InputDecoration(
                   labelText: 'Observation Notes *',
                   hintText:
-                      'e.g. Directly observed arriving on the premises; phone drained.',
+                      'e.g. Directly observed entering the dormitory property; phone drained.',
                   border: OutlineInputBorder(),
                 ),
                 validator: (val) {
@@ -8531,15 +8535,14 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
         await MessagingController.instance.loadConversations();
         return;
       }
-      final opened =
-          await MessagingController.instance.openConversationById(conversationId);
+      final opened = await MessagingController.instance
+          .openConversationById(conversationId);
       if (!mounted) return;
       setState(() {
         _deepLinkLoading = false;
         _deepLinkMissing = !opened;
-        _deepLinkedConversation = opened
-            ? MessagingController.instance.activeConversation
-            : null;
+        _deepLinkedConversation =
+            opened ? MessagingController.instance.activeConversation : null;
       });
     });
   }

@@ -3,20 +3,43 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('overnight curfew routing cannot strand tenants without guardians', () {
+  test('overnight curfew approval belongs exclusively to linked guardians', () {
     final migration = File(
-      'supabase/migrations/202609260002_onboarding_safety_gates.sql',
+      'supabase/migrations/202609280001_guardian_curfew_and_presence_preferences.sql',
     ).readAsStringSync();
     final service = File('lib/services/curfew_service.dart').readAsStringSync();
 
     expect(migration,
         contains('create or replace function public.submit_curfew_request'));
-    expect(migration, contains("else 'pending_staff'"));
+    expect(migration, contains("then 'pending_guardian' else 'pending_staff'"));
     expect(migration, contains('guardian_tenant_links'));
-    expect(migration, contains('revoke insert on public.curfew_requests'));
+    expect(
+        migration,
+        contains(
+            'Only the linked guardian may approve or reject overnight leave'));
+    expect(migration, contains('new.status := new.guardian_decision'));
     expect(service, contains("rpc('submit_curfew_request'"));
     expect(
         service, contains('requiresGuardianReview: request.isPendingGuardian'));
+  });
+
+  test('guardian gate preferences and scheduled presence alerts are durable',
+      () {
+    final migration = File(
+      'supabase/migrations/202609280001_guardian_curfew_and_presence_preferences.sql',
+    ).readAsStringSync();
+    final notifier =
+        File('supabase/functions/notify-geofence/index.ts').readAsStringSync();
+    final processor = File(
+      'supabase/functions/process-guardian-presence-alerts/index.ts',
+    ).readAsStringSync();
+
+    expect(migration, contains('guardian_alert_preferences'));
+    expect(migration, contains('update_my_guardian_alert_preferences'));
+    expect(notifier, contains('gate_entry_enabled'));
+    expect(notifier, contains('gate_exit_enabled'));
+    expect(processor, contains('outside_after_cutoff_enabled'));
+    expect(processor, contains('guardian_presence_alert'));
   });
 
   test('emergency contact is enforced in UI and database activation gates', () {
@@ -46,11 +69,13 @@ void main() {
   });
 
   test('official lease requires and prints room but never the bed label', () {
-    final documents = File('lib/services/contract_document_service.dart')
-        .readAsStringSync();
+    final documents =
+        File('lib/services/contract_document_service.dart').readAsStringSync();
     expect(documents, contains('_assignedRoomNumber(contract.tenantId)'));
-    expect(documents,
-        contains('Assign the tenant to a room before generating the official lease'));
+    expect(
+        documents,
+        contains(
+            'Assign the tenant to a room before generating the official lease'));
     expect(documents, contains("_pdfRow('Assigned room'"));
     expect(documents, isNot(contains("_pdfRow('Assigned bed'")));
   });

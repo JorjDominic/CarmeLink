@@ -4,9 +4,25 @@ Original audited base: `main` at `13b5b28` (`MD file updated`)
 
 Current recheck: `main` at `5ecba11` on September 27, 2026.
 
+## September 28, 2026 — UI and cleaning follow-up
+
+- Implemented guardian-final overnight leave decisions while preserving
+  owner/caretaker visibility and request/decision notifications.
+- Added durable guardian presence preferences, entry/exit preference enforcement
+  in `notify-geofence`, and a scheduled outside-after-cutoff FCM processor.
+- Replaced user-facing perimeter/premises/left wording with dormitory property,
+  entered, and exited terminology. Deployment and device verification remain.
+
+- Added open tasks for the duplicated Profile “Bed” label, automatic cleaning
+  schedule generation per bed, removal of the map icon from the room dropdown,
+  the broken Cancel Request action, and cross-platform font/text joining issues.
+- Added acceptance boundaries for label normalization, idempotent schedule
+  generation, backend-authoritative cancellation, responsive selectors, text
+  scaling, long content, and non-ASCII typography.
+
 ## `5ecba11` build and requested-backlog reconciliation
 
-- Re-ran local verification: `flutter analyze` passes with no issues and all 459
+- Re-ran local verification: `flutter analyze` passes with no issues and all 460
   automated tests pass.
 - Recorded progress in adaptive layouts, simplified/persistent staff navigation,
   live notification/messaging refresh, payment UI, and tenant/guardian contract

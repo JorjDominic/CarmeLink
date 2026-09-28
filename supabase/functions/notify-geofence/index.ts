@@ -62,6 +62,23 @@ Deno.serve(async (request) => {
       guardianIds.add(link.guardian_id)
     })
 
+    // Guardian gate notifications honor durable per-account preferences.
+    if (guardianIds.size) {
+      const { data: preferences, error: preferenceError } = await auth.admin
+        .from('guardian_alert_preferences')
+        .select('guardian_id, gate_entry_enabled, gate_exit_enabled')
+        .in('guardian_id', [...guardianIds])
+      if (preferenceError) throw new Error(`Unable to load guardian alert preferences: ${preferenceError.message}`)
+      const byGuardian = new Map((preferences ?? []).map((item) => [item.guardian_id, item]))
+      for (const guardianId of guardianIds) {
+        const preference = byGuardian.get(guardianId)
+        const enabled = event.direction === 'IN'
+          ? preference?.gate_entry_enabled !== false
+          : preference?.gate_exit_enabled !== false
+        if (!enabled) recipients.delete(guardianId)
+      }
+    }
+
     if (event.verification_method === 'Staff Manual Log') recipients.add(event.tenant_id)
     recipients.delete(auth.user.id)
     if (!recipients.size) return json({ delivered: 0, recipients: 0 })
@@ -81,10 +98,10 @@ Deno.serve(async (request) => {
           notificationBody = `${tenantName} was detected outside during curfew hours.`
         } else if (event.direction === 'IN') {
           title = `🏠 Dorm Arrival: ${tenantName}`
-          notificationBody = `${tenantName} has arrived and entered Carmelita's Dormitory.`
+          notificationBody = `${tenantName} entered the dormitory property.`
         } else {
           title = `🚪 Dorm Departure: ${tenantName}`
-          notificationBody = `${tenantName} has left Carmelita's Dormitory premises.`
+          notificationBody = `${tenantName} exited the dormitory property.`
         }
       } else {
         if (flagged) {
@@ -92,10 +109,10 @@ Deno.serve(async (request) => {
           notificationBody = `${tenantName} was recorded outside during curfew hours.`
         } else if (event.direction === 'IN') {
           title = `🏠 Gate Entry: ${tenantName}`
-          notificationBody = `${tenantName} entered the dormitory premises.`
+          notificationBody = `${tenantName} entered the dormitory property.`
         } else {
           title = `🚪 Gate Exit: ${tenantName}`
-          notificationBody = `${tenantName} left the dormitory premises.`
+          notificationBody = `${tenantName} exited the dormitory property.`
         }
       }
 

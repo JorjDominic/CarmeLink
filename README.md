@@ -658,7 +658,7 @@ For implementation details, see the official [Supabase user invitation guide](ht
 ## Implementation status
 
 Current local baseline (September 27, 2026, `5ecba11`): `flutter analyze`
-passes and all 459 tests pass. Native Android/iOS tripwires use circular OS
+passes and all 460 tests pass. Native Android/iOS tripwires use circular OS
 regions as wake-up hints, then require polygon direction and official gate
 corridor confirmation before queueing a transition. This behavior is not yet
 production-proven on physical devices.
@@ -679,7 +679,7 @@ production-proven on physical devices.
   payments/utilities, maintenance, visitors, curfew, conduct/appeals, and
   inspection completion. Secondary module hooks, preferences, and live device
   delivery are incomplete or unverified.
-- Current local verification: `flutter analyze` passes and all 459 tests pass.
+- Current local verification: `flutter analyze` passes and all 460 tests pass.
 
 Before release, synchronize migrations to clean staging, complete the negative
 role/RLS/Storage matrix, deploy and verify Edge Function secrets, configure

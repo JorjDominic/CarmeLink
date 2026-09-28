@@ -195,7 +195,7 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                   title:
                       '${controller.pendingGuardianCurfewCount} overnight leave request(s) waiting',
                   subtitle:
-                      'Your parental endorsement is needed for ${controller.linkedTenantName}.',
+                      'Your approval is needed for ${controller.linkedTenantName}.',
                   status: 'Action needed',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
@@ -275,7 +275,7 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                   ),
                   title: Text(
                     controller.hasLinkedTenant
-                        ? 'Perimeter status: $presence'
+                        ? 'Dormitory property status: $presence'
                         : 'No linked resident',
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
@@ -601,6 +601,9 @@ class _GuardianPresenceMonitoringPageState
       if (mounted) {
         GuardianController.instance.loadCurfewRequests();
         GuardianController.instance.loadGateEvents();
+        GuardianAlertService.load().then((_) {
+          if (mounted) setState(() {});
+        });
       }
     });
 
@@ -639,7 +642,7 @@ class _GuardianPresenceMonitoringPageState
         SnackBar(
           content: Text(
             approve
-                ? 'Overnight leave endorsed and sent to dormitory staff for review.'
+                ? 'Overnight leave approved. Dormitory staff have been notified.'
                 : 'Overnight leave declined.',
           ),
           backgroundColor:
@@ -756,7 +759,7 @@ class _GuardianPresenceMonitoringPageState
               AdaptiveGrid(
                 children: [
                   MetricCard(
-                    label: 'Endorsements waiting',
+                    label: 'Approvals waiting',
                     value: '$pendingCount',
                     detail: pendingCount > 0
                         ? 'Parental action needed'
@@ -772,7 +775,7 @@ class _GuardianPresenceMonitoringPageState
                     icon: Icons.location_on_outlined,
                   ),
                   const MetricCard(
-                    label: 'Perimeter radius',
+                    label: 'Dormitory property radius',
                     value: '50m Radius',
                     detail: "Carmelita's Dormitory",
                     icon: Icons.location_searching_outlined,
@@ -796,7 +799,7 @@ class _GuardianPresenceMonitoringPageState
                         ),
                         const ButtonSegment<int>(
                           value: 1,
-                          label: Text('Perimeter & Presence'),
+                          label: Text('Dormitory Property & Presence'),
                           icon: Icon(Icons.radar_outlined),
                         ),
                       ],
@@ -859,7 +862,7 @@ class _GuardianPresenceMonitoringPageState
                         ? Icons.task_alt_outlined
                         : Icons.schedule_outlined,
                     title: _filter == 'pending'
-                        ? 'No pending curfew endorsements'
+                        ? 'No pending curfew approvals'
                         : 'No requests in this tab',
                     message: _filter == 'pending'
                         ? 'All resident curfew and leave requests have been reviewed.'
@@ -977,10 +980,16 @@ class _GuardianPresenceMonitoringPageState
                                 GuardianAlertService.preferredAlertTime,
                           );
                           if (picked != null) {
-                            setState(() {
-                              GuardianAlertService.setPreferredAlertTime(
-                                  picked);
-                            });
+                            try {
+                              await GuardianAlertService.save(
+                                  alertTime: picked);
+                              if (mounted) setState(() {});
+                            } catch (error) {
+                              if (mounted) {
+                                showAppSnackBar(context,
+                                    'Could not save alert preference: $error');
+                              }
+                            }
                           }
                         },
                         child: const Text('Set time'),
@@ -1052,8 +1061,8 @@ class _GuardianPresenceMonitoringPageState
                           title: event.isUnavailable
                               ? 'Location check unavailable'
                               : (event.direction == 'IN'
-                                  ? 'Entered dormitory perimeter'
-                                  : 'Exited dormitory perimeter'),
+                                  ? 'Entered dormitory property'
+                                  : 'Exited dormitory property'),
                           subtitle:
                               '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verification}${event.notes != null && event.notes!.isNotEmpty ? ' (${event.notes})' : ''}',
                           trailing: StatusPill(event.status),
@@ -1296,7 +1305,7 @@ class _GuardianCurfewRequestCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Resident requested an overnight stay off-premises. Your parental approval is required before dormitory staff can review and authorize the request.',
+                        'Resident requested an overnight stay away from the dormitory property. Your approval is the final decision; dormitory staff will be notified.',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -1340,7 +1349,7 @@ class _GuardianCurfewRequestCard extends StatelessWidget {
                         onPressed: onEndorse,
                         icon: const Icon(Icons.check_circle_outline, size: 16),
                         label: const Text(
-                          'Endorse Leave',
+                          'Approve Leave',
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                         style: FilledButton.styleFrom(
@@ -1370,7 +1379,7 @@ class _GuardianCurfewRequestCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'You endorsed this leave${request.guardianRemarks != null && request.guardianRemarks!.isNotEmpty ? ": \"${request.guardianRemarks}\"" : ""}',
+                        'You approved this leave${request.guardianRemarks != null && request.guardianRemarks!.isNotEmpty ? ": \"${request.guardianRemarks}\"" : ""}',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -1381,20 +1390,6 @@ class _GuardianCurfewRequestCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (request.status == 'pending_staff') ...[
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Text(
-                    'Forwarded to dormitory staff for final review.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.onSurface.withValues(alpha: .7),
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
-              ],
             ] else if (request.guardianDecision == 'rejected') ...[
               const SizedBox(height: 8),
               Container(
@@ -1497,7 +1492,7 @@ class _GuardianCurfewEndorseSheetState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Endorse Overnight Leave',
+                        'Approve Overnight Leave',
                         style: TextStyle(
                             fontWeight: FontWeight.w800, fontSize: 17),
                       ),
@@ -1561,7 +1556,7 @@ class _GuardianCurfewEndorseSheetState
                         widget.onConfirmEndorse(_notesController.text.trim()),
                     icon: const Icon(Icons.check_circle_outline, size: 18),
                     label: const Text(
-                      'Endorse Leave',
+                      'Approve Leave',
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                     style: FilledButton.styleFrom(
@@ -1837,7 +1832,7 @@ class GuardianActivityPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SectionTitle('Recent presence records',
-                subtitle: 'Verified perimeter crossings'),
+                subtitle: 'Verified dormitory property crossings'),
             const SizedBox(height: 10),
             const _GuardianPresenceRecords(),
           ],

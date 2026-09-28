@@ -3,7 +3,7 @@
 Last updated: September 27, 2026
 
 Current build reviewed at `5ecba11`. `flutter analyze` passes with no issues and
-all 459 tests pass. Recent completed source work includes authenticated FCM token
+all 460 tests pass. Recent completed source work includes authenticated FCM token
 claiming, direct/resumable onboarding and electronic signatures, Android/iOS
 polygon plus official-gate confirmation, narrowed gate-corridor configuration,
 and defensive iOS permission/error handling. Remote deployment and physical
@@ -27,6 +27,30 @@ targets; a feature is not release-complete until its platform-specific behavior
 has either been validated on both or is explicitly tracked as blocked.
 
 ## Immediate agenda
+
+### September 28, 2026 — UI and operations fixes
+
+Implemented in source on September 28: guardian-only final approval for
+overnight leave, staff visibility/notifications without decision authority,
+durable guardian entry/exit/cutoff preferences, preference-aware guardian FCM,
+a scheduled outside-after-cutoff notification processor, and “dormitory
+property / entered / exited” user-facing terminology. Remote migration/function
+deployment, five-minute scheduler configuration, and physical-device FCM proof
+remain open.
+
+- [ ] Normalize profile bed labels so “Bed” is displayed exactly once and add
+  regression coverage for raw labels such as `1` and `Bed 1`.
+- [ ] Add automatic, idempotent cleaning-schedule generation per eligible bed,
+  including rotation policy, occupancy/reassignment handling, manual override,
+  audit/source visibility, and backend/UI tests.
+- [ ] Remove the misleading map icon from the room dropdown while retaining an
+  accessible, responsive room selector.
+- [ ] Repair the affected Cancel Request action end to end: state eligibility,
+  confirmation, protected persistence, authoritative refresh, failure feedback,
+  repeat-tap protection, and regression tests.
+- [ ] Complete a typography audit for joined words, spacing, clipping, overlap,
+  fallback glyphs, line height, font weight, long content, non-ASCII text, and
+  1.0–2.0x text scale across web and mobile.
 
 ### September 27, 2026 — Product UX and policy backlog
 

@@ -1,7 +1,7 @@
 # CarmeLink System Completion Audit
 
 > Current-build addendum — September 27, 2026 (`5ecba11`): analysis passes and
-> all 459 tests pass. Since the original snapshot, source now includes native
+> all 460 tests pass. Since the original snapshot, source now includes native
 > polygon plus official-gate confirmation on Android/iOS, server-owned FCM token
 > claiming, expanded direct/resumable tenant onboarding, electronic signatures,
 > and safer iOS authorization/error handling. These are implemented but still
@@ -198,7 +198,7 @@ After prototype cleanup:
 
 ```text
 flutter analyze                  PASS (no issues)
-flutter test                     PASS (459 tests)
+flutter test                     PASS (460 tests)
 flutter build apk --debug        PASS
 Android Firebase config          PRESENT
 iOS Firebase config              MISSING

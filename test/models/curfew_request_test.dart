@@ -132,6 +132,7 @@ void main() {
       expect(overnightReq.isLateReturn, isFalse);
       expect(overnightReq.isOvernightLeave, isTrue);
       expect(overnightReq.requestTypeLabel, 'Overnight Leave');
+      expect(overnightReq.canReviewStaff, isFalse);
     });
 
     test('copyWith updates specified fields correctly', () {
@@ -210,4 +211,3 @@ void main() {
     });
   });
 }
-

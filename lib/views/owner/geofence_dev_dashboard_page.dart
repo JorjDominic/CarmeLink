@@ -168,7 +168,8 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
         allowedRoles: const {UserRole.owner},
         child: PageFrame(
           title: 'Geofence Dev Dashboard',
-          subtitle: 'Perimeter map, ray-casting verification, and overrides',
+          subtitle:
+              'Dormitory property map, ray-casting verification, and overrides',
           actions: [
             IconButton(
               tooltip: 'Toggle Evaluation Mode',
@@ -275,7 +276,7 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
 
               // 2. Interactive Map Visualizer
               const SectionTitle(
-                'Perimeter Map Visualizer',
+                'Dormitory Property Map Visualizer',
                 subtitle:
                     'Real aerial satellite & street layout (Brgy. Concepcion, Baliwag)',
               ),
@@ -470,8 +471,8 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
                         spacing: 12,
                         runSpacing: 8,
                         children: [
-                          _legendItem(
-                              Colors.greenAccent.shade400, 'Polygon Perimeter'),
+                          _legendItem(Colors.greenAccent.shade400,
+                              'Dormitory Property Boundary'),
                           _legendItem(
                               Colors.cyanAccent.shade400, 'Corners (P1–P4)'),
                           _legendItem(
@@ -490,7 +491,7 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
 
               // 3. Corner Coordinates and Lot Metrics Table
               const SectionTitle(
-                'Perimeter Corner Coordinates',
+                'Dormitory Property Corner Coordinates',
                 subtitle: 'On-site measured GPS markers and edge lengths',
               ),
               const SizedBox(height: 10),
@@ -667,7 +668,7 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Distance to property perimeter: ${_lastEdgeDistance?.toStringAsFixed(2)} meters',
+                              'Distance to dormitory property boundary: ${_lastEdgeDistance?.toStringAsFixed(2)} meters',
                               style:
                                   const TextStyle(fontWeight: FontWeight.w600),
                             ),

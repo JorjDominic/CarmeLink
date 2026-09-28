@@ -720,7 +720,9 @@ class TenantController extends ChangeNotifier {
         final isEntry = newDirection == 'IN';
         PushNotificationService.instance.showLocalNotification(
           id: isEntry ? 1001 : 1002,
-          title: isEntry ? '🏠 Entered dormitory' : '🚪 Left dormitory',
+          title: isEntry
+              ? '🏠 Entered dormitory property'
+              : '🚪 Exited dormitory property',
           body: isEntry
               ? 'Your entry was detected. Welcome home!'
               : 'Your departure was detected. Stay safe!',

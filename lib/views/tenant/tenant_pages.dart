@@ -54,9 +54,7 @@ class TenantDashboardPage extends StatelessWidget {
           final nonDepositPayments =
               controller.payments.where((p) => !p.isDeposit).toList();
           final nextDue = controller.nextDuePayment ??
-              (nonDepositPayments.isNotEmpty
-                  ? nonDepositPayments.first
-                  : null);
+              (nonDepositPayments.isNotEmpty ? nonDepositPayments.first : null);
           final outstanding = controller.outstandingBalance;
           final maintenance = controller.maintenance.isEmpty
               ? null
@@ -1564,7 +1562,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
                           const SizedBox(width: 8),
                           FilterChip(
                             selected: _selectedFilter == 'verified',
-                            label: Text('Verified (${verifiedPayments.length})'),
+                            label:
+                                Text('Verified (${verifiedPayments.length})'),
                             onSelected: (_) =>
                                 setState(() => _selectedFilter = 'verified'),
                           ),
@@ -5676,8 +5675,8 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                                       final msg = switch (result.status) {
                                         'Verified' => result.errorMessage !=
                                                 null
-                                            ? 'Presence confirmed (${result.direction == "IN" ? "Inside perimeter" : "Outside perimeter"}), but server sync warning: ${result.errorMessage}'
-                                            : 'Presence confirmed: ${result.direction == "IN" ? "Inside perimeter" : "Outside perimeter"}',
+                                            ? 'Presence confirmed (${result.direction == "IN" ? "Inside dormitory property" : "Outside dormitory property"}), but server sync warning: ${result.errorMessage}'
+                                            : 'Presence confirmed: ${result.direction == "IN" ? "Inside dormitory property" : "Outside dormitory property"}',
                                         'Flagged' =>
                                           'Presence check recorded (Flagged: curfew hours active)',
                                         _ =>
@@ -6058,8 +6057,8 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                           title: e.isUnavailable
                               ? 'Location check unavailable'
                               : (e.direction == 'IN'
-                                  ? 'Entered dormitory perimeter'
-                                  : 'Exited dormitory perimeter'),
+                                  ? 'Entered dormitory property'
+                                  : 'Exited dormitory property'),
                           subtitle:
                               '${shortDate(e.time)} • ${timeText(e.time)} • ${e.verification}${e.notes != null && e.notes!.isNotEmpty ? ' (${e.notes})' : ''}',
                           trailing: StatusPill(e.status),
@@ -6516,7 +6515,7 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Guardian endorsement first',
+                            'Guardian approval required',
                             style: TextStyle(
                               fontSize: 11,
                               color: Theme.of(context)
@@ -6572,7 +6571,7 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
                         Text(
                           isLate
                               ? 'Forwarded directly to the caretaker / owner on duty for prompt staff review. Your guardian will see this on their read-only curfew activity log.'
-                              : 'Since you will be off-premises overnight, your registered guardian must review and approve this first before caretaker sign-off.',
+                              : 'Since you will be away from the dormitory property overnight, your registered guardian is the only approver. The owner and caretaker will be notified.',
                           style: const TextStyle(fontSize: 12, height: 1.3),
                         ),
                       ],

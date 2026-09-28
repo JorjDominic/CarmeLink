@@ -53,9 +53,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
     await _refresh();
     if (!mounted) return;
     _subscription = _service.streamMyNotifications(limit: 60).listen(
-      _applySnapshot,
-      onError: (_) {},
-    );
+          _applySnapshot,
+          onError: (_) {},
+        );
     _pollTimer = Timer.periodic(
       const Duration(seconds: 5),
       (_) => unawaited(_refresh()),
@@ -117,7 +117,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
     if (mounted) {
       setState(() {
         _notifications = _notifications
-            .map((entry) => entry.id == item.id ? _withReadAt(entry, now) : entry)
+            .map((entry) =>
+                entry.id == item.id ? _withReadAt(entry, now) : entry)
             .toList(growable: false);
       });
       _notifyOptimisticSnapshot();
@@ -764,20 +765,18 @@ class _TenantRequiredDocumentsSectionState
     extends State<_TenantRequiredDocumentsSection> {
   final _service = const ContractOnboardingService();
   late Future<
-          ({
-            TenantContract? contract,
-            List<ContractRequirement> requirements,
-            List<ContractSigner> signers,
-          })>
-      _future = _load();
+      ({
+        TenantContract? contract,
+        List<ContractRequirement> requirements,
+        List<ContractSigner> signers,
+      })> _future = _load();
 
   Future<
-          ({
-            TenantContract? contract,
-            List<ContractRequirement> requirements,
-            List<ContractSigner> signers,
-          })>
-      _load() async {
+      ({
+        TenantContract? contract,
+        List<ContractRequirement> requirements,
+        List<ContractSigner> signers,
+      })> _load() async {
     try {
       final contract = await _service.getMyContract();
       if (contract == null) {
@@ -848,8 +847,7 @@ class _TenantRequiredDocumentsSectionState
             signers.where((s) => s.role == 'tenant').firstOrNull;
 
         final requiredList = reqs.where((r) => r.isRequired).toList();
-        final verifiedCount =
-            requiredList.where((r) => r.isVerified).length;
+        final verifiedCount = requiredList.where((r) => r.isVerified).length;
         final totalRequired = requiredList.length;
 
         final errorColor = Theme.of(context).colorScheme.error;
@@ -857,7 +855,10 @@ class _TenantRequiredDocumentsSectionState
         // 1. Tenant ID status
         final (tenantIdColor, tenantIdText) = () {
           if (tenantIdReq == null) {
-            return (const Color(0xFFE65100), 'Not uploaded yet (Action required)');
+            return (
+              const Color(0xFFE65100),
+              'Not uploaded yet (Action required)'
+            );
           }
           if (tenantIdReq.isVerified) {
             return (const Color(0xFF2E7D32), 'Verified & Approved');
@@ -874,7 +875,10 @@ class _TenantRequiredDocumentsSectionState
               'Rejected: ${tenantIdReq.reviewNotes ?? "Action required"}'
             );
           }
-          return (const Color(0xFFE65100), 'Not uploaded yet (Action required)');
+          return (
+            const Color(0xFFE65100),
+            'Not uploaded yet (Action required)'
+          );
         }();
 
         // 2. Guardian ID status
@@ -898,7 +902,10 @@ class _TenantRequiredDocumentsSectionState
           if (!guardianIdReq.isRequired) {
             return (Colors.grey, 'Optional (Not submitted)');
           }
-          return (const Color(0xFFE65100), 'Not uploaded yet (Action required)');
+          return (
+            const Color(0xFFE65100),
+            'Not uploaded yet (Action required)'
+          );
         }();
 
         // 3. Signed Lease copy status
@@ -907,10 +914,7 @@ class _TenantRequiredDocumentsSectionState
             return (const Color(0xFFE65100), 'Missing (Action required)');
           }
           if (signedReq.physicalCopyReceived) {
-            return (
-              const Color(0xFF2E7D32),
-              'Hard copy received at dorm desk'
-            );
+            return (const Color(0xFF2E7D32), 'Hard copy received at dorm desk');
           }
           if (signedReq.isVerified) {
             return (const Color(0xFF2E7D32), 'Verified & Approved');
@@ -952,7 +956,10 @@ class _TenantRequiredDocumentsSectionState
           if (tenantSigner.status == 'rejected') {
             return (errorColor, 'Signature rejected • Tap to resign on phone');
           }
-          return (const Color(0xFFE65100), 'Pending signature • Tap to sign on phone');
+          return (
+            const Color(0xFFE65100),
+            'Pending signature • Tap to sign on phone'
+          );
         }();
 
         return Column(
@@ -1702,8 +1709,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
                 icon: Icon(submitted
                     ? Icons.check_circle_outline
                     : Icons.send_outlined),
-                label:
-                    Text(submitted ? 'Preview validated' : 'Validate feedback form'),
+                label: Text(
+                    submitted ? 'Preview validated' : 'Validate feedback form'),
               ),
             ),
           ],
@@ -1729,6 +1736,52 @@ class _NotificationPreferencesPageState
     'Maintenance': true,
     'Announcements': true,
   };
+  bool _savingGuardianPreference = false;
+
+  bool get _isGuardian =>
+      SessionController.instance.currentUser?.role == UserRole.guardian;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isGuardian) {
+      GuardianAlertService.load().then((_) {
+        if (!mounted) return;
+        setState(() {
+          enabled['Geofence presence'] =
+              GuardianAlertService.gateEntryEnabled ||
+                  GuardianAlertService.gateExitEnabled;
+        });
+      }).catchError((_) {});
+    }
+  }
+
+  Future<void> _saveGuardianPreference({
+    TimeOfDay? alertTime,
+    bool? gateEnabled,
+    bool? cutoffEnabled,
+  }) async {
+    setState(() => _savingGuardianPreference = true);
+    try {
+      await GuardianAlertService.save(
+        alertTime: alertTime,
+        gateEntryEnabled: gateEnabled,
+        gateExitEnabled: gateEnabled,
+        outsideAfterCutoffEnabled: cutoffEnabled,
+      );
+      if (!mounted) return;
+      setState(() {
+        enabled['Geofence presence'] = GuardianAlertService.gateEntryEnabled ||
+            GuardianAlertService.gateExitEnabled;
+      });
+    } catch (error) {
+      if (mounted) {
+        showAppSnackBar(context, 'Could not save preference: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _savingGuardianPreference = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1754,8 +1807,15 @@ class _NotificationPreferencesPageState
                   secondary: Icon(icons[entry.key]),
                   title: Text(entry.key),
                   value: entry.value,
-                  onChanged: (value) =>
-                      setState(() => enabled[entry.key] = value),
+                  onChanged: _savingGuardianPreference
+                      ? null
+                      : (value) {
+                          if (_isGuardian && entry.key == 'Geofence presence') {
+                            _saveGuardianPreference(gateEnabled: value);
+                          } else {
+                            setState(() => enabled[entry.key] = value);
+                          }
+                        },
                 );
               }).toList(),
             ),
@@ -1803,6 +1863,18 @@ class _NotificationPreferencesPageState
                   ],
                 ),
                 const SizedBox(height: 14),
+                if (_isGuardian)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Outside-after-time alert'),
+                    subtitle: const Text(
+                        'Notify me once per day when my linked resident is still outside the dormitory property after the selected time.'),
+                    value: GuardianAlertService.outsideAfterCutoffEnabled,
+                    onChanged: _savingGuardianPreference
+                        ? null
+                        : (value) =>
+                            _saveGuardianPreference(cutoffEnabled: value),
+                  ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1814,17 +1886,19 @@ class _NotificationPreferencesPageState
                           ?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () async {
-                        final picked = await showTimePicker(
-                          context: context,
-                          initialTime: GuardianAlertService.preferredAlertTime,
-                        );
-                        if (picked != null) {
-                          setState(() {
-                            GuardianAlertService.setPreferredAlertTime(picked);
-                          });
-                        }
-                      },
+                      onPressed: !_isGuardian || _savingGuardianPreference
+                          ? null
+                          : () async {
+                              final picked = await showTimePicker(
+                                context: context,
+                                initialTime:
+                                    GuardianAlertService.preferredAlertTime,
+                              );
+                              if (picked != null) {
+                                await _saveGuardianPreference(
+                                    alertTime: picked);
+                              }
+                            },
                       icon: const Icon(Icons.schedule, size: 16),
                       label: Text(
                         GuardianAlertService.preferredAlertTime.format(context),

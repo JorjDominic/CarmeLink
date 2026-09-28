@@ -1014,9 +1014,10 @@ class TenantContract {
       id: row['id'] as String,
       tenantId: row['tenant_id'] as String,
       tenantName: profile?['full_name'] as String? ?? 'Unknown tenant',
-      contractNumber: (row['contract_number'] as String?)?.trim().isNotEmpty == true
-          ? (row['contract_number'] as String).trim()
-          : 'Pending Generation',
+      contractNumber:
+          (row['contract_number'] as String?)?.trim().isNotEmpty == true
+              ? (row['contract_number'] as String).trim()
+              : 'Pending Generation',
       startsOn: DateTime.parse(row['starts_on'] as String).toLocal(),
       endsOn: DateTime.parse(row['ends_on'] as String).toLocal(),
       monthlyRent: (row['monthly_rent'] as num).toDouble(),
@@ -1452,7 +1453,7 @@ class CurfewRequest {
   bool get canCancel =>
       status == 'pending_guardian' || status == 'pending_staff';
   bool get canReviewGuardian => status == 'pending_guardian';
-  bool get canReviewStaff => status == 'pending_staff';
+  bool get canReviewStaff => status == 'pending_staff' && !isOvernightLeave;
 
   String get statusLabel {
     switch (status) {
