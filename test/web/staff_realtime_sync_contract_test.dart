@@ -36,7 +36,9 @@ void main() {
       expect(source.contains('AppLifecycleState.resumed'), isTrue);
     });
 
-    test('legacy payment subscriptions also observe authoritative billing tables', () {
+    test(
+        'legacy payment subscriptions also observe authoritative billing tables',
+        () {
       final source = File(
         'lib/services/table_refresh_subscription.dart',
       ).readAsStringSync();
@@ -47,14 +49,15 @@ void main() {
       expect(source.contains("yield 'billing_charge_actions'"), isTrue);
     });
 
-    test('live in-app alerts update unread badges and keep navigation in shell', () {
+    test('live in-app alerts update unread badges and keep navigation in shell',
+        () {
       final source = File(
         'lib/core/widgets/adaptive_shell.dart',
       ).readAsStringSync();
 
-      expect(source.contains('streamMyNotifications(limit: 60)'), isTrue);
-      expect(source.contains('fetchMyNotifications(limit: 60)'), isTrue);
-      expect(source.contains('Duration(seconds: 5)'), isTrue);
+      expect(source.contains('streamMyNotifications(limit: 30)'), isTrue);
+      expect(source.contains('fetchMyNotifications(limit: 30)'), isTrue);
+      expect(source.contains('Duration(seconds: 60)'), isTrue);
       expect(source.contains("label: 'View'"), isTrue);
       expect(source.contains('_UnreadCountBadge'), isTrue);
       expect(source.contains('openNotifications: _openNotifications'), isTrue);
@@ -85,8 +88,11 @@ void main() {
       ]) {
         expect(source.contains("'$route'"), isTrue, reason: 'Missing $route');
       }
-      expect(source.contains('notificationPageBuilder: _notificationDestination'), isTrue);
-      expect(source.contains('initialConversationId: notification.routeId'), isTrue);
+      expect(
+          source.contains('notificationPageBuilder: _notificationDestination'),
+          isTrue);
+      expect(source.contains('initialConversationId: notification.routeId'),
+          isTrue);
     });
   });
 }

@@ -5,16 +5,20 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('Phase 1 messaging and notification dynamic contract', () {
     test('notification list has realtime plus polling fallback', () {
-      final page = File('lib/views/shared/shared_views.dart').readAsStringSync();
+      final page =
+          File('lib/views/shared/shared_views.dart').readAsStringSync();
       final migration = File(
         'supabase/migrations/202609270006_app_notifications_realtime.sql',
       ).readAsStringSync();
 
-      expect(page.contains('streamMyNotifications(limit: 60)'), isTrue);
-      expect(page.contains('Duration(seconds: 5)'), isTrue);
+      expect(page.contains('streamMyNotifications(limit: 30)'), isTrue);
+      expect(page.contains('Duration(seconds: 60)'), isTrue);
       expect(page.contains("Key('live-notifications-list')"), isTrue);
       expect(page.contains('onNotificationsChanged'), isTrue);
-      expect(migration.contains('alter publication supabase_realtime add table public.app_notifications'), isTrue);
+      expect(
+          migration.contains(
+              'alter publication supabase_realtime add table public.app_notifications'),
+          isTrue);
     });
 
     test('message deep links resolve the exact conversation record', () {
@@ -27,8 +31,11 @@ void main() {
       final owner = File('lib/views/owner/owner_pages.dart').readAsStringSync();
 
       expect(controller.contains('fetchConversationById'), isTrue);
-      expect(service.contains('Future<ConversationRecord?> fetchConversationById'), isTrue);
-      expect(owner.contains('return OwnerConversationPage(record: deepLinked)'), isTrue);
+      expect(
+          service.contains('Future<ConversationRecord?> fetchConversationById'),
+          isTrue);
+      expect(owner.contains('return OwnerConversationPage(record: deepLinked)'),
+          isTrue);
     });
 
     test('web and mobile badges remain compact and data driven', () {
@@ -39,14 +46,17 @@ void main() {
         'lib/core/widgets/common_widgets.dart',
       ).readAsStringSync();
 
-      expect(adaptive.contains('MessagingController.instance.unreadMessageCount'), isTrue);
+      expect(
+          adaptive.contains('MessagingController.instance.unreadMessageCount'),
+          isTrue);
       expect(adaptive.contains('_UnreadCountBadge('), isTrue);
       expect(adaptive.contains('compact: true'), isTrue);
       expect(common.contains('navScope?.unreadMessageCount ?? 0'), isTrue);
       expect(common.contains('navScope?.unreadNotificationCount ?? 0'), isTrue);
     });
 
-    test('conversation threads use a fixed viewport with internal scrolling', () {
+    test('conversation threads use a fixed viewport with internal scrolling',
+        () {
       final common = File(
         'lib/core/widgets/common_widgets.dart',
       ).readAsStringSync();
@@ -76,7 +86,10 @@ void main() {
         'lib/views/caretaker/caretaker_shell.dart',
       ]) {
         final source = File(file).readAsStringSync();
-        expect(source.contains('notificationPageBuilder: _notificationDestination'), isTrue,
+        expect(
+            source
+                .contains('notificationPageBuilder: _notificationDestination'),
+            isTrue,
             reason: file);
         expect(source.contains("'message' || 'conversation'"), isTrue,
             reason: file);
