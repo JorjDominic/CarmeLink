@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
@@ -8,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../controllers/messaging_controller.dart';
 import '../../controllers/owner_controller.dart';
 import '../../controllers/session_controller.dart';
+import '../../core/config/supabase_config.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/visitor_policy.dart';
@@ -16,6 +19,7 @@ import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../../services/boundary_config_service.dart';
 import '../../services/geofence_service.dart';
+import '../../services/gate_service.dart';
 import '../../services/payment_service.dart';
 import '../../services/tenant_service.dart';
 import '../../services/announcement_service.dart';
@@ -993,8 +997,7 @@ class TenantDetailsPage extends StatelessWidget {
                     title: const Text('Guardian phone'),
                     subtitle: Text(tenant.guardianPhone),
                     trailing: const Icon(Icons.call_outlined),
-                    onTap: () =>
-                        _openPhoneDialer(context, tenant.guardianPhone),
+                    onTap: () => _openPhoneDialer(context, tenant.guardianPhone),
                   ),
                 ),
                 InfoRow(
@@ -1026,10 +1029,11 @@ class TenantDetailsPage extends StatelessWidget {
                       const Expanded(
                         child: SectionTitle('Onboarding checklist'),
                       ),
-                      StatusPill(
-                          hasActiveContract && !needsBed && !needsGuardian
-                              ? 'Complete'
-                              : 'In progress'),
+                      StatusPill(hasActiveContract &&
+                              !needsBed &&
+                              !needsGuardian
+                          ? 'Complete'
+                          : 'In progress'),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -1846,7 +1850,8 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                     Icons.location_on_outlined,
                     const Color(0xFF4C8C65)),
               ];
-              final cardHeight = 110.0 + ((textScale - 1).clamp(0, 1) * 65);
+              final cardHeight =
+                  110.0 + ((textScale - 1).clamp(0, 1) * 65);
               const spacing = 8.0;
               final fittedWidth =
                   (constraints.maxWidth - (spacing * (cards.length - 1))) /
@@ -2073,11 +2078,8 @@ const _operationCategories = [
     Icons.groups_outlined,
     Color(0xFF56886B),
     [
-      _OperationItem(
-          'Tenant directory',
-          'Review resident records and assignments',
-          Icons.groups_outlined,
-          TenantDirectoryPage()),
+      _OperationItem('Tenant directory', 'Review resident records and assignments',
+          Icons.groups_outlined, TenantDirectoryPage()),
       _OperationItem(
         'User accounts',
         'Create and review role-based accounts',
@@ -5110,20 +5112,141 @@ class GeofenceMonitoringPage extends StatefulWidget {
 }
 
 class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
+  static const int _pageSize = 20;
+
+  final TextEditingController _searchController = TextEditingController();
+  final GateService _gateService = const GateService();
+
   String _presenceFilter = 'all';
+  String _eventFilter = 'all';
+  String _roomFilter = 'all';
+  String _bedFilter = 'all';
+  String _dateFilter = 'all';
+  DateTimeRange? _customDateRange;
+  bool _ascending = false;
   bool _showTestPanel = false;
+
+  List<GateEvent> _eventPage = const [];
+  int _eventTotalCount = 0;
+  int _eventPageNumber = 1;
+  bool _eventPageLoading = false;
+  String? _eventPageError;
+  bool _newPresenceDataAvailable = false;
+
+  Timer? _searchDebounce;
+  int _requestVersion = 0;
+  int _lastGateFingerprint = 0;
+  int _lastTenantFingerprint = 0;
 
   @override
   void initState() {
     super.initState();
-    OwnerController.instance.loadGateEvents();
-    OwnerController.instance.loadTenants();
+    final controller = OwnerController.instance;
+    _lastGateFingerprint = _gateFingerprint(controller.gateEvents);
+    _lastTenantFingerprint = _tenantFingerprint(controller.tenants);
+    controller.addListener(_handleControllerChanged);
+    controller.loadGateEvents();
+    controller.loadTenants();
     _refreshBoundary();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_loadEventPage());
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    OwnerController.instance.removeListener(_handleControllerChanged);
+    super.dispose();
+  }
+
+  int _gateFingerprint(List<GateEvent> events) {
+    return Object.hashAll(
+      events.take(10).map(
+            (event) => Object.hash(
+              event.id,
+              event.direction,
+              event.status,
+              event.time.millisecondsSinceEpoch,
+            ),
+          ),
+    );
+  }
+
+  int _tenantFingerprint(List<TenantDirectoryEntry> tenants) {
+    return Object.hashAll(
+      tenants.map(
+        (tenant) => Object.hash(
+          tenant.id,
+          tenant.name,
+          tenant.room,
+          tenant.bedSpace,
+          tenant.gateStatus,
+        ),
+      ),
+    );
+  }
+
+  void _handleControllerChanged() {
+    final controller = OwnerController.instance;
+    final gateFingerprint = _gateFingerprint(controller.gateEvents);
+    final tenantFingerprint = _tenantFingerprint(controller.tenants);
+    final gateChanged = gateFingerprint != _lastGateFingerprint;
+    final tenantsChanged = tenantFingerprint != _lastTenantFingerprint;
+
+    _lastGateFingerprint = gateFingerprint;
+    _lastTenantFingerprint = tenantFingerprint;
+
+    if (!mounted) return;
+
+    if (gateChanged) {
+      if (_eventPageNumber == 1) {
+        unawaited(_loadEventPage(showLoading: false));
+      } else if (!_newPresenceDataAvailable) {
+        setState(() => _newPresenceDataAvailable = true);
+      }
+    }
+
+    if (tenantsChanged) {
+      var resetFilters = false;
+      final rooms = _availableRooms(controller.tenants);
+      if (_roomFilter != 'all' && !rooms.contains(_roomFilter)) {
+        _roomFilter = 'all';
+        resetFilters = true;
+      }
+      final beds = _availableBeds(controller.tenants);
+      if (_bedFilter != 'all' && !beds.contains(_bedFilter)) {
+        _bedFilter = 'all';
+        resetFilters = true;
+      }
+      if (resetFilters && mounted) {
+        setState(() => _eventPageNumber = 1);
+      }
+      if (_searchController.text.trim().isNotEmpty ||
+          _roomFilter != 'all' ||
+          _bedFilter != 'all') {
+        unawaited(_loadEventPage(showLoading: false));
+      }
+    }
   }
 
   Future<void> _refreshBoundary() async {
     await const BoundaryConfigService().loadActiveConfig();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _refreshEverything() async {
+    final controller = OwnerController.instance;
+    await Future.wait([
+      controller.loadGateEvents(force: true),
+      controller.loadTenants(force: true),
+      _refreshBoundary(),
+    ]);
+    if (mounted) {
+      setState(() => _newPresenceDataAvailable = false);
+      await _loadEventPage();
+    }
   }
 
   void _openManualLogDialog({TenantDirectoryEntry? preselected}) {
@@ -5142,6 +5265,1053 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     if (changed == true) await _refreshBoundary();
   }
 
+  Set<String>? _matchingTenantIds(List<TenantDirectoryEntry> tenants) {
+    final query = _searchController.text.trim().toLowerCase();
+    final hasTenantConstraint = query.isNotEmpty ||
+        _roomFilter != 'all' ||
+        _bedFilter != 'all';
+    if (!hasTenantConstraint) return null;
+
+    return tenants.where((tenant) {
+      if (_roomFilter != 'all' && tenant.room != _roomFilter) return false;
+      if (_bedFilter != 'all' && tenant.bedSpace != _bedFilter) return false;
+      if (query.isEmpty) return true;
+      return tenant.name.toLowerCase().contains(query) ||
+          tenant.room.toLowerCase().contains(query) ||
+          tenant.bedSpace.toLowerCase().contains(query) ||
+          'room ${tenant.room}'.toLowerCase().contains(query);
+    }).map((tenant) => tenant.id).toSet();
+  }
+
+  _PresenceDateBounds _dateBounds() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    switch (_dateFilter) {
+      case 'today':
+        return _PresenceDateBounds(
+          start: today,
+          endExclusive: today.add(const Duration(days: 1)),
+        );
+      case 'yesterday':
+        final yesterday = today.subtract(const Duration(days: 1));
+        return _PresenceDateBounds(
+          start: yesterday,
+          endExclusive: today,
+        );
+      case 'last7':
+        return _PresenceDateBounds(
+          start: today.subtract(const Duration(days: 6)),
+          endExclusive: today.add(const Duration(days: 1)),
+        );
+      case 'month':
+        final start = DateTime(now.year, now.month);
+        return _PresenceDateBounds(
+          start: start,
+          endExclusive: DateTime(now.year, now.month + 1),
+        );
+      case 'custom':
+        final range = _customDateRange;
+        if (range == null) return const _PresenceDateBounds();
+        final start = DateTime(
+          range.start.year,
+          range.start.month,
+          range.start.day,
+        );
+        final end = DateTime(
+          range.end.year,
+          range.end.month,
+          range.end.day,
+        ).add(const Duration(days: 1));
+        return _PresenceDateBounds(start: start, endExclusive: end);
+      default:
+        return const _PresenceDateBounds();
+    }
+  }
+
+  GateEventPageResult _fallbackEventPage(
+    List<GateEvent> source,
+    List<TenantDirectoryEntry> tenants,
+  ) {
+    final tenantIds = _matchingTenantIds(tenants);
+    final bounds = _dateBounds();
+    final filtered = source.where((event) {
+      if (tenantIds != null &&
+          (event.tenantId == null || !tenantIds.contains(event.tenantId))) {
+        return false;
+      }
+
+      switch (_eventFilter) {
+        case 'entry':
+          if (event.direction != 'IN') return false;
+          break;
+        case 'exit':
+          if (event.direction != 'OUT') return false;
+          break;
+        case 'unavailable':
+          if (!event.isUnavailable) return false;
+          break;
+      }
+
+      if (bounds.start != null && event.time.isBefore(bounds.start!)) {
+        return false;
+      }
+      if (bounds.endExclusive != null &&
+          !event.time.isBefore(bounds.endExclusive!)) {
+        return false;
+      }
+      return true;
+    }).toList()
+      ..sort(
+        (a, b) => _ascending
+            ? a.time.compareTo(b.time)
+            : b.time.compareTo(a.time),
+      );
+
+    final total = filtered.length;
+    final from = (_eventPageNumber - 1) * _pageSize;
+    if (from >= total) {
+      return GateEventPageResult(events: const [], totalCount: total);
+    }
+    final to = (from + _pageSize) > total ? total : from + _pageSize;
+    return GateEventPageResult(
+      events: filtered.sublist(from, to),
+      totalCount: total,
+    );
+  }
+
+  Future<void> _loadEventPage({bool showLoading = true}) async {
+    final requestVersion = ++_requestVersion;
+    final controller = OwnerController.instance;
+    final tenantIds = _matchingTenantIds(controller.tenants);
+    final bounds = _dateBounds();
+
+    if (showLoading && mounted) {
+      setState(() {
+        _eventPageLoading = true;
+        _eventPageError = null;
+      });
+    }
+
+    try {
+      GateEventPageResult result;
+      if (!SupabaseConfig.isInitialized) {
+        result = _fallbackEventPage(controller.gateEvents, controller.tenants);
+      } else {
+        result = await _gateService.loadGateEventsPage(
+          page: _eventPageNumber,
+          pageSize: _pageSize,
+          tenantIds: tenantIds,
+          eventFilter: _eventFilter,
+          startInclusive: bounds.start,
+          endExclusive: bounds.endExclusive,
+          ascending: _ascending,
+        );
+      }
+
+      if (!mounted || requestVersion != _requestVersion) return;
+
+      final totalPages = result.totalCount == 0
+          ? 0
+          : (result.totalCount + _pageSize - 1) ~/ _pageSize;
+      if (totalPages > 0 && _eventPageNumber > totalPages) {
+        setState(() => _eventPageNumber = totalPages);
+        await _loadEventPage(showLoading: false);
+        return;
+      }
+
+      setState(() {
+        _eventPage = result.events;
+        _eventTotalCount = result.totalCount;
+        _eventPageError = null;
+      });
+    } catch (_) {
+      if (!mounted || requestVersion != _requestVersion) return;
+      final fallback =
+          _fallbackEventPage(controller.gateEvents, controller.tenants);
+      setState(() {
+        _eventPage = fallback.events;
+        _eventTotalCount = fallback.totalCount;
+        _eventPageError =
+            'Could not refresh the full presence history. Showing the latest cached records.';
+      });
+    } finally {
+      if (mounted && requestVersion == _requestVersion) {
+        setState(() => _eventPageLoading = false);
+      }
+    }
+  }
+
+  void _scheduleSearch(String _) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      setState(() {
+        _eventPageNumber = 1;
+        _newPresenceDataAvailable = false;
+      });
+      unawaited(_loadEventPage());
+    });
+  }
+
+  void _applyImmediateFilter(VoidCallback change) {
+    setState(() {
+      change();
+      _eventPageNumber = 1;
+      _newPresenceDataAvailable = false;
+    });
+    unawaited(_loadEventPage());
+  }
+
+  Future<void> _changeDateFilter(String value) async {
+    if (value != 'custom') {
+      _applyImmediateFilter(() => _dateFilter = value);
+      return;
+    }
+
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 3),
+      lastDate: DateTime(now.year + 1, 12, 31),
+      initialDateRange: _customDateRange ??
+          DateTimeRange(
+            start: now.subtract(const Duration(days: 6)),
+            end: now,
+          ),
+      helpText: 'Filter presence events by date',
+    );
+    if (picked == null || !mounted) return;
+    _applyImmediateFilter(() {
+      _dateFilter = 'custom';
+      _customDateRange = picked;
+    });
+  }
+
+  void _clearEventFilters() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    _applyImmediateFilter(() {
+      _eventFilter = 'all';
+      _roomFilter = 'all';
+      _bedFilter = 'all';
+      _dateFilter = 'all';
+      _customDateRange = null;
+      _ascending = false;
+    });
+  }
+
+  List<String> _availableRooms(List<TenantDirectoryEntry> tenants) {
+    final values = tenants
+        .map((tenant) => tenant.room.trim())
+        .where((room) => room.isNotEmpty && room.toLowerCase() != 'unassigned')
+        .toSet()
+        .toList();
+    values.sort((a, b) {
+      final aNumber = int.tryParse(a);
+      final bNumber = int.tryParse(b);
+      if (aNumber != null && bNumber != null) return aNumber.compareTo(bNumber);
+      return a.compareTo(b);
+    });
+    return values;
+  }
+
+  List<String> _availableBeds(List<TenantDirectoryEntry> tenants) {
+    final values = tenants
+        .where((tenant) => _roomFilter == 'all' || tenant.room == _roomFilter)
+        .map((tenant) => tenant.bedSpace.trim())
+        .where((bed) =>
+            bed.isNotEmpty &&
+            bed.toLowerCase() != 'no bed' &&
+            bed.toLowerCase() != 'unassigned')
+        .toSet()
+        .toList()
+      ..sort();
+    return values;
+  }
+
+  bool get _hasActiveEventFilters =>
+      _searchController.text.trim().isNotEmpty ||
+      _eventFilter != 'all' ||
+      _roomFilter != 'all' ||
+      _bedFilter != 'all' ||
+      _dateFilter != 'all' ||
+      _ascending;
+
+  String _dateFilterLabel(BuildContext context) {
+    switch (_dateFilter) {
+      case 'today':
+        return 'Today';
+      case 'yesterday':
+        return 'Yesterday';
+      case 'last7':
+        return 'Last 7 days';
+      case 'month':
+        return 'This month';
+      case 'custom':
+        final range = _customDateRange;
+        if (range == null) return 'Custom range';
+        final localizations = MaterialLocalizations.of(context);
+        return '${localizations.formatShortDate(range.start)} – ${localizations.formatShortDate(range.end)}';
+      default:
+        return 'All dates';
+    }
+  }
+
+  TenantDirectoryEntry? _tenantForEvent(
+    GateEvent event,
+    List<TenantDirectoryEntry> tenants,
+  ) {
+    final id = event.tenantId;
+    if (id == null) return null;
+    for (final tenant in tenants) {
+      if (tenant.id == id) return tenant;
+    }
+    return null;
+  }
+
+  String _eventTitle(GateEvent event) {
+    if (event.isUnavailable) return 'Location Temporarily Unavailable';
+    if (event.direction == 'IN') return 'Entered Dormitory Area';
+    if (event.direction == 'OUT') return 'Left Dormitory Area';
+    return 'Presence Update';
+  }
+
+  String _eventSource(GateEvent event) {
+    switch (event.verificationMethod.toLowerCase()) {
+      case 'gps geofence':
+        return 'Smartphone geofencing';
+      case 'staff manual log':
+        return 'Staff manual log';
+      default:
+        return event.verificationMethod;
+    }
+  }
+
+  String _eventMessage(GateEvent event) {
+    final source = _eventSource(event).toLowerCase();
+    if (event.isUnavailable) {
+      return 'Location status unavailable through $source.';
+    }
+    if (event.direction == 'IN') {
+      return 'Entry recorded through $source.';
+    }
+    if (event.direction == 'OUT') {
+      return 'Exit recorded through $source.';
+    }
+    return 'Presence update recorded through $source.';
+  }
+
+  String _eventStatusLabel(GateEvent event) {
+    if (event.isUnavailable) return 'Unavailable';
+    if (event.isFlagged) return 'Needs review';
+    if (event.isVerified) return 'Recorded';
+    final raw = event.status.trim();
+    if (raw.isEmpty) return 'Recorded';
+    return raw
+        .split(RegExp(r'[_\s]+'))
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
+  String _currentAssignmentLabel(TenantDirectoryEntry? tenant) {
+    if (tenant == null) return 'Assignment unavailable';
+    return 'Room ${tenant.room} • ${tenant.bedSpace}';
+  }
+
+  Future<void> _showEventDetails(
+    GateEvent event,
+    TenantDirectoryEntry? tenant,
+  ) async {
+    final localizations = MaterialLocalizations.of(context);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(event.person),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _eventTitle(event),
+                  style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 14),
+                _PresenceDetailRow(
+                  label: 'Date',
+                  value: localizations.formatMediumDate(event.time),
+                ),
+                _PresenceDetailRow(
+                  label: 'Time',
+                  value: timeText(event.time),
+                ),
+                _PresenceDetailRow(
+                  label: 'Room / Bed',
+                  value: _currentAssignmentLabel(tenant),
+                ),
+                _PresenceDetailRow(
+                  label: 'Source',
+                  value: _eventSource(event),
+                ),
+                _PresenceDetailRow(
+                  label: 'Status',
+                  value: _eventStatusLabel(event),
+                ),
+                if (event.notes?.trim().isNotEmpty == true)
+                  _PresenceDetailRow(
+                    label: 'Notes',
+                    value: event.notes!.trim(),
+                  ),
+                const SizedBox(height: 12),
+                Text(
+                  'Room and bed are shown from the resident’s current assignment because gate events do not store an assignment snapshot.',
+                  style: Theme.of(dialogContext).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEventControls(
+    BuildContext context,
+    List<TenantDirectoryEntry> tenants,
+  ) {
+    final rooms = _availableRooms(tenants);
+    final beds = _availableBeds(tenants);
+
+    return CarmelitaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            key: const Key('presence-search-field'),
+            controller: _searchController,
+            onChanged: _scheduleSearch,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              labelText: 'Search presence history',
+              hintText: 'Tenant name, room number, or bed',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: _searchController.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        _searchController.clear();
+                        _applyImmediateFilter(() {});
+                      },
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _PresenceFilterDropdown(
+                key: const Key('presence-room-filter'),
+                width: 178,
+                label: 'Room',
+                value: rooms.contains(_roomFilter) ? _roomFilter : 'all',
+                items: <String, String>{
+                  'all': 'All rooms',
+                  for (final room in rooms) room: 'Room $room',
+                },
+                onChanged: (value) {
+                  if (value == null) return;
+                  _applyImmediateFilter(() {
+                    _roomFilter = value;
+                    if (_bedFilter != 'all' &&
+                        !_availableBeds(tenants).contains(_bedFilter)) {
+                      _bedFilter = 'all';
+                    }
+                  });
+                },
+              ),
+              _PresenceFilterDropdown(
+                key: const Key('presence-bed-filter'),
+                width: 178,
+                label: 'Bed',
+                value: beds.contains(_bedFilter) ? _bedFilter : 'all',
+                items: <String, String>{
+                  'all': 'All beds',
+                  for (final bed in beds) bed: bed,
+                },
+                onChanged: (value) {
+                  if (value == null) return;
+                  _applyImmediateFilter(() => _bedFilter = value);
+                },
+              ),
+              _PresenceFilterDropdown(
+                key: const Key('presence-event-filter'),
+                width: 190,
+                label: 'Event',
+                value: _eventFilter,
+                items: const {
+                  'all': 'All events',
+                  'entry': 'Entry',
+                  'exit': 'Exit',
+                  'unavailable': 'Location unavailable',
+                },
+                onChanged: (value) {
+                  if (value == null) return;
+                  _applyImmediateFilter(() => _eventFilter = value);
+                },
+              ),
+              _PresenceFilterDropdown(
+                key: const Key('presence-date-filter'),
+                width: 190,
+                label: 'Date',
+                value: _dateFilter,
+                items: const {
+                  'all': 'All dates',
+                  'today': 'Today',
+                  'yesterday': 'Yesterday',
+                  'last7': 'Last 7 days',
+                  'month': 'This month',
+                  'custom': 'Custom range…',
+                },
+                onChanged: (value) {
+                  if (value != null) unawaited(_changeDateFilter(value));
+                },
+              ),
+              _PresenceFilterDropdown(
+                key: const Key('presence-sort-filter'),
+                width: 190,
+                label: 'Sort',
+                value: _ascending ? 'oldest' : 'newest',
+                items: const {
+                  'newest': 'Newest first',
+                  'oldest': 'Oldest first',
+                },
+                onChanged: (value) {
+                  if (value == null) return;
+                  _applyImmediateFilter(() => _ascending = value == 'oldest');
+                },
+              ),
+            ],
+          ),
+          if (_hasActiveEventFilters) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (_searchController.text.trim().isNotEmpty)
+                  Chip(label: Text('Search: ${_searchController.text.trim()}')),
+                if (_roomFilter != 'all')
+                  Chip(label: Text('Room $_roomFilter')),
+                if (_bedFilter != 'all') Chip(label: Text(_bedFilter)),
+                if (_eventFilter != 'all')
+                  Chip(
+                    label: Text(
+                      _eventFilter == 'entry'
+                          ? 'Entry'
+                          : _eventFilter == 'exit'
+                              ? 'Exit'
+                              : 'Location unavailable',
+                    ),
+                  ),
+                if (_dateFilter != 'all')
+                  Chip(label: Text(_dateFilterLabel(context))),
+                if (_ascending) const Chip(label: Text('Oldest first')),
+                TextButton.icon(
+                  key: const Key('presence-clear-filters'),
+                  onPressed: _clearEventFilters,
+                  icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
+                  label: const Text('Clear all filters'),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNewDataBanner() {
+    if (!_newPresenceDataAvailable) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('presence-new-data-banner'),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer.withValues(alpha: .55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.primary.withValues(alpha: .18)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.fiber_new_rounded, color: scheme.primary),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text('New presence data is available.'),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _eventPageNumber = 1;
+                _newPresenceDataAvailable = false;
+              });
+              unawaited(_loadEventPage());
+            },
+            child: const Text('Show latest'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEventHistory(
+    BuildContext context,
+    List<TenantDirectoryEntry> tenants,
+  ) {
+    final start = _eventTotalCount == 0
+        ? 0
+        : ((_eventPageNumber - 1) * _pageSize) + 1;
+    final rawEnd = _eventPageNumber * _pageSize;
+    final end = rawEnd > _eventTotalCount ? _eventTotalCount : rawEnd;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildNewDataBanner(),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _eventTotalCount == 0
+                    ? 'No matching events'
+                    : 'Showing $start–$end of $_eventTotalCount events',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            if (_eventPageLoading)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+          ],
+        ),
+        if (_eventPageError != null) ...[
+          const SizedBox(height: 8),
+          Material(
+            color: Theme.of(context).colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.cloud_off_outlined,
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(_eventPageError!)),
+                  TextButton(
+                    onPressed: _eventPageLoading
+                        ? null
+                        : () => unawaited(_loadEventPage()),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 10),
+        if (_eventPageLoading && _eventPage.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_eventPage.isEmpty)
+          EmptyState(
+            icon: Icons.manage_search_rounded,
+            title: 'No presence events found',
+            message: _hasActiveEventFilters
+                ? 'No records match the selected search and filters. Clear or widen the filters to see more history.'
+                : 'Discrete entry, exit, and location-unavailable records will appear here.',
+          )
+        else
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (kIsWeb && constraints.maxWidth >= 860) {
+                return _buildDesktopEventTable(context, tenants);
+              }
+              return _buildMobileEventCards(context, tenants);
+            },
+          ),
+        const SizedBox(height: 12),
+        _buildPagination(),
+      ],
+    );
+  }
+
+  Widget _buildDesktopEventTable(
+    BuildContext context,
+    List<TenantDirectoryEntry> tenants,
+  ) {
+    final theme = Theme.of(context);
+    final headerStyle = theme.textTheme.labelMedium?.copyWith(
+      fontWeight: FontWeight.w800,
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+
+    Widget header(String text, int flex) => Expanded(
+          flex: flex,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(text, style: headerStyle),
+          ),
+        );
+
+    return CarmelitaCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            color: theme.colorScheme.surfaceContainerLow,
+            child: Row(
+              children: [
+                header('Tenant', 24),
+                header('Event', 24),
+                header('Current room / bed', 18),
+                header('Date', 16),
+                header('Time', 12),
+                header('Status', 14),
+                const SizedBox(width: 32),
+              ],
+            ),
+          ),
+          for (var index = 0; index < _eventPage.length; index++)
+            _buildDesktopEventRow(
+              context,
+              _eventPage[index],
+              _tenantForEvent(_eventPage[index], tenants),
+              showDivider: index != _eventPage.length - 1,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopEventRow(
+    BuildContext context,
+    GateEvent event,
+    TenantDirectoryEntry? tenant, {
+    required bool showDivider,
+  }) {
+    final localizations = MaterialLocalizations.of(context);
+    final theme = Theme.of(context);
+
+    Widget cell(Widget child, int flex) => Expanded(
+          flex: flex,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: child,
+          ),
+        );
+
+    final row = InkWell(
+      key: Key('presence-event-${event.id}'),
+      onTap: () => _showEventDetails(event, tenant),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: Row(
+          children: [
+            cell(
+              Text(
+                event.person,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              24,
+            ),
+            cell(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _eventTitle(event),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _eventMessage(event),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+              24,
+            ),
+            cell(
+              Text(
+                _currentAssignmentLabel(tenant),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              18,
+            ),
+            cell(Text(localizations.formatMediumDate(event.time)), 16),
+            cell(Text(timeText(event.time)), 12),
+            cell(_PresenceStatusBadge(label: _eventStatusLabel(event)), 14),
+            const SizedBox(
+              width: 32,
+              child: Icon(Icons.chevron_right_rounded, size: 20),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!showDivider) return row;
+    return Column(
+      children: [
+        row,
+        const Divider(height: 1),
+      ],
+    );
+  }
+
+  Widget _buildMobileEventCards(
+    BuildContext context,
+    List<TenantDirectoryEntry> tenants,
+  ) {
+    final localizations = MaterialLocalizations.of(context);
+    return Column(
+      children: _eventPage.map((event) {
+        final tenant = _tenantForEvent(event, tenants);
+        final color = event.direction == 'IN'
+            ? const Color(0xFF56886B)
+            : (event.direction == 'OUT'
+                ? const Color(0xFF627FA8)
+                : const Color(0xFFC77800));
+        final icon = event.direction == 'IN'
+            ? Icons.login_rounded
+            : (event.direction == 'OUT'
+                ? Icons.logout_rounded
+                : Icons.location_off_rounded);
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: CarmelitaCard(
+            key: Key('presence-event-${event.id}'),
+            onTap: () => _showEventDetails(event, tenant),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: color.withValues(alpha: .10),
+                      foregroundColor: color,
+                      child: Icon(icon, size: 19),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            event.person,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _eventTitle(event),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _PresenceStatusBadge(label: _eventStatusLabel(event)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  children: [
+                    _PresenceMeta(
+                      icon: Icons.meeting_room_outlined,
+                      text: _currentAssignmentLabel(tenant),
+                    ),
+                    _PresenceMeta(
+                      icon: Icons.calendar_today_outlined,
+                      text: localizations.formatMediumDate(event.time),
+                    ),
+                    _PresenceMeta(
+                      icon: Icons.schedule_rounded,
+                      text: timeText(event.time),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  _eventMessage(event),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildPagination() {
+    if (_eventTotalCount <= _pageSize) return const SizedBox.shrink();
+    final totalPages = (_eventTotalCount + _pageSize - 1) ~/ _pageSize;
+    final pageItems = _paginationItems(totalPages);
+
+    return Column(
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final previous = OutlinedButton.icon(
+              onPressed: _eventPageNumber <= 1 || _eventPageLoading
+                  ? null
+                  : () => _goToPage(_eventPageNumber - 1),
+              icon: const Icon(Icons.chevron_left_rounded, size: 18),
+              label: const Text('Previous'),
+            );
+            final next = OutlinedButton.icon(
+              onPressed: _eventPageNumber >= totalPages || _eventPageLoading
+                  ? null
+                  : () => _goToPage(_eventPageNumber + 1),
+              icon: const Icon(Icons.chevron_right_rounded, size: 18),
+              label: const Text('Next'),
+            );
+            final pageLabel = Text(
+              'Page $_eventPageNumber of $totalPages',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            );
+
+            if (constraints.maxWidth < 430) {
+              return Column(
+                children: [
+                  pageLabel,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: previous),
+                      const SizedBox(width: 8),
+                      Expanded(child: next),
+                    ],
+                  ),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                previous,
+                Expanded(child: pageLabel),
+                next,
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: pageItems.map((item) {
+              if (item == null) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6),
+                  child: Text('…'),
+                );
+              }
+              final selected = item == _eventPageNumber;
+              return Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: selected
+                    ? FilledButton(
+                        key: Key('presence-page-$item'),
+                        onPressed: null,
+                        child: Text('$item'),
+                      )
+                    : OutlinedButton(
+                        key: Key('presence-page-$item'),
+                        onPressed: _eventPageLoading ? null : () => _goToPage(item),
+                        child: Text('$item'),
+                      ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<int?> _paginationItems(int totalPages) {
+    if (totalPages <= 7) {
+      return List<int?>.generate(totalPages, (index) => index + 1);
+    }
+
+    final items = <int?>[1];
+    var start = _eventPageNumber - 1;
+    var end = _eventPageNumber + 1;
+    if (start < 2) {
+      start = 2;
+      end = 4;
+    }
+    if (end > totalPages - 1) {
+      end = totalPages - 1;
+      start = totalPages - 3;
+    }
+    if (start > 2) items.add(null);
+    for (var page = start; page <= end; page++) {
+      items.add(page);
+    }
+    if (end < totalPages - 1) items.add(null);
+    items.add(totalPages);
+    return items;
+  }
+
+  void _goToPage(int page) {
+    if (page == _eventPageNumber || page < 1) return;
+    setState(() {
+      _eventPageNumber = page;
+      _newPresenceDataAvailable = false;
+    });
+    unawaited(_loadEventPage());
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = OwnerController.instance;
@@ -5155,20 +6325,16 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
       actions: [
         IconButton(
           tooltip: 'Refresh presence & events',
-          icon: controller.gateLoading
+          icon: controller.gateLoading || _eventPageLoading
               ? const SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.refresh_rounded),
-          onPressed: controller.gateLoading
+          onPressed: controller.gateLoading || _eventPageLoading
               ? null
-              : () {
-                  controller.loadGateEvents(force: true);
-                  controller.loadTenants(force: true);
-                  _refreshBoundary();
-                },
+              : () => unawaited(_refreshEverything()),
         ),
         PopupMenuButton<String>(
           tooltip: 'Dormitory property & logging options',
@@ -5234,14 +6400,14 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
         animation: controller,
         builder: (context, _) {
           final allTenants = controller.tenants;
-          final filteredTenants = allTenants.where((t) {
+          final filteredTenants = allTenants.where((tenant) {
             switch (_presenceFilter) {
               case 'in':
-                return t.isInside;
+                return tenant.isInside;
               case 'out':
-                return t.isOutside;
+                return tenant.isOutside;
               case 'unavailable':
-                return t.isUnavailable;
+                return tenant.isUnavailable;
               default:
                 return true;
             }
@@ -5252,7 +6418,6 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
             children: [
               const TripwireFlowCard(),
               const SizedBox(height: 16),
-              // ── Owner-only Location Test Panel ───────────────────────
               if (isOwner && _showTestPanel) ...[
                 _LocationTestPanel(tenants: allTenants),
                 const SizedBox(height: 16),
@@ -5304,7 +6469,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                               ),
                               icon: const Icon(Icons.map_outlined, size: 18),
                               label: const Text(
-                                  'View Dormitory Property Map & Overlay'),
+                                'View Dormitory Property Map & Overlay',
+                              ),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -5333,7 +6499,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                             ),
                             icon: const Icon(Icons.map_outlined, size: 18),
                             label: const Text(
-                                'View Dormitory Property Map & Overlay'),
+                              'View Dormitory Property Map & Overlay',
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -5379,8 +6546,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                     onTap: () => setState(() => _presenceFilter = 'out'),
                   ),
                   _FilterChip(
-                    label:
-                        'Unavailable (${controller.tenantsUnavailableCount})',
+                    label: 'Unavailable (${controller.tenantsUnavailableCount})',
                     selected: _presenceFilter == 'unavailable',
                     badgeColor: const Color(0xFFC77800),
                     onTap: () =>
@@ -5400,6 +6566,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                   (tenant) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: CarmelitaCard(
+                      key: Key('presence-resident-${tenant.id}'),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 10,
@@ -5466,50 +6633,16 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                     ),
                   ),
                 ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 24),
               const SectionTitle(
-                'Recent presence events',
+                'Presence event history',
                 subtitle:
-                    'Automated discrete transition logs (data-minimization compliant)',
+                    'Search, filter, and review discrete entry and exit records',
               ),
               const SizedBox(height: 10),
-              if (controller.gateEvents.isEmpty)
-                const EmptyState(
-                  icon: Icons.history_rounded,
-                  title: 'No recent presence events',
-                  message:
-                      'Discrete entry, exit, and manual logs will appear here.',
-                )
-              else
-                ...controller.gateEvents.map(
-                  (event) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: CarmelitaCard(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      child: TimelineTile(
-                        compact: true,
-                        icon: event.direction == 'IN'
-                            ? Icons.login_rounded
-                            : (event.direction == 'OUT'
-                                ? Icons.logout_rounded
-                                : Icons.location_off_rounded),
-                        color: event.direction == 'IN'
-                            ? const Color(0xFF56886B)
-                            : (event.direction == 'OUT'
-                                ? const Color(0xFF627FA8)
-                                : const Color(0xFFC77800)),
-                        title:
-                            '${event.person} • ${event.isUnavailable ? 'Presence unavailable' : (event.direction == 'IN' ? 'Entered dormitory property' : 'Exited dormitory property')}',
-                        subtitle:
-                            '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verificationMethod}${event.notes != null && event.notes!.isNotEmpty ? ' • "${event.notes}"' : ''}',
-                        trailing: StatusPill(event.status),
-                      ),
-                    ),
-                  ),
-                ),
+              _buildEventControls(context, allTenants),
+              const SizedBox(height: 12),
+              _buildEventHistory(context, allTenants),
             ],
           );
         },
@@ -5517,6 +6650,151 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     );
   }
 }
+
+class _PresenceDateBounds {
+  const _PresenceDateBounds({this.start, this.endExclusive});
+
+  final DateTime? start;
+  final DateTime? endExclusive;
+}
+
+class _PresenceFilterDropdown extends StatelessWidget {
+  const _PresenceFilterDropdown({
+    required this.width,
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    super.key,
+  });
+
+  final double width;
+  final String label;
+  final String value;
+  final Map<String, String> items;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          isDense: true,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: value,
+            isExpanded: true,
+            isDense: true,
+            items: items.entries
+                .map(
+                  (entry) => DropdownMenuItem<String>(
+                    value: entry.key,
+                    child: Text(
+                      entry.value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: onChanged,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PresenceStatusBadge extends StatelessWidget {
+  const _PresenceStatusBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final lower = label.toLowerCase();
+    final color = lower.contains('review')
+        ? const Color(0xFFC77800)
+        : lower.contains('unavailable')
+            ? scheme.outline
+            : const Color(0xFF56886B);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w800,
+          fontSize: 11.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _PresenceMeta extends StatelessWidget {
+  const _PresenceMeta({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        const SizedBox(width: 4),
+        Text(text, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+class _PresenceDetailRow extends StatelessWidget {
+  const _PresenceDetailRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+}
+
 
 class _StaffManualLogDialog extends StatefulWidget {
   const _StaffManualLogDialog({this.preselectedTenant});
@@ -8535,14 +9813,15 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
         await MessagingController.instance.loadConversations();
         return;
       }
-      final opened = await MessagingController.instance
-          .openConversationById(conversationId);
+      final opened =
+          await MessagingController.instance.openConversationById(conversationId);
       if (!mounted) return;
       setState(() {
         _deepLinkLoading = false;
         _deepLinkMissing = !opened;
-        _deepLinkedConversation =
-            opened ? MessagingController.instance.activeConversation : null;
+        _deepLinkedConversation = opened
+            ? MessagingController.instance.activeConversation
+            : null;
       });
     });
   }
