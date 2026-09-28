@@ -5120,7 +5120,6 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
   String _presenceFilter = 'all';
   String _eventFilter = 'all';
   String _roomFilter = 'all';
-  String _bedFilter = 'all';
   String _dateFilter = 'all';
   DateTimeRange? _customDateRange;
   bool _ascending = false;
@@ -5131,6 +5130,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
   int _eventPageNumber = 1;
   bool _eventPageLoading = false;
   String? _eventPageError;
+  bool _usingCachedEventHistory = false;
+  bool _cachedHistoryNoticeDismissed = false;
   bool _newPresenceDataAvailable = false;
 
   Timer? _searchDebounce;
@@ -5215,17 +5216,10 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
         _roomFilter = 'all';
         resetFilters = true;
       }
-      final beds = _availableBeds(controller.tenants);
-      if (_bedFilter != 'all' && !beds.contains(_bedFilter)) {
-        _bedFilter = 'all';
-        resetFilters = true;
-      }
       if (resetFilters && mounted) {
         setState(() => _eventPageNumber = 1);
       }
-      if (_searchController.text.trim().isNotEmpty ||
-          _roomFilter != 'all' ||
-          _bedFilter != 'all') {
+      if (_searchController.text.trim().isNotEmpty || _roomFilter != 'all') {
         unawaited(_loadEventPage(showLoading: false));
       }
     }
@@ -5267,14 +5261,11 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
 
   Set<String>? _matchingTenantIds(List<TenantDirectoryEntry> tenants) {
     final query = _searchController.text.trim().toLowerCase();
-    final hasTenantConstraint = query.isNotEmpty ||
-        _roomFilter != 'all' ||
-        _bedFilter != 'all';
+    final hasTenantConstraint = query.isNotEmpty || _roomFilter != 'all';
     if (!hasTenantConstraint) return null;
 
     return tenants.where((tenant) {
       if (_roomFilter != 'all' && tenant.room != _roomFilter) return false;
-      if (_bedFilter != 'all' && tenant.bedSpace != _bedFilter) return false;
       if (query.isEmpty) return true;
       return tenant.name.toLowerCase().contains(query) ||
           tenant.room.toLowerCase().contains(query) ||
@@ -5424,16 +5415,24 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
         _eventPage = result.events;
         _eventTotalCount = result.totalCount;
         _eventPageError = null;
+        _usingCachedEventHistory = false;
+        _cachedHistoryNoticeDismissed = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted || requestVersion != _requestVersion) return;
+      debugPrint('Presence history page load failed: $error');
       final fallback =
           _fallbackEventPage(controller.gateEvents, controller.tenants);
+      final hasCachedRows = fallback.events.isNotEmpty;
       setState(() {
         _eventPage = fallback.events;
         _eventTotalCount = fallback.totalCount;
-        _eventPageError =
-            'Could not refresh the full presence history. Showing the latest cached records.';
+        _usingCachedEventHistory = hasCachedRows;
+        _eventPageError = _cachedHistoryNoticeDismissed
+            ? null
+            : hasCachedRows
+                ? 'Live presence history is temporarily unavailable. Showing recent cached records.'
+                : 'Presence history could not be loaded right now.';
       });
     } finally {
       if (mounted && requestVersion == _requestVersion) {
@@ -5470,16 +5469,22 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     }
 
     final now = DateTime.now();
-    final picked = await showDateRangePicker(
+    final picked = await showDialog<DateTimeRange>(
       context: context,
-      firstDate: DateTime(now.year - 3),
-      lastDate: DateTime(now.year + 1, 12, 31),
-      initialDateRange: _customDateRange ??
-          DateTimeRange(
-            start: now.subtract(const Duration(days: 6)),
-            end: now,
-          ),
-      helpText: 'Filter presence events by date',
+      barrierDismissible: true,
+      builder: (dialogContext) => DateRangePickerDialog(
+        firstDate: DateTime(now.year - 3),
+        lastDate: DateTime(now.year + 1, 12, 31),
+        initialDateRange: _customDateRange ??
+            DateTimeRange(
+              start: now.subtract(const Duration(days: 6)),
+              end: now,
+            ),
+        initialEntryMode: DatePickerEntryMode.calendarOnly,
+        helpText: 'Select custom date range',
+        cancelText: 'Cancel',
+        saveText: 'Apply',
+      ),
     );
     if (picked == null || !mounted) return;
     _applyImmediateFilter(() {
@@ -5494,7 +5499,6 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     _applyImmediateFilter(() {
       _eventFilter = 'all';
       _roomFilter = 'all';
-      _bedFilter = 'all';
       _dateFilter = 'all';
       _customDateRange = null;
       _ascending = false;
@@ -5516,25 +5520,10 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     return values;
   }
 
-  List<String> _availableBeds(List<TenantDirectoryEntry> tenants) {
-    final values = tenants
-        .where((tenant) => _roomFilter == 'all' || tenant.room == _roomFilter)
-        .map((tenant) => tenant.bedSpace.trim())
-        .where((bed) =>
-            bed.isNotEmpty &&
-            bed.toLowerCase() != 'no bed' &&
-            bed.toLowerCase() != 'unassigned')
-        .toSet()
-        .toList()
-      ..sort();
-    return values;
-  }
-
   bool get _hasActiveEventFilters =>
       _searchController.text.trim().isNotEmpty ||
       _eventFilter != 'all' ||
       _roomFilter != 'all' ||
-      _bedFilter != 'all' ||
       _dateFilter != 'all' ||
       _ascending;
 
@@ -5568,6 +5557,18 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
       if (tenant.id == id) return tenant;
     }
     return null;
+  }
+
+  Color _eventColor(GateEvent event) {
+    if (event.direction == 'IN') return const Color(0xFF56886B);
+    if (event.direction == 'OUT') return const Color(0xFF627FA8);
+    return const Color(0xFFC77800);
+  }
+
+  IconData _eventIcon(GateEvent event) {
+    if (event.direction == 'IN') return Icons.login_rounded;
+    if (event.direction == 'OUT') return Icons.logout_rounded;
+    return Icons.location_off_rounded;
   }
 
   String _eventTitle(GateEvent event) {
@@ -5692,7 +5693,6 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     List<TenantDirectoryEntry> tenants,
   ) {
     final rooms = _availableRooms(tenants);
-    final beds = _availableBeds(tenants);
 
     return CarmelitaCard(
       child: Column(
@@ -5705,7 +5705,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
               labelText: 'Search presence history',
-              hintText: 'Tenant name, room number, or bed',
+              hintText: 'Tenant name, room number, or bed assignment',
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: _searchController.text.isEmpty
                   ? null
@@ -5721,14 +5721,54 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
               isDense: true,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primaryContainer
+                      .withValues(alpha: .55),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.tune_rounded,
+                  size: 19,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Filter presence history',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    Text(
+                      'Narrow records by room, event, date, or order.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
               _PresenceFilterDropdown(
                 key: const Key('presence-room-filter'),
-                width: 178,
+                width: 200,
+                icon: Icons.meeting_room_outlined,
                 label: 'Room',
                 value: rooms.contains(_roomFilter) ? _roomFilter : 'all',
                 items: <String, String>{
@@ -5737,32 +5777,13 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                 },
                 onChanged: (value) {
                   if (value == null) return;
-                  _applyImmediateFilter(() {
-                    _roomFilter = value;
-                    if (_bedFilter != 'all' &&
-                        !_availableBeds(tenants).contains(_bedFilter)) {
-                      _bedFilter = 'all';
-                    }
-                  });
-                },
-              ),
-              _PresenceFilterDropdown(
-                key: const Key('presence-bed-filter'),
-                width: 178,
-                label: 'Bed',
-                value: beds.contains(_bedFilter) ? _bedFilter : 'all',
-                items: <String, String>{
-                  'all': 'All beds',
-                  for (final bed in beds) bed: bed,
-                },
-                onChanged: (value) {
-                  if (value == null) return;
-                  _applyImmediateFilter(() => _bedFilter = value);
+                  _applyImmediateFilter(() => _roomFilter = value);
                 },
               ),
               _PresenceFilterDropdown(
                 key: const Key('presence-event-filter'),
-                width: 190,
+                width: 200,
+                icon: Icons.compare_arrows_rounded,
                 label: 'Event',
                 value: _eventFilter,
                 items: const {
@@ -5778,7 +5799,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
               ),
               _PresenceFilterDropdown(
                 key: const Key('presence-date-filter'),
-                width: 190,
+                width: 200,
+                icon: Icons.calendar_month_outlined,
                 label: 'Date',
                 value: _dateFilter,
                 items: const {
@@ -5795,7 +5817,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
               ),
               _PresenceFilterDropdown(
                 key: const Key('presence-sort-filter'),
-                width: 190,
+                width: 200,
+                icon: Icons.swap_vert_rounded,
                 label: 'Sort',
                 value: _ascending ? 'oldest' : 'newest',
                 items: const {
@@ -5820,7 +5843,6 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                   Chip(label: Text('Search: ${_searchController.text.trim()}')),
                 if (_roomFilter != 'all')
                   Chip(label: Text('Room $_roomFilter')),
-                if (_bedFilter != 'all') Chip(label: Text(_bedFilter)),
                 if (_eventFilter != 'all')
                   Chip(
                     label: Text(
@@ -5919,23 +5941,51 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
         if (_eventPageError != null) ...[
           const SizedBox(height: 8),
           Material(
-            color: Theme.of(context).colorScheme.errorContainer,
+            color: _usingCachedEventHistory
+                ? Theme.of(context).colorScheme.surfaceContainerHigh
+                : Theme.of(context).colorScheme.errorContainer,
             borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               child: Row(
                 children: [
                   Icon(
-                    Icons.cloud_off_outlined,
-                    color: Theme.of(context).colorScheme.onErrorContainer,
+                    _usingCachedEventHistory
+                        ? Icons.sync_problem_rounded
+                        : Icons.cloud_off_outlined,
+                    size: 19,
+                    color: _usingCachedEventHistory
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : Theme.of(context).colorScheme.onErrorContainer,
                   ),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(_eventPageError!)),
-                  TextButton(
+                  Expanded(
+                    child: Text(
+                      _eventPageError!,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                  TextButton.icon(
                     onPressed: _eventPageLoading
                         ? null
-                        : () => unawaited(_loadEventPage()),
-                    child: const Text('Retry'),
+                        : () {
+                            setState(
+                              () => _cachedHistoryNoticeDismissed = false,
+                            );
+                            unawaited(_loadEventPage());
+                          },
+                    icon: const Icon(Icons.refresh_rounded, size: 17),
+                    label: const Text('Try again'),
+                  ),
+                  IconButton(
+                    tooltip: 'Dismiss',
+                    onPressed: () {
+                      setState(() {
+                        _cachedHistoryNoticeDismissed = true;
+                        _eventPageError = null;
+                      });
+                    },
+                    icon: const Icon(Icons.close_rounded, size: 18),
                   ),
                 ],
               ),
@@ -6054,21 +6104,43 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
               24,
             ),
             cell(
-              Column(
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _eventTitle(event),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: _eventColor(event).withValues(alpha: .10),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      _eventIcon(event),
+                      size: 18,
+                      color: _eventColor(event),
+                    ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _eventMessage(event),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall,
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _eventTitle(event),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _eventMessage(event),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -6111,16 +6183,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     return Column(
       children: _eventPage.map((event) {
         final tenant = _tenantForEvent(event, tenants);
-        final color = event.direction == 'IN'
-            ? const Color(0xFF56886B)
-            : (event.direction == 'OUT'
-                ? const Color(0xFF627FA8)
-                : const Color(0xFFC77800));
-        final icon = event.direction == 'IN'
-            ? Icons.login_rounded
-            : (event.direction == 'OUT'
-                ? Icons.logout_rounded
-                : Icons.location_off_rounded);
+        final color = _eventColor(event);
+        final icon = _eventIcon(event);
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
@@ -6661,6 +6725,7 @@ class _PresenceDateBounds {
 class _PresenceFilterDropdown extends StatelessWidget {
   const _PresenceFilterDropdown({
     required this.width,
+    required this.icon,
     required this.label,
     required this.value,
     required this.items,
@@ -6669,6 +6734,7 @@ class _PresenceFilterDropdown extends StatelessWidget {
   });
 
   final double width;
+  final IconData icon;
   final String label;
   final String value;
   final Map<String, String> items;
@@ -6681,10 +6747,13 @@ class _PresenceFilterDropdown extends StatelessWidget {
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: label,
+          prefixIcon: Icon(icon, size: 18),
+          prefixIconConstraints:
+              const BoxConstraints(minWidth: 40, minHeight: 36),
           border: const OutlineInputBorder(),
           isDense: true,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
