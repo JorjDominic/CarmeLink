@@ -487,7 +487,15 @@ class TenantController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> cancelMaintenance(String id) => deleteMaintenance(id);
+  Future<void> cancelMaintenance(String id) async {
+    final updated = await _maintenanceService.cancelReport(id);
+    final index = _maintenance.indexWhere((report) => report.id == id);
+    if (index != -1) {
+      _maintenance[index] = updated;
+    }
+    _maintenanceError = null;
+    notifyListeners();
+  }
 
   Future<String?> maintenancePhotoUrl(
     String? photoPath,
@@ -720,9 +728,7 @@ class TenantController extends ChangeNotifier {
         final isEntry = newDirection == 'IN';
         PushNotificationService.instance.showLocalNotification(
           id: isEntry ? 1001 : 1002,
-          title: isEntry
-              ? '🏠 Entered dormitory property'
-              : '🚪 Exited dormitory property',
+          title: isEntry ? '🏠 Entered dormitory' : '🚪 Left dormitory',
           body: isEntry
               ? 'Your entry was detected. Welcome home!'
               : 'Your departure was detected. Stay safe!',

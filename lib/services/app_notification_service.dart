@@ -385,7 +385,7 @@ class AppNotificationService {
             : '🚪 Dorm Departure: $tenantName');
     final body = isFlagged
         ? '$tenantName was detected outside during curfew hours.'
-        : '$tenantName ${isEntry ? "entered" : "exited"} the dormitory property.';
+        : '$tenantName has ${isEntry ? "entered" : "left"} the dormitory premises.';
 
     // Dispatches to linked guardians for this tenant
     await sendNotification(
@@ -615,30 +615,47 @@ class AppNotificationService {
   // ==========================================
   // IN-APP NOTIFICATIONS QUERY & MANAGEMENT
   // ==========================================
-  Future<List<AppNotificationItem>> fetchMyNotifications(
-      {int limit = 40}) async {
+  Future<List<AppNotificationItem>> fetchMyNotificationsPage({
+    int limit = 15,
+    DateTime? before,
+  }) async {
     final client = _client;
     final user = client?.auth.currentUser;
-    if (client == null || user == null) return [];
+    if (client == null || user == null) return const [];
 
+    dynamic query = client
+        .from('app_notifications')
+        .select(
+          'id, recipient_id, notification_type, title, body, route_type, '
+          'route_id, data, created_at, read_at',
+        )
+        .eq('recipient_id', user.id);
+
+    if (before != null) {
+      query = query.lt('created_at', before.toUtc().toIso8601String());
+    }
+
+    final rows = await query
+        .order('created_at', ascending: false)
+        .limit(limit.clamp(1, 60).toInt());
+
+    return (rows as List)
+        .map((row) => AppNotificationItem.fromRow(row as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<List<AppNotificationItem>> fetchMyNotifications({
+    int limit = 40,
+  }) async {
     try {
-      final rows = await client
-          .from('app_notifications')
-          .select()
-          .eq('recipient_id', user.id)
-          .order('created_at', ascending: false)
-          .limit(limit);
-
-      return (rows as List)
-          .map((r) => AppNotificationItem.fromRow(r as Map<String, dynamic>))
-          .toList();
+      return await fetchMyNotificationsPage(limit: limit);
     } catch (e) {
       debugPrint('Error fetching notifications: $e');
-      return [];
+      return const [];
     }
   }
 
-  Stream<List<AppNotificationItem>> streamMyNotifications({int limit = 40}) {
+  Stream<List<AppNotificationItem>> streamMyNotifications({int limit = 30}) {
     final client = _client;
     final user = client?.auth.currentUser;
     if (client == null || user == null) return const Stream.empty();
@@ -650,38 +667,67 @@ class AppNotificationService {
         .order('created_at', ascending: false)
         .limit(limit)
         .map(
-            (rows) => rows.map((r) => AppNotificationItem.fromRow(r)).toList());
+          (rows) => rows
+              .map((row) => AppNotificationItem.fromRow(row))
+              .toList(growable: false),
+        );
   }
 
-  Future<void> markAsRead(String notificationId) async {
+  Future<bool> tryMarkAsRead(String notificationId) async {
     final client = _client;
-    if (client == null) return;
+    if (client == null) return false;
     try {
       await client.rpc('mark_notification_read', params: {
         'p_notification_id': notificationId,
       });
+      return true;
     } catch (e) {
-      // Fallback direct update
-      try {
-        await client.from('app_notifications').update({
-          'read_at': DateTime.now().toUtc().toIso8601String(),
-        }).eq('id', notificationId);
-      } catch (_) {}
+      debugPrint('Error marking notification read: $e');
+      return false;
+    }
+  }
+
+  Future<void> markAsRead(String notificationId) async {
+    await tryMarkAsRead(notificationId);
+  }
+
+  Future<bool> tryMarkAllAsRead() async {
+    final client = _client;
+    if (client == null) return false;
+    try {
+      await client.rpc('mark_all_notifications_read');
+      return true;
+    } catch (e) {
+      debugPrint('Error marking all notifications read: $e');
+      return false;
     }
   }
 
   Future<void> markAllAsRead() async {
+    await tryMarkAllAsRead();
+  }
+
+  Future<int?> fetchMyUnreadCount() async {
     final client = _client;
-    final user = client?.auth.currentUser;
-    if (client == null || user == null) return;
+    if (client == null) return null;
     try {
-      await client
-          .from('app_notifications')
-          .update({'read_at': DateTime.now().toUtc().toIso8601String()})
-          .eq('recipient_id', user.id)
-          .isFilter('read_at', null);
+      final result = await client.rpc('my_unread_notification_count');
+      if (result is int) return result;
+      return int.tryParse(result?.toString() ?? '');
     } catch (e) {
-      debugPrint('Error marking all notifications as read: $e');
+      debugPrint('Error loading unread notification count: $e');
+      return null;
+    }
+  }
+
+  Future<void> cleanupExpiredNotifications() async {
+    final client = _client;
+    if (client == null) return;
+    try {
+      await client.rpc('cleanup_my_expired_notifications');
+    } catch (e) {
+      // Retention cleanup is best-effort and must never block app startup.
+      debugPrint('Notification retention cleanup skipped: $e');
     }
   }
 }
