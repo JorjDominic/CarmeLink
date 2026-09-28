@@ -135,15 +135,15 @@ void main() {
       await tester.tap(find.text('Inside (1)'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Anna Dela Cruz'), findsWidgets);
-      expect(find.text('Maria Clara'), findsNothing);
+      expect(find.byKey(const Key('presence-resident-tenant-1')), findsOneWidget);
+      expect(find.byKey(const Key('presence-resident-tenant-3')), findsNothing);
 
       // Tap 'Outside (1)' filter chip
       await tester.tap(find.text('Outside (1)'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Mark Santos'), findsWidgets);
-      expect(find.text('Anna Dela Cruz'), findsNothing);
+      expect(find.byKey(const Key('presence-resident-tenant-2')), findsOneWidget);
+      expect(find.byKey(const Key('presence-resident-tenant-1')), findsNothing);
     });
 
     testWidgets(
