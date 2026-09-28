@@ -148,9 +148,9 @@ class GateService {
     final from = (safePage - 1) * safePageSize;
     final to = from + safePageSize - 1;
     final response = await query
-        .count(CountOption.exact)
         .order('checked_at', ascending: ascending)
-        .range(from, to);
+        .range(from, to)
+        .count(CountOption.exact);
 
     final rows = response.data as List<dynamic>? ?? const <dynamic>[];
     final events = rows
