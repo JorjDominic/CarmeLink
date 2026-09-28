@@ -34,9 +34,9 @@ Implemented in source on September 28: guardian-only final approval for
 overnight leave, staff visibility/notifications without decision authority,
 durable guardian entry/exit/cutoff preferences, preference-aware guardian FCM,
 a scheduled outside-after-cutoff notification processor, and “dormitory
-property / entered / exited” user-facing terminology. Remote migration/function
-deployment, five-minute scheduler configuration, and physical-device FCM proof
-remain open.
+property / entered / exited” user-facing terminology. The preference migration
+was applied remotely on September 28; function deployment, five-minute scheduler
+configuration, and physical-device FCM proof remain open.
 
 - [ ] Normalize profile bed labels so “Bed” is displayed exactly once and add
   regression coverage for raw labels such as `1` and `Bed 1`.

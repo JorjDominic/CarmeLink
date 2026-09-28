@@ -46,6 +46,8 @@ begin
 end;
 $$;
 
+drop policy if exists contract_documents_storage_owner_signature_insert
+  on storage.objects;
 create policy contract_documents_storage_owner_signature_insert
 on storage.objects for insert to authenticated with check (
   bucket_id = 'contract-documents'
