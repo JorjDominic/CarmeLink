@@ -172,22 +172,23 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     if (_notificationStartInFlight) return;
     _notificationStartInFlight = true;
     try {
+      unawaited(AppNotificationService.instance.cleanupExpiredNotifications());
       // Seed first so existing unread history never appears as a burst of
       // "new" popups when the staff portal opens.
       final initial =
-          await AppNotificationService.instance.fetchMyNotifications(limit: 60);
+          await AppNotificationService.instance.fetchMyNotifications(limit: 30);
       if (!mounted) return;
       _onNotificationSnapshot(initial);
 
       _notificationSubscription = AppNotificationService.instance
-          .streamMyNotifications(limit: 60)
+          .streamMyNotifications(limit: 30)
           .listen(_onNotificationSnapshot);
 
       // app_notifications may not be enabled in the Realtime publication on
       // every deployed environment yet. Polling is a catch-up fallback only;
       // Realtime still delivers immediately wherever it is enabled.
       _notificationPollTimer = Timer.periodic(
-        const Duration(seconds: 5),
+        const Duration(seconds: 60),
         (_) => unawaited(_pollNotifications()),
       );
     } finally {
@@ -198,8 +199,23 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   Future<void> _pollNotifications() async {
     if (!mounted) return;
     final latest =
-        await AppNotificationService.instance.fetchMyNotifications(limit: 60);
+        await AppNotificationService.instance.fetchMyNotifications(limit: 30);
     if (mounted) _onNotificationSnapshot(latest);
+  }
+
+  Future<void> _refreshUnreadNotificationCount() async {
+    final count = await AppNotificationService.instance.fetchMyUnreadCount();
+    if (!mounted || count == null) return;
+    if (_unreadNotificationCount != count) {
+      setState(() => _unreadNotificationCount = count);
+    }
+  }
+
+  void _onNotificationPageChanged(
+    List<AppNotificationItem> notifications,
+  ) {
+    _seenNotificationIds.addAll(notifications.map((item) => item.id));
+    unawaited(_refreshUnreadNotificationCount());
   }
 
   Future<void> _restartNotificationStream() async {
@@ -232,13 +248,10 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       return;
     }
 
-    final unreadCount = notifications.where((item) => !item.isRead).length;
     if (!_notificationsSeeded) {
       _seenNotificationIds.addAll(notifications.map((item) => item.id));
       _notificationsSeeded = true;
-      if (_unreadNotificationCount != unreadCount) {
-        setState(() => _unreadNotificationCount = unreadCount);
-      }
+      unawaited(_refreshUnreadNotificationCount());
       return;
     }
 
@@ -248,9 +261,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     _seenNotificationIds.addAll(notifications.map((item) => item.id));
 
-    if (_unreadNotificationCount != unreadCount) {
-      setState(() => _unreadNotificationCount = unreadCount);
-    }
+    unawaited(_refreshUnreadNotificationCount());
     if (fresh.isEmpty) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -267,7 +278,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 
   NotificationsPage _notificationsPage() => NotificationsPage(
         onOpenNotification: _openNotificationDestination,
-        onNotificationsChanged: _onNotificationSnapshot,
+        onNotificationsChanged: _onNotificationPageChanged,
       );
 
   Future<void> _openNotificationDestination(AppNotificationItem item) async {

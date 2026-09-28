@@ -13,7 +13,6 @@ import '../theme/app_theme.dart';
 import '../../services/geofence_service.dart';
 import 'adaptive_shell.dart';
 
-
 Color mutedAccentForIcon(BuildContext context, IconData icon) {
   if (icon == Icons.payments_outlined ||
       icon == Icons.receipt_long_outlined ||
@@ -448,7 +447,8 @@ class ConversationThreadPanel extends StatefulWidget {
   final String hintText;
 
   @override
-  State<ConversationThreadPanel> createState() => _ConversationThreadPanelState();
+  State<ConversationThreadPanel> createState() =>
+      _ConversationThreadPanelState();
 }
 
 class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
@@ -530,8 +530,8 @@ class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
     final media = MediaQuery.of(context);
     final desktop = media.size.width >= 900;
     final keyboardInset = media.viewInsets.bottom;
-    final availableHeight = media.size.height - keyboardInset -
-        (desktop ? 220.0 : 176.0);
+    final availableHeight =
+        media.size.height - keyboardInset - (desktop ? 220.0 : 176.0);
     final panelHeight = availableHeight
         .clamp(
           desktop ? 430.0 : 340.0,
@@ -634,7 +634,8 @@ class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
                       child: FilledButton.tonalIcon(
                         key: const Key('conversation-new-messages-button'),
                         onPressed: _scrollToLatest,
-                        icon: const Icon(Icons.arrow_downward_rounded, size: 17),
+                        icon:
+                            const Icon(Icons.arrow_downward_rounded, size: 17),
                         label: const Text('New messages'),
                       ),
                     ),
@@ -1163,7 +1164,8 @@ class PageFrame extends StatelessWidget {
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     child: ResponsiveContent(
-                      maxWidth: maxWidth ?? (webPortal ? double.infinity : null),
+                      maxWidth:
+                          maxWidth ?? (webPortal ? double.infinity : null),
                       padding: EdgeInsets.fromLTRB(
                         AppBreakpoints.horizontalPadding(context),
                         6,
@@ -1301,7 +1303,10 @@ class CarmelitaCard extends StatelessWidget {
               ]
             : null,
       ),
-      child: child,
+      child: Material(
+        type: MaterialType.transparency,
+        child: child,
+      ),
     );
 
     if (onTap == null) return content;

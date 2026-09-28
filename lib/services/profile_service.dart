@@ -13,7 +13,13 @@ class ProfileService {
     if (rows.isEmpty) return 'No active room assignment';
     final bed = rows.first['bed_spaces'] as Map<String, dynamic>?;
     final room = bed?['rooms'] as Map<String, dynamic>?;
-    return 'Room ${room?['room_number'] ?? '—'} • Bed ${bed?['label'] ?? '—'}';
+    final rawBedLabel = (bed?['label'] as String?)?.trim();
+    final bedLabel = rawBedLabel == null || rawBedLabel.isEmpty
+        ? '—'
+        : rawBedLabel.toLowerCase().startsWith('bed ')
+            ? rawBedLabel
+            : 'Bed $rawBedLabel';
+    return 'Room ${room?['room_number'] ?? '—'} • $bedLabel';
   }
 
   Future<String> guardianLinkedTenant(String guardianId) async {

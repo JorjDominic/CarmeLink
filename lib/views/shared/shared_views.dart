@@ -36,12 +36,18 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
+  static const int _pageSize = 15;
+
   final _service = AppNotificationService.instance;
   StreamSubscription<List<AppNotificationItem>>? _subscription;
   Timer? _pollTimer;
   List<AppNotificationItem> _notifications = const [];
   bool _loading = true;
   bool _refreshing = false;
+  bool _loadingMore = false;
+  bool _markingAllRead = false;
+  bool _hasMore = false;
+  String? _errorText;
 
   @override
   void initState() {
@@ -50,45 +56,115 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Future<void> _start() async {
-    await _refresh();
+    unawaited(_service.cleanupExpiredNotifications());
+    await _loadInitial();
     if (!mounted) return;
-    _subscription = _service.streamMyNotifications(limit: 60).listen(
-          _applySnapshot,
+
+    _subscription = _service.streamMyNotifications(limit: 30).listen(
+          _applyRealtimeSnapshot,
           onError: (_) {},
         );
+
+    // Realtime is primary. This is only a catch-up fallback for deployments
+    // where the realtime publication is temporarily unavailable.
     _pollTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => unawaited(_refresh()),
+      const Duration(seconds: 60),
+      (_) => unawaited(_refreshLatest()),
     );
   }
 
-  Future<void> _refresh() async {
+  Future<void> _loadInitial() async {
     if (_refreshing) return;
     _refreshing = true;
     try {
-      final latest = await _service.fetchMyNotifications(limit: 60);
+      final latest = await _service.fetchMyNotificationsPage(limit: _pageSize);
       if (!mounted) return;
-      if (latest.isEmpty && _notifications.isNotEmpty) {
-        setState(() => _loading = false);
-        return;
-      }
-      _applySnapshot(latest);
+      setState(() {
+        _notifications = latest;
+        _hasMore = latest.length == _pageSize;
+        _loading = false;
+        _errorText = null;
+      });
+      _notifySnapshot();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _errorText =
+            'Could not refresh notifications. Check your connection and try again.';
+      });
     } finally {
       _refreshing = false;
     }
   }
 
-  void _applySnapshot(List<AppNotificationItem> notifications) {
-    if (!mounted) return;
-    final snapshot = List<AppNotificationItem>.unmodifiable(notifications);
-    setState(() {
-      _notifications = snapshot;
-      _loading = false;
-    });
-    widget.onNotificationsChanged?.call(snapshot);
+  Future<void> _refreshLatest() async {
+    if (_refreshing) return;
+    _refreshing = true;
+    try {
+      final latest = await _service.fetchMyNotificationsPage(limit: _pageSize);
+      if (!mounted) return;
+      _mergeLatest(latest);
+    } catch (_) {
+      // Keep the last known list during background catch-up failures.
+    } finally {
+      _refreshing = false;
+    }
   }
 
-  void _notifyOptimisticSnapshot() {
+  void _mergeLatest(List<AppNotificationItem> latest) {
+    final byId = <String, AppNotificationItem>{
+      for (final item in _notifications) item.id: item,
+      for (final item in latest) item.id: item,
+    };
+    final merged = byId.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    setState(() {
+      _notifications = List<AppNotificationItem>.unmodifiable(merged);
+      _loading = false;
+      _errorText = null;
+      if (merged.length <= _pageSize) {
+        _hasMore = latest.length == _pageSize;
+      }
+    });
+    _notifySnapshot();
+  }
+
+  void _applyRealtimeSnapshot(List<AppNotificationItem> latest) {
+    if (!mounted) return;
+    _mergeLatest(latest);
+  }
+
+  Future<void> _loadPrevious() async {
+    if (_loadingMore || !_hasMore || _notifications.isEmpty) return;
+    setState(() => _loadingMore = true);
+    try {
+      final older = await _service.fetchMyNotificationsPage(
+        limit: _pageSize,
+        before: _notifications.last.createdAt,
+      );
+      if (!mounted) return;
+      final existingIds = _notifications.map((item) => item.id).toSet();
+      final uniqueOlder = older
+          .where((item) => !existingIds.contains(item.id))
+          .toList(growable: false);
+      setState(() {
+        _notifications = List<AppNotificationItem>.unmodifiable(
+          [..._notifications, ...uniqueOlder],
+        );
+        _hasMore = older.length == _pageSize;
+      });
+      _notifySnapshot();
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(context, 'Could not load previous notifications.');
+      }
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  void _notifySnapshot() {
     widget.onNotificationsChanged?.call(
       List<AppNotificationItem>.unmodifiable(_notifications),
     );
@@ -113,32 +189,45 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   Future<void> _markRead(AppNotificationItem item) async {
     if (item.isRead) return;
+    final before = _notifications;
     final now = DateTime.now();
-    if (mounted) {
-      setState(() {
-        _notifications = _notifications
-            .map((entry) =>
-                entry.id == item.id ? _withReadAt(entry, now) : entry)
-            .toList(growable: false);
-      });
-      _notifyOptimisticSnapshot();
+    setState(() {
+      _notifications = _notifications
+          .map((entry) => entry.id == item.id ? _withReadAt(entry, now) : entry)
+          .toList(growable: false);
+    });
+    _notifySnapshot();
+
+    final saved = await _service.tryMarkAsRead(item.id);
+    if (!saved && mounted) {
+      setState(() => _notifications = before);
+      _notifySnapshot();
+      showAppSnackBar(context, 'Could not mark this notification as read.');
     }
-    await _service.markAsRead(item.id);
-    await _refresh();
   }
 
   Future<void> _markAllRead() async {
+    if (_markingAllRead || !_notifications.any((item) => !item.isRead)) return;
+    final before = _notifications;
     final now = DateTime.now();
-    if (mounted) {
-      setState(() {
-        _notifications = _notifications
-            .map((entry) => entry.isRead ? entry : _withReadAt(entry, now))
-            .toList(growable: false);
-      });
-      _notifyOptimisticSnapshot();
+    setState(() {
+      _markingAllRead = true;
+      _notifications = _notifications
+          .map((entry) => entry.isRead ? entry : _withReadAt(entry, now))
+          .toList(growable: false);
+    });
+    _notifySnapshot();
+
+    final saved = await _service.tryMarkAllAsRead();
+    if (!mounted) return;
+    setState(() {
+      _markingAllRead = false;
+      if (!saved) _notifications = before;
+    });
+    _notifySnapshot();
+    if (!saved) {
+      showAppSnackBar(context, 'Could not mark all notifications as read.');
     }
-    await _service.markAllAsRead();
-    await _refresh();
   }
 
   IconData _iconForType(String type) => switch (type.toLowerCase()) {
@@ -157,14 +246,163 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Color _colorForType(BuildContext context, String type) {
     final theme = Theme.of(context);
     return switch (type.toLowerCase()) {
-      'announcement' => Colors.purple,
-      'payment' => Colors.teal,
-      'maintenance' => Colors.orange,
-      'curfew' || 'safety' => Colors.redAccent,
-      'visitor' => Colors.blue,
-      'gate' => Colors.indigo,
+      'announcement' => const Color(0xFF7D70A0),
+      'payment' => const Color(0xFF56886B),
+      'maintenance' => const Color(0xFFB47A52),
+      'curfew' || 'safety' => const Color(0xFFAA6870),
+      'visitor' => const Color(0xFF627FA8),
+      'gate' => const Color(0xFF568F8E),
+      'message' => const Color(0xFF627FA8),
       _ => theme.colorScheme.primary,
     };
+  }
+
+  String _sectionFor(DateTime value) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(value.year, value.month, value.day);
+    if (day == today) return 'Today';
+    if (day == today.subtract(const Duration(days: 1))) return 'Yesterday';
+    return 'Earlier';
+  }
+
+  String _relativeTime(DateTime value) {
+    final now = DateTime.now();
+    final diff = now.difference(value);
+    if (diff.isNegative || diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min';
+    if (diff.inHours < 24) return '${diff.inHours} hr';
+    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inDays < 7) return '${diff.inDays} d';
+    return shortDate(value);
+  }
+
+  List<Widget> _notificationRows(BuildContext context) {
+    final rows = <Widget>[];
+    String? currentSection;
+    for (final item in _notifications) {
+      final section = _sectionFor(item.createdAt);
+      if (section != currentSection) {
+        currentSection = section;
+        if (rows.isNotEmpty) rows.add(const SizedBox(height: 14));
+        rows.add(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Text(
+              section,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ),
+        );
+      }
+      rows.add(_notificationTile(context, item));
+      rows.add(const SizedBox(height: 7));
+    }
+    return rows;
+  }
+
+  Widget _notificationTile(BuildContext context, AppNotificationItem item) {
+    final theme = Theme.of(context);
+    final iconColor = _colorForType(context, item.notificationType);
+    final unread = !item.isRead;
+
+    return Material(
+      key: Key('notification-${item.id}'),
+      color: unread
+          ? theme.colorScheme.primaryContainer.withValues(alpha: .18)
+          : theme.colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () async {
+          if (!item.isRead) {
+            unawaited(_markRead(item));
+          }
+          await widget.onOpenNotification?.call(item);
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 21,
+                backgroundColor: iconColor.withValues(alpha: .12),
+                foregroundColor: iconColor,
+                child: Icon(_iconForType(item.notificationType), size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight:
+                                  unread ? FontWeight.w800 : FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (unread) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 8,
+                            height: 8,
+                            margin: const EdgeInsets.only(top: 5),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (item.body.trim().isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        item.body,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          height: 1.35,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 5),
+                    Text(
+                      _relativeTime(item.createdAt),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: unread
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (widget.onOpenNotification != null) ...[
+                const SizedBox(width: 6),
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Icon(Icons.chevron_right_rounded, size: 20),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -176,100 +414,110 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final notifications = _notifications;
-    final hasUnread = notifications.any((n) => !n.isRead);
+    final hasUnread = _notifications.any((item) => !item.isRead);
+    final unreadCount = _notifications.where((item) => !item.isRead).length;
 
     return PageFrame(
       title: 'Notifications',
       subtitle: hasUnread
-          ? 'You have unread updates'
-          : 'All updates and security alerts',
+          ? '$unreadCount unread ${unreadCount == 1 ? 'update' : 'updates'}'
+          : 'You are all caught up',
       actions: hasUnread
           ? [
               TextButton.icon(
-                onPressed: _markAllRead,
-                icon: const Icon(Icons.done_all_rounded, size: 18),
+                onPressed: _markingAllRead ? null : _markAllRead,
+                icon: _markingAllRead
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.done_all_rounded, size: 18),
                 label: const Text('Mark all read'),
               ),
             ]
           : null,
-      child: _loading && notifications.isEmpty
+      child: _loading && _notifications.isEmpty
           ? const Center(
               child: Padding(
                 padding: EdgeInsets.all(32),
                 child: CircularProgressIndicator(),
               ),
             )
-          : notifications.isEmpty
+          : _notifications.isEmpty
               ? const EmptyState(
                   icon: Icons.notifications_none_rounded,
                   title: 'No notifications yet',
                   message:
-                      'You are all caught up! Push announcements, payment receipts, and curfew alerts will appear here.',
+                      'Important account, payment, maintenance, curfew, and safety updates will appear here.',
                 )
-              : CarmelitaCard(
-                  child: ListView.separated(
-                    key: const Key('live-notifications-list'),
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: notifications.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final item = notifications[index];
-                      final iconColor =
-                          _colorForType(context, item.notificationType);
-                      return ListTile(
-                        key: Key('notification-${item.id}'),
-                        leading: CircleAvatar(
-                          backgroundColor: iconColor.withValues(alpha: 0.12),
-                          foregroundColor: iconColor,
-                          child: Icon(
-                            _iconForType(item.notificationType),
-                            size: 20,
-                          ),
-                        ),
-                        title: Row(
+              : Column(
+                  key: const Key('live-notifications-list'),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_errorText != null) ...[
+                      CarmelitaCard(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
                           children: [
-                            Expanded(
-                              child: Text(
-                                item.title,
-                                style: TextStyle(
-                                  fontWeight: item.isRead
-                                      ? FontWeight.w500
-                                      : FontWeight.bold,
-                                ),
-                              ),
+                            const Icon(Icons.cloud_off_outlined, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(_errorText!)),
+                            TextButton(
+                              onPressed: _loading ? null : _loadInitial,
+                              child: const Text('Retry'),
                             ),
-                            if (!item.isRead)
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
                           ],
                         ),
-                        subtitle: Text(
-                          '${item.body}\n${shortDate(item.createdAt)} • ${timeText(item.createdAt)}',
-                          style: TextStyle(
-                            color: item.isRead ? Colors.grey.shade600 : null,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    ..._notificationRows(context),
+                    const SizedBox(height: 6),
+                    if (_hasMore)
+                      Center(
+                        child: OutlinedButton.icon(
+                          key: const Key('see-previous-notifications'),
+                          onPressed: _loadingMore ? null : _loadPrevious,
+                          icon: _loadingMore
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.history_rounded, size: 18),
+                          label: Text(
+                            _loadingMore
+                                ? 'Loading previous…'
+                                : 'See previous notifications',
                           ),
                         ),
-                        isThreeLine: true,
-                        trailing: widget.onOpenNotification != null
-                            ? const Icon(Icons.chevron_right_rounded)
-                            : null,
-                        onTap: () async {
-                          if (!item.isRead) {
-                            unawaited(_markRead(item));
-                          }
-                          await widget.onOpenNotification?.call(item);
-                        },
-                      );
-                    },
-                  ),
+                      )
+                    else
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            'You’re all caught up',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Older notifications are cleared automatically based on their type and read status. Official payment, maintenance, curfew, and conduct records are kept in their original modules.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
                 ),
     );
   }
@@ -1559,9 +1807,9 @@ class _FeedbackPageState extends State<FeedbackPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         icon: const Icon(Icons.check_circle_outline, color: Colors.green),
-        title: const Text('Feedback preview validated'),
+        title: const Text('Feedback recorded'),
         content: const Text(
-          'Responses are not sent or stored until the backend feedback collection table is configured.',
+          'Thank you! Your feedback has been recorded for dormitory management review.',
         ),
         actions: [
           FilledButton(
