@@ -33,6 +33,12 @@ void main() {
     final processor = File(
       'supabase/functions/process-guardian-presence-alerts/index.ts',
     ).readAsStringSync();
+    final schedulerFix = File(
+      'supabase/migrations/202609280004_fix_guardian_alert_scheduler.sql',
+    ).readAsStringSync();
+    final realtimeFix = File(
+      'supabase/migrations/202609280005_publish_app_notifications_realtime.sql',
+    ).readAsStringSync();
 
     expect(migration, contains('guardian_alert_preferences'));
     expect(migration, contains('update_my_guardian_alert_preferences'));
@@ -40,6 +46,18 @@ void main() {
     expect(notifier, contains('gate_exit_enabled'));
     expect(processor, contains('outside_after_cutoff_enabled'));
     expect(processor, contains('guardian_presence_alert'));
+    expect(processor, contains("crypto.subtle.digest('SHA-256'"));
+    expect(processor, contains(".from('guardian_alert_cron_credentials')"));
+    expect(processor, contains('const routeId = await stableUuid'));
+    expect(processor, contains('preference.updated_at'));
+    expect(processor, contains('preference_revision: preferenceRevision'));
+    expect(processor, isNot(contains('GUARDIAN_ALERT_CRON_SECRET')));
+    expect(schedulerFix, contains("schedule := '* * * * *'"));
+    expect(
+      realtimeFix,
+      contains(
+          'alter publication supabase_realtime add table public.app_notifications'),
+    );
   });
 
   test('emergency contact is enforced in UI and database activation gates', () {

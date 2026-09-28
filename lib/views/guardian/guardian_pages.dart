@@ -700,6 +700,111 @@ class _GuardianPresenceMonitoringPageState
     );
   }
 
+  void _showAlertPreferenceDialog(BuildContext context) {
+    var pickedTime = GuardianAlertService.preferredAlertTime;
+    var outsideEnabled = GuardianAlertService.outsideAfterCutoffEnabled;
+    var insideEnabled = GuardianAlertService.insideAfterCutoffEnabled;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Guardian Alert Preferences',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Configure automated peace-of-mind alerts for your linked resident.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.schedule, color: Color(0xFF627FA8)),
+                title: const Text('Preferred alert time'),
+                subtitle: Text(pickedTime.format(context)),
+                trailing: OutlinedButton(
+                  onPressed: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: pickedTime,
+                    );
+                    if (time != null) {
+                      setSheetState(() => pickedTime = time);
+                    }
+                  },
+                  child: const Text('Change'),
+                ),
+              ),
+              const Divider(),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Alert if outside past time'),
+                subtitle: const Text(
+                  'Notify me once per day if resident is outside after cutoff.',
+                ),
+                value: outsideEnabled,
+                onChanged: (val) => setSheetState(() => outsideEnabled = val),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Alert if inside past time'),
+                subtitle: const Text(
+                  'Notify me once per day if resident is inside after cutoff.',
+                ),
+                value: insideEnabled,
+                onChanged: (val) => setSheetState(() => insideEnabled = val),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () async {
+                    Navigator.of(sheetContext).pop();
+                    try {
+                      await GuardianAlertService.save(
+                        alertTime: pickedTime,
+                        outsideAfterCutoffEnabled: outsideEnabled,
+                        insideAfterCutoffEnabled: insideEnabled,
+                      );
+                      if (mounted) setState(() {});
+                    } catch (error) {
+                      if (mounted) {
+                        showAppSnackBar(
+                          context,
+                          'Could not save alert preference: $error',
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Save preferences'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = GuardianController.instance;
@@ -965,7 +1070,7 @@ class _GuardianPresenceMonitoringPageState
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Alert me if resident is outside past ${GuardianAlertService.preferredAlertTime.format(context)}',
+                              GuardianAlertService.alertSummary(context),
                               style: const TextStyle(
                                   fontSize: 12, color: Colors.black54),
                             ),
@@ -973,26 +1078,8 @@ class _GuardianPresenceMonitoringPageState
                         ),
                       ),
                       OutlinedButton(
-                        onPressed: () async {
-                          final picked = await showTimePicker(
-                            context: context,
-                            initialTime:
-                                GuardianAlertService.preferredAlertTime,
-                          );
-                          if (picked != null) {
-                            try {
-                              await GuardianAlertService.save(
-                                  alertTime: picked);
-                              if (mounted) setState(() {});
-                            } catch (error) {
-                              if (mounted) {
-                                showAppSnackBar(context,
-                                    'Could not save alert preference: $error');
-                              }
-                            }
-                          }
-                        },
-                        child: const Text('Set time'),
+                        onPressed: () => _showAlertPreferenceDialog(context),
+                        child: const Text('Configure'),
                       ),
                     ],
                   ),
