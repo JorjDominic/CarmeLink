@@ -25,6 +25,23 @@ void main() {
     expect(contract.endsOn, DateTime(2027, 8, 31));
   });
 
+  test('TenantContract never exposes a null or blank contract number', () {
+    final contract = TenantContract.fromRow({
+      'id': 'contract-with-missing-number',
+      'tenant_id': 'tenant-1',
+      'contract_number': null,
+      'starts_on': '2026-09-01',
+      'ends_on': '2027-08-31',
+      'monthly_rent': 4000,
+      'security_deposit': 4000,
+      'status': 'draft',
+      'created_at': '2026-09-19T00:00:00Z',
+      'updated_at': '2026-09-19T00:00:00Z',
+    });
+
+    expect(contract.contractNumber, 'Pending Generation');
+  });
+
   test('copyWith preserves identity and updates editable contract fields', () {
     final now = DateTime(2026, 9, 19);
     final original = TenantContract(
