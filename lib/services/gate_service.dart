@@ -10,6 +10,16 @@ import '../core/config/supabase_config.dart';
 import '../models/models.dart';
 import 'app_notification_service.dart';
 
+class GateEventPageResult {
+  const GateEventPageResult({
+    required this.events,
+    required this.totalCount,
+  });
+
+  final List<GateEvent> events;
+  final int totalCount;
+}
+
 /// Backend service interfacing with the public.gate_events table
 /// and secure SECURITY DEFINER RPCs.
 ///
@@ -77,6 +87,81 @@ class GateService {
       // Real data mode: return empty list on connection/table error
       return const [];
     }
+  }
+
+  /// Loads one filtered staff-facing page of append-only presence events.
+  ///
+  /// This is intentionally read-only. It does not participate in geofence
+  /// evaluation, tripwire detection, curfew classification, or event creation.
+  Future<GateEventPageResult> loadGateEventsPage({
+    int page = 1,
+    int pageSize = 20,
+    Set<String>? tenantIds,
+    String eventFilter = 'all',
+    DateTime? startInclusive,
+    DateTime? endExclusive,
+    bool ascending = false,
+  }) async {
+    final safePage = page < 1 ? 1 : page;
+    final safePageSize = pageSize.clamp(1, 100).toInt();
+
+    if (tenantIds != null && tenantIds.isEmpty) {
+      return const GateEventPageResult(events: [], totalCount: 0);
+    }
+
+    dynamic query = _client.from('gate_events').select(
+          'id, tenant_id, direction, verification_method, status, '
+          'checkpoint_type, checked_at, notes, created_by, '
+          'profiles!tenant_id(full_name), '
+          'creator:profiles!created_by(full_name)',
+        );
+
+    if (tenantIds != null) {
+      query = query.inFilter('tenant_id', tenantIds.toList(growable: false));
+    }
+
+    switch (eventFilter) {
+      case 'entry':
+        query = query.eq('direction', 'IN');
+        break;
+      case 'exit':
+        query = query.eq('direction', 'OUT');
+        break;
+      case 'unavailable':
+        query = query.eq('status', 'UNAVAILABLE');
+        break;
+    }
+
+    if (startInclusive != null) {
+      query = query.gte(
+        'checked_at',
+        startInclusive.toUtc().toIso8601String(),
+      );
+    }
+    if (endExclusive != null) {
+      query = query.lt(
+        'checked_at',
+        endExclusive.toUtc().toIso8601String(),
+      );
+    }
+
+    final from = (safePage - 1) * safePageSize;
+    final to = from + safePageSize - 1;
+    final response = await query
+        .order('checked_at', ascending: ascending)
+        .range(from, to)
+        .count(CountOption.exact);
+
+    final rows = response.data as List<dynamic>? ?? const <dynamic>[];
+    final events = rows
+        .map((row) => GateEvent.fromRow(row as Map<String, dynamic>))
+        .toList(growable: false);
+    final count = response.count;
+
+    return GateEventPageResult(
+      events: events,
+      totalCount: count is int ? count : events.length,
+    );
   }
 
   /// Records an on-device evaluated GPS Geofence check via the security definer RPC.
