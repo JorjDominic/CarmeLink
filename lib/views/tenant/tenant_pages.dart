@@ -217,6 +217,8 @@ class TenantDashboardPage extends StatelessWidget {
                 subtitle: 'Important items before everything else',
               ),
               const SizedBox(height: 10),
+              const _TenantLatestAnnouncementCard(),
+              const SizedBox(height: 10),
               if (nextDue != null)
                 AttentionCard(
                   icon: Icons.payments_outlined,
@@ -400,20 +402,6 @@ class TenantDashboardPage extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              SectionTitle(
-                'Latest announcement',
-                trailing: TextButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const TenantAnnouncementsPage(),
-                    ),
-                  ),
-                  child: const Text('View all'),
-                ),
-              ),
-              const SizedBox(height: 10),
-              const _TenantLatestAnnouncementCard(),
             ],
           );
         },
@@ -3272,6 +3260,7 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
   final controller = TenantController.instance;
   late final TableRefreshSubscription subscription;
   String _selectedFilter = 'Active';
+  final Set<String> _cancellingIds = <String>{};
 
   static const List<String> _filters = [
     'Active',
@@ -3334,16 +3323,20 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
 
     if (confirmed != true) return;
 
+    if (_cancellingIds.contains(report.id)) return;
+    setState(() => _cancellingIds.add(report.id));
     try {
-      await controller.deleteMaintenance(report.id);
+      await controller.cancelMaintenance(report.id);
       if (!mounted) return;
-      showAppSnackBar(context, 'Maintenance report cancelled.');
+      showAppSnackBar(context, 'Maintenance request cancelled.');
     } catch (error) {
       if (!mounted) return;
       showAppSnackBar(
         context,
         error.toString().replaceFirst('Exception: ', ''),
       );
+    } finally {
+      if (mounted) setState(() => _cancellingIds.remove(report.id));
     }
   }
 
@@ -4244,51 +4237,6 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
     });
   }
 
-  void _pickLocationFromFloorPlan() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Select room on floor plan',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Tap a room or area on the interactive map to set it as your maintenance location.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 14),
-              FloorPlanCanvas(
-                onLocationSelected: (pickedRoom) {
-                  setState(() {
-                    location = pickedRoom;
-                  });
-                  Navigator.pop(sheetContext);
-                  showAppSnackBar(
-                      context, 'Selected $pickedRoom from floor plan.');
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _save() async {
     final cleanDescription = description.text.trim();
     if (cleanDescription.length < 5) {
@@ -4447,41 +4395,29 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
                 maxLines: 4,
               ),
               const SizedBox(height: 14),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      key: ValueKey('location-$location'),
-                      initialValue: location,
-                      decoration: const InputDecoration(
-                        labelText: 'Room / area',
-                        prefixIcon: Icon(Icons.location_on_outlined, size: 20),
+              DropdownButtonFormField<String>(
+                key: ValueKey('location-$location'),
+                isExpanded: true,
+                initialValue: location,
+                decoration: const InputDecoration(
+                  labelText: 'Room / area',
+                  helperText: 'Choose the closest room or common area.',
+                ),
+                items: _availableLocations
+                    .map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text(
+                          value,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      items: _availableLocations
-                          .map(
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text(value),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: saving
-                          ? null
-                          : (value) =>
-                              setState(() => location = value ?? location),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: IconButton.outlined(
-                      tooltip: 'Pick on floor plan',
-                      onPressed: saving ? null : _pickLocationFromFloorPlan,
-                      icon: const Icon(Icons.map_outlined),
-                    ),
-                  ),
-                ],
+                    )
+                    .toList(),
+                onChanged: saving
+                    ? null
+                    : (value) => setState(() => location = value ?? location),
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
@@ -4600,7 +4536,9 @@ class _TenantLatestAnnouncementCardState
   void initState() {
     super.initState();
     final cached = AnnouncementService.cachedAnnouncements('tenants');
-    _latest = cached?.isNotEmpty == true ? cached!.first : null;
+    final cachedPinned = cached?.where((item) => item.isPinned).toList() ??
+        const <AnnouncementRecord>[];
+    _latest = cachedPinned.isNotEmpty ? cachedPinned.first : null;
     _loadLatest();
     _subscription = TableRefreshSubscription(
       'tenant-dashboard-announcements',
@@ -4623,7 +4561,8 @@ class _TenantLatestAnnouncementCardState
       );
       if (mounted) {
         setState(() {
-          _latest = items.isNotEmpty ? items.first : null;
+          final pinned = items.where((item) => item.isPinned).toList();
+          _latest = pinned.isNotEmpty ? pinned.first : null;
         });
       }
     } catch (_) {
@@ -4644,19 +4583,7 @@ class _TenantLatestAnnouncementCardState
   @override
   Widget build(BuildContext context) {
     final item = _latest;
-    if (item == null) {
-      return AttentionCard(
-        icon: Icons.campaign_outlined,
-        title: 'No announcements',
-        subtitle: 'No notices posted at this time.',
-        status: 'Clear',
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const TenantAnnouncementsPage(),
-          ),
-        ),
-      );
-    }
+    if (item == null) return const SizedBox.shrink();
 
     return AttentionCard(
       icon: _iconForCategory(item.category),
@@ -5675,8 +5602,8 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                                       final msg = switch (result.status) {
                                         'Verified' => result.errorMessage !=
                                                 null
-                                            ? 'Presence confirmed (${result.direction == "IN" ? "Inside dormitory property" : "Outside dormitory property"}), but server sync warning: ${result.errorMessage}'
-                                            : 'Presence confirmed: ${result.direction == "IN" ? "Inside dormitory property" : "Outside dormitory property"}',
+                                            ? 'Presence confirmed (${result.direction == "IN" ? "Inside perimeter" : "Outside perimeter"}), but server sync warning: ${result.errorMessage}'
+                                            : 'Presence confirmed: ${result.direction == "IN" ? "Inside perimeter" : "Outside perimeter"}',
                                         'Flagged' =>
                                           'Presence check recorded (Flagged: curfew hours active)',
                                         _ =>
@@ -6057,8 +5984,8 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                           title: e.isUnavailable
                               ? 'Location check unavailable'
                               : (e.direction == 'IN'
-                                  ? 'Entered dormitory property'
-                                  : 'Exited dormitory property'),
+                                  ? 'Entered dormitory perimeter'
+                                  : 'Exited dormitory perimeter'),
                           subtitle:
                               '${shortDate(e.time)} • ${timeText(e.time)} • ${e.verification}${e.notes != null && e.notes!.isNotEmpty ? ' (${e.notes})' : ''}',
                           trailing: StatusPill(e.status),
@@ -6515,7 +6442,7 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Guardian approval required',
+                            'Guardian endorsement first',
                             style: TextStyle(
                               fontSize: 11,
                               color: Theme.of(context)
@@ -6571,7 +6498,7 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
                         Text(
                           isLate
                               ? 'Forwarded directly to the caretaker / owner on duty for prompt staff review. Your guardian will see this on their read-only curfew activity log.'
-                              : 'Since you will be away from the dormitory property overnight, your registered guardian is the only approver. The owner and caretaker will be notified.',
+                              : 'Since you will be off-premises overnight, your registered guardian must review and approve this first before caretaker sign-off.',
                           style: const TextStyle(fontSize: 12, height: 1.3),
                         ),
                       ],

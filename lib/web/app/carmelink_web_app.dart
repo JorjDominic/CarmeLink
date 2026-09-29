@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
+import '../../controllers/theme_controller.dart';
+import '../../core/runtime/app_surface.dart';
 import '../auth/staff_gate.dart';
 import '../landing/landing_page.dart';
 import '../theme/web_theme.dart';
 import 'web_routes.dart';
-
-import '../../core/runtime/app_surface.dart';
 
 /// Separate Flutter web application. Does not alter the mobile app's routing.
 class CarmeLinkWebApp extends StatelessWidget {
@@ -16,30 +16,38 @@ class CarmeLinkWebApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CarmeLink | Carmelita Dormitory',
-      debugShowCheckedModeBanner: false,
-      builder: (context, child) => CarmeLinkSurfaceScope(
-        surface: CarmeLinkAppSurface.webPortal,
-        child: child ?? const SizedBox.shrink(),
-      ),
-      theme: WebTheme.light(),
-      initialRoute: SessionController.isPasswordRecoveryUri(Uri.base)
-          ? WebRoutes.resetPassword
-          : WebRoutes.home,
-      routes: {
-        WebRoutes.home: (context) => LandingPage(
-              onStaffPortal: () =>
-                  Navigator.of(context).pushNamed(WebRoutes.staff),
-            ),
-        WebRoutes.staff: (context) =>
-            authReady ? const StaffGate() : const _StaffUnavailablePage(),
-        WebRoutes.resetPassword: (context) =>
-            authReady ? const StaffGate() : const _StaffUnavailablePage(),
-      },
-      onUnknownRoute: (settings) => MaterialPageRoute<void>(
-        settings: settings,
-        builder: (context) => const _NotFoundPage(),
+    final controller = ThemeController.instance;
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) => MaterialApp(
+        title: 'CarmeLink | Carmelita Dormitory',
+        debugShowCheckedModeBanner: false,
+        builder: (context, child) => CarmeLinkSurfaceScope(
+          surface: CarmeLinkAppSurface.webPortal,
+          child: child ?? const SizedBox.shrink(),
+        ),
+        theme: WebTheme.light(),
+        darkTheme: WebTheme.dark(),
+        themeMode: controller.themeMode,
+        themeAnimationDuration: const Duration(milliseconds: 220),
+        themeAnimationCurve: Curves.easeOutCubic,
+        initialRoute: SessionController.isPasswordRecoveryUri(Uri.base)
+            ? WebRoutes.resetPassword
+            : WebRoutes.home,
+        routes: {
+          WebRoutes.home: (context) => LandingPage(
+                onStaffPortal: () =>
+                    Navigator.of(context).pushNamed(WebRoutes.staff),
+              ),
+          WebRoutes.staff: (context) =>
+              authReady ? const StaffGate() : const _StaffUnavailablePage(),
+          WebRoutes.resetPassword: (context) =>
+              authReady ? const StaffGate() : const _StaffUnavailablePage(),
+        },
+        onUnknownRoute: (settings) => MaterialPageRoute<void>(
+          settings: settings,
+          builder: (context) => const _NotFoundPage(),
+        ),
       ),
     );
   }

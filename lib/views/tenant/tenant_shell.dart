@@ -18,7 +18,7 @@ class TenantShell extends StatefulWidget {
   State<TenantShell> createState() => _TenantShellState();
 }
 
-class _TenantShellState extends State<TenantShell> {
+class _TenantShellState extends State<TenantShell> with WidgetsBindingObserver {
   TableRefreshSubscription? _liveDataSubscription;
   bool _refreshInFlight = false;
   bool _refreshAgain = false;
@@ -26,6 +26,7 @@ class _TenantShellState extends State<TenantShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     TenantController.instance.loadMaintenance();
     TenantController.instance.loadMyRoom();
@@ -77,7 +78,15 @@ class _TenantShellState extends State<TenantShell> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshLiveData());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_liveDataSubscription?.dispose());
     super.dispose();
   }

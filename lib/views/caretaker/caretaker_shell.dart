@@ -21,7 +21,8 @@ class CaretakerShell extends StatefulWidget {
   State<CaretakerShell> createState() => _CaretakerShellState();
 }
 
-class _CaretakerShellState extends State<CaretakerShell> {
+class _CaretakerShellState extends State<CaretakerShell>
+    with WidgetsBindingObserver {
   TableRefreshSubscription? _liveDataSubscription;
   bool _refreshInFlight = false;
   bool _refreshAgain = false;
@@ -29,6 +30,7 @@ class _CaretakerShellState extends State<CaretakerShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     OwnerController.instance.loadRooms();
     OwnerController.instance.loadPayments();
     OwnerController.instance.loadCurfewRequests();
@@ -82,7 +84,15 @@ class _CaretakerShellState extends State<CaretakerShell> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshLiveData());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_liveDataSubscription?.dispose());
     super.dispose();
   }

@@ -197,6 +197,27 @@ class MaintenanceService {
     }
   }
 
+  Future<MaintenanceReport> cancelReport(String id) async {
+    _requireTenantId();
+    final row = await _client.rpc(
+      'cancel_my_maintenance_report',
+      params: {'p_report_id': id},
+    );
+
+    if (row is Map<String, dynamic>) {
+      return _fromRow(row);
+    }
+    if (row is Map) {
+      return _fromRow(Map<String, dynamic>.from(row));
+    }
+    if (row is List && row.isNotEmpty && row.first is Map) {
+      return _fromRow(Map<String, dynamic>.from(row.first as Map));
+    }
+    throw Exception(
+      'This maintenance request could not be cancelled. Only pending requests can be cancelled.',
+    );
+  }
+
   Future<void> deleteReport(String id) async {
     final tenantId = _requireTenantId();
 

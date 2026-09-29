@@ -22,10 +22,28 @@ class AppBreakpoints {
 
   static double horizontalPadding(BuildContext context) {
     final value = width(context);
-    if (value < extraSmall) return 14;
-    if (value < phone) return 18;
-    if (value < tablet) return 24;
+    if (value < extraSmall) return 12;
+    if (value < phone) return 16;
+    if (value < tablet) return 20;
+    if (value < largeTablet) return 24;
     return 32;
+  }
+
+  /// Calculates a safe responsive column count without forcing tiles below
+  /// their intended minimum width. This keeps the 320/375 px layouts from
+  /// becoming compressed while still allowing denser tablet/desktop grids.
+  static int columnsForMinTileWidth(
+    double availableWidth, {
+    required double minTileWidth,
+    double spacing = 12,
+    int maxColumns = 4,
+  }) {
+    if (availableWidth <= 0 || minTileWidth <= 0 || maxColumns <= 1) {
+      return 1;
+    }
+    final estimated =
+        ((availableWidth + spacing) / (minTileWidth + spacing)).floor();
+    return estimated.clamp(1, maxColumns);
   }
 
   static double contentMaxWidth(BuildContext context) {

@@ -6,6 +6,7 @@ import '../../controllers/messaging_controller.dart';
 import '../../controllers/session_controller.dart';
 import '../../views/shared/shared_views.dart';
 import '../../services/app_notification_service.dart';
+import '../../services/web_workspace_persistence_service.dart';
 import 'common_widgets.dart';
 
 import '../runtime/app_surface.dart';
@@ -17,6 +18,8 @@ class AppDestination {
     required this.selectedIcon,
     required this.page,
     this.isWorkInProgress = false,
+    this.webGroup,
+    this.webDescription,
   });
 
   final String label;
@@ -24,6 +27,10 @@ class AppDestination {
   final IconData selectedIcon;
   final Widget page;
   final bool isWorkInProgress;
+
+  /// Browser-only grouping metadata. Mobile navigation ignores these fields.
+  final String? webGroup;
+  final String? webDescription;
 }
 
 class CarmelitaNavScope extends InheritedWidget {
@@ -34,6 +41,7 @@ class CarmelitaNavScope extends InheritedWidget {
     this.unreadMessageCount = 0,
     this.unreadNotificationCount = 0,
     required this.selectIndex,
+    required this.selectLabel,
     required super.child,
     super.key,
   });
@@ -44,6 +52,7 @@ class CarmelitaNavScope extends InheritedWidget {
   final int unreadMessageCount;
   final int unreadNotificationCount;
   final ValueChanged<int> selectIndex;
+  final ValueChanged<String> selectLabel;
 
   static CarmelitaNavScope? maybeOf(
     BuildContext context,
@@ -60,7 +69,8 @@ class CarmelitaNavScope extends InheritedWidget {
         openNotifications != oldWidget.openNotifications ||
         unreadMessageCount != oldWidget.unreadMessageCount ||
         unreadNotificationCount != oldWidget.unreadNotificationCount ||
-        selectIndex != oldWidget.selectIndex;
+        selectIndex != oldWidget.selectIndex ||
+        selectLabel != oldWidget.selectLabel;
   }
 }
 
@@ -125,6 +135,16 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   bool _notificationsSeeded = false;
   int _unreadNotificationCount = 0;
   bool _messagingStarted = false;
+  String? _workspaceLabelOverride;
+  String? _workspaceGroupOverride;
+
+  // Desktop sidebar disclosure belongs to the persistent shell rather than the
+  // sidebar widget. This keeps the user's open/closed groups unchanged while
+  // workspace pages switch. Empty by default = a tidy collapsed sidebar.
+  final Set<String> _expandedWebGroups = <String>{};
+  static const _workspacePersistence = WebWorkspacePersistenceService();
+  bool _workspaceRestoreScheduled = false;
+
   GlobalKey<NavigatorState> _webWorkspaceNavigatorKey =
       GlobalKey<NavigatorState>();
 
@@ -132,6 +152,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   void initState() {
     super.initState();
     MessagingController.instance.addListener(_onMessagingChanged);
+    _scheduleWorkspaceRestore();
   }
 
   void _onMessagingChanged() {
@@ -166,28 +187,38 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     if (hadRealtimeNotifications != hasRealtimeNotifications) {
       unawaited(_restartNotificationStream());
     }
+    if (oldWidget.roleLabel != widget.roleLabel) {
+      _expandedWebGroups.clear();
+      _workspaceLabelOverride = null;
+      _workspaceGroupOverride = null;
+      index = 0;
+      _webWorkspaceNavigatorKey = GlobalKey<NavigatorState>();
+      _workspaceRestoreScheduled = false;
+      _scheduleWorkspaceRestore();
+    }
   }
 
   Future<void> _startNotificationStream() async {
     if (_notificationStartInFlight) return;
     _notificationStartInFlight = true;
     try {
+      unawaited(AppNotificationService.instance.cleanupExpiredNotifications());
       // Seed first so existing unread history never appears as a burst of
       // "new" popups when the staff portal opens.
       final initial =
-          await AppNotificationService.instance.fetchMyNotifications(limit: 60);
+          await AppNotificationService.instance.fetchMyNotifications(limit: 30);
       if (!mounted) return;
       _onNotificationSnapshot(initial);
 
       _notificationSubscription = AppNotificationService.instance
-          .streamMyNotifications(limit: 60)
+          .streamMyNotifications(limit: 30)
           .listen(_onNotificationSnapshot);
 
       // app_notifications may not be enabled in the Realtime publication on
       // every deployed environment yet. Polling is a catch-up fallback only;
       // Realtime still delivers immediately wherever it is enabled.
       _notificationPollTimer = Timer.periodic(
-        const Duration(seconds: 5),
+        const Duration(seconds: 60),
         (_) => unawaited(_pollNotifications()),
       );
     } finally {
@@ -198,8 +229,23 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   Future<void> _pollNotifications() async {
     if (!mounted) return;
     final latest =
-        await AppNotificationService.instance.fetchMyNotifications(limit: 60);
+        await AppNotificationService.instance.fetchMyNotifications(limit: 30);
     if (mounted) _onNotificationSnapshot(latest);
+  }
+
+  Future<void> _refreshUnreadNotificationCount() async {
+    final count = await AppNotificationService.instance.fetchMyUnreadCount();
+    if (!mounted || count == null) return;
+    if (_unreadNotificationCount != count) {
+      setState(() => _unreadNotificationCount = count);
+    }
+  }
+
+  void _onNotificationPageChanged(
+    List<AppNotificationItem> notifications,
+  ) {
+    _seenNotificationIds.addAll(notifications.map((item) => item.id));
+    unawaited(_refreshUnreadNotificationCount());
   }
 
   Future<void> _restartNotificationStream() async {
@@ -232,13 +278,10 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       return;
     }
 
-    final unreadCount = notifications.where((item) => !item.isRead).length;
     if (!_notificationsSeeded) {
       _seenNotificationIds.addAll(notifications.map((item) => item.id));
       _notificationsSeeded = true;
-      if (_unreadNotificationCount != unreadCount) {
-        setState(() => _unreadNotificationCount = unreadCount);
-      }
+      unawaited(_refreshUnreadNotificationCount());
       return;
     }
 
@@ -248,9 +291,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     _seenNotificationIds.addAll(notifications.map((item) => item.id));
 
-    if (_unreadNotificationCount != unreadCount) {
-      setState(() => _unreadNotificationCount = unreadCount);
-    }
+    unawaited(_refreshUnreadNotificationCount());
     if (fresh.isEmpty) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -267,14 +308,34 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 
   NotificationsPage _notificationsPage() => NotificationsPage(
         onOpenNotification: _openNotificationDestination,
-        onNotificationsChanged: _onNotificationSnapshot,
+        onNotificationsChanged: _onNotificationPageChanged,
       );
 
   Future<void> _openNotificationDestination(AppNotificationItem item) async {
     final destination = widget.notificationPageBuilder?.call(item);
     if (!mounted || destination == null) return;
     if (CarmeLinkSurfaceScope.isWebPortal(context)) {
-      _openWebWorkspacePage(destination);
+      final route = (item.routeType?.trim().isNotEmpty == true
+              ? item.routeType!
+              : item.notificationType)
+          .toLowerCase();
+      final label = switch (route) {
+        'payment' => 'Payment verification',
+        'maintenance' => 'Maintenance',
+        'visitor' => 'Visitors',
+        'curfew' || 'gate' || 'gate_event' => 'Presence & Curfew',
+        'conduct_case' || 'safety' => 'Conduct & Cases',
+        'inspection' => 'Room inspections',
+        'announcement' => 'Announcements',
+        'message' || 'conversation' => 'Messages',
+        'onboarding' => 'Residents',
+        _ => 'Notification details',
+      };
+      _openWebWorkspacePage(
+        destination,
+        label: label,
+        group: 'Updates',
+      );
       return;
     }
     await Navigator.of(context).push(
@@ -349,21 +410,154 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     super.dispose();
   }
 
+  List<AppDestination> _webWorkspaceDestinations() =>
+      [...widget.destinations, ...widget.webDestinations];
+
+  String _baseWorkspaceLabel() {
+    final destinations = _webWorkspaceDestinations();
+    if (destinations.isEmpty) return 'Dashboard';
+    final safeIndex = index >= 0 && index < destinations.length ? index : 0;
+    return destinations[safeIndex].label;
+  }
+
+  void _scheduleWorkspaceRestore() {
+    if (_workspaceRestoreScheduled) return;
+    _workspaceRestoreScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_restoreWebWorkspaceState());
+    });
+  }
+
+  Future<void> _restoreWebWorkspaceState() async {
+    if (!mounted || !CarmeLinkSurfaceScope.isWebPortal(context)) return;
+    final saved = await _workspacePersistence.load(widget.roleLabel);
+    if (!mounted) return;
+
+    final destinations = _webWorkspaceDestinations();
+    if (destinations.isEmpty) return;
+
+    final savedBase = saved.baseDestinationLabel?.trim().toLowerCase();
+    final baseIndex = savedBase == null
+        ? -1
+        : destinations.indexWhere(
+            (item) => item.label.trim().toLowerCase() == savedBase,
+          );
+
+    final validGroups =
+        destinations.map((item) => item.webGroup).whereType<String>().toSet();
+    final restoredGroups = saved.expandedGroups.intersection(validGroups);
+
+    setState(() {
+      index = baseIndex >= 0 ? baseIndex : 0;
+      _expandedWebGroups
+        ..clear()
+        ..addAll(restoredGroups);
+      _workspaceLabelOverride = null;
+      _workspaceGroupOverride = null;
+      _webWorkspaceNavigatorKey = GlobalKey<NavigatorState>();
+    });
+
+    final visible = saved.visiblePageLabel?.trim();
+    if (visible == null || visible.isEmpty) return;
+    final wanted = visible.toLowerCase();
+    final destinationIndex = destinations.indexWhere(
+      (item) => item.label.trim().toLowerCase() == wanted,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (destinationIndex >= 0 && destinationIndex != index) {
+        _select(destinationIndex);
+      } else if (wanted == 'messages') {
+        _openMessages();
+      } else if (wanted == 'notifications') {
+        _openNotifications();
+      }
+    });
+  }
+
+  Future<void> _persistWorkspaceDestination(String visibleLabel) async {
+    if (!mounted || !CarmeLinkSurfaceScope.isWebPortal(context)) return;
+    await _workspacePersistence.saveDestination(
+      roleLabel: widget.roleLabel,
+      baseDestinationLabel: _baseWorkspaceLabel(),
+      visiblePageLabel: visibleLabel,
+    );
+  }
+
+  void _toggleWebGroup(String group) {
+    setState(() {
+      if (_expandedWebGroups.contains(group)) {
+        _expandedWebGroups.remove(group);
+      } else {
+        _expandedWebGroups.add(group);
+      }
+    });
+    unawaited(
+      _workspacePersistence.saveExpandedGroups(
+        roleLabel: widget.roleLabel,
+        groups: _expandedWebGroups,
+      ),
+    );
+  }
+
   void _select(int value) {
+    final destinations = CarmeLinkSurfaceScope.isWebPortal(context)
+        ? _webWorkspaceDestinations()
+        : widget.destinations;
+    if (value < 0 || value >= destinations.length) return;
+
     if (value == index) {
       final navigator = _webWorkspaceNavigatorKey.currentState;
       if (navigator != null && navigator.canPop()) {
         navigator.popUntil((route) => route.isFirst);
       }
+      if (_workspaceLabelOverride != null || _workspaceGroupOverride != null) {
+        setState(() {
+          _workspaceLabelOverride = null;
+          _workspaceGroupOverride = null;
+        });
+      }
+      unawaited(_persistWorkspaceDestination(destinations[value].label));
       return;
     }
     setState(() {
       index = value;
+      _workspaceLabelOverride = null;
+      _workspaceGroupOverride = null;
       _webWorkspaceNavigatorKey = GlobalKey<NavigatorState>();
     });
+    unawaited(_persistWorkspaceDestination(destinations[value].label));
   }
 
-  void _openWebWorkspacePage(Widget page) {
+  void _selectByLabel(String label) {
+    final webPortal = CarmeLinkSurfaceScope.isWebPortal(context);
+    final destinations = webPortal
+        ? [...widget.destinations, ...widget.webDestinations]
+        : widget.destinations;
+    final wanted = label.trim().toLowerCase();
+    final target = destinations.indexWhere(
+      (item) => item.label.trim().toLowerCase() == wanted,
+    );
+    if (target >= 0) {
+      _select(target);
+    }
+  }
+
+  void _openWebWorkspacePage(
+    Widget page, {
+    String? label,
+    String? group,
+  }) {
+    if (label != null && mounted) {
+      setState(() {
+        _workspaceLabelOverride = label;
+        _workspaceGroupOverride = group;
+      });
+    }
+    if (label != null) {
+      unawaited(_persistWorkspaceDestination(label));
+    }
     final navigator = _webWorkspaceNavigatorKey.currentState;
     if (navigator != null) {
       navigator.push(MaterialPageRoute<void>(builder: (_) => page));
@@ -568,7 +762,11 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 
   void _openNotifications() {
     if (CarmeLinkSurfaceScope.isWebPortal(context)) {
-      _openWebWorkspacePage(_notificationsPage());
+      _openWebWorkspacePage(
+        _notificationsPage(),
+        label: 'Notifications',
+        group: 'Communication',
+      );
       return;
     }
     Navigator.of(context).push(
@@ -578,7 +776,11 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 
   void _openMessages() {
     if (CarmeLinkSurfaceScope.isWebPortal(context)) {
-      _openWebWorkspacePage(widget.messagePage);
+      _openWebWorkspacePage(
+        widget.messagePage,
+        label: 'Messages',
+        group: 'Communication',
+      );
       return;
     }
     Navigator.of(context).push(
@@ -613,6 +815,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       unreadMessageCount: unreadMessageCount,
       unreadNotificationCount: _unreadNotificationCount,
       selectIndex: _select,
+      selectLabel: _selectByLabel,
       child: Scaffold(
         extendBody: !webPortal,
         body: webPortal
@@ -626,13 +829,35 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                         destinations: activeDestinations,
                         mainDestinationCount: widget.destinations.length,
                         selectedIndex: activeIndex,
+                        expandedGroups: _expandedWebGroups,
+                        onGroupToggle: _toggleWebGroup,
                         onSelected: _select,
                         onOpenMessages: _openMessages,
                         onOpenNotifications: _openNotifications,
-                        onOpenPage: _openWebWorkspacePage,
+                        onOpenPage: (label, page) => _openWebWorkspacePage(
+                          page,
+                          label: label,
+                          group: 'Account',
+                        ),
                       ),
                       const VerticalDivider(width: 1),
-                      Expanded(child: _webWorkspace(page, activeIndex)),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            _WebWorkspaceContextBar(
+                              roleLabel: widget.roleLabel,
+                              groupLabel: _workspaceGroupOverride ??
+                                  destination.webGroup ??
+                                  'Workspace',
+                              pageLabel:
+                                  _workspaceLabelOverride ?? destination.label,
+                            ),
+                            Expanded(
+                              child: _webWorkspace(page, activeIndex),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   )
                 : Column(
@@ -815,6 +1040,80 @@ class _CompactWebNavigationBarState extends State<_CompactWebNavigationBar>
 /// Wide-screen web navigation for the existing OwnerShell/CaretakerShell.
 /// The destination list belongs to the mobile role shell, so module access,
 /// business logic and unfinished-feature labels cannot drift to demo data.
+class _WebWorkspaceContextBar extends StatelessWidget {
+  const _WebWorkspaceContextBar({
+    required this.roleLabel,
+    required this.groupLabel,
+    required this.pageLabel,
+  });
+
+  final String roleLabel;
+  final String groupLabel;
+  final String pageLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Material(
+      key: const Key('web-workspace-context-bar'),
+      color: colors.surface,
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: theme.dividerColor)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.workspaces_outline, size: 18, color: colors.primary),
+            const SizedBox(width: 9),
+            Flexible(
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 7,
+                runSpacing: 2,
+                children: [
+                  Text(
+                    '$roleLabel workspace',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: colors.outline,
+                  ),
+                  Text(
+                    groupLabel,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: colors.outline,
+                  ),
+                  Text(
+                    pageLabel,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _WebStaffSidebar extends StatelessWidget {
   const _WebStaffSidebar({
     required this.roleLabel,
@@ -823,6 +1122,8 @@ class _WebStaffSidebar extends StatelessWidget {
     required this.destinations,
     required this.mainDestinationCount,
     required this.selectedIndex,
+    required this.expandedGroups,
+    required this.onGroupToggle,
     required this.onSelected,
     required this.onOpenMessages,
     required this.onOpenNotifications,
@@ -835,18 +1136,82 @@ class _WebStaffSidebar extends StatelessWidget {
   final List<AppDestination> destinations;
   final int mainDestinationCount;
   final int selectedIndex;
+  final Set<String> expandedGroups;
+  final ValueChanged<String> onGroupToggle;
   final ValueChanged<int> onSelected;
   final VoidCallback onOpenMessages;
   final VoidCallback onOpenNotifications;
-  final ValueChanged<Widget> onOpenPage;
+  final void Function(String label, Widget page) onOpenPage;
+
+  Map<String, List<int>> get _toolGroups {
+    final groups = <String, List<int>>{};
+    for (var i = mainDestinationCount; i < destinations.length; i++) {
+      final item = destinations[i];
+      final group = item.webGroup ?? 'Staff tools';
+      groups.putIfAbsent(group, () => <int>[]).add(i);
+    }
+    return groups;
+  }
+
+  String _groupKey(String value) => value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-|-$'), '');
+
+  Widget _destinationTile(BuildContext context, int itemIndex) {
+    final item = destinations[itemIndex];
+    final selected = itemIndex == selectedIndex;
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Material(
+        color: selected
+            ? colors.primary.withValues(alpha: .10)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: ListTile(
+          key: Key('web-staff-destination-$itemIndex'),
+          dense: true,
+          minTileHeight: 46,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          selected: selected,
+          selectedColor: colors.primary,
+          leading: Icon(
+            selected ? item.selectedIcon : item.icon,
+            size: 20,
+          ),
+          title: Text(
+            item.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: item.webDescription == null
+              ? null
+              : Text(
+                  item.webDescription!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10.5),
+                ),
+          trailing: item.isWorkInProgress ? const _WipBadge() : null,
+          onTap: () => onSelected(itemIndex),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final groups = _toolGroups;
+
     return SizedBox(
       key: const Key('web-staff-sidebar'),
-      width: 248,
+      width: 286,
       child: Material(
         color: colors.surface,
         child: SafeArea(
@@ -855,22 +1220,29 @@ class _WebStaffSidebar extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 16, 16),
+                padding: const EdgeInsets.fromLTRB(20, 22, 16, 14),
                 child: Row(
                   children: [
-                    Icon(Icons.apartment_rounded,
-                        color: colors.primary, size: 28),
+                    Icon(
+                      Icons.apartment_rounded,
+                      color: colors.primary,
+                      size: 28,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('CarmeLink',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              )),
-                          Text('$roleLabel workspace',
-                              style: theme.textTheme.bodySmall),
+                          Text(
+                            'CarmeLink',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            '$roleLabel workspace',
+                            style: theme.textTheme.bodySmall,
+                          ),
                         ],
                       ),
                     ),
@@ -880,72 +1252,123 @@ class _WebStaffSidebar extends StatelessWidget {
               const Divider(height: 1),
               Expanded(
                 child: ListView(
-                  key: const Key('web-staff-navigation'),
+                  key: const PageStorageKey<String>('web-staff-navigation'),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
-                    vertical: 14,
+                    vertical: 12,
                   ),
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 5, 12, 10),
-                      child: Text('MANAGEMENT',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colors.primary,
-                            letterSpacing: 1.4,
-                            fontWeight: FontWeight.bold,
-                          )),
+                      padding: const EdgeInsets.fromLTRB(12, 5, 12, 8),
+                      child: Text(
+                        'WORKSPACE',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colors.primary,
+                          letterSpacing: 1.4,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    ...List.generate(destinations.length, (itemIndex) {
-                      final item = destinations[itemIndex];
-                      final selected = itemIndex == selectedIndex;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (itemIndex == mainDestinationCount)
-                            Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(12, 14, 12, 10),
-                              child: Text('STAFF TOOLS',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: colors.primary,
-                                    letterSpacing: 1.4,
-                                    fontWeight: FontWeight.bold,
-                                  )),
-                            ),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Material(
-                              color: selected
-                                  ? colors.primary.withValues(alpha: .10)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                              child: ListTile(
-                                key: Key('web-staff-destination-$itemIndex'),
-                                dense: true,
-                                minTileHeight: 48,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                    ...List.generate(
+                      mainDestinationCount,
+                      (index) => _destinationTile(context, index),
+                    ),
+                    const SizedBox(height: 6),
+                    const Divider(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 5, 12, 7),
+                      child: Text(
+                        'MANAGEMENT AREAS',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colors.primary,
+                          letterSpacing: 1.4,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    for (final entry in groups.entries) ...[
+                      Builder(
+                        builder: (context) {
+                          final active = entry.value.contains(selectedIndex);
+                          final expanded = expandedGroups.contains(entry.key);
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Material(
+                                color: active
+                                    ? colors.primary.withValues(alpha: .055)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(11),
+                                child: InkWell(
+                                  key: Key(
+                                    'web-staff-group-${_groupKey(entry.key)}',
+                                  ),
+                                  borderRadius: BorderRadius.circular(11),
+                                  onTap: () => onGroupToggle(entry.key),
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      11,
+                                      9,
+                                      8,
+                                      9,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            entry.key,
+                                            style: theme.textTheme.labelLarge
+                                                ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              color: active
+                                                  ? colors.primary
+                                                  : null,
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          '${entry.value.length}',
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                            color: colors.onSurfaceVariant,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        AnimatedRotation(
+                                          duration: const Duration(
+                                            milliseconds: 180,
+                                          ),
+                                          turns: expanded ? .5 : 0,
+                                          child: const Icon(
+                                            Icons.keyboard_arrow_down_rounded,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                                selected: selected,
-                                selectedColor: colors.primary,
-                                leading: Icon(
-                                  selected ? item.selectedIcon : item.icon,
-                                  size: 21,
-                                ),
-                                title: Text(item.label,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
-                                trailing: item.isWorkInProgress
-                                    ? const _WipBadge()
-                                    : null,
-                                onTap: () => onSelected(itemIndex),
                               ),
-                            ),
-                          ),
-                        ],
-                      );
-                    }),
-                    const Divider(height: 24),
+                              if (expanded)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 8,
+                                    top: 4,
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      for (final itemIndex in entry.value)
+                                        _destinationTile(context, itemIndex),
+                                    ],
+                                  ),
+                                ),
+                              const SizedBox(height: 4),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                    const Divider(height: 22),
                     ListTile(
                       key: const Key('web-staff-messages'),
                       dense: true,
@@ -967,10 +1390,14 @@ class _WebStaffSidebar extends StatelessWidget {
                       onTap: onOpenNotifications,
                     ),
                     ListTile(
+                      key: const Key('web-staff-settings'),
                       dense: true,
                       leading: const Icon(Icons.settings_outlined),
                       title: const Text('Settings'),
-                      onTap: () => onOpenPage(const SettingsPage()),
+                      onTap: () => onOpenPage(
+                        'Settings',
+                        const SettingsPage(),
+                      ),
                     ),
                   ],
                 ),
@@ -978,10 +1405,12 @@ class _WebStaffSidebar extends StatelessWidget {
               const Divider(height: 1),
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text('Staff portal · $roleLabel',
-                    style: theme.textTheme.bodySmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                child: Text(
+                  'Staff portal · $roleLabel',
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

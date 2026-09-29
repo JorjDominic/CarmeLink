@@ -8,10 +8,17 @@ import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../../services/app_notification_service.dart';
 import '../../services/table_refresh_subscription.dart';
+import '../../views/owner/billing_management_page.dart';
+import '../../views/owner/contracts_page.dart';
+import '../../views/owner/guardian_link_management_page.dart';
 import '../../views/owner/owner_pages.dart';
 import '../../views/owner/room_monitoring_page.dart';
+import '../../views/shared/account_management_page.dart';
 import '../../views/shared/conduct_case_pages.dart';
+import '../../views/shared/employee_curfew_profile_pages.dart';
+import '../../views/shared/retention_settings_page.dart';
 import '../../views/shared/shared_views.dart';
+import '../../views/shared/cleaning_schedule_management_page.dart';
 import 'staff_overview_page.dart';
 
 /// A browser-only destination composition. Every management destination is
@@ -48,9 +55,186 @@ abstract final class StaffWebDestinations {
     ];
   }
 
-  /// Detailed staff modules now live inside the six Operations groups instead
-  /// of competing for permanent sidebar space.
-  static List<AppDestination> desktopTools(UserRole role) => const [];
+  /// Desktop keeps every important module one click away while retaining the
+  /// simpler mobile navigation. Groups are presentation metadata only; the
+  /// underlying pages, services, role guards and RLS remain unchanged.
+  static List<AppDestination> desktopTools(UserRole role) {
+    assert(role == UserRole.owner || role == UserRole.caretaker);
+    final owner = role == UserRole.owner;
+    return [
+      const AppDestination(
+        label: 'Rooms',
+        icon: Icons.meeting_room_outlined,
+        selectedIcon: Icons.meeting_room,
+        page: RoomMonitoringPage(),
+        webGroup: 'Facilities',
+        webDescription: 'Occupancy and floor plan',
+      ),
+      const AppDestination(
+        label: 'Maintenance',
+        icon: Icons.build_outlined,
+        selectedIcon: Icons.build,
+        page: MaintenanceManagementPage(),
+        webGroup: 'Facilities',
+        webDescription: 'Repair requests and progress',
+      ),
+      const AppDestination(
+        label: 'Cleaning schedules',
+        icon: Icons.cleaning_services_outlined,
+        selectedIcon: Icons.cleaning_services,
+        page: CleaningScheduleManagementPage(),
+        webGroup: 'Facilities',
+        webDescription: 'Automatic rotation and manual overrides',
+      ),
+      const AppDestination(
+        label: 'Room inspections',
+        icon: Icons.fact_check_outlined,
+        selectedIcon: Icons.fact_check,
+        page: RoomMonitoringPage(),
+        webGroup: 'Facilities',
+        webDescription: 'Inspection notices and findings',
+      ),
+      const AppDestination(
+        label: 'Visitors',
+        icon: Icons.people_outline,
+        selectedIcon: Icons.people,
+        page: VisitorManagementPage(),
+        webGroup: 'Access & Safety',
+        webDescription: 'Visitor requests and status',
+      ),
+      const AppDestination(
+        label: 'Presence & Curfew',
+        icon: Icons.location_on_outlined,
+        selectedIcon: Icons.location_on,
+        page: GeofenceMonitoringPage(),
+        webGroup: 'Access & Safety',
+        webDescription: 'Presence, boundary and curfew records',
+      ),
+      const AppDestination(
+        label: 'Employee curfew',
+        icon: Icons.badge_outlined,
+        selectedIcon: Icons.badge,
+        page: EmployeeCurfewProfilesPage(),
+        webGroup: 'Access & Safety',
+        webDescription: 'Employment-based curfew profiles',
+      ),
+      const AppDestination(
+        label: 'Conduct & Cases',
+        icon: Icons.gavel_outlined,
+        selectedIcon: Icons.gavel,
+        page: StaffConductCasesPage(),
+        webGroup: 'Access & Safety',
+        webDescription: 'Incidents, responses and appeals',
+      ),
+      const AppDestination(
+        label: 'Billing & charges',
+        icon: Icons.account_balance_wallet_outlined,
+        selectedIcon: Icons.account_balance_wallet,
+        page: BillingManagementPage(),
+        webGroup: 'Billing & Records',
+        webDescription: 'Rent, utilities, balances and other charges',
+      ),
+      const AppDestination(
+        label: 'Payment verification',
+        icon: Icons.payments_outlined,
+        selectedIcon: Icons.payments,
+        page: PaymentVerificationPage(),
+        webGroup: 'Billing & Records',
+        webDescription: 'Review submitted payment proof',
+      ),
+      const AppDestination(
+        label: 'Report management',
+        icon: Icons.assignment_outlined,
+        selectedIcon: Icons.assignment,
+        page: ReportManagementPage(),
+        webGroup: 'Billing & Records',
+        webDescription: 'Operational and maintenance reports',
+      ),
+      if (owner) ...[
+        const AppDestination(
+          label: 'Income & expenses',
+          icon: Icons.insights_outlined,
+          selectedIcon: Icons.insights,
+          page: ExpenseIncomeSummaryPage(),
+          webGroup: 'Billing & Records',
+          webDescription: 'Property financial summary',
+        ),
+        const AppDestination(
+          label: 'Contracts',
+          icon: Icons.description_outlined,
+          selectedIcon: Icons.description,
+          page: ContractsPage(),
+          webGroup: 'Billing & Records',
+          webDescription: 'Contracts and renewals',
+        ),
+        const AppDestination(
+          label: 'Confidential reports',
+          icon: Icons.shield_outlined,
+          selectedIcon: Icons.shield,
+          page: ConfidentialReportsPage(),
+          webGroup: 'Billing & Records',
+          webDescription: 'Private resident concerns',
+        ),
+        const AppDestination(
+          label: 'Disciplinary records',
+          icon: Icons.rule_outlined,
+          selectedIcon: Icons.rule,
+          page: DisciplinaryRecordsPage(),
+          webGroup: 'Billing & Records',
+          webDescription: 'Recorded violations and actions',
+        ),
+        const AppDestination(
+          label: 'Analytics',
+          icon: Icons.analytics_outlined,
+          selectedIcon: Icons.analytics,
+          page: ReportsAnalyticsPage(),
+          webGroup: 'Billing & Records',
+          webDescription: 'Operational metrics and trends',
+        ),
+      ],
+      const AppDestination(
+        label: 'Announcements',
+        icon: Icons.campaign_outlined,
+        selectedIcon: Icons.campaign,
+        page: AnnouncementsManagementPage(),
+        webGroup: 'Communication',
+        webDescription: 'Publish dormitory notices',
+      ),
+      const AppDestination(
+        label: 'Contact directory',
+        icon: Icons.emergency_outlined,
+        selectedIcon: Icons.emergency,
+        page: EmergencyContactsPage(),
+        webGroup: 'Communication',
+        webDescription: 'Important contact information',
+      ),
+      const AppDestination(
+        label: 'Accounts',
+        icon: Icons.manage_accounts_outlined,
+        selectedIcon: Icons.manage_accounts,
+        page: AccountManagementPage(),
+        webGroup: 'Administration',
+        webDescription: 'Role-based user accounts',
+      ),
+      if (owner)
+        const AppDestination(
+          label: 'Guardian links',
+          icon: Icons.family_restroom_outlined,
+          selectedIcon: Icons.family_restroom,
+          page: GuardianLinkManagementPage(),
+          webGroup: 'Administration',
+          webDescription: 'Tenant and guardian access links',
+        ),
+      const AppDestination(
+        label: 'Security & retention',
+        icon: Icons.security_outlined,
+        selectedIcon: Icons.security,
+        page: RetentionSettingsPage(),
+        webGroup: 'Administration',
+        webDescription: 'Sensitive-record retention controls',
+      ),
+    ];
+  }
 }
 
 /// RoleGuard remains in front of every route; Supabase RLS remains authoritative.

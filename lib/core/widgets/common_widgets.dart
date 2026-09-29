@@ -13,7 +13,6 @@ import '../theme/app_theme.dart';
 import '../../services/geofence_service.dart';
 import 'adaptive_shell.dart';
 
-
 Color mutedAccentForIcon(BuildContext context, IconData icon) {
   if (icon == Icons.payments_outlined ||
       icon == Icons.receipt_long_outlined ||
@@ -448,7 +447,8 @@ class ConversationThreadPanel extends StatefulWidget {
   final String hintText;
 
   @override
-  State<ConversationThreadPanel> createState() => _ConversationThreadPanelState();
+  State<ConversationThreadPanel> createState() =>
+      _ConversationThreadPanelState();
 }
 
 class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
@@ -530,8 +530,8 @@ class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
     final media = MediaQuery.of(context);
     final desktop = media.size.width >= 900;
     final keyboardInset = media.viewInsets.bottom;
-    final availableHeight = media.size.height - keyboardInset -
-        (desktop ? 220.0 : 176.0);
+    final availableHeight =
+        media.size.height - keyboardInset - (desktop ? 220.0 : 176.0);
     final panelHeight = availableHeight
         .clamp(
           desktop ? 430.0 : 340.0,
@@ -634,7 +634,8 @@ class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
                       child: FilledButton.tonalIcon(
                         key: const Key('conversation-new-messages-button'),
                         onPressed: _scrollToLatest,
-                        icon: const Icon(Icons.arrow_downward_rounded, size: 17),
+                        icon:
+                            const Icon(Icons.arrow_downward_rounded, size: 17),
                         label: const Text('New messages'),
                       ),
                     ),
@@ -947,7 +948,7 @@ class PageFrame extends StatelessWidget {
     final webPortal = CarmeLinkSurfaceScope.isWebPortal(context);
     final showMobileMenu = !webPortal && navScope != null;
     final canPop = Navigator.of(context).canPop();
-    final extraBottom = navScope == null ? 24.0 : 132.0;
+    final extraBottom = navScope == null ? 24.0 : (webPortal ? 32.0 : 132.0);
     final currentRole = SessionController.instance.currentUser?.role;
     final isStaff =
         currentRole == UserRole.owner || currentRole == UserRole.caretaker;
@@ -1063,7 +1064,9 @@ class PageFrame extends StatelessWidget {
     );
 
     Widget? resolvedFloatingActionButton = floatingActionButton;
-    if (resolvedFloatingActionButton != null && navScope != null) {
+    if (resolvedFloatingActionButton != null &&
+        navScope != null &&
+        !webPortal) {
       resolvedFloatingActionButton = Padding(
         padding: const EdgeInsets.only(bottom: 82),
         child: resolvedFloatingActionButton,
@@ -1163,7 +1166,8 @@ class PageFrame extends StatelessWidget {
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     child: ResponsiveContent(
-                      maxWidth: maxWidth ?? (webPortal ? double.infinity : null),
+                      maxWidth:
+                          maxWidth ?? (webPortal ? double.infinity : null),
                       padding: EdgeInsets.fromLTRB(
                         AppBreakpoints.horizontalPadding(context),
                         6,
@@ -1751,14 +1755,12 @@ class AdaptiveGrid extends StatelessWidget {
   final List<Widget> children;
   final double minTileWidth;
 
-  int _columnsFor(double width) {
-    if (width < 320) return 1;
-    if (width < 600) return 2;
-
-    const spacing = 12.0;
-    final estimated = ((width + spacing) / (minTileWidth + spacing)).floor();
-    return estimated.clamp(2, 4);
-  }
+  int _columnsFor(double width) => AppBreakpoints.columnsForMinTileWidth(
+        width,
+        minTileWidth: minTileWidth,
+        spacing: 12,
+        maxColumns: 4,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -1803,11 +1805,14 @@ class ActionGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final columns = width < 330
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        final columns = width < 360 || textScale >= 1.35
             ? 2
-            : width < 700
-                ? 4
-                : 6;
+            : width < 600
+                ? 3
+                : width < 1024
+                    ? 4
+                    : 6;
         final itemWidth = (width - (spacing * (columns - 1))) / columns;
 
         return Wrap(

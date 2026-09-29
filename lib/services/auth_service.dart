@@ -5,6 +5,7 @@ import '../models/models.dart';
 
 abstract class AuthService {
   Future<AppUser?> restoreSession();
+  Future<AppUser?> refreshCurrentUser();
   Future<AppUser> signIn(String email, String password);
   Future<void> signOut();
   Future<AppUser> verifyEmailCode(String email, String code);
@@ -28,6 +29,15 @@ class SupabaseAuthService implements AuthService {
       await _client.auth.signOut();
       rethrow;
     }
+  }
+
+  @override
+  Future<AppUser?> refreshCurrentUser() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return null;
+    // Unlike restoreSession(), a transient profile-refresh failure must not
+    // sign the user out after an otherwise successful profile edit.
+    return _loadProfile(user);
   }
 
   @override
