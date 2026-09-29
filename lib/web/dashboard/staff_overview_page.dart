@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../controllers/owner_controller.dart';
+import '../../core/widgets/adaptive_shell.dart';
 import '../../models/models.dart';
 import '../../views/owner/contracts_page.dart';
 import '../../views/owner/owner_pages.dart';
@@ -24,9 +25,16 @@ class StaffOverviewPage extends StatefulWidget {
 class _StaffOverviewPageState extends State<StaffOverviewPage> {
   bool refreshing = false;
 
-  void _open(Widget page) => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => page),
-      );
+  void _open(Widget page, {String? destinationLabel}) {
+    final nav = CarmelitaNavScope.maybeOf(context);
+    if (destinationLabel != null && nav != null) {
+      nav.selectLabel(destinationLabel);
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => page),
+    );
+  }
 
   Future<void> _refresh() async {
     if (refreshing) return;
@@ -72,6 +80,7 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                     : data.roomsError ?? 'Room records unavailable',
                 Icons.bed_outlined,
                 const RoomMonitoringPage(),
+                'Rooms',
               ),
               _Metric(
                 'Residents inside',
@@ -82,6 +91,7 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                     : data.tenantsError ?? 'Presence records unavailable',
                 Icons.location_on_outlined,
                 const GeofenceMonitoringPage(),
+                'Presence & Curfew',
               ),
               _Metric(
                 'Maintenance',
@@ -93,6 +103,7 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                         'Maintenance records unavailable',
                 Icons.handyman_outlined,
                 const MaintenanceManagementPage(),
+                'Maintenance',
               ),
               _Metric(
                 'Payment reviews',
@@ -103,6 +114,7 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                     : data.paymentsError ?? 'Payment records unavailable',
                 Icons.receipt_long_outlined,
                 const PaymentVerificationPage(),
+                'Payment verification',
               ),
             ];
             return LayoutBuilder(builder: (context, constraints) {
@@ -150,7 +162,10 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                                     value: metric.value,
                                     detail: metric.detail,
                                     icon: metric.icon,
-                                    onTap: () => _open(metric.page),
+                                    onTap: () => _open(
+                                      metric.page,
+                                      destinationLabel: metric.destinationLabel,
+                                    ),
                                   ),
                                 ),
                             ],
@@ -173,7 +188,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                               ? '${data.openMaintenance}'
                               : null,
                           icon: Icons.build_outlined,
-                          onTap: () => _open(const MaintenanceManagementPage()),
+                          onTap: () => _open(const MaintenanceManagementPage(),
+                              destinationLabel: 'Maintenance'),
                         ),
                         const SizedBox(height: 9),
                         StaffActionRow(
@@ -186,7 +202,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                               ? '${data.pendingPaymentProofs}'
                               : null,
                           icon: Icons.receipt_long_outlined,
-                          onTap: () => _open(const PaymentVerificationPage()),
+                          onTap: () => _open(const PaymentVerificationPage(),
+                              destinationLabel: 'Payment verification'),
                         ),
                         if (owner) ...[
                           const SizedBox(height: 9),
@@ -200,7 +217,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                                 ? '${data.contractsExpiringWithin30Days}'
                                 : null,
                             icon: Icons.description_outlined,
-                            onTap: () => _open(const ContractsPage()),
+                            onTap: () => _open(const ContractsPage(),
+                                destinationLabel: 'Contracts'),
                           ),
                         ],
                         const SizedBox(height: 28),
@@ -212,29 +230,34 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                         const SizedBox(height: 12),
                         Wrap(spacing: 9, runSpacing: 9, children: [
                           OutlinedButton.icon(
-                            onPressed: () => _open(const TenantDirectoryPage()),
+                            onPressed: () => _open(const TenantDirectoryPage(),
+                                destinationLabel: 'Residents'),
                             icon: const Icon(Icons.groups_outlined, size: 18),
                             label: const Text('Tenant directory'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(const RoomMonitoringPage()),
+                            onPressed: () => _open(const RoomMonitoringPage(),
+                                destinationLabel: 'Rooms'),
                             icon: const Icon(Icons.meeting_room_outlined,
                                 size: 18),
                             label: const Text('Room monitoring'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(const OperationsHubPage()),
+                            onPressed: () => _open(const OperationsHubPage(),
+                                destinationLabel: 'Operations'),
                             icon: const Icon(Icons.tune_outlined, size: 18),
                             label: const Text('Operations'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () =>
-                                _open(const VisitorManagementPage()),
+                            onPressed: () => _open(
+                                const VisitorManagementPage(),
+                                destinationLabel: 'Visitors'),
                             icon: const Icon(Icons.people_outline, size: 18),
                             label: const Text('Visitors'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(const RoomMonitoringPage()),
+                            onPressed: () => _open(const RoomMonitoringPage(),
+                                destinationLabel: 'Cleaning schedules'),
                             icon: const Icon(
                               Icons.cleaning_services_outlined,
                               size: 18,
@@ -242,26 +265,30 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                             label: const Text('Cleaning schedules'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(const RoomMonitoringPage()),
+                            onPressed: () => _open(const RoomMonitoringPage(),
+                                destinationLabel: 'Room inspections'),
                             icon:
                                 const Icon(Icons.fact_check_outlined, size: 18),
                             label: const Text('Room inspections'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () =>
-                                _open(const StaffConductCasesPage()),
+                            onPressed: () => _open(
+                                const StaffConductCasesPage(),
+                                destinationLabel: 'Conduct & Cases'),
                             icon: const Icon(Icons.gavel_outlined, size: 18),
                             label: const Text('Conduct & cases'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () =>
-                                _open(const EmployeeCurfewProfilesPage()),
+                            onPressed: () => _open(
+                                const EmployeeCurfewProfilesPage(),
+                                destinationLabel: 'Employee curfew'),
                             icon: const Icon(Icons.badge_outlined, size: 18),
                             label: const Text('Employee curfew'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () =>
-                                _open(const RetentionSettingsPage()),
+                            onPressed: () => _open(
+                                const RetentionSettingsPage(),
+                                destinationLabel: 'Security & retention'),
                             icon: const Icon(Icons.security_outlined, size: 18),
                             label: const Text('Security & retention'),
                           ),
@@ -284,12 +311,20 @@ String _display(bool ready, bool loading, String value) => ready
         : 'Unavailable';
 
 class _Metric {
-  const _Metric(this.label, this.value, this.detail, this.icon, this.page);
+  const _Metric(
+    this.label,
+    this.value,
+    this.detail,
+    this.icon,
+    this.page,
+    this.destinationLabel,
+  );
   final String label;
   final String value;
   final String detail;
   final IconData icon;
   final Widget page;
+  final String destinationLabel;
 }
 
 class _OverviewHeader extends StatelessWidget {
