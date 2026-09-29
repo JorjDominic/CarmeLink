@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../controllers/session_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/runtime/app_surface.dart';
+import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
@@ -19,6 +21,7 @@ import 'package:carmelitas_dormitory_system/views/shared/retention_settings_page
 import '../tenant/onboarding_form_page.dart';
 import '../tenant/tenant_requirements_page.dart';
 import 'profile_edit_page.dart';
+import 'move_out_settlement_page.dart';
 import 'signature_pad_dialog.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -524,6 +527,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 }
 
+void _openMoveOutSettlement(BuildContext context) {
+  if (CarmeLinkSurfaceScope.isWebPortal(context)) {
+    final nav = CarmelitaNavScope.maybeOf(context);
+    if (nav != null) {
+      nav.selectLabel('Move-out & settlement');
+      return;
+    }
+  }
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(builder: (_) => const MoveOutSettlementPage()),
+  );
+}
+
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
   @override
@@ -626,6 +642,28 @@ class _OwnerProfileContent extends StatelessWidget {
               value: user.role == UserRole.owner
                   ? 'Full dormitory administration'
                   : 'Dormitory operations'),
+          const SizedBox(height: 20),
+          const SectionTitle('Tenancy operations'),
+          const SizedBox(height: 10),
+          CarmelitaCard(
+            onTap: () => _openMoveOutSettlement(context),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: const ListTile(
+              dense: true,
+              visualDensity: VisualDensity(vertical: -2),
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.exit_to_app_rounded),
+              title: Text(
+                'Move-out & settlement',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+              ),
+              subtitle: Text(
+                'Notice, final inspection, clearance, and deposit settlement',
+                style: TextStyle(fontSize: 11),
+              ),
+              trailing: Icon(Icons.chevron_right_rounded),
+            ),
+          ),
           const SizedBox(height: 20),
           const SectionTitle('Account'),
           const SizedBox(height: 10),
@@ -887,6 +925,28 @@ class _TenantProfileContent extends StatelessWidget {
           _TenantOnboardingDetailsSection(userId: user.id),
           const SizedBox(height: 16),
           const _TenantRequiredDocumentsSection(),
+          const SizedBox(height: 20),
+          const SectionTitle('Tenancy'),
+          const SizedBox(height: 10),
+          CarmelitaCard(
+            onTap: () => _openMoveOutSettlement(context),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: const ListTile(
+              dense: true,
+              visualDensity: VisualDensity(vertical: -2),
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.exit_to_app_rounded),
+              title: Text(
+                'Move-out notice & settlement',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+              ),
+              subtitle: Text(
+                'Submit a 30-day notice and track final clearance',
+                style: TextStyle(fontSize: 11),
+              ),
+              trailing: Icon(Icons.chevron_right_rounded),
+            ),
+          ),
           const SizedBox(height: 20),
           const SectionTitle('Account'),
           const SizedBox(height: 10),
