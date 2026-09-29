@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../controllers/owner_controller.dart';
+import '../../core/constants/app_assets.dart';
 import '../../core/widgets/adaptive_shell.dart';
 import '../../models/models.dart';
 import '../../views/owner/contracts_page.dart';
@@ -9,6 +10,7 @@ import '../../views/owner/room_monitoring_page.dart';
 import '../../views/shared/conduct_case_pages.dart';
 import '../../views/shared/employee_curfew_profile_pages.dart';
 import '../../views/shared/retention_settings_page.dart';
+import '../../views/shared/cleaning_schedule_management_page.dart';
 import '../theme/web_theme.dart';
 import 'widgets/staff_overview_card.dart';
 
@@ -134,6 +136,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                           refreshing: refreshing,
                           onRefresh: _refresh,
                         ),
+                        const SizedBox(height: 14),
+                        const _StaffPropertyHero(),
                         const SizedBox(height: 22),
                         const _SectionLabel(
                           title: 'Property at a glance',
@@ -188,8 +192,7 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                               ? '${data.openMaintenance}'
                               : null,
                           icon: Icons.build_outlined,
-                          onTap: () => _open(const MaintenanceManagementPage(),
-                              destinationLabel: 'Maintenance'),
+                          onTap: () => _open(const MaintenanceManagementPage(), destinationLabel: 'Maintenance'),
                         ),
                         const SizedBox(height: 9),
                         StaffActionRow(
@@ -202,8 +205,7 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                               ? '${data.pendingPaymentProofs}'
                               : null,
                           icon: Icons.receipt_long_outlined,
-                          onTap: () => _open(const PaymentVerificationPage(),
-                              destinationLabel: 'Payment verification'),
+                          onTap: () => _open(const PaymentVerificationPage(), destinationLabel: 'Payment verification'),
                         ),
                         if (owner) ...[
                           const SizedBox(height: 9),
@@ -217,8 +219,7 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                                 ? '${data.contractsExpiringWithin30Days}'
                                 : null,
                             icon: Icons.description_outlined,
-                            onTap: () => _open(const ContractsPage(),
-                                destinationLabel: 'Contracts'),
+                            onTap: () => _open(const ContractsPage(), destinationLabel: 'Contracts'),
                           ),
                         ],
                         const SizedBox(height: 28),
@@ -230,34 +231,32 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                         const SizedBox(height: 12),
                         Wrap(spacing: 9, runSpacing: 9, children: [
                           OutlinedButton.icon(
-                            onPressed: () => _open(const TenantDirectoryPage(),
-                                destinationLabel: 'Residents'),
+                            onPressed: () => _open(const TenantDirectoryPage(), destinationLabel: 'Residents'),
                             icon: const Icon(Icons.groups_outlined, size: 18),
                             label: const Text('Tenant directory'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(const RoomMonitoringPage(),
-                                destinationLabel: 'Rooms'),
+                            onPressed: () => _open(const RoomMonitoringPage(), destinationLabel: 'Rooms'),
                             icon: const Icon(Icons.meeting_room_outlined,
                                 size: 18),
                             label: const Text('Room monitoring'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(const OperationsHubPage(),
-                                destinationLabel: 'Operations'),
+                            onPressed: () => _open(const OperationsHubPage(), destinationLabel: 'Operations'),
                             icon: const Icon(Icons.tune_outlined, size: 18),
                             label: const Text('Operations'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(
-                                const VisitorManagementPage(),
-                                destinationLabel: 'Visitors'),
+                            onPressed: () =>
+                                _open(const VisitorManagementPage(), destinationLabel: 'Visitors'),
                             icon: const Icon(Icons.people_outline, size: 18),
                             label: const Text('Visitors'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(const RoomMonitoringPage(),
-                                destinationLabel: 'Cleaning schedules'),
+                            onPressed: () => _open(
+                              const CleaningScheduleManagementPage(),
+                              destinationLabel: 'Cleaning schedules',
+                            ),
                             icon: const Icon(
                               Icons.cleaning_services_outlined,
                               size: 18,
@@ -265,30 +264,26 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                             label: const Text('Cleaning schedules'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(const RoomMonitoringPage(),
-                                destinationLabel: 'Room inspections'),
+                            onPressed: () => _open(const RoomMonitoringPage(), destinationLabel: 'Room inspections'),
                             icon:
                                 const Icon(Icons.fact_check_outlined, size: 18),
                             label: const Text('Room inspections'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(
-                                const StaffConductCasesPage(),
-                                destinationLabel: 'Conduct & Cases'),
+                            onPressed: () =>
+                                _open(const StaffConductCasesPage(), destinationLabel: 'Conduct & Cases'),
                             icon: const Icon(Icons.gavel_outlined, size: 18),
                             label: const Text('Conduct & cases'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(
-                                const EmployeeCurfewProfilesPage(),
-                                destinationLabel: 'Employee curfew'),
+                            onPressed: () =>
+                                _open(const EmployeeCurfewProfilesPage(), destinationLabel: 'Employee curfew'),
                             icon: const Icon(Icons.badge_outlined, size: 18),
                             label: const Text('Employee curfew'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(
-                                const RetentionSettingsPage(),
-                                destinationLabel: 'Security & retention'),
+                            onPressed: () =>
+                                _open(const RetentionSettingsPage(), destinationLabel: 'Security & retention'),
                             icon: const Icon(Icons.security_outlined, size: 18),
                             label: const Text('Security & retention'),
                           ),
@@ -393,6 +388,75 @@ class _OverviewHeader extends StatelessWidget {
             ),
           ],
         ),
+      );
+}
+
+class _StaffPropertyHero extends StatelessWidget {
+  const _StaffPropertyHero();
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 700;
+          return ClipRRect(
+            key: const Key('staff-dashboard-property-hero'),
+            borderRadius: BorderRadius.circular(22),
+            child: SizedBox(
+              width: double.infinity,
+              height: compact ? 170 : 210,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    AppAssets.dormOverview,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: .70),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Positioned(
+                    left: 22,
+                    right: 22,
+                    bottom: 18,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'CarmeLink',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -.4,
+                          ),
+                        ),
+                        SizedBox(height: 3),
+                        Text(
+                          'Quick monitoring for daily operations',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       );
 }
 
