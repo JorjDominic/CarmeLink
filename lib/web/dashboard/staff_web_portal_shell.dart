@@ -17,6 +17,7 @@ import '../../views/shared/conduct_case_pages.dart';
 import '../../views/shared/employee_curfew_profile_pages.dart';
 import '../../views/shared/retention_settings_page.dart';
 import '../../views/shared/shared_views.dart';
+import '../../views/shared/cleaning_schedule_management_page.dart';
 import 'staff_overview_page.dart';
 
 /// A browser-only destination composition. Every management destination is
@@ -80,9 +81,9 @@ abstract final class StaffWebDestinations {
         label: 'Cleaning schedules',
         icon: Icons.cleaning_services_outlined,
         selectedIcon: Icons.cleaning_services,
-        page: RoomMonitoringPage(),
+        page: CleaningScheduleManagementPage(),
         webGroup: 'Facilities',
-        webDescription: 'Room and bed cleaning duties',
+        webDescription: 'Automatic rotation and manual overrides',
       ),
       const AppDestination(
         label: 'Room inspections',
