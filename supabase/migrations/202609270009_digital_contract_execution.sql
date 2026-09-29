@@ -2,7 +2,6 @@
 -- signatures the authoritative activation evidence.
 
 create sequence if not exists public.tenant_contract_number_seq;
-
 create or replace function public.next_tenant_contract_number()
 returns text
 language sql
@@ -12,19 +11,15 @@ as $$
   select 'CTR-' || to_char(current_date, 'YYYY') || '-' ||
          lpad(nextval('public.tenant_contract_number_seq')::text, 6, '0');
 $$;
-
 alter table public.tenant_contracts
   alter column contract_number set default public.next_tenant_contract_number();
-
 revoke all on function public.next_tenant_contract_number() from public, anon, authenticated;
-
 -- The former signed-photocopy item belongs to the retired paper workflow.
 update public.contract_requirements
 set is_required = false,
     status = case when status = 'verified' then 'verified' else 'waived' end,
     updated_at = now()
 where requirement_type = 'signed_photocopies';
-
 create or replace function public.initialize_contract_onboarding(p_contract_id uuid)
 returns void language plpgsql security definer set search_path = '' as $$
 begin
@@ -45,7 +40,8 @@ begin
   on conflict (contract_id, signer_role) do nothing;
 end;
 $$;
-
+drop policy if exists contract_documents_storage_owner_signature_insert
+  on storage.objects;
 create policy contract_documents_storage_owner_signature_insert
 on storage.objects for insert to authenticated with check (
   bucket_id = 'contract-documents'
@@ -56,7 +52,6 @@ on storage.objects for insert to authenticated with check (
     where c.id::text = (storage.foldername(name))[1] and c.status = 'draft'
   )
 );
-
 create or replace function public.submit_owner_electronic_signature(
   p_contract_id uuid,
   p_storage_path text,
@@ -91,12 +86,10 @@ begin
   if v_signer.id is null then raise exception 'Owner signer is not eligible for signing'; end if;
   return v_signer;
 end $$;
-
 revoke all on function public.submit_owner_electronic_signature(uuid,text,bigint,text)
   from public, anon;
 grant execute on function public.submit_owner_electronic_signature(uuid,text,bigint,text)
   to authenticated;
-
 create or replace function public.sync_electronic_contract_signature_status()
 returns trigger
 language plpgsql
@@ -130,15 +123,12 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists contract_signers_sync_contract_status on public.contract_signers;
 create trigger contract_signers_sync_contract_status
 after insert or update of status, is_required on public.contract_signers
 for each row execute function public.sync_electronic_contract_signature_status();
-
 revoke all on function public.sync_electronic_contract_signature_status()
   from public, anon, authenticated;
-
 create or replace function public.require_verified_email_for_active_contract()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin
