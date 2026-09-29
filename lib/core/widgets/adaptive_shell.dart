@@ -6,6 +6,7 @@ import '../../controllers/messaging_controller.dart';
 import '../../controllers/session_controller.dart';
 import '../../views/shared/shared_views.dart';
 import '../../services/app_notification_service.dart';
+import '../../services/web_workspace_persistence_service.dart';
 import 'common_widgets.dart';
 
 import '../runtime/app_surface.dart';
@@ -141,6 +142,8 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   // sidebar widget. This keeps the user's open/closed groups unchanged while
   // workspace pages switch. Empty by default = a tidy collapsed sidebar.
   final Set<String> _expandedWebGroups = <String>{};
+  static const _workspacePersistence = WebWorkspacePersistenceService();
+  bool _workspaceRestoreScheduled = false;
 
   GlobalKey<NavigatorState> _webWorkspaceNavigatorKey =
       GlobalKey<NavigatorState>();
@@ -149,6 +152,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   void initState() {
     super.initState();
     MessagingController.instance.addListener(_onMessagingChanged);
+    _scheduleWorkspaceRestore();
   }
 
   void _onMessagingChanged() {
@@ -185,6 +189,12 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     }
     if (oldWidget.roleLabel != widget.roleLabel) {
       _expandedWebGroups.clear();
+      _workspaceLabelOverride = null;
+      _workspaceGroupOverride = null;
+      index = 0;
+      _webWorkspaceNavigatorKey = GlobalKey<NavigatorState>();
+      _workspaceRestoreScheduled = false;
+      _scheduleWorkspaceRestore();
     }
   }
 
@@ -224,8 +234,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   }
 
   Future<void> _refreshUnreadNotificationCount() async {
-    final count =
-        await AppNotificationService.instance.fetchMyUnreadCount();
+    final count = await AppNotificationService.instance.fetchMyUnreadCount();
     if (!mounted || count == null) return;
     if (_unreadNotificationCount != count) {
       setState(() => _unreadNotificationCount = count);
@@ -401,6 +410,81 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     super.dispose();
   }
 
+  List<AppDestination> _webWorkspaceDestinations() =>
+      [...widget.destinations, ...widget.webDestinations];
+
+  String _baseWorkspaceLabel() {
+    final destinations = _webWorkspaceDestinations();
+    if (destinations.isEmpty) return 'Dashboard';
+    final safeIndex = index >= 0 && index < destinations.length ? index : 0;
+    return destinations[safeIndex].label;
+  }
+
+  void _scheduleWorkspaceRestore() {
+    if (_workspaceRestoreScheduled) return;
+    _workspaceRestoreScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_restoreWebWorkspaceState());
+    });
+  }
+
+  Future<void> _restoreWebWorkspaceState() async {
+    if (!mounted || !CarmeLinkSurfaceScope.isWebPortal(context)) return;
+    final saved = await _workspacePersistence.load(widget.roleLabel);
+    if (!mounted) return;
+
+    final destinations = _webWorkspaceDestinations();
+    if (destinations.isEmpty) return;
+
+    final savedBase = saved.baseDestinationLabel?.trim().toLowerCase();
+    final baseIndex = savedBase == null
+        ? -1
+        : destinations.indexWhere(
+            (item) => item.label.trim().toLowerCase() == savedBase,
+          );
+
+    final validGroups =
+        destinations.map((item) => item.webGroup).whereType<String>().toSet();
+    final restoredGroups = saved.expandedGroups.intersection(validGroups);
+
+    setState(() {
+      index = baseIndex >= 0 ? baseIndex : 0;
+      _expandedWebGroups
+        ..clear()
+        ..addAll(restoredGroups);
+      _workspaceLabelOverride = null;
+      _workspaceGroupOverride = null;
+      _webWorkspaceNavigatorKey = GlobalKey<NavigatorState>();
+    });
+
+    final visible = saved.visiblePageLabel?.trim();
+    if (visible == null || visible.isEmpty) return;
+    final wanted = visible.toLowerCase();
+    final destinationIndex = destinations.indexWhere(
+      (item) => item.label.trim().toLowerCase() == wanted,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (destinationIndex >= 0 && destinationIndex != index) {
+        _select(destinationIndex);
+      } else if (wanted == 'messages') {
+        _openMessages();
+      } else if (wanted == 'notifications') {
+        _openNotifications();
+      }
+    });
+  }
+
+  Future<void> _persistWorkspaceDestination(String visibleLabel) async {
+    if (!mounted || !CarmeLinkSurfaceScope.isWebPortal(context)) return;
+    await _workspacePersistence.saveDestination(
+      roleLabel: widget.roleLabel,
+      baseDestinationLabel: _baseWorkspaceLabel(),
+      visiblePageLabel: visibleLabel,
+    );
+  }
+
   void _toggleWebGroup(String group) {
     setState(() {
       if (_expandedWebGroups.contains(group)) {
@@ -409,9 +493,20 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
         _expandedWebGroups.add(group);
       }
     });
+    unawaited(
+      _workspacePersistence.saveExpandedGroups(
+        roleLabel: widget.roleLabel,
+        groups: _expandedWebGroups,
+      ),
+    );
   }
 
   void _select(int value) {
+    final destinations = CarmeLinkSurfaceScope.isWebPortal(context)
+        ? _webWorkspaceDestinations()
+        : widget.destinations;
+    if (value < 0 || value >= destinations.length) return;
+
     if (value == index) {
       final navigator = _webWorkspaceNavigatorKey.currentState;
       if (navigator != null && navigator.canPop()) {
@@ -423,6 +518,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
           _workspaceGroupOverride = null;
         });
       }
+      unawaited(_persistWorkspaceDestination(destinations[value].label));
       return;
     }
     setState(() {
@@ -431,6 +527,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       _workspaceGroupOverride = null;
       _webWorkspaceNavigatorKey = GlobalKey<NavigatorState>();
     });
+    unawaited(_persistWorkspaceDestination(destinations[value].label));
   }
 
   void _selectByLabel(String label) {
@@ -457,6 +554,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
         _workspaceLabelOverride = label;
         _workspaceGroupOverride = group;
       });
+    }
+    if (label != null) {
+      unawaited(_persistWorkspaceDestination(label));
     }
     final navigator = _webWorkspaceNavigatorKey.currentState;
     if (navigator != null) {
@@ -734,8 +834,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                         onSelected: _select,
                         onOpenMessages: _openMessages,
                         onOpenNotifications: _openNotifications,
-                        onOpenPage: (label, page) =>
-                            _openWebWorkspacePage(
+                        onOpenPage: (label, page) => _openWebWorkspacePage(
                           page,
                           label: label,
                           group: 'Account',
