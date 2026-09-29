@@ -37,17 +37,18 @@ void main() {
     });
 
     test(
-        'legacy payment subscriptions also observe authoritative billing tables',
-        () {
-      final source = File(
-        'lib/services/table_refresh_subscription.dart',
-      ).readAsStringSync();
+      'legacy payment subscriptions also observe authoritative billing tables',
+      () {
+        final source = File(
+          'lib/services/table_refresh_subscription.dart',
+        ).readAsStringSync();
 
-      expect(source.contains("if (table == 'payments')"), isTrue);
-      expect(source.contains("yield 'billing_charges'"), isTrue);
-      expect(source.contains("yield 'payment_transactions'"), isTrue);
-      expect(source.contains("yield 'billing_charge_actions'"), isTrue);
-    });
+        expect(source.contains("if (table == 'payments')"), isTrue);
+        expect(source.contains("yield 'billing_charges'"), isTrue);
+        expect(source.contains("yield 'payment_transactions'"), isTrue);
+        expect(source.contains("yield 'billing_charge_actions'"), isTrue);
+      },
+    );
 
     test('live in-app alerts update unread badges and keep navigation in shell',
         () {
@@ -61,10 +62,10 @@ void main() {
       expect(source.contains("label: 'View'"), isTrue);
       expect(source.contains('_UnreadCountBadge'), isTrue);
       expect(source.contains('openNotifications: _openNotifications'), isTrue);
-      expect(
-        source.contains('_openWebWorkspacePage(_notificationsPage())'),
-        isTrue,
-      );
+      expect(source.contains('_openWebWorkspacePage('), isTrue);
+      expect(source.contains('_notificationsPage(),'), isTrue);
+      expect(source.contains("label: 'Notifications'"), isTrue);
+      expect(source.contains("group: 'Communication'"), isTrue);
     });
 
     test('actionable notifications map to existing live staff modules', () {
@@ -89,8 +90,9 @@ void main() {
         expect(source.contains("'$route'"), isTrue, reason: 'Missing $route');
       }
       expect(
-          source.contains('notificationPageBuilder: _notificationDestination'),
-          isTrue);
+        source.contains('notificationPageBuilder: _notificationDestination'),
+        isTrue,
+      );
       expect(source.contains('initialConversationId: notification.routeId'),
           isTrue);
     });
