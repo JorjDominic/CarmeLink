@@ -11,7 +11,6 @@ import '../../views/shared/conduct_case_pages.dart';
 import '../../views/shared/employee_curfew_profile_pages.dart';
 import '../../views/shared/retention_settings_page.dart';
 import '../../views/shared/cleaning_schedule_management_page.dart';
-import '../theme/web_theme.dart';
 import 'widgets/staff_overview_card.dart';
 
 /// New LIVE dashboard on the browser route only. Reuses existing management
@@ -66,7 +65,7 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: WebPalette.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: AnimatedBuilder(
           animation: OwnerController.instance,
           builder: (context, _) {
@@ -192,7 +191,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                               ? '${data.openMaintenance}'
                               : null,
                           icon: Icons.build_outlined,
-                          onTap: () => _open(const MaintenanceManagementPage(), destinationLabel: 'Maintenance'),
+                          onTap: () => _open(const MaintenanceManagementPage(),
+                              destinationLabel: 'Maintenance'),
                         ),
                         const SizedBox(height: 9),
                         StaffActionRow(
@@ -205,7 +205,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                               ? '${data.pendingPaymentProofs}'
                               : null,
                           icon: Icons.receipt_long_outlined,
-                          onTap: () => _open(const PaymentVerificationPage(), destinationLabel: 'Payment verification'),
+                          onTap: () => _open(const PaymentVerificationPage(),
+                              destinationLabel: 'Payment verification'),
                         ),
                         if (owner) ...[
                           const SizedBox(height: 9),
@@ -219,7 +220,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                                 ? '${data.contractsExpiringWithin30Days}'
                                 : null,
                             icon: Icons.description_outlined,
-                            onTap: () => _open(const ContractsPage(), destinationLabel: 'Contracts'),
+                            onTap: () => _open(const ContractsPage(),
+                                destinationLabel: 'Contracts'),
                           ),
                         ],
                         const SizedBox(height: 28),
@@ -231,24 +233,28 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                         const SizedBox(height: 12),
                         Wrap(spacing: 9, runSpacing: 9, children: [
                           OutlinedButton.icon(
-                            onPressed: () => _open(const TenantDirectoryPage(), destinationLabel: 'Residents'),
+                            onPressed: () => _open(const TenantDirectoryPage(),
+                                destinationLabel: 'Residents'),
                             icon: const Icon(Icons.groups_outlined, size: 18),
                             label: const Text('Tenant directory'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(const RoomMonitoringPage(), destinationLabel: 'Rooms'),
+                            onPressed: () => _open(const RoomMonitoringPage(),
+                                destinationLabel: 'Rooms'),
                             icon: const Icon(Icons.meeting_room_outlined,
                                 size: 18),
                             label: const Text('Room monitoring'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(const OperationsHubPage(), destinationLabel: 'Operations'),
+                            onPressed: () => _open(const OperationsHubPage(),
+                                destinationLabel: 'Operations'),
                             icon: const Icon(Icons.tune_outlined, size: 18),
                             label: const Text('Operations'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () =>
-                                _open(const VisitorManagementPage(), destinationLabel: 'Visitors'),
+                            onPressed: () => _open(
+                                const VisitorManagementPage(),
+                                destinationLabel: 'Visitors'),
                             icon: const Icon(Icons.people_outline, size: 18),
                             label: const Text('Visitors'),
                           ),
@@ -264,26 +270,30 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                             label: const Text('Cleaning schedules'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(const RoomMonitoringPage(), destinationLabel: 'Room inspections'),
+                            onPressed: () => _open(const RoomMonitoringPage(),
+                                destinationLabel: 'Room inspections'),
                             icon:
                                 const Icon(Icons.fact_check_outlined, size: 18),
                             label: const Text('Room inspections'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () =>
-                                _open(const StaffConductCasesPage(), destinationLabel: 'Conduct & Cases'),
+                            onPressed: () => _open(
+                                const StaffConductCasesPage(),
+                                destinationLabel: 'Conduct & Cases'),
                             icon: const Icon(Icons.gavel_outlined, size: 18),
                             label: const Text('Conduct & cases'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () =>
-                                _open(const EmployeeCurfewProfilesPage(), destinationLabel: 'Employee curfew'),
+                            onPressed: () => _open(
+                                const EmployeeCurfewProfilesPage(),
+                                destinationLabel: 'Employee curfew'),
                             icon: const Icon(Icons.badge_outlined, size: 18),
                             label: const Text('Employee curfew'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () =>
-                                _open(const RetentionSettingsPage(), destinationLabel: 'Security & retention'),
+                            onPressed: () => _open(
+                                const RetentionSettingsPage(),
+                                destinationLabel: 'Security & retention'),
                             icon: const Icon(Icons.security_outlined, size: 18),
                             label: const Text('Security & retention'),
                           ),
@@ -334,61 +344,74 @@ class _OverviewHeader extends StatelessWidget {
   final VoidCallback onRefresh;
 
   @override
-  Widget build(BuildContext context) => Container(
-        key: const Key('staff-overview-header'),
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: WebPalette.cream,
-          border: Border.all(color: WebPalette.border),
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 14,
-          runSpacing: 16,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('CARMELITA / $roleLabel',
-                    style: const TextStyle(
-                      color: WebPalette.plum,
-                      fontSize: 11,
-                      letterSpacing: 1.5,
-                      fontWeight: FontWeight.w800,
-                    )),
-                const SizedBox(height: 8),
-                const Text('The day in focus.',
-                    style: TextStyle(
-                      color: WebPalette.ink,
-                      fontSize: 29,
-                      letterSpacing: -.6,
-                      fontWeight: FontWeight.w800,
-                    )),
-                const SizedBox(height: 5),
-                const Text(
-                    'Your operational overview, drawn from current records.',
-                    style: TextStyle(color: WebPalette.muted, fontSize: 13)),
-              ],
-            ),
-            OutlinedButton.icon(
-              key: const Key('staff-overview-refresh'),
-              onPressed: refreshing ? null : onRefresh,
-              icon: refreshing
-                  ? const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh, size: 18),
-              label: Text(refreshing ? 'Refreshing' : 'Refresh records'),
-            ),
-          ],
-        ),
-      );
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final border = Theme.of(context).dividerColor;
+
+    return Container(
+      key: const Key('staff-overview-header'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        border: Border.all(color: border),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 14,
+        runSpacing: 16,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'CARMELITA / $roleLabel',
+                style: TextStyle(
+                  color: scheme.primary,
+                  fontSize: 11,
+                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'The day in focus.',
+                style: TextStyle(
+                  color: scheme.onSurface,
+                  fontSize: 29,
+                  letterSpacing: -.6,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                'Your operational overview, drawn from current records.',
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          OutlinedButton.icon(
+            key: const Key('staff-overview-refresh'),
+            onPressed: refreshing ? null : onRefresh,
+            icon: refreshing
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh, size: 18),
+            label: Text(refreshing ? 'Refreshing' : 'Refresh records'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _StaffPropertyHero extends StatelessWidget {
@@ -466,19 +489,29 @@ class _SectionLabel extends StatelessWidget {
   final String subtitle;
 
   @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: const TextStyle(
-                color: WebPalette.ink,
-                fontSize: 21,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -.3,
-              )),
-          const SizedBox(height: 4),
-          Text(subtitle,
-              style: const TextStyle(color: WebPalette.muted, fontSize: 13)),
-        ],
-      );
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: scheme.onSurface,
+            fontSize: 21,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.3,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: TextStyle(
+            color: scheme.onSurfaceVariant,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
+  }
 }

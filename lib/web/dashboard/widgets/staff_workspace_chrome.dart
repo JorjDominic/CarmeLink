@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/web_theme.dart';
 import '../staff_portal_theme.dart';
 
 /// Presentation layer for the REAL owner/caretaker web workspace.
@@ -23,6 +22,9 @@ class StaffWorkspaceChrome extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final spacious = width >= 900;
+    final scheme = Theme.of(context).colorScheme;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final border = Theme.of(context).dividerColor;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -36,10 +38,8 @@ class StaffWorkspaceChrome extends StatelessWidget {
                 vertical: spacious ? 15 : 9,
               ),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                border: Border(
-                  bottom: BorderSide(color: Theme.of(context).dividerColor),
-                ),
+                color: scheme.surface,
+                border: Border(bottom: BorderSide(color: border)),
               ),
               child: Row(
                 children: [
@@ -48,17 +48,17 @@ class StaffWorkspaceChrome extends StatelessWidget {
                     height: spacious ? 46 : 38,
                     clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
-                      color: WebPalette.cream,
-                      border: Border.all(color: WebPalette.border),
+                      color: scheme.surfaceContainerLow,
+                      border: Border.all(color: border),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Image.asset(
                       'assets/web/brand/carmelita_logo.jpg',
                       fit: BoxFit.contain,
                       semanticLabel: 'Carmelita Dormitory logo',
-                      errorBuilder: (context, error, stack) => const Icon(
+                      errorBuilder: (context, error, stack) => Icon(
                         Icons.apartment_rounded,
-                        color: WebPalette.plum,
+                        color: scheme.primary,
                       ),
                     ),
                   ),
@@ -69,12 +69,12 @@ class StaffWorkspaceChrome extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (spacious)
-                          const Text(
+                          Text(
                             'CARMELITA / MANAGEMENT',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: WebPalette.muted,
+                              color: scheme.onSurfaceVariant,
                               fontSize: 10,
                               letterSpacing: 1.5,
                               fontWeight: FontWeight.w800,
@@ -85,7 +85,7 @@ class StaffWorkspaceChrome extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: WebPalette.ink,
+                            color: onSurface,
                             fontSize: spacious ? 20 : 14,
                             letterSpacing: spacious ? -.4 : 0,
                             fontWeight: FontWeight.w800,
@@ -102,14 +102,14 @@ class StaffWorkspaceChrome extends StatelessWidget {
                         vertical: 9,
                       ),
                       decoration: BoxDecoration(
-                        color: WebPalette.sand,
+                        color: scheme.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: WebPalette.border),
+                        border: Border.all(color: border),
                       ),
                       child: Text(
                         roleLabel,
-                        style: const TextStyle(
-                          color: WebPalette.plum,
+                        style: TextStyle(
+                          color: scheme.primary,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),

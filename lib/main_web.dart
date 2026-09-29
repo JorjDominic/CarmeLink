@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'controllers/session_controller.dart';
+import 'controllers/theme_controller.dart';
 import 'core/config/supabase_config.dart';
 import 'web/app/carmelink_web_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ThemeController.instance.loadLocalPreference();
 
   // Public pages remain available if the staff authentication service fails.
   var authReady = false;

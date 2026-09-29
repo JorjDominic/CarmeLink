@@ -18,6 +18,7 @@ import '../../services/contract_onboarding_service.dart';
 import 'package:carmelitas_dormitory_system/views/shared/retention_settings_page.dart';
 import '../tenant/onboarding_form_page.dart';
 import '../tenant/tenant_requirements_page.dart';
+import 'profile_edit_page.dart';
 import 'signature_pad_dialog.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -1584,6 +1585,31 @@ class SettingsPage extends StatelessWidget {
             ),
             const SizedBox(height: 22),
             const SectionTitle(
+              'Profile',
+              subtitle: 'Your editable account information',
+            ),
+            const SizedBox(height: 10),
+            CarmelitaCard(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.manage_accounts_outlined),
+                title: const Text(
+                  'Edit profile',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: const Text(
+                  'Update your name, phone, and role-appropriate profile details.',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ProfileEditPage(),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            const SectionTitle(
               'Appearance',
               subtitle: 'System, Light, or Dark',
             ),
@@ -1704,7 +1730,7 @@ class SettingsPage extends StatelessWidget {
                       ),
                     ),
                     subtitle: const Text(
-                      'Will connect to Supabase Auth in the backend phase.',
+                      'Update your password securely through Supabase Auth.',
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.of(context).push(

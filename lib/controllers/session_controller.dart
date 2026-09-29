@@ -15,6 +15,7 @@ import 'guardian_controller.dart';
 import 'messaging_controller.dart';
 import 'owner_controller.dart';
 import 'tenant_controller.dart';
+import 'theme_controller.dart';
 
 class SessionController extends ChangeNotifier {
   SessionController._();
@@ -74,6 +75,10 @@ class SessionController extends ChangeNotifier {
             .restoreSession()
             .timeout(const Duration(seconds: 4));
 
+        if (_currentUser != null) {
+          unawaited(ThemeController.instance.loadForCurrentUser());
+        }
+
         if (_currentUser?.role == UserRole.tenant) {
           unawaited(GeofenceScheduler.instance.start(_currentUser!.id));
         }
@@ -107,6 +112,7 @@ class SessionController extends ChangeNotifier {
       _currentUser = await _authService.signIn(email, password);
       await _syncEmailVerification();
       _justSignedOut = false;
+      unawaited(ThemeController.instance.loadForCurrentUser());
 
       if (_currentUser?.role == UserRole.tenant) {
         unawaited(GeofenceScheduler.instance.start(_currentUser!.id));
@@ -149,6 +155,7 @@ class SessionController extends ChangeNotifier {
       await _syncEmailVerification();
       _emailAwaitingVerification = null;
       _justSignedOut = false;
+      unawaited(ThemeController.instance.loadForCurrentUser());
 
       if (_currentUser?.role == UserRole.tenant) {
         unawaited(GeofenceScheduler.instance.start(_currentUser!.id));
@@ -189,6 +196,17 @@ class SessionController extends ChangeNotifier {
     } catch (error) {
       debugPrint('Could not sync email verification timestamp: $error');
     }
+  }
+
+  Future<void> refreshCurrentUser() async {
+    final refreshed = await _authService
+        .refreshCurrentUser()
+        .timeout(const Duration(seconds: 5));
+    if (refreshed == null) {
+      throw StateError('Your session has expired.');
+    }
+    _currentUser = refreshed;
+    notifyListeners();
   }
 
   Future<void> signOut() async {

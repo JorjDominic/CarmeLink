@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/web_motion.dart';
-import '../../theme/web_theme.dart';
 
 /// Web-only metric. Values must originate from the live controller, never
 /// fabricated defaults. An unavailable dataset is NOT represented as zero.
@@ -29,77 +28,96 @@ class _StaffOverviewCardState extends State<StaffOverviewCard> {
   bool hovered = false;
 
   @override
-  Widget build(BuildContext context) => MouseRegion(
-        onEnter: (_) => setState(() => hovered = true),
-        onExit: (_) => setState(() => hovered = false),
-        child: AnimatedContainer(
-          key: Key('staff-metric-${widget.label.toLowerCase().replaceAll(' ', '-')}'),
-          duration: WebMotion.duration(context, WebMotion.feedback),
-          curve: WebMotion.enter,
-          decoration: BoxDecoration(
-            color: hovered ? WebPalette.cream : WebPalette.surface,
-            border: Border.all(
-              color: hovered ? WebPalette.plum : WebPalette.border,
-            ),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: hovered
-                ? [BoxShadow(
-                    color: WebPalette.ink.withValues(alpha: .055),
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final border = Theme.of(context).dividerColor;
+    final surface = Theme.of(context).colorScheme.surface;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => hovered = true),
+      onExit: (_) => setState(() => hovered = false),
+      child: AnimatedContainer(
+        key: Key(
+          'staff-metric-${widget.label.toLowerCase().replaceAll(' ', '-')}',
+        ),
+        duration: WebMotion.duration(context, WebMotion.feedback),
+        curve: WebMotion.enter,
+        decoration: BoxDecoration(
+          color: hovered ? scheme.surfaceContainerHigh : surface,
+          border: Border.all(color: hovered ? scheme.primary : border),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: hovered
+              ? [
+                  BoxShadow(
+                    color: scheme.shadow.withValues(alpha: .12),
                     blurRadius: 20,
                     offset: const Offset(0, 6),
-                  )]
-                : null,
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(18),
-              onTap: widget.onTap,
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(children: [
-                      Icon(widget.icon, color: WebPalette.plum, size: 21),
+                  ),
+                ]
+              : null,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: widget.onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Icon(widget.icon, color: scheme.primary, size: 21),
                       const Spacer(),
-                      const Icon(Icons.arrow_outward,
-                          color: WebPalette.muted, size: 17),
-                    ]),
-                    const SizedBox(height: 20),
-                    Text(widget.value,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: WebPalette.ink,
-                          fontSize: 27,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -.7,
-                        )),
-                    const SizedBox(height: 4),
-                    Text(widget.label,
-                        style: const TextStyle(
-                          color: WebPalette.ink,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        )),
-                    const SizedBox(height: 4),
-                    Text(widget.detail,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: WebPalette.muted,
-                          fontSize: 12,
-                          height: 1.4,
-                        )),
-                  ],
-                ),
+                      Icon(
+                        Icons.arrow_outward,
+                        color: scheme.onSurfaceVariant,
+                        size: 17,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    widget.value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: scheme.onSurface,
+                      fontSize: 27,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.7,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.label,
+                    style: TextStyle(
+                      color: scheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.detail,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 class StaffActionRow extends StatelessWidget {
@@ -119,26 +137,31 @@ class StaffActionRow extends StatelessWidget {
   final String? value;
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: WebPalette.surface,
-        child: InkWell(
-          key: Key('staff-action-${title.toLowerCase().replaceAll(' ', '-')}'),
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 16),
-            decoration: BoxDecoration(
-              border: Border.all(color: WebPalette.border),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(children: [
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final border = Theme.of(context).dividerColor;
+
+    return Material(
+      color: scheme.surface,
+      child: InkWell(
+        key: Key('staff-action-${title.toLowerCase().replaceAll(' ', '-')}'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 16),
+          decoration: BoxDecoration(
+            border: Border.all(color: border),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: WebPalette.sand,
+                  color: scheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: WebPalette.plum, size: 20),
+                child: Icon(icon, color: scheme.primary, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -146,32 +169,46 @@ class StaffActionRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(title,
-                        style: const TextStyle(
-                            color: WebPalette.ink,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700)),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 3),
-                    Text(description,
-                        style: const TextStyle(
-                          color: WebPalette.muted,
-                          fontSize: 12,
-                          height: 1.4,
-                        )),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
                   ],
                 ),
               ),
               if (value != null) ...[
                 const SizedBox(width: 6),
-                Text(value!,
-                    style: const TextStyle(
-                        color: WebPalette.plum,
-                        fontWeight: FontWeight.w800)),
+                Text(
+                  value!,
+                  style: TextStyle(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ],
               const SizedBox(width: 7),
-              const Icon(Icons.chevron_right, color: WebPalette.muted, size: 19),
-            ]),
+              Icon(
+                Icons.chevron_right,
+                color: scheme.onSurfaceVariant,
+                size: 19,
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
+  }
 }

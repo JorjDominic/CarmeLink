@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
-/// Website colors are aliases of the MOBILE palette, not a second brand.
-/// The legacy `plum` names are kept temporarily so existing web screens
-/// continue compiling; their actual colors are now Carmelita brown/taupe.
+/// Light-mode aliases retained for the public marketing website. Authenticated
+/// staff surfaces use Theme.of(context) so they can follow Light/Dark/System.
 abstract final class WebPalette {
   static const ink = AppColors.lightText;
   static const plum = AppColors.lightPrimary;
@@ -21,38 +20,48 @@ abstract final class WebPalette {
 }
 
 abstract final class WebTheme {
-  static ThemeData light() {
-    // Same color scheme as the mobile app; web keeps its own layouts,
-    // typography, button geometry and motion system.
-    final scheme = AppTheme.light().colorScheme;
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: WebPalette.background,
-      fontFamily: 'Roboto',
-      textTheme: const TextTheme(
-        bodyMedium: TextStyle(color: WebPalette.ink, height: 1.5),
-        bodyLarge: TextStyle(color: WebPalette.ink, height: 1.6),
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: WebPalette.background,
-        foregroundColor: WebPalette.ink,
+  static ThemeData light() => _fromAppTheme(AppTheme.light());
+
+  static ThemeData dark() => _fromAppTheme(AppTheme.dark());
+
+  static ThemeData _fromAppTheme(ThemeData base) {
+    final scheme = base.colorScheme;
+    final border = scheme.outlineVariant;
+    final textTheme = base.textTheme.apply(fontFamily: 'Roboto').copyWith(
+          bodyMedium: base.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurface,
+            height: 1.5,
+            fontFamily: 'Roboto',
+          ),
+          bodyLarge: base.textTheme.bodyLarge?.copyWith(
+            color: scheme.onSurface,
+            height: 1.6,
+            fontFamily: 'Roboto',
+          ),
+        );
+
+    return base.copyWith(
+      textTheme: textTheme,
+      appBarTheme: AppBarTheme(
+        backgroundColor: base.scaffoldBackgroundColor,
+        foregroundColor: scheme.onSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
       ),
       cardTheme: CardThemeData(
-        color: WebPalette.surface,
+        color: scheme.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: WebPalette.border),
+          side: BorderSide(color: border),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: WebPalette.plum,
-          foregroundColor: Colors.white,
+          backgroundColor: scheme.primary,
+          foregroundColor: scheme.onPrimary,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 19),
           minimumSize: const Size(48, 48),
           shape: RoundedRectangleBorder(
@@ -62,8 +71,8 @@ abstract final class WebTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: WebPalette.plum,
-          side: const BorderSide(color: WebPalette.border),
+          foregroundColor: scheme.primary,
+          side: BorderSide(color: border),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 19),
           minimumSize: const Size(48, 48),
           shape: RoundedRectangleBorder(
@@ -71,7 +80,7 @@ abstract final class WebTheme {
           ),
         ),
       ),
-      dividerColor: WebPalette.border,
+      dividerColor: border,
     );
   }
 }
