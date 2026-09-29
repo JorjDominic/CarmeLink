@@ -18,10 +18,11 @@ void main() {
   };
 
   final viewports = <String, Size>{
-    'narrow phone': const Size(320, 640),
-    'phone landscape': const Size(640, 360),
-    'tablet': const Size(800, 1200),
-    'desktop': const Size(1440, 1000),
+    '320 phone': const Size(320, 700),
+    '375 phone': const Size(375, 812),
+    '768 tablet': const Size(768, 1024),
+    '1024 desktop threshold': const Size(1024, 768),
+    '1440 desktop': const Size(1440, 1000),
   };
 
   for (final page in pages.entries) {
