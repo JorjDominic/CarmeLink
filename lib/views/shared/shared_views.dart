@@ -1893,9 +1893,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         icon: const Icon(Icons.check_circle_outline, color: Colors.green),
-        title: const Text('Feedback recorded'),
+        title: const Text('Feedback preview validated'),
         content: const Text(
-          'Thank you! Your feedback has been recorded for dormitory management review.',
+          'The form looks valid, but this preview was not sent or stored. ' +
+              'Backend feedback persistence is not enabled yet.',
         ),
         actions: [
           FilledButton(
