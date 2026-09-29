@@ -2034,6 +2034,7 @@ class _NotificationPreferencesPageState
     TimeOfDay? alertTime,
     bool? gateEnabled,
     bool? cutoffEnabled,
+    bool? insideEnabled,
   }) async {
     setState(() => _savingGuardianPreference = true);
     try {
@@ -2042,6 +2043,7 @@ class _NotificationPreferencesPageState
         gateEntryEnabled: gateEnabled,
         gateExitEnabled: gateEnabled,
         outsideAfterCutoffEnabled: cutoffEnabled,
+        insideAfterCutoffEnabled: insideEnabled,
       );
       if (!mounted) return;
       setState(() {
@@ -2137,7 +2139,7 @@ class _NotificationPreferencesPageState
                   ],
                 ),
                 const SizedBox(height: 14),
-                if (_isGuardian)
+                if (_isGuardian) ...[
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Outside-after-time alert'),
@@ -2149,6 +2151,18 @@ class _NotificationPreferencesPageState
                         : (value) =>
                             _saveGuardianPreference(cutoffEnabled: value),
                   ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Inside-after-time alert'),
+                    subtitle: const Text(
+                        'Notify me once per day when my linked resident is inside the dormitory property after the selected time.'),
+                    value: GuardianAlertService.insideAfterCutoffEnabled,
+                    onChanged: _savingGuardianPreference
+                        ? null
+                        : (value) =>
+                            _saveGuardianPreference(insideEnabled: value),
+                  ),
+                ],
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

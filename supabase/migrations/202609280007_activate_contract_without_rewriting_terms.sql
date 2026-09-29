@@ -24,7 +24,9 @@ begin
   return v_contract_id;
 end;
 $$;
+
 revoke all on function public.activate_tenant_contract(uuid)
   from public, anon;
 grant execute on function public.activate_tenant_contract(uuid)
   to authenticated;
+

@@ -20,19 +20,24 @@ begin
   return new;
 end;
 $$;
+
 drop trigger if exists tenant_contracts_ensure_contract_number
   on public.tenant_contracts;
 create trigger tenant_contracts_ensure_contract_number
 before insert or update of contract_number on public.tenant_contracts
 for each row execute function public.ensure_tenant_contract_number();
+
 -- Repair legacy blank identifiers, if any. A true NULL cannot currently exist
 -- because the column is NOT NULL, but this remains safe if older deployments
 -- temporarily relaxed that constraint.
 update public.tenant_contracts
 set contract_number = public.next_tenant_contract_number()
 where contract_number is null or btrim(contract_number) = '';
+
 alter table public.tenant_contracts
   alter column contract_number set default public.next_tenant_contract_number(),
   alter column contract_number set not null;
+
 revoke all on function public.ensure_tenant_contract_number()
   from public, anon, authenticated;
+

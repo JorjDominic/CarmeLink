@@ -4,14 +4,17 @@
 
 create extension if not exists pg_cron with schema pg_catalog;
 create extension if not exists pg_net with schema extensions;
+
 create table if not exists public.guardian_alert_cron_credentials (
   id uuid primary key default gen_random_uuid(),
   token_hash text not null unique check (token_hash ~ '^[a-f0-9]{64}$'),
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
+
 alter table public.guardian_alert_cron_credentials enable row level security;
 revoke all on public.guardian_alert_cron_credentials from anon, authenticated;
+
 do $$
 declare
   v_secret text := replace(gen_random_uuid()::text, '-', '') ||
@@ -41,5 +44,6 @@ begin
   );
   perform cron.schedule('guardian-presence-alerts', '*/5 * * * *', v_command);
 end $$;
+
 comment on table public.guardian_alert_cron_credentials is
   'Private hashes used to authenticate the pg_cron guardian presence-alert processor.';

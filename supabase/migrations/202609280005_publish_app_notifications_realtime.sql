@@ -12,3 +12,4 @@ begin
     alter publication supabase_realtime add table public.app_notifications;
   end if;
 end $$;
+

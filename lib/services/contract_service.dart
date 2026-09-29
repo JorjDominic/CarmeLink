@@ -62,6 +62,20 @@ class ContractService {
     return TenantContract.fromRow(row);
   }
 
+  /// Activates a draft without resending generated or immutable terms.
+  Future<TenantContract> activateContract(String contractId) async {
+    await SupabaseConfig.client.rpc(
+      'activate_tenant_contract',
+      params: {'p_contract_id': contractId},
+    );
+    final row = await SupabaseConfig.client
+        .from('tenant_contracts')
+        .select(_selection)
+        .eq('id', contractId)
+        .single();
+    return TenantContract.fromRow(row);
+  }
+
   Future<void> deleteContract(String id) async {
     await SupabaseConfig.client.from('tenant_contracts').delete().eq('id', id);
   }

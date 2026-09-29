@@ -2,6 +2,7 @@
 
 alter table public.guardian_alert_preferences
   add column if not exists inside_after_cutoff_enabled boolean not null default false;
+
 -- Update get_my_guardian_alert_preferences
 create or replace function public.get_my_guardian_alert_preferences()
 returns public.guardian_alert_preferences
@@ -17,6 +18,7 @@ begin
   where guardian_id = auth.uid();
   return v_row;
 end $$;
+
 -- Update update_my_guardian_alert_preferences with inside_after_cutoff_enabled support
 create or replace function public.update_my_guardian_alert_preferences(
   p_gate_entry_enabled boolean,
@@ -50,5 +52,6 @@ begin
   returning * into v_row;
   return v_row;
 end $$;
+
 revoke all on function public.update_my_guardian_alert_preferences(boolean,boolean,boolean,time,boolean) from public, anon;
 grant execute on function public.update_my_guardian_alert_preferences(boolean,boolean,boolean,time,boolean) to authenticated;

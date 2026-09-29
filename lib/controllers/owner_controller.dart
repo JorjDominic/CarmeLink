@@ -15,7 +15,6 @@ import '../services/staff_maintenance_service.dart';
 import '../services/tenant_service.dart';
 import '../services/visitor_service.dart';
 
-
 class OwnerController extends ChangeNotifier {
   OwnerController._();
 
@@ -197,8 +196,9 @@ class OwnerController extends ChangeNotifier {
   int get pendingPaymentProofs =>
       payments.where((payment) => payment.isPending).length;
 
-  int get overduePaymentCount =>
-      payments.where((payment) => !payment.isDeposit && payment.isOverdue).length;
+  int get overduePaymentCount => payments
+      .where((payment) => !payment.isDeposit && payment.isOverdue)
+      .length;
 
   double get totalCollectedRevenue => payments
       .where((payment) => payment.isVerified && !payment.isDeposit)
@@ -784,6 +784,14 @@ class OwnerController extends ChangeNotifier {
 
   Future<TenantContract> updateContract(TenantContract contract) async {
     final item = await _contractService.updateContract(contract);
+    final index = _contracts.indexWhere((value) => value.id == item.id);
+    if (index >= 0) _contracts[index] = item;
+    notifyListeners();
+    return item;
+  }
+
+  Future<TenantContract> activateContract(String contractId) async {
+    final item = await _contractService.activateContract(contractId);
     final index = _contracts.indexWhere((value) => value.id == item.id);
     if (index >= 0) _contracts[index] = item;
     notifyListeners();

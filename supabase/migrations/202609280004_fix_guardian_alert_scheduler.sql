@@ -10,3 +10,4 @@ begin
     perform cron.alter_job(v_job.jobid, schedule := '* * * * *');
   end loop;
 end $$;
+

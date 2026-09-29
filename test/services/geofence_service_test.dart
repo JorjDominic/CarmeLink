@@ -418,16 +418,58 @@ void main() {
         ),
         isFalse,
       );
+
+      // Testing checkInside: true
+      // Past alert time with tenant IN -> true
+      expect(
+        GuardianAlertService.shouldTriggerGuardianAlert(
+          linkedTenantGateStatus: 'IN',
+          alertTime: alertTime,
+          now: pastTime,
+          checkInside: true,
+        ),
+        isTrue,
+      );
+
+      // Past alert time with tenant Inside -> true
+      expect(
+        GuardianAlertService.shouldTriggerGuardianAlert(
+          linkedTenantGateStatus: 'Inside',
+          alertTime: alertTime,
+          now: pastTime,
+          checkInside: true,
+        ),
+        isTrue,
+      );
+
+      // Past alert time with tenant OUT and checkInside: true -> false
+      expect(
+        GuardianAlertService.shouldTriggerGuardianAlert(
+          linkedTenantGateStatus: 'OUT',
+          alertTime: alertTime,
+          now: pastTime,
+          checkInside: true,
+        ),
+        isFalse,
+      );
     });
 
-    test('updates and preserves preferred alert time in service state', () {
+    test('updates and preserves preferred alert time and inside/outside in service state', () {
       const customTime = TimeOfDay(hour: 20, minute: 30);
       GuardianAlertService.setPreferredAlertTime(customTime);
       expect(GuardianAlertService.preferredAlertTime, customTime);
 
-      // Reset to default 9:00 PM
+      GuardianAlertService.setInsideAfterCutoffEnabled(true);
+      expect(GuardianAlertService.insideAfterCutoffEnabled, isTrue);
+
+      GuardianAlertService.setOutsideAfterCutoffEnabled(false);
+      expect(GuardianAlertService.outsideAfterCutoffEnabled, isFalse);
+
+      // Reset to defaults
       GuardianAlertService.setPreferredAlertTime(
           const TimeOfDay(hour: 21, minute: 0));
+      GuardianAlertService.setInsideAfterCutoffEnabled(false);
+      GuardianAlertService.setOutsideAfterCutoffEnabled(true);
     });
   });
 

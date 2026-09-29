@@ -2,14 +2,25 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/cloudinary.ts'
 import { fcmAccessToken, sendFcm } from '../_shared/fcm.ts'
 
-// Invoke every five minutes with Authorization: Bearer <GUARDIAN_ALERT_CRON_SECRET>.
+const encoder = new TextEncoder()
+
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(value))
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+async function stableUuid(value: string): Promise<string> {
+  const hex = await sha256(value)
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+}
+
+// Invoked every minute by pg_cron. The scheduler owns the raw bearer token;
+// only its SHA-256 hash is retained in the database.
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
-  const expected = Deno.env.get('GUARDIAN_ALERT_CRON_SECRET')
-  if (!expected || request.headers.get('Authorization') !== `Bearer ${expected}`) {
-    return json({ error: 'Unauthorized' }, 401)
-  }
 
   try {
     const admin = createClient(
@@ -17,6 +28,22 @@ Deno.serve(async (request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       { auth: { autoRefreshToken: false, persistSession: false } },
     )
+    const authorizationHeader = request.headers.get('Authorization') ?? ''
+    const bearerToken = authorizationHeader.startsWith('Bearer ')
+      ? authorizationHeader.slice('Bearer '.length).trim()
+      : ''
+    if (!bearerToken) return json({ error: 'Unauthorized' }, 401)
+
+    const tokenHash = await sha256(bearerToken)
+    const { data: credential, error: credentialError } = await admin
+      .from('guardian_alert_cron_credentials')
+      .select('id')
+      .eq('token_hash', tokenHash)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (credentialError) throw credentialError
+    if (!credential) return json({ error: 'Unauthorized' }, 401)
+
     const nowParts = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
@@ -27,8 +54,8 @@ Deno.serve(async (request) => {
 
     const { data: preferences, error: preferenceError } = await admin
       .from('guardian_alert_preferences')
-      .select('guardian_id, alert_cutoff')
-      .eq('outside_after_cutoff_enabled', true)
+      .select('guardian_id, alert_cutoff, outside_after_cutoff_enabled, inside_after_cutoff_enabled, updated_at')
+      .or('outside_after_cutoff_enabled.eq.true,inside_after_cutoff_enabled.eq.true')
     if (preferenceError) throw preferenceError
 
     let created = 0, delivered = 0
@@ -42,8 +69,24 @@ Deno.serve(async (request) => {
         const { data: tenant } = await admin.from('tenant_details')
           .select('current_gate_status')
           .eq('profile_id', link.tenant_id).maybeSingle()
-        if (tenant?.current_gate_status !== 'OUT') continue
-        const routeId = `${preference.guardian_id}:${link.tenant_id}:${today}`
+        if (!tenant) continue
+
+        const isOut = tenant.current_gate_status === 'OUT'
+        const isIn = tenant.current_gate_status === 'IN'
+
+        const shouldAlertOutside = preference.outside_after_cutoff_enabled && isOut
+        const shouldAlertInside = preference.inside_after_cutoff_enabled && isIn
+
+        if (!shouldAlertOutside && !shouldAlertInside) continue
+
+        const conditionKey = shouldAlertOutside ? 'outside' : 'inside'
+        // One alert per condition and saved preference revision. Including the
+        // revision lets a guardian change today's cutoff and receive the newly
+        // requested alert, while the minute scheduler still cannot spam the
+        // same preference repeatedly.
+        const preferenceRevision = preference.updated_at ?? preference.alert_cutoff
+        const deduplicationKey = `${preference.guardian_id}:${link.tenant_id}:${today}:${conditionKey}:${preferenceRevision}`
+        const routeId = await stableUuid(deduplicationKey)
         const { data: existing } = await admin.from('app_notifications').select('id')
           .eq('recipient_id', preference.guardian_id)
           .eq('route_type', 'guardian_presence_alert').eq('route_id', routeId).maybeSingle()
@@ -51,12 +94,22 @@ Deno.serve(async (request) => {
         const { data: profile } = await admin.from('profiles')
           .select('full_name').eq('id', link.tenant_id).maybeSingle()
         const tenantName = profile?.full_name?.trim() || 'Your linked resident'
-        const title = `Resident outside dormitory property: ${tenantName}`
-        const body = `${tenantName} is still outside the dormitory property after your preferred alert time.`
+        const title = shouldAlertOutside
+          ? `Resident outside dormitory property: ${tenantName}`
+          : `Resident inside dormitory property: ${tenantName}`
+        const body = shouldAlertOutside
+          ? `${tenantName} is still outside the dormitory property after your preferred alert time.`
+          : `${tenantName} is inside the dormitory property after your preferred alert time.`
         const { data: notification, error } = await admin.from('app_notifications').insert({
           recipient_id: preference.guardian_id, notification_type: 'gate', title, body,
           route_type: 'guardian_presence_alert', route_id: routeId,
-          data: { tenant_id: link.tenant_id, local_date: today },
+          data: {
+            tenant_id: link.tenant_id,
+            local_date: today,
+            condition: conditionKey,
+            alert_cutoff: preference.alert_cutoff,
+            preference_revision: preferenceRevision,
+          },
         }).select('id').single()
         if (error || !notification) continue
         created++

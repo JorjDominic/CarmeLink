@@ -828,9 +828,7 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
     if (!_canActivate || _working) return;
     setState(() => _working = true);
     try {
-      await OwnerController.instance.updateContract(
-        widget.contract.copyWith(status: 'active'),
-      );
+      await OwnerController.instance.activateContract(widget.contract.id);
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) {

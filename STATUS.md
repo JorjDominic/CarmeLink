@@ -130,9 +130,10 @@ because a page or service exists.
   FCM push when a linked resident remains outside after the selected cutoff.
 - [x] User-facing geofence wording now says “dormitory property,” “entered,” and
   “exited”; technical geometry code may still use “perimeter” internally.
-- [ ] Deployment: apply migration
-  `202609280001_guardian_curfew_and_presence_preferences.sql`, deploy both
-  notification functions, set `GUARDIAN_ALERT_CRON_SECRET`, and invoke
+- [x] Remote migration
+  `202609280001_guardian_curfew_and_presence_preferences.sql` applied on
+  September 28, 2026; guardian preference read/write RPCs are available.
+- [ ] Deploy both notification functions, set `GUARDIAN_ALERT_CRON_SECRET`, and invoke
   `process-guardian-presence-alerts` every five minutes from the approved
   scheduler. Verify guardian/staff delivery on physical devices.
 
