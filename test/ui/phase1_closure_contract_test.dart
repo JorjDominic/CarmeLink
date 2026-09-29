@@ -31,12 +31,18 @@ void main() {
       expect(devicePageStart, greaterThan(settingsStart));
 
       final settings = source.substring(settingsStart, devicePageStart);
-      expect(settings.contains("StatusPill('Capstone 2 · Planned')"), isTrue);
+      expect(
+        settings.contains(
+          'Trusted-device registration is planned for Capstone 2.',
+        ),
+        isTrue,
+      );
       expect(settings.contains('enabled: false'), isTrue);
       expect(settings.contains('const DeviceBindingPage()'), isFalse);
     });
 
-    test('web staff navigation is simplified into residents and operations',
+    test(
+        'web staff navigation keeps simple primary destinations plus grouped tools',
         () {
       final source = File(
         'lib/web/dashboard/staff_web_portal_shell.dart',
@@ -47,7 +53,12 @@ void main() {
       }
       expect(source.contains("label: 'Curfew'"), isFalse);
       expect(
-          source.contains('desktopTools(UserRole role) => const []'), isTrue);
+        source.contains(
+            'static List<AppDestination> desktopTools(UserRole role)'),
+        isTrue,
+      );
+      expect(source.contains("webGroup: 'Facilities'"), isTrue);
+      expect(source.contains("webGroup: 'Billing & Records'"), isTrue);
     });
 
     test(
@@ -104,7 +115,8 @@ void main() {
       expect(
           shell.contains('notificationPageBuilder: _notificationDestination'),
           isTrue);
-      expect(adaptive.contains('streamMyNotifications(limit: 60)'), isTrue);
+      expect(adaptive.contains('streamMyNotifications(limit: 30)'), isTrue);
+      expect(adaptive.contains('Duration(seconds: 60)'), isTrue);
       expect(adaptive.contains('_UnreadCountBadge'), isTrue);
       expect(adaptive.contains("label: 'View'"), isTrue);
       expect(
@@ -168,9 +180,16 @@ void main() {
           File('lib/views/shared/shared_views.dart').readAsStringSync();
 
       expect(source.contains("title: 'Feedback preview'"), isTrue);
-      expect(source.contains('sent or stored until the backend'), isTrue);
-      expect(source.contains('transmitted or stored until backend support'),
-          isTrue);
+      expect(source.contains('currently a UI preview'), isTrue);
+      expect(source.contains('Feedback is not '), isTrue);
+      expect(
+        source.contains(
+          'transmitted or stored until backend support is added.',
+        ),
+        isTrue,
+      );
+      expect(source.contains('Feedback preview validated'), isTrue);
+      expect(source.contains('not sent or stored'), isTrue);
     });
 
     test('readiness script permits the active web branch', () {
