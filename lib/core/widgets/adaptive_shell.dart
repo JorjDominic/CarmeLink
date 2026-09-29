@@ -136,6 +136,12 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   bool _messagingStarted = false;
   String? _workspaceLabelOverride;
   String? _workspaceGroupOverride;
+
+  // Desktop sidebar disclosure belongs to the persistent shell rather than the
+  // sidebar widget. This keeps the user's open/closed groups unchanged while
+  // workspace pages switch. Empty by default = a tidy collapsed sidebar.
+  final Set<String> _expandedWebGroups = <String>{};
+
   GlobalKey<NavigatorState> _webWorkspaceNavigatorKey =
       GlobalKey<NavigatorState>();
 
@@ -177,6 +183,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     if (hadRealtimeNotifications != hasRealtimeNotifications) {
       unawaited(_restartNotificationStream());
     }
+    if (oldWidget.roleLabel != widget.roleLabel) {
+      _expandedWebGroups.clear();
+    }
   }
 
   Future<void> _startNotificationStream() async {
@@ -215,7 +224,8 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   }
 
   Future<void> _refreshUnreadNotificationCount() async {
-    final count = await AppNotificationService.instance.fetchMyUnreadCount();
+    final count =
+        await AppNotificationService.instance.fetchMyUnreadCount();
     if (!mounted || count == null) return;
     if (_unreadNotificationCount != count) {
       setState(() => _unreadNotificationCount = count);
@@ -389,6 +399,16 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     _notificationPollTimer?.cancel();
     unawaited(_notificationSubscription?.cancel());
     super.dispose();
+  }
+
+  void _toggleWebGroup(String group) {
+    setState(() {
+      if (_expandedWebGroups.contains(group)) {
+        _expandedWebGroups.remove(group);
+      } else {
+        _expandedWebGroups.add(group);
+      }
+    });
   }
 
   void _select(int value) {
@@ -709,10 +729,13 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                         destinations: activeDestinations,
                         mainDestinationCount: widget.destinations.length,
                         selectedIndex: activeIndex,
+                        expandedGroups: _expandedWebGroups,
+                        onGroupToggle: _toggleWebGroup,
                         onSelected: _select,
                         onOpenMessages: _openMessages,
                         onOpenNotifications: _openNotifications,
-                        onOpenPage: (label, page) => _openWebWorkspacePage(
+                        onOpenPage: (label, page) =>
+                            _openWebWorkspacePage(
                           page,
                           label: label,
                           group: 'Account',
@@ -992,7 +1015,7 @@ class _WebWorkspaceContextBar extends StatelessWidget {
   }
 }
 
-class _WebStaffSidebar extends StatefulWidget {
+class _WebStaffSidebar extends StatelessWidget {
   const _WebStaffSidebar({
     required this.roleLabel,
     required this.unreadMessageCount,
@@ -1000,6 +1023,8 @@ class _WebStaffSidebar extends StatefulWidget {
     required this.destinations,
     required this.mainDestinationCount,
     required this.selectedIndex,
+    required this.expandedGroups,
+    required this.onGroupToggle,
     required this.onSelected,
     required this.onOpenMessages,
     required this.onOpenNotifications,
@@ -1012,42 +1037,21 @@ class _WebStaffSidebar extends StatefulWidget {
   final List<AppDestination> destinations;
   final int mainDestinationCount;
   final int selectedIndex;
+  final Set<String> expandedGroups;
+  final ValueChanged<String> onGroupToggle;
   final ValueChanged<int> onSelected;
   final VoidCallback onOpenMessages;
   final VoidCallback onOpenNotifications;
   final void Function(String label, Widget page) onOpenPage;
 
-  @override
-  State<_WebStaffSidebar> createState() => _WebStaffSidebarState();
-}
-
-class _WebStaffSidebarState extends State<_WebStaffSidebar> {
-  final Set<String> _expandedGroups = <String>{};
-
   Map<String, List<int>> get _toolGroups {
     final groups = <String, List<int>>{};
-    for (var i = widget.mainDestinationCount;
-        i < widget.destinations.length;
-        i++) {
-      final item = widget.destinations[i];
+    for (var i = mainDestinationCount; i < destinations.length; i++) {
+      final item = destinations[i];
       final group = item.webGroup ?? 'Staff tools';
       groups.putIfAbsent(group, () => <int>[]).add(i);
     }
     return groups;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _expandedGroups.addAll(_toolGroups.keys);
-  }
-
-  @override
-  void didUpdateWidget(covariant _WebStaffSidebar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    for (final group in _toolGroups.keys) {
-      _expandedGroups.add(group);
-    }
   }
 
   String _groupKey(String value) => value
@@ -1056,8 +1060,8 @@ class _WebStaffSidebarState extends State<_WebStaffSidebar> {
       .replaceAll(RegExp(r'^-|-$'), '');
 
   Widget _destinationTile(BuildContext context, int itemIndex) {
-    final item = widget.destinations[itemIndex];
-    final selected = itemIndex == widget.selectedIndex;
+    final item = destinations[itemIndex];
+    final selected = itemIndex == selectedIndex;
     final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -1094,7 +1098,7 @@ class _WebStaffSidebarState extends State<_WebStaffSidebar> {
                   style: const TextStyle(fontSize: 10.5),
                 ),
           trailing: item.isWorkInProgress ? const _WipBadge() : null,
-          onTap: () => widget.onSelected(itemIndex),
+          onTap: () => onSelected(itemIndex),
         ),
       ),
     );
@@ -1120,19 +1124,26 @@ class _WebStaffSidebarState extends State<_WebStaffSidebar> {
                 padding: const EdgeInsets.fromLTRB(20, 22, 16, 14),
                 child: Row(
                   children: [
-                    Icon(Icons.apartment_rounded,
-                        color: colors.primary, size: 28),
+                    Icon(
+                      Icons.apartment_rounded,
+                      color: colors.primary,
+                      size: 28,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('CarmeLink',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              )),
-                          Text('${widget.roleLabel} workspace',
-                              style: theme.textTheme.bodySmall),
+                          Text(
+                            'CarmeLink',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            '$roleLabel workspace',
+                            style: theme.textTheme.bodySmall,
+                          ),
                         ],
                       ),
                     ),
@@ -1142,7 +1153,7 @@ class _WebStaffSidebarState extends State<_WebStaffSidebar> {
               const Divider(height: 1),
               Expanded(
                 child: ListView(
-                  key: const Key('web-staff-navigation'),
+                  key: const PageStorageKey<String>('web-staff-navigation'),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 12,
@@ -1150,104 +1161,113 @@ class _WebStaffSidebarState extends State<_WebStaffSidebar> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 5, 12, 8),
-                      child: Text('WORKSPACE',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colors.primary,
-                            letterSpacing: 1.4,
-                            fontWeight: FontWeight.bold,
-                          )),
+                      child: Text(
+                        'WORKSPACE',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colors.primary,
+                          letterSpacing: 1.4,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     ...List.generate(
-                      widget.mainDestinationCount,
+                      mainDestinationCount,
                       (index) => _destinationTile(context, index),
                     ),
                     const SizedBox(height: 6),
                     const Divider(height: 16),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 5, 12, 7),
-                      child: Text('MANAGEMENT AREAS',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colors.primary,
-                            letterSpacing: 1.4,
-                            fontWeight: FontWeight.bold,
-                          )),
+                      child: Text(
+                        'MANAGEMENT AREAS',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colors.primary,
+                          letterSpacing: 1.4,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     for (final entry in groups.entries) ...[
-                      Builder(builder: (context) {
-                        final active =
-                            entry.value.contains(widget.selectedIndex);
-                        final expanded = _expandedGroups.contains(entry.key);
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Material(
-                              color: active
-                                  ? colors.primary.withValues(alpha: .055)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(11),
-                              child: InkWell(
-                                key: Key(
-                                    'web-staff-group-${_groupKey(entry.key)}'),
+                      Builder(
+                        builder: (context) {
+                          final active = entry.value.contains(selectedIndex);
+                          final expanded = expandedGroups.contains(entry.key);
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Material(
+                                color: active
+                                    ? colors.primary.withValues(alpha: .055)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(11),
-                                onTap: () => setState(() {
-                                  if (expanded) {
-                                    _expandedGroups.remove(entry.key);
-                                  } else {
-                                    _expandedGroups.add(entry.key);
-                                  }
-                                }),
-                                child: Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(11, 9, 8, 9),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          entry.key,
-                                          style: theme.textTheme.labelLarge
-                                              ?.copyWith(
-                                            fontWeight: FontWeight.w800,
-                                            color:
-                                                active ? colors.primary : null,
+                                child: InkWell(
+                                  key: Key(
+                                    'web-staff-group-${_groupKey(entry.key)}',
+                                  ),
+                                  borderRadius: BorderRadius.circular(11),
+                                  onTap: () => onGroupToggle(entry.key),
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      11,
+                                      9,
+                                      8,
+                                      9,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            entry.key,
+                                            style: theme.textTheme.labelLarge
+                                                ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              color: active
+                                                  ? colors.primary
+                                                  : null,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      Text(
-                                        '${entry.value.length}',
-                                        style: theme.textTheme.labelSmall
-                                            ?.copyWith(
-                                          color: colors.onSurfaceVariant,
+                                        Text(
+                                          '${entry.value.length}',
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                            color: colors.onSurfaceVariant,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      AnimatedRotation(
-                                        duration:
-                                            const Duration(milliseconds: 180),
-                                        turns: expanded ? .5 : 0,
-                                        child: const Icon(
-                                          Icons.keyboard_arrow_down_rounded,
-                                          size: 20,
+                                        const SizedBox(width: 4),
+                                        AnimatedRotation(
+                                          duration: const Duration(
+                                            milliseconds: 180,
+                                          ),
+                                          turns: expanded ? .5 : 0,
+                                          child: const Icon(
+                                            Icons.keyboard_arrow_down_rounded,
+                                            size: 20,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            if (expanded)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 8, top: 4),
-                                child: Column(
-                                  children: [
-                                    for (final itemIndex in entry.value)
-                                      _destinationTile(context, itemIndex),
-                                  ],
+                              if (expanded)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 8,
+                                    top: 4,
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      for (final itemIndex in entry.value)
+                                        _destinationTile(context, itemIndex),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            const SizedBox(height: 4),
-                          ],
-                        );
-                      }),
+                              const SizedBox(height: 4),
+                            ],
+                          );
+                        },
+                      ),
                     ],
                     const Divider(height: 22),
                     ListTile(
@@ -1255,27 +1275,27 @@ class _WebStaffSidebarState extends State<_WebStaffSidebar> {
                       dense: true,
                       leading: _MenuIconWithBadge(
                         icon: Icons.chat_bubble_outline,
-                        count: widget.unreadMessageCount,
+                        count: unreadMessageCount,
                       ),
                       title: const Text('Messages'),
-                      onTap: widget.onOpenMessages,
+                      onTap: onOpenMessages,
                     ),
                     ListTile(
                       key: const Key('web-staff-notifications'),
                       dense: true,
                       leading: _MenuIconWithBadge(
                         icon: Icons.notifications_outlined,
-                        count: widget.unreadNotificationCount,
+                        count: unreadNotificationCount,
                       ),
                       title: const Text('Notifications'),
-                      onTap: widget.onOpenNotifications,
+                      onTap: onOpenNotifications,
                     ),
                     ListTile(
                       key: const Key('web-staff-settings'),
                       dense: true,
                       leading: const Icon(Icons.settings_outlined),
                       title: const Text('Settings'),
-                      onTap: () => widget.onOpenPage(
+                      onTap: () => onOpenPage(
                         'Settings',
                         const SettingsPage(),
                       ),
@@ -1286,10 +1306,12 @@ class _WebStaffSidebarState extends State<_WebStaffSidebar> {
               const Divider(height: 1),
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text('Staff portal · ${widget.roleLabel}',
-                    style: theme.textTheme.bodySmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                child: Text(
+                  'Staff portal · $roleLabel',
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

@@ -10,15 +10,15 @@ void main() {
 
       expect(source.contains("Key('web-staff-sidebar')"), isTrue);
       expect(
-        source.contains('class _WebStaffSidebar extends StatefulWidget'),
+        source.contains('class _WebStaffSidebar extends StatelessWidget'),
         isTrue,
       );
-      expect(source.contains('_expandedGroups'), isTrue);
+      expect(source.contains('_expandedWebGroups'), isTrue);
       expect(source.contains('web-staff-group-'), isTrue);
       expect(source.contains('_groupKey(entry.key)'), isTrue);
       expect(source.contains('Icons.keyboard_arrow_down_rounded'), isTrue);
-      expect(source.contains('_expandedGroups.remove(entry.key)'), isTrue);
-      expect(source.contains('_expandedGroups.add(entry.key)'), isTrue);
+      expect(source.contains('_expandedWebGroups.remove(group)'), isTrue);
+      expect(source.contains('_expandedWebGroups.add(group)'), isTrue);
       expect(source.contains('MANAGEMENT AREAS'), isTrue);
     });
 
@@ -38,8 +38,8 @@ void main() {
       () {
         final adaptive =
             File('lib/core/widgets/adaptive_shell.dart').readAsStringSync();
-        final overview = File('lib/web/dashboard/staff_overview_page.dart')
-            .readAsStringSync();
+        final overview =
+            File('lib/web/dashboard/staff_overview_page.dart').readAsStringSync();
 
         expect(adaptive.contains('selectLabel'), isTrue);
         expect(adaptive.contains('void _selectByLabel(String label)'), isTrue);
