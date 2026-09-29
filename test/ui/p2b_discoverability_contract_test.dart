@@ -41,7 +41,7 @@ void main() {
     });
 
     test(
-        'web staff sidebar stays simplified while Operations exposes staff tools',
+        'web staff sidebar groups desktop tools while Operations remains available',
         () {
       final shell = File(
         'lib/web/dashboard/staff_web_portal_shell.dart',
@@ -50,7 +50,13 @@ void main() {
 
       expect(shell.contains("label: 'Residents'"), isTrue);
       expect(shell.contains("label: 'Operations'"), isTrue);
-      expect(shell.contains('desktopTools(UserRole role) => const []'), isTrue);
+      expect(
+          shell.contains('static List<AppDestination> desktopTools'), isTrue);
+      expect(shell.contains("webGroup: 'Facilities'"), isTrue);
+      expect(shell.contains("webGroup: 'Access & Safety'"), isTrue);
+      expect(shell.contains("webGroup: 'Billing & Records'"), isTrue);
+      expect(shell.contains("webGroup: 'Communication'"), isTrue);
+      expect(shell.contains("webGroup: 'Administration'"), isTrue);
 
       for (final label in [
         'Cleaning schedules',

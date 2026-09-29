@@ -34,7 +34,7 @@ void main() {
       expect(source.contains('label: label'), isTrue);
       expect(source.contains("group: 'Updates'"), isTrue);
       expect(source.contains('Navigator.of(context).push'), isTrue);
-      expect(source.contains('onTap: widget.onOpenNotifications'), isTrue);
+      expect(source.contains('onTap: onOpenNotifications'), isTrue);
     });
 
     test(

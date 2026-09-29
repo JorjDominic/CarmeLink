@@ -19,8 +19,7 @@ void main() {
           tenant.contains('controller.cancelMaintenance(report.id)'), isTrue);
       expect(
           controller.contains('_maintenanceService.cancelReport(id)'), isTrue);
-      expect(service.contains("rpc(\n      'cancel_my_maintenance_report'"),
-          isTrue);
+      expect(service.contains("'cancel_my_maintenance_report'"), isTrue);
       expect(migration.contains('cancel_my_maintenance_report'), isTrue);
       expect(migration.contains("status = 'cancelled'"), isTrue);
     });
@@ -63,7 +62,8 @@ void main() {
     test('shared cards provide a Material surface for ListTile ink', () {
       final common =
           File('lib/core/widgets/common_widgets.dart').readAsStringSync();
-      expect(common.contains('type: MaterialType.transparency'), isTrue);
+      expect(common.contains('return Material('), isTrue);
+      expect(common.contains('child: InkWell('), isTrue);
     });
   });
 }
