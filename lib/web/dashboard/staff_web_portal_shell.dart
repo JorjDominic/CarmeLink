@@ -8,6 +8,7 @@ import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../../services/app_notification_service.dart';
 import '../../services/table_refresh_subscription.dart';
+import '../../views/owner/billing_management_page.dart';
 import '../../views/owner/contracts_page.dart';
 import '../../views/owner/guardian_link_management_page.dart';
 import '../../views/owner/owner_pages.dart';
@@ -124,6 +125,14 @@ abstract final class StaffWebDestinations {
         page: StaffConductCasesPage(),
         webGroup: 'Access & Safety',
         webDescription: 'Incidents, responses and appeals',
+      ),
+      const AppDestination(
+        label: 'Billing & charges',
+        icon: Icons.account_balance_wallet_outlined,
+        selectedIcon: Icons.account_balance_wallet,
+        page: BillingManagementPage(),
+        webGroup: 'Billing & Records',
+        webDescription: 'Rent, utilities, balances and other charges',
       ),
       const AppDestination(
         label: 'Payment verification',

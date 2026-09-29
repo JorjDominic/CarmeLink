@@ -4,6 +4,7 @@ import '../../controllers/owner_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/widgets/adaptive_shell.dart';
 import '../../models/models.dart';
+import '../../views/owner/billing_management_page.dart';
 import '../../views/owner/contracts_page.dart';
 import '../../views/owner/owner_pages.dart';
 import '../../views/owner/room_monitoring_page.dart';
@@ -196,6 +197,22 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                         ),
                         const SizedBox(height: 9),
                         StaffActionRow(
+                          title: 'Billing & charges',
+                          description: data.paymentsLoadedOnce
+                              ? 'Review balances, utilities and approved charges'
+                              : data.paymentsError ??
+                                  'Waiting for billing data',
+                          value: data.paymentsLoadedOnce
+                              ? '${data.overduePaymentCount} overdue'
+                              : null,
+                          icon: Icons.account_balance_wallet_outlined,
+                          onTap: () => _open(
+                            const BillingManagementPage(),
+                            destinationLabel: 'Billing & charges',
+                          ),
+                        ),
+                        const SizedBox(height: 9),
+                        StaffActionRow(
                           title: 'Payment proofs',
                           description: data.paymentsLoadedOnce
                               ? 'Verify submitted payment evidence'
@@ -250,6 +267,17 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                                 destinationLabel: 'Operations'),
                             icon: const Icon(Icons.tune_outlined, size: 18),
                             label: const Text('Operations'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => _open(
+                              const BillingManagementPage(),
+                              destinationLabel: 'Billing & charges',
+                            ),
+                            icon: const Icon(
+                              Icons.account_balance_wallet_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Billing & charges'),
                           ),
                           OutlinedButton.icon(
                             onPressed: () => _open(
