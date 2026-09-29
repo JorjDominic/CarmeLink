@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../controllers/guardian_controller.dart';
 import '../../core/widgets/adaptive_shell.dart';
@@ -15,14 +17,46 @@ class GuardianShell extends StatefulWidget {
   State<GuardianShell> createState() => _GuardianShellState();
 }
 
-class _GuardianShellState extends State<GuardianShell> {
+class _GuardianShellState extends State<GuardianShell>
+    with WidgetsBindingObserver {
+  bool _refreshInFlight = false;
+  bool _refreshAgain = false;
   @override
   void initState() {
     super.initState();
-    GuardianController.instance.loadData();
-    GuardianController.instance.loadCurfewRequests();
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_refreshLiveData());
   }
 
+  Future<void> _refreshLiveData() async {
+    if (_refreshInFlight) {
+      _refreshAgain = true;
+      return;
+    }
+
+    do {
+      _refreshAgain = false;
+      _refreshInFlight = true;
+      try {
+        await GuardianController.instance.loadData(force: true);
+      } finally {
+        _refreshInFlight = false;
+      }
+    } while (_refreshAgain && mounted);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshLiveData());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   Widget? _notificationDestination(AppNotificationItem notification) {
     final routeType = notification.routeType?.trim();
@@ -33,7 +67,10 @@ class _GuardianShellState extends State<GuardianShell> {
     return switch (route) {
       'message' || 'conversation' => const GuardianConversationPage(),
       'payment' => const GuardianPaymentStatusPage(),
-      'curfew' || 'gate' || 'gate_event' || 'safety' =>
+      'curfew' ||
+      'gate' ||
+      'gate_event' ||
+      'safety' =>
         const GuardianPresenceMonitoringPage(),
       'announcement' => const GuardianAnnouncementsPage(),
       _ => null,

@@ -241,9 +241,10 @@ class GuardianController extends ChangeNotifier {
         'gate_events',
       ],
       () {
+        // loadData refreshes the linked resident, room, payments, curfew, and
+        // presence together. Avoid launching duplicate curfew/gate queries for
+        // the same realtime event.
         loadData(force: true);
-        loadCurfewRequests(force: true);
-        loadGateEvents(force: true);
       },
     );
   }

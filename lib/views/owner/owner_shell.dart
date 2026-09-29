@@ -21,7 +21,7 @@ class OwnerShell extends StatefulWidget {
   State<OwnerShell> createState() => _OwnerShellState();
 }
 
-class _OwnerShellState extends State<OwnerShell> {
+class _OwnerShellState extends State<OwnerShell> with WidgetsBindingObserver {
   TableRefreshSubscription? _liveDataSubscription;
   bool _refreshInFlight = false;
   bool _refreshAgain = false;
@@ -29,6 +29,7 @@ class _OwnerShellState extends State<OwnerShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     OwnerController.instance.loadRooms();
     OwnerController.instance.loadPayments();
     OwnerController.instance.loadCurfewRequests();
@@ -88,7 +89,15 @@ class _OwnerShellState extends State<OwnerShell> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshLiveData());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_liveDataSubscription?.dispose());
     super.dispose();
   }
