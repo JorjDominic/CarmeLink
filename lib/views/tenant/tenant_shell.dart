@@ -2,13 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../controllers/tenant_access_controller.dart';
 import '../../controllers/tenant_controller.dart';
 import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../../services/app_notification_service.dart';
+import '../../services/geofence_scheduler.dart';
 import '../../services/table_refresh_subscription.dart';
+import '../../controllers/session_controller.dart';
 import '../shared/shared_views.dart';
+import 'tenant_access_gate.dart';
 import 'tenant_pages.dart';
 
 class TenantShell extends StatefulWidget {
@@ -22,11 +26,35 @@ class _TenantShellState extends State<TenantShell> with WidgetsBindingObserver {
   TableRefreshSubscription? _liveDataSubscription;
   bool _refreshInFlight = false;
   bool _refreshAgain = false;
+  bool _coreStarted = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    TenantAccessController.instance.addListener(_onAccessChanged);
+    unawaited(TenantAccessController.instance.refresh());
+  }
+
+  void _onAccessChanged() {
+    if (!mounted) return;
+    if (TenantAccessController.instance.canAccessCore) {
+      final tenantId = SessionController.instance.currentUser?.id;
+      if (tenantId != null) {
+        unawaited(GeofenceScheduler.instance.start(tenantId));
+      }
+      _startCoreFeatures();
+    } else if (TenantAccessController.instance.state !=
+        TenantAccessState.loading) {
+      GeofenceScheduler.instance.stop();
+    }
+    setState(() {});
+  }
+
+  void _startCoreFeatures() {
+    if (_coreStarted) return;
+    _coreStarted = true;
 
     TenantController.instance.loadMaintenance();
     TenantController.instance.loadMyRoom();
@@ -80,13 +108,17 @@ class _TenantShellState extends State<TenantShell> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(_refreshLiveData());
+      unawaited(TenantAccessController.instance.refresh());
+      if (TenantAccessController.instance.canAccessCore) {
+        unawaited(_refreshLiveData());
+      }
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    TenantAccessController.instance.removeListener(_onAccessChanged);
     unawaited(_liveDataSubscription?.dispose());
     super.dispose();
   }
@@ -117,43 +149,45 @@ class _TenantShellState extends State<TenantShell> with WidgetsBindingObserver {
         allowedRoles: {
           UserRole.tenant,
         },
-        child: AdaptiveRoleShell(
-          roleLabel: 'Tenant',
-          notificationPageBuilder: _notificationDestination,
-          messagePage: TenantMessagesPage(),
-          destinations: [
-            AppDestination(
-              label: 'Home',
-              icon: Icons.home_outlined,
-              selectedIcon: Icons.home,
-              page: TenantDashboardPage(),
-            ),
-            AppDestination(
-              label: 'Payments',
-              icon: Icons.account_balance_wallet_outlined,
-              selectedIcon: Icons.account_balance_wallet,
-              page: PaymentsPage(),
-            ),
-            AppDestination(
-              label: 'Reports',
-              icon: Icons.assignment_outlined,
-              selectedIcon: Icons.assignment,
-              page: TenantReportsHubPage(),
-            ),
-            AppDestination(
-              label: 'Curfew',
-              icon: Icons.schedule_outlined,
-              selectedIcon: Icons.schedule,
-              page: TenantPresencePage(),
-              isWorkInProgress: true,
-            ),
-            AppDestination(
-              label: 'Profile',
-              icon: Icons.person_outline,
-              selectedIcon: Icons.person,
-              page: ProfilePage(),
-            ),
-          ],
-        ),
+        child: TenantAccessController.instance.canAccessCore
+            ? AdaptiveRoleShell(
+                roleLabel: 'Tenant',
+                notificationPageBuilder: _notificationDestination,
+                messagePage: TenantMessagesPage(),
+                destinations: [
+                  AppDestination(
+                    label: 'Home',
+                    icon: Icons.home_outlined,
+                    selectedIcon: Icons.home,
+                    page: TenantDashboardPage(),
+                  ),
+                  AppDestination(
+                    label: 'Payments',
+                    icon: Icons.account_balance_wallet_outlined,
+                    selectedIcon: Icons.account_balance_wallet,
+                    page: PaymentsPage(),
+                  ),
+                  AppDestination(
+                    label: 'Reports',
+                    icon: Icons.assignment_outlined,
+                    selectedIcon: Icons.assignment,
+                    page: TenantReportsHubPage(),
+                  ),
+                  AppDestination(
+                    label: 'Curfew',
+                    icon: Icons.schedule_outlined,
+                    selectedIcon: Icons.schedule,
+                    page: TenantPresencePage(),
+                    isWorkInProgress: true,
+                  ),
+                  AppDestination(
+                    label: 'Profile',
+                    icon: Icons.person_outline,
+                    selectedIcon: Icons.person,
+                    page: ProfilePage(),
+                  ),
+                ],
+              )
+            : const TenantAccessGate(),
       );
 }
