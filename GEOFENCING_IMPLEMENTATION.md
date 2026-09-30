@@ -1,5 +1,98 @@
 # CarmeLink Automatic Geofencing Implementation
 
+> **Authoritative geofencing document — September 30, 2026.** This file now
+> includes the implemented design, platform limitations, operational guidance,
+> and physical-device test plan. It replaces the former tripwire implementation
+> plan and issues/mitigations documents.
+
+## Current implementation status
+
+Source baseline: `3d8a2f9` (`Geofencing fix - automatic in and out`).
+
+Implemented in the current working tree:
+
+- Android and iOS native region monitoring use a coarse circular wake region.
+- The exact on-device property polygon is authoritative for `IN` and `OUT`.
+- The optional official-gate region is a faster wake-up hint; crossing its line
+  is no longer mandatory for a valid transition.
+- Fresh fixes worse than 35 metres or older than two minutes are rejected.
+- A 3-metre edge hysteresis buffer prevents boundary chatter.
+- Native recovery requires two consecutive accurate fixes before correcting a
+  server status that became stale during a monitoring interruption.
+- Registration/resume seeds native monitoring from the last server-recorded
+  `IN` or `OUT` state rather than silently accepting the current side as a new
+  baseline.
+- Android starts a bounded foreground location burst after registration and
+  uses WorkManager to upload queued events when connectivity returns.
+- iOS uses region monitoring, significant-location-change monitoring, a bounded
+  accuracy burst, native offline queuing, and launch-time restoration.
+- Native queues retain at most 24 minimized events and ignore events older than
+  24 hours. Raw coordinates are not uploaded.
+- The monitoring UI treats gate configuration as optional and reports whether
+  automatic background monitoring itself is active.
+
+Automated evidence completed September 30, 2026:
+
+- 42 focused geofencing/platform/UI tests passed after reconciliation changes.
+- Flutter static analysis passed with no issues.
+- Android `:app:compileDebugKotlin` passed using Android Studio JBR 21.
+- iOS native compilation and lifecycle behavior still require macOS/Xcode and
+  a physical iPhone.
+
+Known platform boundaries:
+
+- Swiping an Android app from Recents is not the same as Settings **Force
+  Stop**. Registered geofences normally remain eligible after a Recents swipe.
+- Android blocks receivers and workers while the app remains Force Stopped.
+  CarmeLink cannot bypass that OS rule; after the next manual launch, the new
+  server-state/two-fix reconciliation repairs a missed transition.
+- iOS region monitoring and significant-location-change monitoring can relaunch
+  an app that is not running when `Always` authorization and system settings
+  permit it, but wake timing is controlled by iOS and must be device-tested.
+- Android automatically retries queued uploads through network-constrained
+  WorkManager. iOS preserves its native queue and retries on later location or
+  app lifecycle opportunities; immediate upload at the moment connectivity
+  returns is not yet guaranteed.
+
+## Physical-device validation plan
+
+Testing is deliberately split into two passes:
+
+### Pass 1 — before Apple Developer Program enrollment
+
+Use a directly signed development build for every scenario the current signing
+window permits. Record iPhone model, iOS version, authorization state, precise
+location state, Background App Refresh state, network state, timestamps, local
+notification result, queued-event count, and server event result.
+
+1. Grant `Always` and Precise Location, then confirm monitoring is active.
+2. Test `IN → OUT` and `OUT → IN` with the app foregrounded.
+3. Repeat with the app backgrounded and the screen locked.
+4. Swipe the app out of the app switcher, cross the boundary, and continue far
+   enough to exercise both region and significant-change recovery.
+5. Cross while offline, restore connectivity, and confirm one idempotent event.
+6. Disable and restore location permission, Precise Location, GPS, and
+   Background App Refresh one at a time.
+7. Reboot, unlock once, and verify monitoring restoration.
+8. Start outside while the server still says `IN`; reopen the app and confirm
+   that two matching fixes reconcile it to `OUT`.
+
+### Pass 2 — after Apple Developer Program enrollment
+
+Repeat the complete matrix using the enrolled team, production-like signing,
+Background Modes capability, APNs configuration, and a TestFlight build. Add
+overnight suspension, longer offline periods, token refresh, repeated app
+switcher removal, low-power mode, and multiple iOS/device versions. Enrollment
+does not change Core Location semantics; it makes production-like signing,
+entitlements, TestFlight distribution, and longer-running validation possible.
+
+### Acceptance rule
+
+Do not mark iOS geofencing production-ready from Simulator results or a single
+successful walk. Preserve logs and screenshots from repeated physical-device
+runs. A delayed event is acceptable within the documented 15-minute target;
+missing, duplicated, or falsely inferred transitions require investigation.
+
 ## Purpose
 
 This document specifies the recommended software-only geofencing design for
@@ -104,7 +197,8 @@ A single GPS sample must not change confirmed presence.
 1. The OS reports a possible exit, movement triggers verification, or a
    reconciliation check finds an outside reading.
 2. Set the transient state to `VERIFYING_EXIT`.
-3. Collect at least two acceptable readings over 30-60 seconds.
+3. Collect at least two consecutive acceptable readings during the bounded
+   native verification burst.
 4. Require all accepted readings to be beyond the exit threshold.
 5. If confirmed, record `OUTSIDE_CONFIRMED`.
 6. If readings disagree, retain the previous confirmed state and retry later.
@@ -113,7 +207,8 @@ A single GPS sample must not change confirmed presence.
 
 1. The OS reports a possible entry or reconciliation finds an inside reading.
 2. Set the transient state to `VERIFYING_ENTRY`.
-3. Collect at least two acceptable readings over 30-60 seconds.
+3. Collect at least two consecutive acceptable readings during the bounded
+   native verification burst.
 4. Require all accepted readings to be clearly inside the polygon.
 5. If confirmed, record `INSIDE_CONFIRMED`.
 6. If readings disagree, retain the previous confirmed state and retry later.

@@ -1,5 +1,9 @@
 # CarmeLink User Workflows, Inputs, and Results
 
+> Reviewed September 30, 2026. Current readiness is tracked in `STATUS.md`.
+> Automatic presence behavior and platform limitations are defined in
+> `GEOFENCING_IMPLEMENTATION.md`.
+
 > Workflow reference only. Use [`STATUS.md`](STATUS.md) for the current gap and completion tracker.
 
 This document describes the system as a user experiences it.

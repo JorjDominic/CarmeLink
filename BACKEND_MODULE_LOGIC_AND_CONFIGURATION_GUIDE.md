@@ -1,5 +1,9 @@
 # CarmeLink Backend Module Logic and Configuration Guide
 
+> Reviewed for the September 30, 2026 documentation consolidation. This remains
+> the backend configuration reference; current completion claims belong in
+> `STATUS.md`.
+
 > Canonical completion decisions and open gaps are maintained in [`STATUS.md`](STATUS.md). This file is a technical reference, not the live status authority.
 
 > Repository review date: September 25, 2026  

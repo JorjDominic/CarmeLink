@@ -1,5 +1,9 @@
 # CarmeLink Module and Feature Status
 
+> Updated September 30, 2026. Overall readiness and release blockers live in
+> `STATUS.md`; geofencing implementation and device validation live in
+> `GEOFENCING_IMPLEMENTATION.md`. This file remains the module-level matrix.
+
 > Reviewed against current source at `5ecba11` on September 27, 2026.
 > `flutter analyze`: pass. `flutter test`: 460/460 pass. “Implemented” below is
 > not equivalent to deployed or physically verified.
@@ -236,9 +240,9 @@ These are pending improvements, not claims about the current build.
 ## Current verification results
 
 ```text
-flutter analyze             PASS — no issues
-flutter test                PASS — 460 tests
-flutter build apk --debug   PASS
+Flutter analysis (changed) PASS — no issues, September 30
+Focused geofence/UI tests  PASS — 42 tests, September 30
+Android Kotlin compile     PASS — :app:compileDebugKotlin
 Remote migration parity     NOT VERIFIED
 Remote RLS/Storage tests    NOT VERIFIED
 Physical mobile tests       NOT VERIFIED

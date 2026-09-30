@@ -1,5 +1,9 @@
 # CarmeLink Mobile Backend Reference
 
+> Reviewed September 30, 2026. Gate events remain minimized and append-only;
+> current polygon, offline, reconciliation, and lifecycle behavior is defined
+> in `GEOFENCING_IMPLEMENTATION.md`.
+
 ## React DevTools Data Contract
 
 > Verified against the repository migrations and Flutter service on September 20, 2026. Items marked **LIVE CONFIRM** must still be checked in deployed Supabase.

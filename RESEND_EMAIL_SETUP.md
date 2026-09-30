@@ -1,5 +1,8 @@
 # Resend email verification setup
 
+> Reviewed September 30, 2026. Production secret and delivery verification are
+> tracked separately in `STATUS.md`.
+
 The `create-user` Edge Function creates an unverified account without sending
 an email. After the user attempts to sign in, CarmeLink shows the verification
 screen and sends a code only when the user selects **Send code**.
