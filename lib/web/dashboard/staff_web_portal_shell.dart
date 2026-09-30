@@ -16,6 +16,7 @@ import '../../views/owner/room_monitoring_page.dart';
 import '../../views/shared/account_management_page.dart';
 import '../../views/shared/conduct_case_pages.dart';
 import '../../views/shared/employee_curfew_profile_pages.dart';
+import '../../views/shared/move_out_settlement_page.dart';
 import '../../views/shared/retention_settings_page.dart';
 import '../../views/shared/shared_views.dart';
 import '../../views/shared/cleaning_schedule_management_page.dart';
@@ -133,6 +134,15 @@ abstract final class StaffWebDestinations {
         page: BillingManagementPage(),
         webGroup: 'Billing & Records',
         webDescription: 'Rent, utilities, balances and other charges',
+      ),
+      const AppDestination(
+        label: 'Move-out & settlement',
+        icon: Icons.exit_to_app_rounded,
+        selectedIcon: Icons.exit_to_app,
+        page: MoveOutSettlementPage(),
+        webGroup: 'Billing & Records',
+        webDescription:
+            'Notice, final inspection, clearance and deposit settlement',
       ),
       const AppDestination(
         label: 'Payment verification',
@@ -280,6 +290,10 @@ class _StaffWebPortalShellState extends State<StaffWebPortalShell>
     'conduct_case_appeals',
     'employee_curfew_profiles',
     'retention_policy_settings',
+    'move_out_cases',
+    'move_out_clearance_items',
+    'move_out_deductions',
+    'move_out_settlements',
   ];
   @override
   void initState() {

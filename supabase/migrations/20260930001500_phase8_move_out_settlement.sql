@@ -1,4 +1,5 @@
 begin;
+
 -- Phase 8: Move-out & Settlement
 --
 -- This migration owns bounded move-out records, final-inspection coordination,
@@ -40,14 +41,17 @@ create table public.move_out_cases (
     check (char_length(cancellation_reason) <= 1200),
   check (planned_move_out_on >= notice_submitted_on + 30)
 );
+
 create unique index move_out_cases_one_active_per_tenant_idx
   on public.move_out_cases(tenant_id)
   where status <> 'cancelled';
 create index move_out_cases_status_date_idx
   on public.move_out_cases(status, planned_move_out_on);
+
 create trigger move_out_cases_set_updated_at
 before update on public.move_out_cases
 for each row execute function public.set_updated_at();
+
 create table public.move_out_clearance_items (
   id uuid primary key default gen_random_uuid(),
   case_id uuid not null references public.move_out_cases(id) on delete cascade,
@@ -62,9 +66,11 @@ create table public.move_out_clearance_items (
   updated_at timestamptz not null default now(),
   unique(case_id, item_key)
 );
+
 create trigger move_out_clearance_items_set_updated_at
 before update on public.move_out_clearance_items
 for each row execute function public.set_updated_at();
+
 create table public.move_out_deductions (
   id uuid primary key default gen_random_uuid(),
   case_id uuid not null references public.move_out_cases(id) on delete cascade,
@@ -80,6 +86,7 @@ create table public.move_out_deductions (
   review_note text not null default '' check (char_length(review_note) <= 1500)
 );
 create index move_out_deductions_case_idx on public.move_out_deductions(case_id, created_at);
+
 create table public.move_out_settlements (
   case_id uuid primary key references public.move_out_cases(id) on delete cascade,
   contract_deposit_amount numeric(12,2) not null default 0,
@@ -101,13 +108,16 @@ create table public.move_out_settlements (
   updated_by uuid references public.profiles(id) on delete restrict,
   updated_at timestamptz not null default now()
 );
+
 create trigger move_out_settlements_set_updated_at
 before update on public.move_out_settlements
 for each row execute function public.set_updated_at();
+
 alter table public.move_out_cases enable row level security;
 alter table public.move_out_clearance_items enable row level security;
 alter table public.move_out_deductions enable row level security;
 alter table public.move_out_settlements enable row level security;
+
 revoke all on public.move_out_cases from anon, authenticated;
 revoke all on public.move_out_clearance_items from anon, authenticated;
 revoke all on public.move_out_deductions from anon, authenticated;
@@ -116,6 +126,7 @@ grant select on public.move_out_cases to authenticated;
 grant select on public.move_out_clearance_items to authenticated;
 grant select on public.move_out_deductions to authenticated;
 grant select on public.move_out_settlements to authenticated;
+
 create policy move_out_cases_authorized_select on public.move_out_cases
 for select to authenticated using (
   tenant_id = auth.uid() or (select public.is_staff())
@@ -135,6 +146,7 @@ for select to authenticated using (exists (
   select 1 from public.move_out_cases c
   where c.id = case_id and (c.tenant_id = auth.uid() or (select public.is_staff()))
 ));
+
 create or replace function public.refresh_move_out_settlement(p_case_id uuid)
 returns void language plpgsql security definer set search_path = '' as $$
 declare
@@ -160,6 +172,7 @@ begin
   where case_id=p_case_id;
 end $$;
 revoke all on function public.refresh_move_out_settlement(uuid) from public, anon, authenticated;
+
 create or replace function public.create_move_out_case(
   p_tenant_id uuid,
   p_notice_submitted_on date,
@@ -240,6 +253,7 @@ begin
 end $$;
 revoke all on function public.create_move_out_case(uuid,date,date,text) from public, anon;
 grant execute on function public.create_move_out_case(uuid,date,date,text) to authenticated;
+
 create or replace function public.cancel_move_out_case(p_case_id uuid, p_reason text)
 returns void language plpgsql security definer set search_path = '' as $$
 declare v_case public.move_out_cases; v_actor uuid:=auth.uid();
@@ -254,6 +268,7 @@ begin
 end $$;
 revoke all on function public.cancel_move_out_case(uuid,text) from public, anon;
 grant execute on function public.cancel_move_out_case(uuid,text) to authenticated;
+
 create or replace function public.schedule_move_out_final_inspection(
   p_case_id uuid, p_scheduled_at timestamptz, p_notice_text text
 ) returns uuid language plpgsql security definer set search_path = '' as $$
@@ -279,6 +294,7 @@ begin
 end $$;
 revoke all on function public.schedule_move_out_final_inspection(uuid,timestamptz,text) from public, anon;
 grant execute on function public.schedule_move_out_final_inspection(uuid,timestamptz,text) to authenticated;
+
 create or replace function public.sync_move_out_case_from_inspection()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin
@@ -294,9 +310,11 @@ begin
   return new;
 end $$;
 revoke all on function public.sync_move_out_case_from_inspection() from public, anon, authenticated;
+
 create trigger room_inspections_sync_move_out_case
 after update of status on public.room_inspections
 for each row execute function public.sync_move_out_case_from_inspection();
+
 create or replace function public.set_move_out_clearance_item(
   p_case_id uuid,p_item_key text,p_status text,p_notes text default ''
 ) returns void language plpgsql security definer set search_path = '' as $$
@@ -320,6 +338,7 @@ begin
 end $$;
 revoke all on function public.set_move_out_clearance_item(uuid,text,text,text) from public, anon;
 grant execute on function public.set_move_out_clearance_item(uuid,text,text,text) to authenticated;
+
 create or replace function public.set_move_out_deposit_received(p_case_id uuid,p_amount numeric)
 returns void language plpgsql security definer set search_path = '' as $$
 declare v_case_status text; v_refund_status text;
@@ -340,6 +359,7 @@ begin
 end $$;
 revoke all on function public.set_move_out_deposit_received(uuid,numeric) from public, anon;
 grant execute on function public.set_move_out_deposit_received(uuid,numeric) to authenticated;
+
 create or replace function public.add_move_out_deduction(
   p_case_id uuid,p_category text,p_label text,p_amount numeric,p_evidence_note text
 ) returns uuid language plpgsql security definer set search_path = '' as $$
@@ -364,6 +384,7 @@ begin
 end $$;
 revoke all on function public.add_move_out_deduction(uuid,text,text,numeric,text) from public, anon;
 grant execute on function public.add_move_out_deduction(uuid,text,text,numeric,text) to authenticated;
+
 create or replace function public.review_move_out_deduction(
   p_deduction_id uuid,p_approve boolean,p_review_note text default ''
 ) returns void language plpgsql security definer set search_path = '' as $$
@@ -388,6 +409,7 @@ begin
 end $$;
 revoke all on function public.review_move_out_deduction(uuid,boolean,text) from public, anon;
 grant execute on function public.review_move_out_deduction(uuid,boolean,text) to authenticated;
+
 create or replace function public.record_move_out_settlement_outcome(
   p_case_id uuid,p_refund_method text default null,p_refund_reference text default null,
   p_refund_proof_path text default null,p_shortfall_note text default null
@@ -447,6 +469,7 @@ begin
 end $$;
 revoke all on function public.record_move_out_settlement_outcome(uuid,text,text,text,text) from public, anon;
 grant execute on function public.record_move_out_settlement_outcome(uuid,text,text,text,text) to authenticated;
+
 create or replace function public.acknowledge_move_out_settlement(
   p_case_id uuid,p_response text default ''
 ) returns void language plpgsql security definer set search_path = '' as $$
@@ -465,6 +488,7 @@ begin
 end $$;
 revoke all on function public.acknowledge_move_out_settlement(uuid,text) from public, anon;
 grant execute on function public.acknowledge_move_out_settlement(uuid,text) to authenticated;
+
 create or replace function public.mark_move_out_ready_for_closure(p_case_id uuid,p_handoff_note text)
 returns void language plpgsql security definer set search_path = '' as $$
 declare v_case public.move_out_cases; v_inspection_status text; v_outstanding numeric(12,2); v_refund_status text;
@@ -493,9 +517,11 @@ begin
 end $$;
 revoke all on function public.mark_move_out_ready_for_closure(uuid,text) from public, anon;
 grant execute on function public.mark_move_out_ready_for_closure(uuid,text) to authenticated;
+
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 values('move_out_refund_proofs','move_out_refund_proofs',false,5242880,array['image/jpeg','image/png','image/webp'])
 on conflict(id) do update set public=false,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
+
 create policy move_out_refund_proof_staff_insert on storage.objects
 for insert to authenticated with check (
   bucket_id='move_out_refund_proofs' and (select public.current_user_role())='owner'
@@ -509,10 +535,12 @@ for select to authenticated using (
     )
   )
 );
+
 create policy move_out_refund_proof_owner_delete on storage.objects
 for delete to authenticated using (
   bucket_id='move_out_refund_proofs' and (select public.current_user_role())='owner'
 );
+
 -- Explicitly no contract / assignment mutation is performed anywhere above.
 -- A ready_for_closure case is a handoff boundary for Jorj-reviewed closure integration.
 
@@ -527,4 +555,5 @@ begin
     end if;
   end loop;
 end $$;
+
 commit;

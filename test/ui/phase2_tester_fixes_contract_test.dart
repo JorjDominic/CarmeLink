@@ -20,6 +20,7 @@ void main() {
       expect(
           controller.contains('_maintenanceService.cancelReport(id)'), isTrue);
       expect(service.contains("'cancel_my_maintenance_report'"), isTrue);
+      expect(service.contains("'p_report_id': id"), isTrue);
       expect(migration.contains('cancel_my_maintenance_report'), isTrue);
       expect(migration.contains("status = 'cancelled'"), isTrue);
     });
@@ -63,6 +64,7 @@ void main() {
       final common =
           File('lib/core/widgets/common_widgets.dart').readAsStringSync();
       expect(common.contains('return Material('), isTrue);
+      expect(common.contains('color: Colors.transparent'), isTrue);
       expect(common.contains('child: InkWell('), isTrue);
     });
   });
