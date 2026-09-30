@@ -51,10 +51,10 @@ void main() {
       expect(shell.contains("label: 'Residents'"), isTrue);
       expect(shell.contains("label: 'Operations'"), isTrue);
       expect(
-        shell.contains(
-            'static List<AppDestination> desktopTools(UserRole role)'),
+        shell.contains('static List<AppDestination> desktopTools(UserRole role)'),
         isTrue,
       );
+      // Original (main): shell.contains('static List<AppDestination> desktopTools')
       expect(shell.contains("webGroup: 'Facilities'"), isTrue);
       expect(shell.contains("webGroup: 'Access & Safety'"), isTrue);
       expect(shell.contains("webGroup: 'Billing & Records'"), isTrue);

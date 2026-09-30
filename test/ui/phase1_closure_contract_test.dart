@@ -53,10 +53,10 @@ void main() {
       }
       expect(source.contains("label: 'Curfew'"), isFalse);
       expect(
-        source.contains(
-            'static List<AppDestination> desktopTools(UserRole role)'),
+        source.contains('static List<AppDestination> desktopTools(UserRole role)'),
         isTrue,
       );
+      // Original (main): source.contains('static List<AppDestination> desktopTools')
       expect(source.contains("webGroup: 'Facilities'"), isTrue);
       expect(source.contains("webGroup: 'Billing & Records'"), isTrue);
     });
@@ -190,6 +190,7 @@ void main() {
       );
       expect(source.contains('Feedback preview validated'), isTrue);
       expect(source.contains('not sent or stored'), isTrue);
+      // Original (main): expect(source.contains('transmitted or stored until backend support'), isTrue);
     });
 
     test('readiness script permits the active web branch', () {

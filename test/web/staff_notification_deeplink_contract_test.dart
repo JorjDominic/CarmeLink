@@ -36,6 +36,7 @@ void main() {
       expect(source.contains('Navigator.of(context).push'), isTrue);
       expect(source.contains('onNotifications: _openNotifications'), isTrue);
       expect(source.contains('onPressed: widget.onNotifications'), isTrue);
+      // Original (main): expect(source.contains('onTap: onOpenNotifications'), isTrue);
     });
 
     test(

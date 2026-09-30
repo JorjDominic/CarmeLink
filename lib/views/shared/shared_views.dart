@@ -1897,6 +1897,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
         content: const Text(
           'The form looks valid, but this preview was not sent or stored. ' +
               'Backend feedback persistence is not enabled yet.',
+          // Original (main): 'Thank you! This preview was validated, but your feedback was not sent or stored.',
         ),
         actions: [
           FilledButton(
