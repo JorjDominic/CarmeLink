@@ -5403,7 +5403,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
               showAllPresenceRecords ? events : events.take(5).toList();
           final monitoringActive = _monitoringStatus['registered'] == true;
           final gateConfigured = _monitoringStatus['gateEnabled'] == true;
-          final automaticReady = monitoringActive && gateConfigured;
+          final automaticReady = monitoringActive;
           final pendingTransitions =
               (_monitoringStatus['pendingCount'] as num?)?.toInt() ?? 0;
 
@@ -5560,10 +5560,10 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                                     pendingTransitions > 0
                                         ? '$pendingTransitions crossing event(s) waiting to sync.'
                                         : automaticReady
-                                            ? 'Wake-up and Point 1 → Point 2 gate detection are registered.'
-                                            : !gateConfigured
-                                                ? 'The official gate configuration has not reached this device yet.'
-                                                : 'Enable Always / Allow all the time location access.',
+                                            ? gateConfigured
+                                                ? 'Property boundary monitoring and the optional gate wake-up are registered.'
+                                                : 'Property boundary monitoring is registered; the optional gate wake-up is not configured.'
+                                            : 'Enable Always / Allow all the time location access.',
                                     style:
                                         Theme.of(context).textTheme.bodySmall,
                                   ),
@@ -5729,9 +5729,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              !gateConfigured
-                                  ? 'Refresh monitoring after the Point 1 → Point 2 gate configuration is deployed.'
-                                  : 'Turn on location services and grant Always / Allow all the time access so crossings can be logged while CarmeLink is closed.',
+                              'Turn on location services and grant Always / Allow all the time access so crossings can be logged while CarmeLink is closed.',
                               style: TextStyle(fontSize: 13),
                             ),
                             const SizedBox(height: 8),
@@ -5792,10 +5790,10 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                     label: 'Detection signal',
                     value: automaticReady ? 'Active' : 'Needs attention',
                     detail: automaticReady
-                        ? 'Wake circle + Point 1 → Point 2 gate'
-                        : !gateConfigured
-                            ? 'Gate configuration pending'
-                            : 'Check Always location access',
+                        ? gateConfigured
+                            ? 'Property polygon + optional gate wake-up'
+                            : 'Property polygon monitoring'
+                        : 'Check Always location access',
                     icon: !automaticReady
                         ? Icons.location_disabled_outlined
                         : Icons.gps_fixed_outlined,

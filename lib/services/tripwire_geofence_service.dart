@@ -10,9 +10,10 @@ import 'geofence_service.dart';
 
 /// Coordinates the native, low-power IN/OUT tripwire with authenticated sync.
 ///
-/// Native code captures minimized transitions while Flutter is suspended. This
-/// service establishes the initial baseline without logging it, then drains
-/// confirmed transitions through the existing secure Supabase boundary.
+/// Native code captures minimized transitions while Flutter is suspended. On
+/// registration it seeds native monitoring from the last server-recorded
+/// direction, allowing accurate native fixes to reconcile a crossing missed
+/// during an Android force-stop or another monitoring interruption.
 class TripwireGeofenceService {
   TripwireGeofenceService._();
 
@@ -42,6 +43,7 @@ class TripwireGeofenceService {
 
       GeofenceLocationService.applyBoundaryConfiguration(row);
       final baseline = await _locationService.checkCurrentPresence();
+      final serverDirection = await _loadServerDirection(tenantId);
       final session = SupabaseConfig.client.auth.currentSession;
       if (session == null) return;
       final rawPolygon = row['polygon_points'];
@@ -59,7 +61,11 @@ class TripwireGeofenceService {
         'latitude': (row['center_latitude'] as num).toDouble(),
         'longitude': (row['center_longitude'] as num).toDouble(),
         'radiusMeters': (row['radius_meters'] as num).toDouble(),
-        'initialDirection': baseline.isUnavailable ? null : baseline.direction,
+        // Prefer durable server state. If it differs from the current physical
+        // side, native code requires two accurate matching fixes before it
+        // records a reconciliation transition.
+        'initialDirection': serverDirection ??
+            (baseline.isUnavailable ? null : baseline.direction),
         'polygon': polygon,
         'edgeBufferMeters':
             (row['edge_buffer_meters'] as num?)?.toDouble() ?? 3.0,
@@ -84,6 +90,24 @@ class TripwireGeofenceService {
       // Desktop and unsupported test platforms do not install native adapters.
     } catch (error) {
       debugPrint('Could not start native tripwire monitoring: $error');
+    }
+  }
+
+  Future<String?> _loadServerDirection(String tenantId) async {
+    try {
+      final row = await SupabaseConfig.client
+          .from('tenant_details')
+          .select('current_gate_status')
+          .eq('profile_id', tenantId)
+          .maybeSingle();
+      final direction = row?['current_gate_status'];
+      return direction == 'IN' || direction == 'OUT'
+          ? direction as String
+          : null;
+    } catch (error) {
+      debugPrint(
+          'Could not load server gate status for reconciliation: $error');
+      return null;
     }
   }
 

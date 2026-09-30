@@ -2444,7 +2444,7 @@ class TripwireFlowCard extends StatelessWidget {
         legend(const Color(0xFF56886B), 'Property polygon',
             'the four measured corners decide inside or outside.'),
         legend(const Color(0xFFC77800), 'Official gate',
-            '$gateLabel is the only edge that records IN or OUT.'),
+            '$gateLabel provides an extra prompt wake-up signal.'),
         const Divider(height: 16),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,

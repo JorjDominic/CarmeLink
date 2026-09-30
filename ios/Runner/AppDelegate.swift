@@ -93,6 +93,8 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   private let registeredKey = "tripwire_registered"
   private let queuedDirectionKey = "tripwire_queued_direction"
   private let confirmedDirectionKey = "tripwire_confirmed_direction"
+  private let candidateDirectionKey = "tripwire_candidate_direction"
+  private let candidateFixCountKey = "tripwire_candidate_fix_count"
   private var burstTimeout: DispatchWorkItem?
   private var burstActive = false
   private var syncing = false
@@ -153,6 +155,8 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     if initialDirection == "IN" || initialDirection == "OUT" {
       defaults.set(initialDirection, forKey: confirmedDirectionKey)
     }
+    defaults.removeObject(forKey: candidateDirectionKey)
+    defaults.removeObject(forKey: candidateFixCountKey)
 
     // Start monitoring if authorized for Always OR When In Use.
     // When In Use will still receive region callbacks while active/suspended,
@@ -160,6 +164,9 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     let status = manager.authorizationStatus
     if status == .authorizedAlways || status == .authorizedWhenInUse {
       startMonitoring(latitude: latitude, longitude: longitude, radius: radius)
+      // Obtain multiple accurate fixes now. This reconciles stale server state
+      // immediately after the user reopens an app that Android/iOS had stopped.
+      startLocationBurst()
     }
     if status == .authorizedWhenInUse {
       manager.requestAlwaysAuthorization()
@@ -273,10 +280,6 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       abs(location.timestamp.timeIntervalSinceNow) <= 120
     else { return }
     guard let direction = verifiedDirection(for: location) else { return }
-    let previousLocation: CLLocation? = defaults.object(forKey: "tripwire_last_lat") == nil ? nil : CLLocation(
-      latitude: defaults.double(forKey: "tripwire_last_lat"),
-      longitude: defaults.double(forKey: "tripwire_last_lng")
-    )
     defaults.set(location.coordinate.latitude, forKey: "tripwire_last_lat")
     defaults.set(location.coordinate.longitude, forKey: "tripwire_last_lng")
     defaults.set(location.timestamp.timeIntervalSince1970, forKey: "tripwire_last_at")
@@ -284,14 +287,33 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       // The first significant-location callback establishes state; it is not
       // evidence that a crossing occurred after monitoring began.
       defaults.set(direction, forKey: confirmedDirectionKey)
+      defaults.removeObject(forKey: candidateDirectionKey)
+      defaults.removeObject(forKey: candidateFixCountKey)
       return
     }
     let previousDirection = effectiveDirection()
-    // When gate line is enabled, additionally require the movement path to
-    // cross the gate segment. Without a gate line, polygon evaluation alone
-    // is sufficient to confirm a crossing.
-    guard previousDirection != direction else { return }
-    guard movementCrossesGate(from: previousLocation ?? location, to: location) else { return }
+    // The accurate polygon result is authoritative. The optional gate region
+    // remains a low-latency wake-up hint, but sparse background fixes are not
+    // required to intersect its short segment. Requiring that intersection
+    // discarded real exits when iOS delivered its fix beyond the gate.
+    guard previousDirection != direction else {
+      defaults.removeObject(forKey: candidateDirectionKey)
+      defaults.removeObject(forKey: candidateFixCountKey)
+      return
+    }
+    let candidateCount: Int
+    if defaults.string(forKey: candidateDirectionKey) == direction {
+      candidateCount = defaults.integer(forKey: candidateFixCountKey) + 1
+    } else {
+      candidateCount = 1
+    }
+    defaults.set(direction, forKey: candidateDirectionKey)
+    defaults.set(candidateCount, forKey: candidateFixCountKey)
+    // Two consecutive accurate fixes prevent a transient GPS jump from
+    // rewriting state during post-force-stop reconciliation.
+    guard candidateCount >= 2 else { return }
+    defaults.removeObject(forKey: candidateDirectionKey)
+    defaults.removeObject(forKey: candidateFixCountKey)
     append(direction: direction)
     stopLocationBurst()
   }
@@ -374,28 +396,6 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     return inside ? "IN" : "OUT"
   }
 
-  /// Returns true when the movement path between two fixes should be treated
-  /// as a confirmed boundary crossing.
-  ///
-  /// When the virtual gate line IS configured, we also require the movement
-  /// vector to intersect (or come within tolerance of) the gate segment —
-  /// this prevents false triggers from someone standing near the boundary.
-  ///
-  /// When the gate line is NOT configured (gateEnabled = false), polygon
-  /// evaluation in verifiedDirection() is the sole arbiter, so we always
-  /// return true here to let it through.
-  private func movementCrossesGate(from: CLLocation, to: CLLocation) -> Bool {
-    guard defaults.bool(forKey: "tripwire_gate_enabled") else {
-      // No gate line — polygon direction change is sufficient.
-      return true
-    }
-    let start = Point(lat: defaults.double(forKey: "tripwire_gate_start_lat"), lng: defaults.double(forKey: "tripwire_gate_start_lng"))
-    let end = Point(lat: defaults.double(forKey: "tripwire_gate_end_lat"), lng: defaults.double(forKey: "tripwire_gate_end_lng"))
-    let a = Point(lat: from.coordinate.latitude, lng: from.coordinate.longitude)
-    let b = Point(lat: to.coordinate.latitude, lng: to.coordinate.longitude)
-    return segmentDistance(a, b, start, end) <= defaults.double(forKey: "tripwire_gate_tolerance")
-  }
-
   private func xy(_ p: Point, _ origin: Point) -> (Double, Double) {
     let radius = 6_371_000.0
     return ((p.lng - origin.lng) * .pi / 180 * radius * cos(origin.lat * .pi / 180),
@@ -406,18 +406,6 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     let q = xy(p, a), e = xy(b, a), length = e.0 * e.0 + e.1 * e.1
     let t = length == 0 ? 0 : max(0, min(1, (q.0 * e.0 + q.1 * e.1) / length))
     return hypot(q.0 - t * e.0, q.1 - t * e.1)
-  }
-
-  private func segmentDistance(_ a: Point, _ b: Point, _ c: Point, _ d: Point) -> Double {
-    // Gate corridors are deliberately tolerant; endpoint-to-segment distance
-    // plus the intersection test covers sparse background fixes.
-    let aa = xy(a, a), bb = xy(b, a), cc = xy(c, a), dd = xy(d, a)
-    func cross(_ p: (Double, Double), _ q: (Double, Double), _ r: (Double, Double)) -> Double {
-      (q.0-p.0)*(r.1-p.1) - (q.1-p.1)*(r.0-p.0)
-    }
-    if cross(aa,bb,cc) * cross(aa,bb,dd) <= 0 && cross(cc,dd,aa) * cross(cc,dd,bb) <= 0 { return 0 }
-    return min(pointSegmentDistance(a,c,d), pointSegmentDistance(b,c,d),
-               pointSegmentDistance(c,a,b), pointSegmentDistance(d,a,b))
   }
 
   // ─── CLLocationManagerDelegate — auth & errors ────────────────────────────

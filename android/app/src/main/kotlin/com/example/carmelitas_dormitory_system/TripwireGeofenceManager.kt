@@ -142,6 +142,7 @@ class TripwireGeofenceManager(private val context: Context) {
         if (initialDirection == "IN" || initialDirection == "OUT") {
             editor.putString("confirmed_direction", initialDirection)
         }
+        editor.remove("candidate_direction").remove("candidate_fix_count")
         editor.apply()
 
         // Seed the movement segment without creating an event. The next OS
@@ -199,7 +200,22 @@ class TripwireGeofenceManager(private val context: Context) {
         client.removeGeofences(pendingIntent).addOnCompleteListener {
             try {
                 client.addGeofences(request, pendingIntent)
-                    .addOnSuccessListener { result.success(true) }
+                    .addOnSuccessListener {
+                        // Registration can follow recovery from Android Force
+                        // Stop. Start a bounded accurate burst while the app is
+                        // visibly open so two fixes can reconcile stale state
+                        // without waiting for another circle transition.
+                        try {
+                            ContextCompat.startForegroundService(
+                                context,
+                                Intent(context, TripwireLocationBurstService::class.java),
+                            )
+                        } catch (_: RuntimeException) {
+                            // Initial-trigger and later region callbacks remain
+                            // available if the OS refuses this recovery burst.
+                        }
+                        result.success(true)
+                    }
                     .addOnFailureListener { error ->
                         prefs.edit().putBoolean("registered", false).apply()
                         result.error("registration_failed", error.message, null)
