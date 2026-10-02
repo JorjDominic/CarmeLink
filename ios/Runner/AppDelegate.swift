@@ -95,6 +95,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   private let confirmedDirectionKey = "tripwire_confirmed_direction"
   private let candidateDirectionKey = "tripwire_candidate_direction"
   private let candidateFixCountKey = "tripwire_candidate_fix_count"
+  private let candidateStartedAtKey = "tripwire_candidate_started_at"
   private let monitoringAvailableKey = "tripwire_monitoring_available"
   private let monitoringReasonKey = "tripwire_monitoring_reason"
   private var burstTimeout: DispatchWorkItem?
@@ -161,6 +162,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     }
     defaults.removeObject(forKey: candidateDirectionKey)
     defaults.removeObject(forKey: candidateFixCountKey)
+    defaults.removeObject(forKey: candidateStartedAtKey)
 
     // Start monitoring if authorized for Always OR When In Use.
     // When In Use will still receive region callbacks while active/suspended,
@@ -168,7 +170,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     let status = manager.authorizationStatus
     if status == .authorizedAlways || status == .authorizedWhenInUse {
       startMonitoring(latitude: latitude, longitude: longitude, radius: radius)
-      startContinuousMonitoring()
+      startContinuousMonitoring(highAccuracy: false)
     }
     if status == .authorizedWhenInUse {
       manager.requestAlwaysAuthorization()
@@ -186,7 +188,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       longitude: defaults.double(forKey: "tripwire_longitude"),
       radius: defaults.double(forKey: "tripwire_radius")
     )
-    startContinuousMonitoring()
+    startContinuousMonitoring(highAccuracy: false)
     if status == .authorizedWhenInUse {
       manager.requestAlwaysAuthorization()
     }
@@ -281,6 +283,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
 
   func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
     reportMonitoringHealth(available: true, reason: nil)
+    expireCandidateIfNeeded()
     guard
       defaults.bool(forKey: registeredKey),
       let location = locations.last,
@@ -298,6 +301,8 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       defaults.set(direction, forKey: confirmedDirectionKey)
       defaults.removeObject(forKey: candidateDirectionKey)
       defaults.removeObject(forKey: candidateFixCountKey)
+      defaults.removeObject(forKey: candidateStartedAtKey)
+      startContinuousMonitoring(highAccuracy: false)
       return
     }
     let previousDirection = effectiveDirection()
@@ -308,6 +313,8 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     guard previousDirection != direction else {
       defaults.removeObject(forKey: candidateDirectionKey)
       defaults.removeObject(forKey: candidateFixCountKey)
+      defaults.removeObject(forKey: candidateStartedAtKey)
+      startContinuousMonitoring(highAccuracy: false)
       return
     }
     let candidateCount: Int
@@ -318,21 +325,37 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     }
     defaults.set(direction, forKey: candidateDirectionKey)
     defaults.set(candidateCount, forKey: candidateFixCountKey)
+    if defaults.string(forKey: candidateDirectionKey) != direction || candidateCount == 1 {
+      defaults.set(Date().timeIntervalSince1970, forKey: candidateStartedAtKey)
+    }
+    startContinuousMonitoring(highAccuracy: true)
     // Two consecutive accurate fixes prevent a transient GPS jump from
     // rewriting state during post-force-stop reconciliation.
     guard candidateCount >= 2 else { return }
     defaults.removeObject(forKey: candidateDirectionKey)
     defaults.removeObject(forKey: candidateFixCountKey)
+    defaults.removeObject(forKey: candidateStartedAtKey)
     append(direction: direction)
+    startContinuousMonitoring(highAccuracy: false)
   }
 
-  private func startContinuousMonitoring() {
+  private func startContinuousMonitoring(highAccuracy: Bool = false) {
     guard defaults.bool(forKey: registeredKey) else { return }
-    manager.desiredAccuracy = kCLLocationAccuracyBest
-    // Keep delivering fixes after the tenant stops just inside. Direction
-    // changes still require two accurate, matching fixes before being stored.
-    manager.distanceFilter = kCLDistanceFilterNone
+    manager.desiredAccuracy = highAccuracy
+      ? kCLLocationAccuracyBest : kCLLocationAccuracyNearestTenMeters
+    manager.distanceFilter = highAccuracy ? kCLDistanceFilterNone : 15
+    manager.pausesLocationUpdatesAutomatically = !highAccuracy
     manager.startUpdatingLocation()
+  }
+
+  private func expireCandidateIfNeeded() {
+    guard defaults.integer(forKey: candidateFixCountKey) > 0 else { return }
+    let startedAt = defaults.double(forKey: candidateStartedAtKey)
+    guard startedAt == 0 || Date().timeIntervalSince1970 - startedAt > 120 else { return }
+    defaults.removeObject(forKey: candidateDirectionKey)
+    defaults.removeObject(forKey: candidateFixCountKey)
+    defaults.removeObject(forKey: candidateStartedAtKey)
+    startContinuousMonitoring(highAccuracy: false)
   }
 
   // ─── Fine-accuracy location burst ─────────────────────────────────────────
@@ -367,7 +390,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     burstTimeout = nil
     burstActive = false
     if defaults.bool(forKey: registeredKey) {
-      startContinuousMonitoring()
+      startContinuousMonitoring(highAccuracy: false)
     } else {
       manager.stopUpdatingLocation()
       manager.distanceFilter = kCLDistanceFilterNone

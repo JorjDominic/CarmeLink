@@ -11,6 +11,7 @@ object TripwireCrossingVerifier {
     private const val MAX_AGE_MILLIS = 120_000L
     private const val CANDIDATE_DIRECTION = "candidate_direction"
     private const val CANDIDATE_FIX_COUNT = "candidate_fix_count"
+    private const val CANDIDATE_STARTED_AT = "candidate_started_at"
     private const val REQUIRED_MATCHING_FIXES = 2
 
     fun accept(context: Context, location: Location): String? {
@@ -56,6 +57,7 @@ object TripwireCrossingVerifier {
                 .putString("confirmed_direction", direction)
                 .remove(CANDIDATE_DIRECTION)
                 .remove(CANDIDATE_FIX_COUNT)
+                .remove(CANDIDATE_STARTED_AT)
                 .apply()
             return null
         }
@@ -63,6 +65,7 @@ object TripwireCrossingVerifier {
             prefs.edit()
                 .remove(CANDIDATE_DIRECTION)
                 .remove(CANDIDATE_FIX_COUNT)
+                .remove(CANDIDATE_STARTED_AT)
                 .apply()
             return null // No crossing.
         }
@@ -79,11 +82,17 @@ object TripwireCrossingVerifier {
         prefs.edit()
             .putString(CANDIDATE_DIRECTION, direction)
             .putInt(CANDIDATE_FIX_COUNT, candidateCount)
+            .apply {
+                if (previousCandidate != direction) {
+                    putLong(CANDIDATE_STARTED_AT, System.currentTimeMillis())
+                }
+            }
             .apply()
         if (candidateCount < REQUIRED_MATCHING_FIXES) return null
         prefs.edit()
             .remove(CANDIDATE_DIRECTION)
             .remove(CANDIDATE_FIX_COUNT)
+            .remove(CANDIDATE_STARTED_AT)
             .apply()
 
         // The precise polygon result is authoritative. The optional gate region

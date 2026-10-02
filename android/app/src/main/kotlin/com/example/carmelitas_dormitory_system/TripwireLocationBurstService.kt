@@ -49,6 +49,7 @@ class TripwireLocationBurstService : Service() {
 
     private val locationClient by lazy { LocationServices.getFusedLocationProviderClient(this) }
     private var running = false
+    private var highAccuracyMode = false
     private val healthHandler = Handler(Looper.getMainLooper())
     private val healthCheck = object : Runnable {
         override fun run() {
@@ -76,6 +77,7 @@ class TripwireLocationBurstService : Service() {
                         showCrossingNotification(direction)
                     }
                 }
+                updateLocationMode(hasCandidateTransition())
             }
         }
     }
@@ -120,25 +122,49 @@ class TripwireLocationBurstService : Service() {
             return
         }
 
-        // Do not require additional movement between fixes. Entry commonly
-        // leaves only one accurate fix before the tenant stops or GPS quality
-        // drops indoors; the verifier still requires two matching fresh fixes.
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5_000L)
-            .setMinUpdateIntervalMillis(3_000L)
-            .setMinUpdateDistanceMeters(0f)
-            .setMaxUpdateAgeMillis(5_000L)
-            .build()
+        updateLocationMode(false)
+    }
+
+    private fun locationRequest(highAccuracy: Boolean): LocationRequest = if (highAccuracy) {
+        // Near an edge (or while confirming a candidate), do not require
+        // movement between fixes so entry can complete after the tenant stops.
+        LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5_000L)
+            .setMinUpdateIntervalMillis(3_000L).setMinUpdateDistanceMeters(0f)
+            .setMaxUpdateAgeMillis(5_000L).build()
+    } else {
+        LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 30_000L)
+            .setMinUpdateIntervalMillis(15_000L).setMinUpdateDistanceMeters(10f)
+            .setMaxUpdateAgeMillis(30_000L).build()
+    }
+
+    private fun updateLocationMode(highAccuracy: Boolean) {
+        if (running && highAccuracyMode == highAccuracy) return
         try {
+            if (running) locationClient.removeLocationUpdates(callback)
+            highAccuracyMode = highAccuracy
             running = true
-            locationClient.requestLocationUpdates(request, callback, Looper.getMainLooper())
+            locationClient.requestLocationUpdates(
+                locationRequest(highAccuracy), callback, Looper.getMainLooper(),
+            )
         } catch (_: SecurityException) {
             stopMonitoring()
         }
     }
 
+    private fun hasCandidateTransition(): Boolean {
+        val prefs = getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE)
+        if (prefs.getInt("candidate_fix_count", 0) <= 0) return false
+        val startedAt = prefs.getLong("candidate_started_at", 0L)
+        if (startedAt > 0L && System.currentTimeMillis() - startedAt <= 120_000L) return true
+        prefs.edit().remove("candidate_direction").remove("candidate_fix_count")
+            .remove("candidate_started_at").apply()
+        return false
+    }
+
     private fun stopMonitoring() {
         if (running) locationClient.removeLocationUpdates(callback)
         running = false
+        highAccuracyMode = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } else {
@@ -153,6 +179,7 @@ class TripwireLocationBurstService : Service() {
         try { unregisterReceiver(providerReceiver) } catch (_: IllegalArgumentException) { }
         if (running) locationClient.removeLocationUpdates(callback)
         running = false
+        highAccuracyMode = false
         super.onDestroy()
     }
 

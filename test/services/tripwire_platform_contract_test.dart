@@ -117,13 +117,34 @@ void main() {
       final source = iosDelegate.readAsStringSync();
       final plist = File('ios/Runner/Info.plist').readAsStringSync();
 
-      expect(source.contains('startContinuousMonitoring()'), isTrue);
+      expect(source.contains('startContinuousMonitoring(highAccuracy: false)'),
+          isTrue);
       expect(source.contains('manager.startUpdatingLocation()'), isTrue);
-      expect(source.contains('manager.distanceFilter = kCLDistanceFilterNone'),
+      expect(
+          source.contains(
+              'manager.distanceFilter = highAccuracy ? kCLDistanceFilterNone : 15'),
           isTrue);
       expect(source.contains('manager.allowsBackgroundLocationUpdates = true'),
           isTrue);
       expect(plist.contains('<string>location</string>'), isTrue);
+    });
+
+    test('both platforms use adaptive lower-power monitoring', () {
+      final android = androidMonitor.readAsStringSync();
+      final ios = iosDelegate.readAsStringSync();
+
+      expect(android.contains('PRIORITY_BALANCED_POWER_ACCURACY'), isTrue);
+      expect(android.contains('hasCandidateTransition()'), isTrue);
+      expect(android.contains('HIGH_ACCURACY_EDGE_METERS'), isFalse);
+      expect(android.contains('setMinUpdateIntervalMillis(15_000L)'), isTrue);
+      expect(ios.contains('kCLLocationAccuracyNearestTenMeters'), isTrue);
+      expect(ios.contains('startContinuousMonitoring(highAccuracy: true)'),
+          isTrue);
+      expect(ios.contains('nearBoundary'), isFalse);
+      expect(android.contains('candidate_started_at'), isTrue);
+      expect(ios.contains('expireCandidateIfNeeded()'), isTrue);
+      expect(ios.contains('pausesLocationUpdatesAutomatically = !highAccuracy'),
+          isTrue);
     });
   });
 }

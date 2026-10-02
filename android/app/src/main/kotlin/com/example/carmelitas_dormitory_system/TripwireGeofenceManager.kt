@@ -155,6 +155,7 @@ class TripwireGeofenceManager(private val context: Context) {
             editor.putString("confirmed_direction", initialDirection)
         }
         editor.remove("candidate_direction").remove("candidate_fix_count")
+            .remove("candidate_started_at")
         editor.apply()
 
         // Seed the movement segment without creating an event. The next OS
