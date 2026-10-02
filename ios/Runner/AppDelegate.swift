@@ -25,6 +25,23 @@ import UserNotifications
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  /// Called when the OS wakes the app to deliver background URLSession events.
+  /// The tripwire background session uses identifier "com.carmelitas.carmelink.tripwire.sync".
+  /// Touching `tripwire.backgroundSession` here ensures the session is created and
+  /// its delegate receives the pending completion callbacks.
+  override func application(
+    _ application: UIApplication,
+    handleEventsForBackgroundURLSession identifier: String,
+    completionHandler: @escaping () -> Void
+  ) {
+    if identifier == "com.carmelitas.carmelink.tripwire.sync" {
+      _ = tripwire.backgroundSession // ensure lazy init
+      tripwire.backgroundSessionCompletionHandler = completionHandler
+    } else {
+      completionHandler()
+    }
+  }
+
   private func handleTripwireCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
     case "register":
@@ -82,7 +99,7 @@ import UserNotifications
   }
 }
 
-final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
+final class TripwireLocationManager: NSObject, CLLocationManagerDelegate, URLSessionDataDelegate {
   static let shared = TripwireLocationManager()
 
   private let manager = CLLocationManager()
@@ -107,6 +124,23 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   private var syncing = false
   private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
   private var burstBackgroundTask: UIBackgroundTaskIdentifier = .invalid
+
+  // Background URLSession for gate event uploads. Upload tasks survive iOS
+  // app suspension and are completed by the OS even if the app is killed.
+  // URLSession.shared dataTask dies when iOS background time expires.
+  // Internal so AppDelegate can touch it in handleEventsForBackgroundURLSession.
+  lazy var backgroundSession: URLSession = {
+    let config = URLSessionConfiguration.background(withIdentifier: "com.carmelitas.carmelink.tripwire.sync")
+    config.isDiscretionary = false
+    config.sessionSendsLaunchEvents = true
+    return URLSession(configuration: config, delegate: self, delegateQueue: nil)
+  }()
+  // Pending completion handlers keyed by URLSessionTask.taskIdentifier.
+  private var pendingHandlers: [Int: (Int, Data?, Error?) -> Void] = [:]
+  private var pendingData: [Int: Data] = [:]
+  /// Stored by AppDelegate from handleEventsForBackgroundURLSession and
+  /// called once all pending background tasks have fired their delegates.
+  var backgroundSessionCompletionHandler: (() -> Void)?
 
   private override init() {
     super.init()
@@ -810,16 +844,62 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     }
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
-    request.httpBody = payload
-    request.timeoutInterval = 15
+    request.timeoutInterval = 30
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.setValue(apiKey, forHTTPHeaderField: "apikey")
     if includeAuthorization, let token = defaults.string(forKey: "tripwire_access_token") {
       request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     }
-    URLSession.shared.dataTask(with: request) { data, response, error in
-      completion((response as? HTTPURLResponse)?.statusCode ?? 0, data, error)
-    }.resume()
+
+    // Use a background URLSession upload task. Unlike URLSession.shared dataTask,
+    // upload tasks in a background session are managed by the OS and can complete
+    // even after iOS suspends the app at the end of its background execution time.
+    // This is the key fix for geofence events not uploading when the app is swiped
+    // from Recents and iOS fires didEnterRegion / didExitRegion.
+    do {
+      let tempFile = FileManager.default.temporaryDirectory
+        .appendingPathComponent("carmelink_\(UUID().uuidString).json")
+      try payload.write(to: tempFile)
+      let task = backgroundSession.uploadTask(with: request, fromFile: tempFile)
+      pendingHandlers[task.taskIdentifier] = { code, data, error in
+        try? FileManager.default.removeItem(at: tempFile)
+        completion(code, data, error)
+      }
+      task.resume()
+    } catch {
+      // Fallback: if temp file write fails, use shared session (foreground only).
+      URLSession.shared.dataTask(with: { var r = request; r.httpBody = payload; return r }()) { data, response, error in
+        completion((response as? HTTPURLResponse)?.statusCode ?? 0, data, error)
+      }.resume()
+    }
+  }
+
+  // ─── URLSessionDataDelegate (background upload completion) ────────────────
+
+  func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+    let id = dataTask.taskIdentifier
+    if pendingData[id] == nil { pendingData[id] = Data() }
+    pendingData[id]?.append(data)
+  }
+
+  func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      let id = task.taskIdentifier
+      let data = self.pendingData.removeValue(forKey: id)
+      let handler = self.pendingHandlers.removeValue(forKey: id)
+      let code = (task.response as? HTTPURLResponse)?.statusCode ?? 0
+      handler?(code, data, error)
+    }
+  }
+
+  /// Called by the OS when all background URLSession events for this session have
+  /// been delivered. Must call the stored completion handler so iOS can snapshot.
+  func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+    DispatchQueue.main.async { [weak self] in
+      self?.backgroundSessionCompletionHandler?()
+      self?.backgroundSessionCompletionHandler = nil
+    }
   }
 
   private func failSync(_ message: String) {

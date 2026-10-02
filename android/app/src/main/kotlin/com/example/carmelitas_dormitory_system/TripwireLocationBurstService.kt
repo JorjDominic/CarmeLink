@@ -73,7 +73,7 @@ class TripwireLocationBurstService : Service() {
                     System.currentTimeMillis(),
                 )
                 if (queued && !MainActivity.isInForeground) {
-                    showCrossingNotification(direction)
+                    CrossingNotificationHelper.show(this@TripwireLocationBurstService, direction)
                 }
             }
             updateLocationMode(hasCandidateTransition())
@@ -120,7 +120,13 @@ class TripwireLocationBurstService : Service() {
             return
         }
 
-        updateLocationMode(false)
+        // If a geofence transition was recently detected (by GeofenceTransitionWorker
+        // while the app was killed), start in high-accuracy mode immediately so
+        // TripwireCrossingVerifier can confirm the crossing faster.
+        val prefs = getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE)
+        val lastTransitionAt = prefs.getLong("last_geofence_transition_at", 0L)
+        val hintRecent = System.currentTimeMillis() - lastTransitionAt < 5 * 60 * 1000L
+        updateLocationMode(hintRecent)
     }
 
     private fun locationRequest(highAccuracy: Boolean): LocationRequest = if (highAccuracy) {

@@ -65,7 +65,7 @@
         <receiver
             android:name=".GeofenceBroadcastReceiver"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="true" />
         <service
             android:name=".TripwireLocationBurstService"
             android:enabled="true"
