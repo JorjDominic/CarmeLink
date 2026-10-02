@@ -16,7 +16,8 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
         try {
             ContextCompat.startForegroundService(
                 context,
-                Intent(context, TripwireLocationBurstService::class.java),
+                Intent(context, TripwireLocationBurstService::class.java)
+                    .setAction(TripwireLocationBurstService.ACTION_START),
             )
         } catch (_: RuntimeException) {
             // The OS can deny background foreground-service starts under

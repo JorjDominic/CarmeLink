@@ -11,6 +11,10 @@ void main() {
     'android/app/src/main/kotlin/com/example/carmelitas_dormitory_system/'
     'TripwireGeofenceManager.kt',
   );
+  final androidMonitor = File(
+    'android/app/src/main/kotlin/com/example/carmelitas_dormitory_system/'
+    'TripwireLocationBurstService.kt',
+  );
   final iosDelegate = File('ios/Runner/AppDelegate.swift');
   final dartTripwire = File('lib/services/tripwire_geofence_service.dart');
 
@@ -96,6 +100,28 @@ void main() {
           isTrue);
       expect(ios.contains('guard candidateCount >= 2 else { return }'), isTrue);
       expect(ios.contains('startLocationBurst()'), isTrue);
+    });
+
+    test('Android monitoring persists after the task is removed', () {
+      final source = androidMonitor.readAsStringSync();
+      final manifest =
+          File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+
+      expect(source.contains('return START_STICKY'), isTrue);
+      expect(source.contains('setMinUpdateDistanceMeters(5f)'), isTrue);
+      expect(source.contains('stopBurst()'), isFalse);
+      expect(manifest.contains('android:stopWithTask="false"'), isTrue);
+    });
+
+    test('iOS retains continuous background polygon monitoring', () {
+      final source = iosDelegate.readAsStringSync();
+      final plist = File('ios/Runner/Info.plist').readAsStringSync();
+
+      expect(source.contains('startContinuousMonitoring()'), isTrue);
+      expect(source.contains('manager.startUpdatingLocation()'), isTrue);
+      expect(source.contains('manager.allowsBackgroundLocationUpdates = true'),
+          isTrue);
+      expect(plist.contains('<string>location</string>'), isTrue);
     });
   });
 }

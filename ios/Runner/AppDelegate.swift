@@ -106,6 +106,8 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     manager.delegate = self
     manager.pausesLocationUpdatesAutomatically = false
     manager.allowsBackgroundLocationUpdates = true
+    manager.showsBackgroundLocationIndicator = true
+    manager.activityType = .fitness
   }
 
   func register(
@@ -164,9 +166,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     let status = manager.authorizationStatus
     if status == .authorizedAlways || status == .authorizedWhenInUse {
       startMonitoring(latitude: latitude, longitude: longitude, radius: radius)
-      // Obtain multiple accurate fixes now. This reconciles stale server state
-      // immediately after the user reopens an app that Android/iOS had stopped.
-      startLocationBurst()
+      startContinuousMonitoring()
     }
     if status == .authorizedWhenInUse {
       manager.requestAlwaysAuthorization()
@@ -183,6 +183,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       longitude: defaults.double(forKey: "tripwire_longitude"),
       radius: defaults.double(forKey: "tripwire_radius")
     )
+    startContinuousMonitoring()
     if status == .authorizedWhenInUse {
       manager.requestAlwaysAuthorization()
     }
@@ -228,7 +229,10 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   }
 
   func unregister() {
-    stopLocationBurst()
+    burstTimeout?.cancel()
+    burstTimeout = nil
+    burstActive = false
+    manager.stopUpdatingLocation()
     for region in manager.monitoredRegions where region.identifier == regionIdentifier || region.identifier == gateRegionIdentifier {
       manager.stopMonitoring(for: region)
     }
@@ -315,7 +319,13 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     defaults.removeObject(forKey: candidateDirectionKey)
     defaults.removeObject(forKey: candidateFixCountKey)
     append(direction: direction)
-    stopLocationBurst()
+  }
+
+  private func startContinuousMonitoring() {
+    guard defaults.bool(forKey: registeredKey) else { return }
+    manager.desiredAccuracy = kCLLocationAccuracyBest
+    manager.distanceFilter = 5
+    manager.startUpdatingLocation()
   }
 
   // ─── Fine-accuracy location burst ─────────────────────────────────────────
@@ -348,9 +358,13 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   private func stopLocationBurst() {
     burstTimeout?.cancel()
     burstTimeout = nil
-    if burstActive { manager.stopUpdatingLocation() }
     burstActive = false
-    manager.distanceFilter = kCLDistanceFilterNone
+    if defaults.bool(forKey: registeredKey) {
+      startContinuousMonitoring()
+    } else {
+      manager.stopUpdatingLocation()
+      manager.distanceFilter = kCLDistanceFilterNone
+    }
     if burstBackgroundTask != .invalid {
       UIApplication.shared.endBackgroundTask(burstBackgroundTask)
       burstBackgroundTask = .invalid

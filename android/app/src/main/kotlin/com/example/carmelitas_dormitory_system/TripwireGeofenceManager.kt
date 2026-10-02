@@ -76,6 +76,18 @@ class TripwireGeofenceManager(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         )
 
+    private fun monitoringIntent(action: String = TripwireLocationBurstService.ACTION_START) =
+        Intent(context, TripwireLocationBurstService::class.java).setAction(action)
+
+    private fun startPersistentMonitoring() {
+        try {
+            ContextCompat.startForegroundService(context, monitoringIntent())
+        } catch (_: RuntimeException) {
+            // A geofence callback or the next visible app start retries this
+            // if Android temporarily rejects a background service start.
+        }
+    }
+
     fun register(
         latitude: Double,
         longitude: Double,
@@ -201,19 +213,10 @@ class TripwireGeofenceManager(private val context: Context) {
             try {
                 client.addGeofences(request, pendingIntent)
                     .addOnSuccessListener {
-                        // Registration can follow recovery from Android Force
-                        // Stop. Start a bounded accurate burst while the app is
-                        // visibly open so two fixes can reconcile stale state
-                        // without waiting for another circle transition.
-                        try {
-                            ContextCompat.startForegroundService(
-                                context,
-                                Intent(context, TripwireLocationBurstService::class.java),
-                            )
-                        } catch (_: RuntimeException) {
-                            // Initial-trigger and later region callbacks remain
-                            // available if the OS refuses this recovery burst.
-                        }
+                        // Keep exact polygon monitoring alive after the task is
+                        // removed from Recents. Android still stops it after a
+                        // user-initiated Force Stop until the app is reopened.
+                        startPersistentMonitoring()
                         result.success(true)
                     }
                     .addOnFailureListener { error ->
@@ -258,6 +261,7 @@ class TripwireGeofenceManager(private val context: Context) {
 
     fun unregister(result: MethodChannel.Result) {
         client.removeGeofences(pendingIntent).addOnCompleteListener {
+            context.stopService(monitoringIntent(TripwireLocationBurstService.ACTION_STOP))
             prefs.edit().clear().apply()
             result.success(true)
         }
