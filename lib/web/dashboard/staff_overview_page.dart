@@ -82,7 +82,7 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                     : data.roomsError ?? 'Room records unavailable',
                 Icons.bed_outlined,
                 const RoomMonitoringPage(),
-                'Rooms',
+                'Rooms & inspections',
               ),
               _Metric(
                 'Residents inside',
@@ -104,8 +104,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                     : data.maintenanceError ??
                         'Maintenance records unavailable',
                 Icons.handyman_outlined,
-                const MaintenanceManagementPage(),
-                'Maintenance',
+                const ReportManagementPage(),
+                'Report management',
               ),
               _Metric(
                 'Payment reviews',
@@ -192,8 +192,8 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                               ? '${data.openMaintenance}'
                               : null,
                           icon: Icons.build_outlined,
-                          onTap: () => _open(const MaintenanceManagementPage(),
-                              destinationLabel: 'Maintenance'),
+                          onTap: () => _open(const ReportManagementPage(),
+                              destinationLabel: 'Report management'),
                         ),
                         const SizedBox(height: 9),
                         StaffActionRow(
@@ -257,7 +257,7 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                           ),
                           OutlinedButton.icon(
                             onPressed: () => _open(const RoomMonitoringPage(),
-                                destinationLabel: 'Rooms'),
+                                destinationLabel: 'Rooms & inspections'),
                             icon: const Icon(Icons.meeting_room_outlined,
                                 size: 18),
                             label: const Text('Room monitoring'),
@@ -289,20 +289,13 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                           OutlinedButton.icon(
                             onPressed: () => _open(
                               const CleaningScheduleManagementPage(),
-                              destinationLabel: 'Cleaning schedules',
+                              destinationLabel: 'Cleaning schedules & reports',
                             ),
                             icon: const Icon(
                               Icons.cleaning_services_outlined,
                               size: 18,
                             ),
-                            label: const Text('Cleaning schedules'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () => _open(const RoomMonitoringPage(),
-                                destinationLabel: 'Room inspections'),
-                            icon:
-                                const Icon(Icons.fact_check_outlined, size: 18),
-                            label: const Text('Room inspections'),
+                            label: const Text('Cleaning schedules & reports'),
                           ),
                           OutlinedButton.icon(
                             onPressed: () => _open(

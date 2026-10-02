@@ -739,10 +739,12 @@ class MutedDashboardGrid extends StatelessWidget {
       {required this.items,
       this.compact = false,
       this.denseFourColumn = false,
+      this.prominentCompactText = false,
       super.key});
   final List<MutedDashboardItem> items;
   final bool compact;
   final bool denseFourColumn;
+  final bool prominentCompactText;
 
   @override
   Widget build(BuildContext context) =>
@@ -770,8 +772,10 @@ class MutedDashboardGrid extends StatelessWidget {
             crossAxisCount: columns,
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
-            mainAxisExtent:
-                compact ? 100 + ((textScale - 1).clamp(0, 1) * 72) : null,
+            mainAxisExtent: compact
+                ? (prominentCompactText ? 99 : 100) +
+                    ((textScale - 1).clamp(0, 1) * 72)
+                : null,
             childAspectRatio: compact
                 ? (scaledText ? 1.05 : 1.25)
                 : denseFourColumn && constraints.maxWidth < 500
@@ -786,7 +790,11 @@ class MutedDashboardGrid extends StatelessWidget {
               onTap: item.onTap,
               borderRadius: BorderRadius.circular(16),
               child: Container(
-                padding: EdgeInsets.all(compactTriple ? 6 : (compact ? 7 : 10)),
+                padding: EdgeInsets.all(
+                  prominentCompactText
+                      ? 6
+                      : (compactTriple ? 6 : (compact ? 7 : 10)),
+                ),
                 decoration: BoxDecoration(
                   color: item.color.withValues(alpha: .035),
                   border: Border.all(color: item.color.withValues(alpha: .10)),
@@ -803,20 +811,24 @@ class MutedDashboardGrid extends StatelessWidget {
                               borderRadius: BorderRadius.circular(9)),
                           child: Icon(item.icon,
                               color: item.color,
-                              size: compactTriple ? 15 : (compact ? 17 : 19))),
+                              size: prominentCompactText
+                                  ? 18
+                                  : (compactTriple
+                                      ? 15
+                                      : (compact ? 17 : 19)))),
                       const Spacer(),
                       Text(item.value,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
                                   color: item.color,
                                   fontWeight: FontWeight.w900,
-                                  fontSize: compactTriple
-                                      ? 17
-                                      : (compact ? 19 : 17))),
+                                  fontSize: prominentCompactText
+                                      ? 20
+                                      : compactTriple
+                                          ? 17
+                                          : (compact ? 19 : 17))),
                       const SizedBox(height: 2),
                       Text(item.label,
                           maxLines: 1,
@@ -825,19 +837,22 @@ class MutedDashboardGrid extends StatelessWidget {
                               .textTheme
                               .titleSmall
                               ?.copyWith(
-                                  fontSize:
-                                      compactTriple ? 10 : (compact ? 12 : 10),
+                                  fontSize: prominentCompactText
+                                      ? 12
+                                      : (compactTriple
+                                          ? 10
+                                          : (compact ? 12 : 10)),
                                   fontWeight: FontWeight.w800)),
                       Text(item.detail,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                  fontSize: compactTriple
-                                      ? 8.5
-                                      : (compact ? 11 : 9))),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  fontSize: prominentCompactText
+                                      ? 10.5
+                                      : compactTriple
+                                          ? 8.5
+                                          : (compact ? 11 : 9))),
                     ]),
               ),
             );
