@@ -321,11 +321,11 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
           .toLowerCase();
       final label = switch (route) {
         'payment' => 'Payment verification',
-        'maintenance' => 'Maintenance',
+        'maintenance' => 'Report management',
         'visitor' => 'Visitors',
         'curfew' || 'gate' || 'gate_event' => 'Presence & Curfew',
         'conduct_case' || 'safety' => 'Conduct & Cases',
-        'inspection' => 'Room inspections',
+        'inspection' => 'Rooms & inspections',
         'announcement' => 'Announcements',
         'message' || 'conversation' => 'Messages',
         'onboarding' => 'Residents',
@@ -428,6 +428,16 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     });
   }
 
+  String _canonicalWebDestinationLabel(String value) {
+    final normalized = value.trim().toLowerCase();
+    return switch (normalized) {
+      'rooms' || 'room inspections' => 'rooms & inspections',
+      'cleaning schedules' => 'cleaning schedules & reports',
+      'maintenance' => 'report management',
+      _ => normalized,
+    };
+  }
+
   Future<void> _restoreWebWorkspaceState() async {
     if (!mounted || !CarmeLinkSurfaceScope.isWebPortal(context)) return;
     final saved = await _workspacePersistence.load(widget.roleLabel);
@@ -436,22 +446,26 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     final destinations = _webWorkspaceDestinations();
     if (destinations.isEmpty) return;
 
-    final savedBase = saved.baseDestinationLabel?.trim().toLowerCase();
+    final savedBase = saved.baseDestinationLabel == null
+        ? null
+        : _canonicalWebDestinationLabel(saved.baseDestinationLabel!);
     final baseIndex = savedBase == null
         ? -1
         : destinations.indexWhere(
-            (item) => item.label.trim().toLowerCase() == savedBase,
+            (item) => _canonicalWebDestinationLabel(item.label) == savedBase,
           );
 
     final validGroups =
         destinations.map((item) => item.webGroup).whereType<String>().toSet();
     final restoredGroups = saved.expandedGroups.intersection(validGroups);
+    final restoredGroup = restoredGroups.isEmpty ? null : restoredGroups.first;
 
     setState(() {
       index = baseIndex >= 0 ? baseIndex : 0;
-      _expandedWebGroups
-        ..clear()
-        ..addAll(restoredGroups);
+      _expandedWebGroups.clear();
+      if (restoredGroup != null) {
+        _expandedWebGroups.add(restoredGroup);
+      }
       _workspaceLabelOverride = null;
       _workspaceGroupOverride = null;
       _webWorkspaceNavigatorKey = GlobalKey<NavigatorState>();
@@ -459,9 +473,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 
     final visible = saved.visiblePageLabel?.trim();
     if (visible == null || visible.isEmpty) return;
-    final wanted = visible.toLowerCase();
+    final wanted = _canonicalWebDestinationLabel(visible);
     final destinationIndex = destinations.indexWhere(
-      (item) => item.label.trim().toLowerCase() == wanted,
+      (item) => _canonicalWebDestinationLabel(item.label) == wanted,
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -490,7 +504,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       if (_expandedWebGroups.contains(group)) {
         _expandedWebGroups.remove(group);
       } else {
-        _expandedWebGroups.add(group);
+        _expandedWebGroups
+          ..clear()
+          ..add(group);
       }
     });
     unawaited(
@@ -521,12 +537,26 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       unawaited(_persistWorkspaceDestination(destinations[value].label));
       return;
     }
+    final selectedGroup = destinations[value].webGroup;
     setState(() {
       index = value;
       _workspaceLabelOverride = null;
       _workspaceGroupOverride = null;
       _webWorkspaceNavigatorKey = GlobalKey<NavigatorState>();
+      if (CarmeLinkSurfaceScope.isWebPortal(context) && selectedGroup != null) {
+        _expandedWebGroups
+          ..clear()
+          ..add(selectedGroup);
+      }
     });
+    if (selectedGroup != null) {
+      unawaited(
+        _workspacePersistence.saveExpandedGroups(
+          roleLabel: widget.roleLabel,
+          groups: _expandedWebGroups,
+        ),
+      );
+    }
     unawaited(_persistWorkspaceDestination(destinations[value].label));
   }
 
@@ -535,9 +565,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     final destinations = webPortal
         ? [...widget.destinations, ...widget.webDestinations]
         : widget.destinations;
-    final wanted = label.trim().toLowerCase();
+    final wanted = _canonicalWebDestinationLabel(label);
     final target = destinations.indexWhere(
-      (item) => item.label.trim().toLowerCase() == wanted,
+      (item) => _canonicalWebDestinationLabel(item.label) == wanted,
     );
     if (target >= 0) {
       _select(target);

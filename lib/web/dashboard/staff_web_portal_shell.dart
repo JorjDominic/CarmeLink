@@ -64,36 +64,20 @@ abstract final class StaffWebDestinations {
     final owner = role == UserRole.owner;
     return [
       const AppDestination(
-        label: 'Rooms',
+        label: 'Rooms & inspections',
         icon: Icons.meeting_room_outlined,
         selectedIcon: Icons.meeting_room,
         page: RoomMonitoringPage(),
         webGroup: 'Facilities',
-        webDescription: 'Occupancy and floor plan',
+        webDescription: 'Occupancy, floor plan, cleaning and inspections',
       ),
       const AppDestination(
-        label: 'Maintenance',
-        icon: Icons.build_outlined,
-        selectedIcon: Icons.build,
-        page: MaintenanceManagementPage(),
-        webGroup: 'Facilities',
-        webDescription: 'Repair requests and progress',
-      ),
-      const AppDestination(
-        label: 'Cleaning schedules',
+        label: 'Cleaning schedules & reports',
         icon: Icons.cleaning_services_outlined,
         selectedIcon: Icons.cleaning_services,
         page: CleaningScheduleManagementPage(),
         webGroup: 'Facilities',
-        webDescription: 'Automatic rotation and manual overrides',
-      ),
-      const AppDestination(
-        label: 'Room inspections',
-        icon: Icons.fact_check_outlined,
-        selectedIcon: Icons.fact_check,
-        page: RoomMonitoringPage(),
-        webGroup: 'Facilities',
-        webDescription: 'Inspection notices and findings',
+        webDescription: 'Automatic rotation, overrides and missed-duty reports',
       ),
       const AppDestination(
         label: 'Visitors',
@@ -152,13 +136,17 @@ abstract final class StaffWebDestinations {
         webGroup: 'Billing & Records',
         webDescription: 'Review submitted payment proof',
       ),
-      const AppDestination(
+      AppDestination(
         label: 'Report management',
         icon: Icons.assignment_outlined,
         selectedIcon: Icons.assignment,
-        page: ReportManagementPage(),
+        page: owner
+            ? const ReportManagementPage()
+            : const MaintenanceManagementPage(),
         webGroup: 'Billing & Records',
-        webDescription: 'Operational and maintenance reports',
+        webDescription: owner
+            ? 'Maintenance and confidential reports'
+            : 'Maintenance reports and repair progress',
       ),
       if (owner) ...[
         const AppDestination(

@@ -53,16 +53,16 @@ void main() {
       }
       expect(source.contains("label: 'Curfew'"), isFalse);
       expect(
-        source.contains('static List<AppDestination> desktopTools(UserRole role)'),
+        source.contains(
+            'static List<AppDestination> desktopTools(UserRole role)'),
         isTrue,
       );
-      // Original (main): source.contains('static List<AppDestination> desktopTools')
       expect(source.contains("webGroup: 'Facilities'"), isTrue);
       expect(source.contains("webGroup: 'Billing & Records'"), isTrue);
     });
 
     test(
-        'operations hub exposes the six approved groups without floor-plan duplication',
+        'operations hub exposes the six approved groups with consolidated room tools',
         () {
       final source =
           File('lib/views/owner/owner_pages.dart').readAsStringSync();
@@ -79,7 +79,12 @@ void main() {
       }
 
       expect(source.contains("_OperationItem('Floor plan'"), isFalse);
-      expect(source.contains("'Occupancy and interactive floor plan'"), isTrue);
+      expect(
+        source.contains(
+          "'Occupancy, floor plan, inspection notices, and findings'",
+        ),
+        isTrue,
+      );
       expect(source.contains("Key('operations-summary-row')"), isTrue);
     });
 
@@ -190,7 +195,6 @@ void main() {
       );
       expect(source.contains('Feedback preview validated'), isTrue);
       expect(source.contains('not sent or stored'), isTrue);
-      // Original (main): expect(source.contains('transmitted or stored until backend support'), isTrue);
     });
 
     test('readiness script permits the active web branch', () {

@@ -26,6 +26,7 @@ import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../shared/account_management_page.dart';
 import '../shared/staff_quick_panel.dart';
+import '../shared/cleaning_schedule_management_page.dart';
 import '../shared/employee_curfew_profile_pages.dart';
 import '../shared/conduct_case_pages.dart';
 import '../shared/retention_settings_page.dart';
@@ -997,7 +998,8 @@ class TenantDetailsPage extends StatelessWidget {
                     title: const Text('Guardian phone'),
                     subtitle: Text(tenant.guardianPhone),
                     trailing: const Icon(Icons.call_outlined),
-                    onTap: () => _openPhoneDialer(context, tenant.guardianPhone),
+                    onTap: () =>
+                        _openPhoneDialer(context, tenant.guardianPhone),
                   ),
                 ),
                 InfoRow(
@@ -1029,11 +1031,10 @@ class TenantDetailsPage extends StatelessWidget {
                       const Expanded(
                         child: SectionTitle('Onboarding checklist'),
                       ),
-                      StatusPill(hasActiveContract &&
-                              !needsBed &&
-                              !needsGuardian
-                          ? 'Complete'
-                          : 'In progress'),
+                      StatusPill(
+                          hasActiveContract && !needsBed && !needsGuardian
+                              ? 'Complete'
+                              : 'In progress'),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -1734,9 +1735,8 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
   final searchController = TextEditingController();
   final Set<String> _quickAccess = {
     'Visitors',
-    'Maintenance',
-    'Cleaning schedules',
-    'Room inspections',
+    'Rooms & inspections',
+    'Cleaning schedules & reports',
     'Conduct & cases',
     'Payments',
     'Report management',
@@ -1850,8 +1850,7 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                     Icons.location_on_outlined,
                     const Color(0xFF4C8C65)),
               ];
-              final cardHeight =
-                  110.0 + ((textScale - 1).clamp(0, 1) * 65);
+              final cardHeight = 110.0 + ((textScale - 1).clamp(0, 1) * 65);
               const spacing = 8.0;
               final fittedWidth =
                   (constraints.maxWidth - (spacing * (cards.length - 1))) /
@@ -2078,8 +2077,11 @@ const _operationCategories = [
     Icons.groups_outlined,
     Color(0xFF56886B),
     [
-      _OperationItem('Tenant directory', 'Review resident records and assignments',
-          Icons.groups_outlined, TenantDirectoryPage()),
+      _OperationItem(
+          'Tenant directory',
+          'Review resident records and assignments',
+          Icons.groups_outlined,
+          TenantDirectoryPage()),
       _OperationItem(
         'User accounts',
         'Create and review role-based accounts',
@@ -2097,24 +2099,20 @@ const _operationCategories = [
   ),
   _OperationCategory(
     'Rooms & Facilities',
-    'Rooms, maintenance, cleaning, and inspections',
+    'Rooms, cleaning schedules, reports, and inspections',
     Icons.apartment_outlined,
     Color(0xFF568F8E),
     [
-      _OperationItem('Room monitoring', 'Occupancy and interactive floor plan',
-          Icons.bed_outlined, RoomMonitoringPage()),
-      _OperationItem('Maintenance', 'Manage repair requests',
-          Icons.build_outlined, MaintenanceManagementPage()),
       _OperationItem(
-          'Cleaning schedules',
-          'Open a room to manage bed cleaning schedules',
+          'Rooms & inspections',
+          'Occupancy, floor plan, inspection notices, and findings',
+          Icons.bed_outlined,
+          RoomMonitoringPage()),
+      _OperationItem(
+          'Cleaning schedules & reports',
+          'Manage cleaning rotation, overrides, and missed-duty reports',
           Icons.cleaning_services_outlined,
-          RoomMonitoringPage()),
-      _OperationItem(
-          'Room inspections',
-          'Open a room to review inspection notices and findings',
-          Icons.fact_check_outlined,
-          RoomMonitoringPage()),
+          CleaningScheduleManagementPage()),
     ],
   ),
   _OperationCategory(
@@ -2141,7 +2139,7 @@ const _operationCategories = [
     [
       _OperationItem(
           'Report management',
-          'Maintenance, confidential, and cleaning reports',
+          'Maintenance reports and owner-only confidential reports',
           Icons.assignment_outlined,
           ReportManagementPage()),
       _OperationItem(
@@ -2834,7 +2832,11 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                 ),
               const SizedBox(height: 16),
               if (_workspace == 'bills') ...[
-                MutedDashboardGrid(items: dashboardItems.sublist(1)),
+                MutedDashboardGrid(
+                  items: dashboardItems.sublist(1),
+                  compact: true,
+                  prominentCompactText: true,
+                ),
                 const SizedBox(height: 16),
               ],
 
@@ -5026,6 +5028,10 @@ class ReportManagementPage extends StatelessWidget {
     final isOwner =
         SessionController.instance.currentUser?.role == UserRole.owner;
 
+    if (!isOwner) {
+      return const MaintenanceManagementPage();
+    }
+
     return PageFrame(
       title: 'Report management',
       subtitle: 'Review reporting workflows from one place',
@@ -5045,26 +5051,14 @@ class ReportManagementPage extends StatelessWidget {
             color: const Color(0xFFB47A52),
             page: const MaintenanceManagementPage(),
           ),
-          if (isOwner) ...[
-            const SizedBox(height: 12),
-            _reportQueue(
-              context,
-              title: 'Confidential reports',
-              subtitle:
-                  'Review restricted safety, rules, and roommate concerns.',
-              icon: Icons.shield_outlined,
-              color: const Color(0xFF7D70A0),
-              page: const ConfidentialReportsPage(),
-            ),
-          ],
           const SizedBox(height: 12),
           _reportQueue(
             context,
-            title: 'Cleaning compliance reports',
-            subtitle: 'Select a room to review private missed-duty reports.',
-            icon: Icons.cleaning_services_outlined,
-            color: const Color(0xFF56886B),
-            page: const RoomMonitoringPage(),
+            title: 'Confidential reports',
+            subtitle: 'Review restricted safety, rules, and roommate concerns.',
+            icon: Icons.shield_outlined,
+            color: const Color(0xFF7D70A0),
+            page: const ConfidentialReportsPage(),
           ),
         ],
       ),
@@ -5264,14 +5258,17 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     final hasTenantConstraint = query.isNotEmpty || _roomFilter != 'all';
     if (!hasTenantConstraint) return null;
 
-    return tenants.where((tenant) {
-      if (_roomFilter != 'all' && tenant.room != _roomFilter) return false;
-      if (query.isEmpty) return true;
-      return tenant.name.toLowerCase().contains(query) ||
-          tenant.room.toLowerCase().contains(query) ||
-          tenant.bedSpace.toLowerCase().contains(query) ||
-          'room ${tenant.room}'.toLowerCase().contains(query);
-    }).map((tenant) => tenant.id).toSet();
+    return tenants
+        .where((tenant) {
+          if (_roomFilter != 'all' && tenant.room != _roomFilter) return false;
+          if (query.isEmpty) return true;
+          return tenant.name.toLowerCase().contains(query) ||
+              tenant.room.toLowerCase().contains(query) ||
+              tenant.bedSpace.toLowerCase().contains(query) ||
+              'room ${tenant.room}'.toLowerCase().contains(query);
+        })
+        .map((tenant) => tenant.id)
+        .toSet();
   }
 
   _PresenceDateBounds _dateBounds() {
@@ -5354,9 +5351,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
       return true;
     }).toList()
       ..sort(
-        (a, b) => _ascending
-            ? a.time.compareTo(b.time)
-            : b.time.compareTo(a.time),
+        (a, b) =>
+            _ascending ? a.time.compareTo(b.time) : b.time.compareTo(a.time),
       );
 
     final total = filtered.length;
@@ -5612,7 +5608,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     return raw
         .split(RegExp(r'[_\s]+'))
         .where((part) => part.isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
   }
 
@@ -5639,9 +5636,10 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
               children: [
                 Text(
                   _eventTitle(event),
-                  style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                  style:
+                      Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
                 ),
                 const SizedBox(height: 14),
                 _PresenceDetailRow(
@@ -5908,9 +5906,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     BuildContext context,
     List<TenantDirectoryEntry> tenants,
   ) {
-    final start = _eventTotalCount == 0
-        ? 0
-        : ((_eventPageNumber - 1) * _pageSize) + 1;
+    final start =
+        _eventTotalCount == 0 ? 0 : ((_eventPageNumber - 1) * _pageSize) + 1;
     final rawEnd = _eventPageNumber * _pageSize;
     final end = rawEnd > _eventTotalCount ? _eventTotalCount : rawEnd;
 
@@ -6129,8 +6126,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                           _eventTitle(event),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w700),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -6331,7 +6327,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                       )
                     : OutlinedButton(
                         key: Key('presence-page-$item'),
-                        onPressed: _eventPageLoading ? null : () => _goToPage(item),
+                        onPressed:
+                            _eventPageLoading ? null : () => _goToPage(item),
                         child: Text('$item'),
                       ),
               );
@@ -6385,6 +6382,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
     return PageFrame(
       title: 'Presence & Curfew',
       subtitle: 'Gate crossings, resident status, and exceptions',
+      useScriptTitle: false,
       maxWidth: kIsWeb ? 1400 : 780,
       actions: [
         IconButton(
@@ -6610,7 +6608,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                     onTap: () => setState(() => _presenceFilter = 'out'),
                   ),
                   _FilterChip(
-                    label: 'Unavailable (${controller.tenantsUnavailableCount})',
+                    label:
+                        'Unavailable (${controller.tenantsUnavailableCount})',
                     selected: _presenceFilter == 'unavailable',
                     badgeColor: const Color(0xFFC77800),
                     onTap: () =>
@@ -6826,7 +6825,8 @@ class _PresenceMeta extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 15, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        Icon(icon,
+            size: 15, color: Theme.of(context).colorScheme.onSurfaceVariant),
         const SizedBox(width: 4),
         Text(text, style: Theme.of(context).textTheme.bodySmall),
       ],
@@ -6863,7 +6863,6 @@ class _PresenceDetailRow extends StatelessWidget {
     );
   }
 }
-
 
 class _StaffManualLogDialog extends StatefulWidget {
   const _StaffManualLogDialog({this.preselectedTenant});
@@ -8413,6 +8412,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
     return PageFrame(
       title: 'Visitor management',
       subtitle: 'Advance requests, approvals, arrivals, and departures',
+      useScriptTitle: false,
       onRefresh: () => controller.loadVisitors(force: true),
       child: AnimatedBuilder(
         animation: controller,
@@ -9882,15 +9882,14 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
         await MessagingController.instance.loadConversations();
         return;
       }
-      final opened =
-          await MessagingController.instance.openConversationById(conversationId);
+      final opened = await MessagingController.instance
+          .openConversationById(conversationId);
       if (!mounted) return;
       setState(() {
         _deepLinkLoading = false;
         _deepLinkMissing = !opened;
-        _deepLinkedConversation = opened
-            ? MessagingController.instance.activeConversation
-            : null;
+        _deepLinkedConversation =
+            opened ? MessagingController.instance.activeConversation : null;
       });
     });
   }
@@ -10176,58 +10175,151 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
 class EmergencyContactsPage extends StatelessWidget {
   const EmergencyContactsPage({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    final controller = OwnerController.instance;
+  String _roomBedLabel(TenantDirectoryEntry tenant) {
+    final room = tenant.room.trim();
+    final bed = tenant.bedSpace.trim();
+    if (room.isEmpty && bed.isEmpty) return 'Room / bed not assigned';
 
-    return PageFrame(
-      title: 'Dormitory contact directory',
-      subtitle: 'Guardian and emergency contacts for internal reference',
-      child: CarmelitaCard(
-        child: Column(
-          children: controller.tenants
-              .map(
-                (tenant) => Material(
-                  type: MaterialType.transparency,
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const CircleAvatar(
-                      child: Icon(
-                        Icons.contact_phone_outlined,
-                      ),
-                    ),
-                    title: Text(
-                      tenant.guardianName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    subtitle: Text(
-                      '${tenant.name} • '
-                      '${tenant.guardianPhone}',
-                    ),
-                    trailing: IconButton(
-                      tooltip: 'Call ${tenant.guardianName}',
-                      onPressed: tenant.guardianPhone.trim().isEmpty
+    final roomLabel = room.isEmpty
+        ? 'Room not assigned'
+        : room.toLowerCase().startsWith('room ')
+            ? room
+            : 'Room $room';
+    final bedLabel = bed.isEmpty
+        ? 'Bed not assigned'
+        : bed.toLowerCase().startsWith('bed ')
+            ? bed
+            : 'Bed $bed';
+    return '$roomLabel • $bedLabel';
+  }
+
+  String _phoneLabel(String phone) {
+    final value = phone.trim();
+    return value.isEmpty ? 'No phone number' : value;
+  }
+
+  Widget _directoryList({
+    required BuildContext context,
+    required List<TenantDirectoryEntry> tenants,
+    required bool guardians,
+  }) {
+    final webPortal = kIsWeb;
+    return CarmelitaCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      child: Column(
+        children: [
+          for (var index = 0; index < tenants.length; index++) ...[
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              leading: CircleAvatar(
+                child: Icon(
+                  guardians
+                      ? Icons.family_restroom_outlined
+                      : Icons.person_outline,
+                ),
+              ),
+              title: Text(
+                guardians ? tenants[index].guardianName : tenants[index].name,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: Text(
+                guardians
+                    ? 'Linked resident: ${tenants[index].name}\n${_phoneLabel(tenants[index].guardianPhone)}'
+                    : '${_roomBedLabel(tenants[index])}\n${_phoneLabel(tenants[index].phone)}',
+              ),
+              isThreeLine: true,
+              trailing: webPortal
+                  ? null
+                  : IconButton(
+                      tooltip: guardians
+                          ? 'Call ${tenants[index].guardianName}'
+                          : 'Call ${tenants[index].name}',
+                      onPressed: (guardians
+                                  ? tenants[index].guardianPhone
+                                  : tenants[index].phone)
+                              .trim()
+                              .isEmpty
                           ? null
                           : () => _openPhoneDialer(
                                 context,
-                                tenant.guardianPhone,
+                                guardians
+                                    ? tenants[index].guardianPhone
+                                    : tenants[index].phone,
                               ),
                       icon: const Icon(Icons.call_outlined),
                     ),
-                    onTap: tenant.guardianPhone.trim().isEmpty
-                        ? null
-                        : () => _openPhoneDialer(
-                              context,
-                              tenant.guardianPhone,
-                            ),
-                  ),
-                ),
-              )
-              .toList(),
-        ),
+              onTap: webPortal ||
+                      (guardians
+                              ? tenants[index].guardianPhone
+                              : tenants[index].phone)
+                          .trim()
+                          .isEmpty
+                  ? null
+                  : () => _openPhoneDialer(
+                        context,
+                        guardians
+                            ? tenants[index].guardianPhone
+                            : tenants[index].phone,
+                      ),
+            ),
+            if (index != tenants.length - 1) const Divider(height: 1),
+          ],
+        ],
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = OwnerController.instance;
+    final tenants = List<TenantDirectoryEntry>.from(controller.tenants)
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final guardians = controller.tenants
+        .where((tenant) =>
+            tenant.guardianName.trim().isNotEmpty ||
+            tenant.guardianPhone.trim().isNotEmpty)
+        .toList()
+      ..sort((a, b) =>
+          a.guardianName.toLowerCase().compareTo(b.guardianName.toLowerCase()));
+
+    return PageFrame(
+      title: 'Dormitory contact directory',
+      subtitle: 'Resident and guardian contact details for internal reference',
+      useScriptTitle: false,
+      child: tenants.isEmpty
+          ? const EmptyState(
+              icon: Icons.contacts_outlined,
+              title: 'No directory entries',
+              message: 'Tenant and guardian contacts will appear here.',
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionTitle(
+                  'Tenants / students',
+                  subtitle:
+                      '${tenants.length} resident contact(s) with room and bed assignment',
+                ),
+                const SizedBox(height: 10),
+                _directoryList(
+                  context: context,
+                  tenants: tenants,
+                  guardians: false,
+                ),
+                const SizedBox(height: 22),
+                SectionTitle(
+                  'Guardians',
+                  subtitle:
+                      '${guardians.length} guardian link(s) with resident reference',
+                ),
+                const SizedBox(height: 10),
+                _directoryList(
+                  context: context,
+                  tenants: guardians,
+                  guardians: true,
+                ),
+              ],
+            ),
     );
   }
 }

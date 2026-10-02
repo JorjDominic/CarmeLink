@@ -32,8 +32,8 @@ void main() {
       final source =
           File('lib/views/owner/owner_pages.dart').readAsStringSync();
 
-      expect(source.contains("'Cleaning schedules'"), isTrue);
-      expect(source.contains("'Room inspections'"), isTrue);
+      expect(source.contains("'Cleaning schedules & reports'"), isTrue);
+      expect(source.contains("'Rooms & inspections'"), isTrue);
       expect(source.contains("'Conduct & cases'"), isTrue);
       expect(source.contains("'Security & retention'"), isTrue);
       expect(source.contains('EmployeeCurfewProfilesPage()'), isTrue);
@@ -51,7 +51,8 @@ void main() {
       expect(shell.contains("label: 'Residents'"), isTrue);
       expect(shell.contains("label: 'Operations'"), isTrue);
       expect(
-        shell.contains('static List<AppDestination> desktopTools(UserRole role)'),
+        shell.contains(
+            'static List<AppDestination> desktopTools(UserRole role)'),
         isTrue,
       );
       // Original (main): shell.contains('static List<AppDestination> desktopTools')
@@ -62,8 +63,8 @@ void main() {
       expect(shell.contains("webGroup: 'Administration'"), isTrue);
 
       for (final label in [
-        'Cleaning schedules',
-        'Room inspections',
+        'Cleaning schedules & reports',
+        'Rooms & inspections',
         'Visitors',
         'Conduct & cases',
         'Employee curfew profiles',
