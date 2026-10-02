@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
 
@@ -23,6 +24,30 @@ class GuardianAlertService {
   static bool get gateExitEnabled => _gateExitEnabled;
   static bool get outsideAfterCutoffEnabled => _outsideAfterCutoffEnabled;
   static bool get insideAfterCutoffEnabled => _insideAfterCutoffEnabled;
+
+  /// Asks the linked tenant to refresh presence without changing their status.
+  /// Link validation and rate limiting are enforced again by the backend.
+  static Future<void> requestTenantStatusUpdate(String tenantId) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null || client.auth.currentUser == null) {
+      throw Exception('Sign in as a guardian to send a reminder.');
+    }
+    try {
+      final response = await client.functions.invoke(
+        'request-tenant-status-update',
+        body: {'tenant_id': tenantId},
+      );
+      if (response.status < 200 || response.status >= 300) {
+        final data = response.data;
+        final message = data is Map ? data['error']?.toString() : null;
+        throw Exception(message ?? 'Unable to send the presence reminder.');
+      }
+    } on FunctionException catch (error) {
+      final details = error.details;
+      final message = details is Map ? details['error']?.toString() : null;
+      throw Exception(message ?? 'Unable to send the presence reminder.');
+    }
+  }
 
   @visibleForTesting
   static void setPreferredAlertTime(TimeOfDay time) {
