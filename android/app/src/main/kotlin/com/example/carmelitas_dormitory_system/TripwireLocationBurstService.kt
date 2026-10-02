@@ -62,23 +62,21 @@ class TripwireLocationBurstService : Service() {
     }
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
-            for (location in result.locations) {
-                val direction = TripwireCrossingVerifier.accept(this@TripwireLocationBurstService, location)
-                if (direction != null) {
-                    val queued = TripwireGeofenceManager.appendEvent(
-                        this@TripwireLocationBurstService,
-                        direction,
-                        // Use the detection time. Some Android providers and
-                        // emulators expose a stale fix timestamp even though
-                        // this high-accuracy callback has just been delivered.
-                        System.currentTimeMillis(),
-                    )
-                    if (queued && !MainActivity.isInForeground) {
-                        showCrossingNotification(direction)
-                    }
+            // A batched callback is one observation, not multiple independent
+            // confirmations. Only its newest fix may advance a candidate.
+            val location = result.lastLocation ?: return
+            val direction = TripwireCrossingVerifier.accept(this@TripwireLocationBurstService, location)
+            if (direction != null) {
+                val queued = TripwireGeofenceManager.appendEvent(
+                    this@TripwireLocationBurstService,
+                    direction,
+                    System.currentTimeMillis(),
+                )
+                if (queued && !MainActivity.isInForeground) {
+                    showCrossingNotification(direction)
                 }
-                updateLocationMode(hasCandidateTransition())
             }
+            updateLocationMode(hasCandidateTransition())
         }
     }
 

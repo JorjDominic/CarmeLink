@@ -19,7 +19,7 @@ void main() {
   final dartTripwire = File('lib/services/tripwire_geofence_service.dart');
 
   group('native tripwire platform contract', () {
-    test('Android accepts a verified polygon side change without gate proof',
+    test('Android keeps IN permissive but protects stationary OUT transitions',
         () {
       final source = androidVerifier.readAsStringSync();
 
@@ -27,10 +27,11 @@ void main() {
       expect(source.contains('return direction'), isTrue);
       expect(source.contains('return if (crossedGate) direction else null'),
           isFalse);
-      expect(source.contains('segmentDistanceMeters('), isFalse);
+      expect(source.contains('direction == "OUT"'), isTrue);
+      expect(source.contains('candidateCrossesGate'), isTrue);
     });
 
-    test('iOS accepts a verified polygon side change without gate proof', () {
+    test('iOS keeps IN permissive but protects stationary OUT transitions', () {
       final source = iosDelegate.readAsStringSync();
 
       expect(
@@ -38,8 +39,8 @@ void main() {
         isTrue,
       );
       expect(source.contains('append(direction: direction)'), isTrue);
-      expect(source.contains('guard movementCrossesGate('), isFalse);
-      expect(source.contains('private func movementCrossesGate('), isFalse);
+      expect(source.contains('direction != "OUT"'), isTrue);
+      expect(source.contains('candidateCrossesGate'), isTrue);
     });
 
     test('both platforms retain accuracy freshness and edge protections', () {
@@ -49,12 +50,15 @@ void main() {
       expect(
           android.contains('location.accuracy > MAX_ACCURACY_METERS'), isTrue);
       expect(android.contains('MAX_AGE_MILLIS'), isTrue);
-      expect(android.contains('edgeDistance <= edgeBuffer'), isTrue);
+      expect(android.contains('MIN_EDGE_BUFFER_METERS'), isTrue);
       expect(ios.contains('location.horizontalAccuracy <= 35'), isTrue);
       expect(
           ios.contains('abs(location.timestamp.timeIntervalSinceNow) <= 120'),
           isTrue);
-      expect(ios.contains('edgeDistance <= defaults.double'), isTrue);
+      expect(
+          ios.contains(
+              'max(defaults.double(forKey: "tripwire_edge_buffer"), 8)'),
+          isTrue);
     });
 
     test('gate and outer regions remain background wake-up hints', () {
@@ -96,10 +100,21 @@ void main() {
       expect(dart.contains("direction == 'IN' || direction == 'OUT'"), isTrue);
       expect(androidVerifierSource.contains('REQUIRED_MATCHING_FIXES = 2'),
           isTrue);
+      expect(androidVerifierSource.contains('MIN_CANDIDATE_FIX_SPACING_MILLIS'),
+          isTrue);
       expect(androidManagerSource.contains('TripwireLocationBurstService'),
           isTrue);
       expect(ios.contains('guard candidateCount >= 2 else { return }'), isTrue);
+      expect(ios.contains('sufficientlySeparated'), isTrue);
       expect(ios.contains('startLocationBurst()'), isTrue);
+    });
+
+    test('Android counts only the newest fix from a batched callback', () {
+      final source = androidMonitor.readAsStringSync();
+
+      expect(source.contains('val location = result.lastLocation ?: return'),
+          isTrue);
+      expect(source.contains('for (location in result.locations)'), isFalse);
     });
 
     test('Android monitoring persists after the task is removed', () {

@@ -96,6 +96,10 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   private let candidateDirectionKey = "tripwire_candidate_direction"
   private let candidateFixCountKey = "tripwire_candidate_fix_count"
   private let candidateStartedAtKey = "tripwire_candidate_started_at"
+  private let candidateLastFixAtKey = "tripwire_candidate_last_fix_at"
+  private let candidateOriginLatKey = "tripwire_candidate_origin_lat"
+  private let candidateOriginLngKey = "tripwire_candidate_origin_lng"
+  private let candidateMovingKey = "tripwire_candidate_moving"
   private let monitoringAvailableKey = "tripwire_monitoring_available"
   private let monitoringReasonKey = "tripwire_monitoring_reason"
   private var burstTimeout: DispatchWorkItem?
@@ -163,6 +167,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     defaults.removeObject(forKey: candidateDirectionKey)
     defaults.removeObject(forKey: candidateFixCountKey)
     defaults.removeObject(forKey: candidateStartedAtKey)
+    clearCandidateEvidence()
 
     // Start monitoring if authorized for Always OR When In Use.
     // When In Use will still receive region callbacks while active/suspended,
@@ -292,6 +297,10 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       abs(location.timestamp.timeIntervalSinceNow) <= 120
     else { return }
     guard let direction = verifiedDirection(for: location) else { return }
+    let previousLocation: CLLocation? = defaults.object(forKey: "tripwire_last_lat") == nil ? nil : CLLocation(
+      latitude: defaults.double(forKey: "tripwire_last_lat"),
+      longitude: defaults.double(forKey: "tripwire_last_lng")
+    )
     defaults.set(location.coordinate.latitude, forKey: "tripwire_last_lat")
     defaults.set(location.coordinate.longitude, forKey: "tripwire_last_lng")
     defaults.set(location.timestamp.timeIntervalSince1970, forKey: "tripwire_last_at")
@@ -302,6 +311,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       defaults.removeObject(forKey: candidateDirectionKey)
       defaults.removeObject(forKey: candidateFixCountKey)
       defaults.removeObject(forKey: candidateStartedAtKey)
+      clearCandidateEvidence()
       startContinuousMonitoring(highAccuracy: false)
       return
     }
@@ -314,27 +324,44 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       defaults.removeObject(forKey: candidateDirectionKey)
       defaults.removeObject(forKey: candidateFixCountKey)
       defaults.removeObject(forKey: candidateStartedAtKey)
+      clearCandidateEvidence()
       startContinuousMonitoring(highAccuracy: false)
       return
     }
+    let previousCandidate = defaults.string(forKey: candidateDirectionKey)
+    let newCandidate = previousCandidate != direction
+    let lastCandidateFixAt = defaults.double(forKey: candidateLastFixAtKey)
+    let sufficientlySeparated = location.timestamp.timeIntervalSince1970 - lastCandidateFixAt >= 8
     let candidateCount: Int
-    if defaults.string(forKey: candidateDirectionKey) == direction {
+    if !newCandidate && sufficientlySeparated {
       candidateCount = defaults.integer(forKey: candidateFixCountKey) + 1
+    } else if !newCandidate {
+      candidateCount = max(defaults.integer(forKey: candidateFixCountKey), 1)
     } else {
       candidateCount = 1
     }
+    let candidateMoving = (!newCandidate && defaults.bool(forKey: candidateMovingKey)) || location.speed >= 0.5
     defaults.set(direction, forKey: candidateDirectionKey)
     defaults.set(candidateCount, forKey: candidateFixCountKey)
-    if defaults.string(forKey: candidateDirectionKey) != direction || candidateCount == 1 {
+    defaults.set(candidateMoving, forKey: candidateMovingKey)
+    if newCandidate {
       defaults.set(Date().timeIntervalSince1970, forKey: candidateStartedAtKey)
+      let origin = previousLocation ?? location
+      defaults.set(origin.coordinate.latitude, forKey: candidateOriginLatKey)
+      defaults.set(origin.coordinate.longitude, forKey: candidateOriginLngKey)
+    }
+    if newCandidate || sufficientlySeparated {
+      defaults.set(location.timestamp.timeIntervalSince1970, forKey: candidateLastFixAtKey)
     }
     startContinuousMonitoring(highAccuracy: true)
     // Two consecutive accurate fixes prevent a transient GPS jump from
     // rewriting state during post-force-stop reconciliation.
     guard candidateCount >= 2 else { return }
+    guard direction != "OUT" || candidateMoving || candidateCrossesGate(to: location) else { return }
     defaults.removeObject(forKey: candidateDirectionKey)
     defaults.removeObject(forKey: candidateFixCountKey)
     defaults.removeObject(forKey: candidateStartedAtKey)
+    clearCandidateEvidence()
     append(direction: direction)
     startContinuousMonitoring(highAccuracy: false)
   }
@@ -355,6 +382,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     defaults.removeObject(forKey: candidateDirectionKey)
     defaults.removeObject(forKey: candidateFixCountKey)
     defaults.removeObject(forKey: candidateStartedAtKey)
+    clearCandidateEvidence()
     startContinuousMonitoring(highAccuracy: false)
   }
 
@@ -435,7 +463,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       pointSegmentDistance(p, points[$0], points[($0 + 1) % points.count])
     }.min() ?? .greatestFiniteMagnitude
     // Hysteresis: if we're within the edge buffer, keep the last known direction.
-    if edgeDistance <= defaults.double(forKey: "tripwire_edge_buffer"),
+    if edgeDistance <= max(defaults.double(forKey: "tripwire_edge_buffer"), 8),
        let previous = effectiveDirection() { return previous }
     return inside ? "IN" : "OUT"
   }
@@ -450,6 +478,45 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     let q = xy(p, a), e = xy(b, a), length = e.0 * e.0 + e.1 * e.1
     let t = length == 0 ? 0 : max(0, min(1, (q.0 * e.0 + q.1 * e.1) / length))
     return hypot(q.0 - t * e.0, q.1 - t * e.1)
+  }
+
+  private func clearCandidateEvidence() {
+    defaults.removeObject(forKey: candidateLastFixAtKey)
+    defaults.removeObject(forKey: candidateOriginLatKey)
+    defaults.removeObject(forKey: candidateOriginLngKey)
+    defaults.removeObject(forKey: candidateMovingKey)
+  }
+
+  private func candidateCrossesGate(to location: CLLocation) -> Bool {
+    guard defaults.bool(forKey: "tripwire_gate_enabled"),
+          defaults.object(forKey: candidateOriginLatKey) != nil,
+          defaults.object(forKey: candidateOriginLngKey) != nil else { return false }
+    let origin = Point(
+      lat: defaults.double(forKey: candidateOriginLatKey),
+      lng: defaults.double(forKey: candidateOriginLngKey)
+    )
+    let current = Point(lat: location.coordinate.latitude, lng: location.coordinate.longitude)
+    let gateStart = Point(
+      lat: defaults.double(forKey: "tripwire_gate_start_lat"),
+      lng: defaults.double(forKey: "tripwire_gate_start_lng")
+    )
+    let gateEnd = Point(
+      lat: defaults.double(forKey: "tripwire_gate_end_lat"),
+      lng: defaults.double(forKey: "tripwire_gate_end_lng")
+    )
+    return segmentDistance(origin, current, gateStart, gateEnd) <=
+      max(defaults.double(forKey: "tripwire_gate_tolerance"), 8)
+  }
+
+  private func segmentDistance(_ a: Point, _ b: Point, _ c: Point, _ d: Point) -> Double {
+    let aa = xy(a, a), bb = xy(b, a), cc = xy(c, a), dd = xy(d, a)
+    func cross(_ p: (Double, Double), _ q: (Double, Double), _ r: (Double, Double)) -> Double {
+      (q.0-p.0)*(r.1-p.1) - (q.1-p.1)*(r.0-p.0)
+    }
+    if cross(aa,bb,cc) * cross(aa,bb,dd) <= 0 &&
+       cross(cc,dd,aa) * cross(cc,dd,bb) <= 0 { return 0 }
+    return min(pointSegmentDistance(a,c,d), pointSegmentDistance(b,c,d),
+               pointSegmentDistance(c,a,b), pointSegmentDistance(d,a,b))
   }
 
   // ─── CLLocationManagerDelegate — auth & errors ────────────────────────────
