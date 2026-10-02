@@ -18,7 +18,8 @@ void main() {
       expect(source.contains('_groupKey(entry.key)'), isTrue);
       expect(source.contains('Icons.keyboard_arrow_down_rounded'), isTrue);
       expect(source.contains('_expandedWebGroups.remove(group)'), isTrue);
-      expect(source.contains('_expandedWebGroups.add(group)'), isTrue);
+      expect(source.contains('..add(group)'), isTrue);
+      expect(source.contains('..clear()'), isTrue);
       expect(source.contains('MANAGEMENT AREAS'), isTrue);
     });
 
@@ -38,13 +39,14 @@ void main() {
       () {
         final adaptive =
             File('lib/core/widgets/adaptive_shell.dart').readAsStringSync();
-        final overview =
-            File('lib/web/dashboard/staff_overview_page.dart').readAsStringSync();
+        final overview = File('lib/web/dashboard/staff_overview_page.dart')
+            .readAsStringSync();
 
         expect(adaptive.contains('selectLabel'), isTrue);
         expect(adaptive.contains('void _selectByLabel(String label)'), isTrue);
         expect(overview.contains('nav.selectLabel(destinationLabel)'), isTrue);
-        expect(overview.contains("destinationLabel: 'Maintenance'"), isTrue);
+        expect(
+            overview.contains("destinationLabel: 'Report management'"), isTrue);
         expect(
           overview.contains("destinationLabel: 'Payment verification'"),
           isTrue,
@@ -69,10 +71,8 @@ void main() {
       }
 
       for (final tool in [
-        'Rooms',
-        'Maintenance',
-        'Cleaning schedules',
-        'Room inspections',
+        'Rooms & inspections',
+        'Cleaning schedules & reports',
         'Visitors',
         'Presence & Curfew',
         'Employee curfew',
@@ -85,6 +85,9 @@ void main() {
       ]) {
         expect(source.contains("label: '$tool'"), isTrue, reason: tool);
       }
+
+      expect(source.contains("label: 'Maintenance'"), isFalse);
+      expect(source.contains("label: 'Room inspections'"), isFalse);
     });
 
     test('Phase 3 leaves the mobile floating navigation path intact', () {
