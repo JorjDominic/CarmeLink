@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/natural_sort.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../services/room_service.dart';
 import '../../services/table_refresh_subscription.dart';
@@ -147,10 +148,12 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
           currentRooms.fold<int>(0, (sum, room) => sum + room.beds.length);
       final available = currentRooms.fold<int>(
           0, (sum, room) => sum + room.physicallyAvailable);
+      final orderedRooms = List<RoomRecord>.from(currentRooms)
+        ..sort((a, b) => compareNaturalLabels(a.number, b.number));
       final visibleRooms = kIsWeb
-          ? filterRoomDirectory(currentRooms,
+          ? filterRoomDirectory(orderedRooms,
               query: _roomQuery, availability: _availabilityFilter)
-          : currentRooms;
+          : orderedRooms;
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -257,7 +260,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
               ),
           ] else
             RoomFloorPlanView(
-              rooms: currentRooms,
+              rooms: orderedRooms,
               onRoomTap: _openRoomDetail,
             ),
         ],

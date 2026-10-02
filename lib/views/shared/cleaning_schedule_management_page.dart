@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/utils/cleaning_schedule_policy.dart';
+import '../../core/utils/natural_sort.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../services/cleaning_schedule_management_service.dart';
 import '../../services/room_service.dart';
@@ -63,10 +64,12 @@ class _CleaningScheduleManagementPageState
 
     try {
       final rooms = await _roomService.listRooms(forceRefresh: true);
-      final schedules = await _scheduleService.listForRooms(rooms);
+      final orderedRooms = List<RoomRecord>.from(rooms)
+        ..sort((a, b) => compareNaturalLabels(a.number, b.number));
+      final schedules = await _scheduleService.listForRooms(orderedRooms);
       if (!mounted) return;
       setState(() {
-        _rooms = rooms;
+        _rooms = orderedRooms;
         _schedules = schedules;
         _loading = false;
         _errorMessage = null;
@@ -138,7 +141,7 @@ class _CleaningScheduleManagementPageState
         .length;
 
     return PageFrame(
-      title: 'Cleaning schedules',
+      title: 'Cleaning schedules & reports',
       subtitle: 'Automatic occupied-bed rotation with manual overrides',
       useScriptTitle: false,
       onRefresh: () => _load(showSpinner: false),
@@ -262,7 +265,7 @@ class _RoomCleaningRotationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final occupied = room.beds.where((bed) => bed.occupied).toList()
-      ..sort((a, b) => a.label.compareTo(b.label));
+      ..sort((a, b) => compareNaturalLabels(a.label, b.label));
 
     return CarmelitaCard(
       child: Column(
@@ -314,8 +317,7 @@ class _RoomCleaningRotationCard extends StatelessWidget {
                   : entries
                       .map((entry) => cleaningWeekdayShort(entry.weekday))
                       .join(' • ');
-              final hasManual =
-                  entries.any((entry) => !entry.isAutomatic);
+              final hasManual = entries.any((entry) => !entry.isAutomatic);
               final generator = entries.isEmpty
                   ? 'System pending'
                   : hasManual
@@ -374,9 +376,8 @@ class _RoomCleaningRotationCard extends StatelessWidget {
             runSpacing: 8,
             children: [
               OutlinedButton.icon(
-                onPressed: occupied.isEmpty || regenerating
-                    ? null
-                    : onRegenerate,
+                onPressed:
+                    occupied.isEmpty || regenerating ? null : onRegenerate,
                 icon: regenerating
                     ? const SizedBox(
                         width: 16,
