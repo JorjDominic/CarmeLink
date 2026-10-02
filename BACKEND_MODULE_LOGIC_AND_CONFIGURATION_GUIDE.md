@@ -457,6 +457,33 @@ The authoritative boundary can be a polygon, but both native adapters monitor a 
 
 Therefore, polygon deployments can produce native events that disagree with foreground polygon checks, especially on Android between the configured boundary and the 100 m wake-up radius. The code comment saying the larger Android circle only wakes a final polygon decision does not match the current receiver: the receiver immediately queues the circular transition. Treat native presence as circular until a coordinate-aware polygon confirmation stage is implemented.
 
+### Possible future Wi-Fi corroboration
+
+Dorm Wi-Fi must remain a separate supporting-evidence subsystem. Do not add
+router association rows to `gate_events`, convert disconnection to `OUT`, or
+clear a location-monitoring incident because Wi-Fi is present. A future
+implementation should use a dedicated evidence table and display
+`LIKELY_IN`/`WIFI_CORROBORATED` separately from confirmed presence.
+
+Preferred requirements:
+
+- managed AP/controller, captive-portal, or RADIUS association events;
+- authenticated ingestion endpoint and rotated integration secret;
+- opt-in device enrollment with replacement and revocation;
+- support for per-network private/randomized MAC addresses;
+- 2–5 minute dwell, AP-roaming reconciliation, stale-session expiry,
+  idempotency keys, and controller clock validation;
+- approved-AP allow-list and indoor/outdoor coverage survey;
+- pseudonymous device/AP identifiers, strict RLS, short retention, and no
+  browsing history, traffic contents, passwords, or unrelated client logs;
+- explicit source/confidence fields and UI wording that never represents a
+  Wi-Fi-only observation as verified GPS presence.
+
+Mobile SSID/BSSID checks are lower reliability because Android and iOS restrict
+scanning and network-identity access. They may assist while the app is running
+but are not a cross-platform closed-app wake mechanism. See
+`GEOFENCING_IMPLEMENTATION.md` for the model and acceptance criteria.
+
 ### Platform readiness weighting
 
 For ordinary in-app CRUD workflows, the platforms are approximately equal because both use the same Flutter/Supabase implementation. For current native integration readiness:

@@ -54,6 +54,109 @@ Known platform boundaries:
   app lifecycle opportunities; immediate upload at the moment connectivity
   returns is not yet guaranteed.
 
+## Deferred option: dorm Wi-Fi presence corroboration
+
+Wi-Fi presence is a possible later enhancement, not part of the current
+authoritative `IN`/`OUT` implementation. It must be treated as supporting
+evidence because a Wi-Fi association proves that a device reached an access
+point, not that its owner crossed the official property boundary.
+
+### Intended semantics
+
+- GPS/polygon confirmation remains the primary source of `IN` and `OUT`.
+- A verified dorm-network observation may produce `LIKELY_IN` or
+  `WIFI_CORROBORATED`; it must not insert a normal verified gate transition.
+- Wi-Fi evidence must not close a Location Off incident or suppress the
+  tenant's location reminder.
+- Absence from Wi-Fi must never mean `OUT`. The phone may use mobile data,
+  disable Wi-Fi, lose signal, sleep, or roam between access points.
+- Staff manual gate records remain the authoritative operational fallback when
+  GPS is unavailable.
+
+### Preferred architecture
+
+Prefer router/controller-side association events over mobile background Wi-Fi
+scanning. Android and iOS restrict background scans, and both can restrict
+SSID/BSSID access based on permission, location-service, entitlement, and OS
+state. iOS also does not guarantee that a terminated app will wake when a
+particular Wi-Fi network becomes visible.
+
+The preferred flow is:
+
+1. An authenticated tenant explicitly enrolls a device and accepts the privacy
+   notice.
+2. The dorm router, access-point controller, RADIUS service, or captive portal
+   sends association/disassociation events through a protected integration.
+3. The backend maps a pseudonymous enrolled-device identifier to a tenant.
+4. An association remains stable for a configurable dwell period (start with
+   2–5 minutes) before creating `LIKELY_IN` evidence.
+5. Short reconnects, AP roaming, duplicate events, and stale sessions are
+   reconciled and de-duplicated.
+6. Staff/guardian UI displays source and confidence separately from the last
+   GPS-confirmed direction.
+
+### Infrastructure required
+
+- Managed Wi-Fi hardware/controller with an authenticated API, webhook, RADIUS
+  accounting, or equivalent association-log export.
+- Reliable timestamps and stable identifiers for approved dorm access points.
+- A server ingestion endpoint protected by a rotated secret, signed webhook,
+  mTLS, or an equivalent control.
+- Device enrollment/removal screens, including replacement, lost-device, and
+  consent-withdrawal handling.
+- A private mapping between tenants and pseudonymous enrolled-device IDs.
+- Monitoring for controller downtime, clock drift, duplicates, and backlog.
+
+### Private/randomized MAC address constraints
+
+Modern Android and iOS devices normally use a private MAC address per Wi-Fi
+network. The design must support this rather than asking tenants to disable it
+globally. Enrollment may capture the current private address for the dorm SSID
+through a controlled flow or use authenticated 802.1X/RADIUS identity. Refresh
+the mapping after network reset, device replacement, or address rotation. A MAC
+address alone must never be treated as a permanent human identity.
+
+### Suggested backend model
+
+Keep Wi-Fi observations separate from `gate_events`, for example:
+
+```text
+wifi_presence_evidence
+  id
+  tenant_id
+  enrolled_device_id
+  observed_state        # ASSOCIATED / DISCONNECTED / STALE
+  confidence            # SUPPORTING only
+  access_point_id       # pseudonymous approved AP identifier
+  observed_at
+  received_at
+  expires_at
+```
+
+Do not store Wi-Fi passwords, browsing history, traffic contents, unrelated
+client lists, or continuous raw controller logs. Apply a short written
+retention period and restrict evidence to authorized users under RLS.
+
+### Mobile-only alternative (lower reliability)
+
+If router integration is unavailable, the app may check whether it is already
+connected to an allow-listed dorm SSID/BSSID while running. This requires the
+Android nearby-Wi-Fi/location permissions appropriate to the target SDK and
+physical testing. iOS SSID access requires approved capabilities and conditions
+and remains unsuitable as a guaranteed closed-app trigger. Scanning must be
+rate-limited and must never connect the phone to a network automatically.
+
+### Acceptance criteria before implementation
+
+- Written consent, retention, access, and dispute policy is approved.
+- Router APIs and private-MAC behavior are tested on representative phones.
+- Indoor/outdoor coverage is surveyed, including signal leakage outside.
+- False-positive, false-negative, reconnect, roaming, power-loss, and internet
+  outage cases are measured.
+- UI never labels Wi-Fi-only evidence as verified GPS presence.
+- The feature can be disabled without affecting GPS, Location Off incidents,
+  FCM, or staff manual logging.
+
 ## Physical-device validation plan
 
 Testing is deliberately split into two passes:

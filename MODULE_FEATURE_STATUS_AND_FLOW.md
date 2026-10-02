@@ -159,6 +159,7 @@ These are pending improvements, not claims about the current build.
 | iOS native tripwire | Partial | Core Location circular region/significant changes queue events; Flutter drains them when running. | No native background uploader; register reports success before authorization/monitor confirmation. |
 | Polygon parity | Partial | Foreground Dart supports polygon; native Android/iOS adapters monitor a circle and directly queue circular transitions. | Choose one official model or add coordinate-aware polygon confirmation. |
 | Geofence notifications | Implemented, verify live | Stored event invokes `notify-geofence`, resolves staff/guardians, inserts app notifications, and attempts FCM. | Validate recipients, deduplication, secrets, and killed-app delivery. |
+| Dorm Wi-Fi corroboration | Deferred / possible addition | Proposed router/controller association evidence could provide a non-authoritative `LIKELY_IN` signal when GPS is unavailable. It is not implemented and must not write verified gate events. | Requires managed-network integration, opt-in enrollment, private-MAC handling, dwell/de-duplication logic, coverage testing, retention policy, and clear confidence/source labels. Mobile SSID scanning alone is unreliable for closed apps, especially on iOS. |
 
 ## Messaging, announcements, and notifications
 

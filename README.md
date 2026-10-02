@@ -329,6 +329,13 @@ Selecting an area opens a focused page containing its related pages. Each manage
 
 Displays geofence entry and exit events and alerts. Staff can review uncertain or flagged location events and record a manual decision.
 
+> **Future option — dorm Wi-Fi corroboration:** A managed router/controller may
+> later provide a supporting `LIKELY_IN` signal when GPS is unavailable. This
+> is not implemented, must remain separate from verified gate events, and
+> requires consent, enrollment, private-MAC support, dwell/de-duplication,
+> coverage testing, and restricted retention. Mobile SSID scanning alone is
+> not a reliable closed-app solution. See `GEOFENCING_IMPLEMENTATION.md`.
+
 #### Profile
 
 Shows staff contact details, access level, management shortcuts, and Settings.
