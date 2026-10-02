@@ -731,6 +731,7 @@ class _TenantEmployeeCurfewProfileCardState
   EmployeeCurfewProfileRecord? profile;
   bool loading = true;
   String? errorMessage;
+  bool _dismissed = false;
 
   @override
   void initState() {
@@ -813,16 +814,23 @@ class _TenantEmployeeCurfewProfileCardState
 
     final current = profile;
     if (current == null) {
-      return const CarmelitaCard(
+      if (_dismissed) return const SizedBox.shrink();
+      return CarmelitaCard(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.schedule_outlined),
-            SizedBox(width: 12),
-            Expanded(
+            const Icon(Icons.schedule_outlined),
+            const SizedBox(width: 12),
+            const Expanded(
               child: Text(
                 'No approved employee curfew profile applies today. Your normal curfew and approved exception requests remain unchanged.',
               ),
+            ),
+            IconButton(
+              tooltip: 'Hide notice',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.close_rounded, size: 18),
+              onPressed: () => setState(() => _dismissed = true),
             ),
           ],
         ),

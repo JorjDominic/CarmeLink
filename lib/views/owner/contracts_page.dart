@@ -1534,16 +1534,20 @@ class _ContractEditorState extends State<_ContractEditor> {
           Text('Contract status',
               style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: ['draft', 'active', 'expired', 'terminated']
-                .map((status) => ChoiceChip(
-                      selected: _status == status,
-                      label: Text(_titleCase(status)),
-                      onSelected: (_) => setState(() => _status = status),
-                    ))
-                .toList(),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: ['draft', 'active', 'expired', 'terminated']
+                  .map((status) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          selected: _status == status,
+                          label: Text(_titleCase(status)),
+                          onSelected: (_) => setState(() => _status = status),
+                        ),
+                      ))
+                  .toList(),
+            ),
           ),
           const SizedBox(height: 14),
           TextFormField(

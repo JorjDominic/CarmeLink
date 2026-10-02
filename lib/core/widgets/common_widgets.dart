@@ -142,55 +142,61 @@ class RecordListToolbar extends StatelessWidget {
           );
           final children = [scopeControl, if (extra != null) extra!, sortBox];
           if (useCompactScope) {
-            return Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                ChoiceChip(
-                  visualDensity: VisualDensity.compact,
-                  selected: scope == RecordListScope.active,
-                  label: Text(
-                      activeCount == null ? 'Active' : 'Active ($activeCount)'),
-                  onSelected: (_) => onScopeChanged(RecordListScope.active),
-                ),
-                ChoiceChip(
-                  visualDensity: VisualDensity.compact,
-                  selected: scope == RecordListScope.history,
-                  label: Text(historyCount == null
-                      ? 'History'
-                      : 'History ($historyCount)'),
-                  onSelected: (_) => onScopeChanged(RecordListScope.history),
-                ),
-                if (extra != null) extra!,
-                PopupMenuButton<RecordListSort>(
-                  tooltip: 'Sort records',
-                  initialValue: sort,
-                  onSelected: onSortChanged,
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(
-                        value: RecordListSort.newest,
-                        child: Text('Newest first')),
-                    PopupMenuItem(
-                        value: RecordListSort.oldest,
-                        child: Text('Oldest first')),
-                    PopupMenuItem(
-                        value: RecordListSort.status, child: Text('By status')),
-                    PopupMenuItem(
-                        value: RecordListSort.title, child: Text('A-Z')),
-                  ],
-                  child: Chip(
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Row(
+                children: [
+                  ChoiceChip(
                     visualDensity: VisualDensity.compact,
-                    avatar: const Icon(Icons.sort_rounded, size: 17),
-                    label: Text(switch (sort) {
-                      RecordListSort.oldest => 'Oldest',
-                      RecordListSort.status => 'Status',
-                      RecordListSort.title => 'A-Z',
-                      _ => 'Newest',
-                    }),
+                    selected: scope == RecordListScope.active,
+                    label: Text(
+                        activeCount == null ? 'Active' : 'Active ($activeCount)'),
+                    onSelected: (_) => onScopeChanged(RecordListScope.active),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    visualDensity: VisualDensity.compact,
+                    selected: scope == RecordListScope.history,
+                    label: Text(historyCount == null
+                        ? 'History'
+                        : 'History ($historyCount)'),
+                    onSelected: (_) => onScopeChanged(RecordListScope.history),
+                  ),
+                  if (extra != null) ...[
+                    const SizedBox(width: 8),
+                    extra!,
+                  ],
+                  const SizedBox(width: 8),
+                  PopupMenuButton<RecordListSort>(
+                    tooltip: 'Sort records',
+                    initialValue: sort,
+                    onSelected: onSortChanged,
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                          value: RecordListSort.newest,
+                          child: Text('Newest first')),
+                      PopupMenuItem(
+                          value: RecordListSort.oldest,
+                          child: Text('Oldest first')),
+                      PopupMenuItem(
+                          value: RecordListSort.status, child: Text('By status')),
+                      PopupMenuItem(
+                          value: RecordListSort.title, child: Text('A-Z')),
+                    ],
+                    child: Chip(
+                      visualDensity: VisualDensity.compact,
+                      avatar: const Icon(Icons.sort_rounded, size: 17),
+                      label: Text(switch (sort) {
+                        RecordListSort.oldest => 'Oldest',
+                        RecordListSort.status => 'Status',
+                        RecordListSort.title => 'A-Z',
+                        _ => 'Newest',
+                      }),
+                    ),
+                  ),
+                ],
+              ),
             );
           }
           return constraints.maxWidth < 600
@@ -2375,18 +2381,53 @@ class WorkInProgressNotice extends StatelessWidget {
 }
 
 /// Responsive explanation of the privacy-preserving dual-geofence pipeline.
-class TripwireFlowCard extends StatelessWidget {
+class TripwireFlowCard extends StatefulWidget {
   const TripwireFlowCard({
     this.compact = false,
     this.gateLabel = 'Point 1 → Point 2',
+    this.initiallyExpanded = true,
     super.key,
   });
 
   final bool compact;
   final String gateLabel;
+  final bool initiallyExpanded;
+
+  @override
+  State<TripwireFlowCard> createState() => _TripwireFlowCardState();
+}
+
+class _TripwireFlowCardState extends State<TripwireFlowCard> {
+  late bool _expanded;
+  bool _dismissed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.initiallyExpanded;
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_dismissed) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => setState(() {
+              _dismissed = false;
+              _expanded = true;
+            }),
+            icon: const Icon(Icons.info_outline, size: 16),
+            label: const Text(
+              'Show crossing detection guide',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+        ),
+      );
+    }
     final scheme = Theme.of(context).colorScheme;
     Widget legend(Color color, String title, String detail) => Padding(
           padding: const EdgeInsets.only(bottom: 10),
@@ -2425,7 +2466,7 @@ class TripwireFlowCard extends StatelessWidget {
       label:
           'Diagram showing the outer circular wake zone, four-corner property polygon, and Point 1 to Point 2 gate on the polygon edge.',
       child: Container(
-        height: compact ? 190 : 215,
+        height: widget.compact ? 190 : 215,
         decoration: BoxDecoration(
           color: scheme.surfaceContainerHighest.withValues(alpha: .32),
           borderRadius: BorderRadius.circular(14),
@@ -2444,7 +2485,7 @@ class TripwireFlowCard extends StatelessWidget {
         legend(const Color(0xFF56886B), 'Property polygon',
             'the four measured corners decide inside or outside.'),
         legend(const Color(0xFFC77800), 'Official gate',
-            '$gateLabel provides an extra prompt wake-up signal.'),
+            '${widget.gateLabel} provides an extra prompt wake-up signal.'),
         const Divider(height: 16),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2477,34 +2518,97 @@ class TripwireFlowCard extends StatelessWidget {
                 child: Text('How automatic crossing detection works',
                     style: TextStyle(fontWeight: FontWeight.w800)),
               ),
+              IconButton(
+                tooltip: _expanded ? 'Collapse guide' : 'Expand guide',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  _expanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  size: 20,
+                ),
+                onPressed: () => setState(() => _expanded = !_expanded),
+              ),
+              IconButton(
+                tooltip: 'Hide guide',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.close_rounded, size: 18),
+                onPressed: () => setState(() => _dismissed = true),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final vertical = compact || constraints.maxWidth < 620;
-              if (vertical) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+          if (_expanded) ...[
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final vertical = widget.compact || constraints.maxWidth < 620;
+                if (vertical) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      diagram,
+                      const SizedBox(height: 12),
+                      explanation,
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    diagram,
-                    const SizedBox(height: 12),
-                    explanation,
+                    Expanded(flex: 6, child: diagram),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 5, child: explanation),
                   ],
                 );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 6, child: diagram),
-                  const SizedBox(width: 16),
-                  Expanded(flex: 5, child: explanation),
-                ],
-              );
-            },
-          ),
+              },
+            ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// Keeps filter controls on one horizontally scrollable line on phones while
+/// retaining a wrapped desktop/tablet layout.
+class ResponsiveFilterBar extends StatelessWidget {
+  const ResponsiveFilterBar({
+    super.key,
+    required this.children,
+    this.spacing = 8,
+    this.runSpacing = 8,
+    this.mobileBreakpoint = 600,
+  });
+
+  final List<Widget> children;
+  final double spacing;
+  final double runSpacing;
+  final double mobileBreakpoint;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= mobileBreakpoint) {
+          return Wrap(
+            spacing: spacing,
+            runSpacing: runSpacing,
+            children: children,
+          );
+        }
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: Row(
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                if (index > 0) SizedBox(width: spacing),
+                children[index],
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -4747,27 +4747,31 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
                         ),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _categories.map((cat) {
-                      final isSelected = _selectedCategory == cat.$1;
-                      return FilterChip(
-                        avatar: Icon(
-                          cat.$3,
-                          size: 16,
-                          color: isSelected
-                              ? Colors.white
-                              : _categoryColor(cat.$1),
-                        ),
-                        label: Text(cat.$2),
-                        selected: isSelected,
-                        onSelected: (_) {
-                          setState(() => _selectedCategory = cat.$1);
-                          setSheetState(() {});
-                        },
-                      );
-                    }).toList(),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _categories.map((cat) {
+                        final isSelected = _selectedCategory == cat.$1;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            avatar: Icon(
+                              cat.$3,
+                              size: 16,
+                              color: isSelected
+                                  ? Colors.white
+                                  : _categoryColor(cat.$1),
+                            ),
+                            label: Text(cat.$2),
+                            selected: isSelected,
+                            onSelected: (_) {
+                              setState(() => _selectedCategory = cat.$1);
+                              setSheetState(() {});
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
                   const SizedBox(height: 22),
                   SizedBox(
@@ -4898,33 +4902,35 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
           ),
           if (hasActiveFilter) ...[
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  'Filter:',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.taupe,
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                InputChip(
-                  visualDensity: VisualDensity.compact,
-                  label: Text(_categoryTitle(_selectedCategory)),
-                  avatar: Icon(_categoryIcon(_selectedCategory), size: 14),
-                  onDeleted: () => setState(() => _selectedCategory = 'all'),
-                ),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Text(
+                    'Filter:',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.taupe,
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
-                  onPressed: () => setState(() => _selectedCategory = 'all'),
-                  child: const Text('Clear', style: TextStyle(fontSize: 12)),
-                ),
-              ],
+                  const SizedBox(width: 6),
+                  InputChip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text(_categoryTitle(_selectedCategory)),
+                    avatar: Icon(_categoryIcon(_selectedCategory), size: 14),
+                    onDeleted: () => setState(() => _selectedCategory = 'all'),
+                  ),
+                  const SizedBox(width: 4),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                    ),
+                    onPressed: () => setState(() => _selectedCategory = 'all'),
+                    child: const Text('Clear', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
             ),
           ],
           const SizedBox(height: 12),
