@@ -327,7 +327,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate, URLSes
       defaults.bool(forKey: registeredKey),
       let location = locations.last,
       location.horizontalAccuracy >= 0,
-      location.horizontalAccuracy <= 35,
+      location.horizontalAccuracy <= 45,
       abs(location.timestamp.timeIntervalSinceNow) <= 120
     else { return }
     guard let direction = verifiedDirection(for: location) else { return }
@@ -346,7 +346,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate, URLSes
       defaults.removeObject(forKey: candidateFixCountKey)
       defaults.removeObject(forKey: candidateStartedAtKey)
       clearCandidateEvidence()
-      startContinuousMonitoring(highAccuracy: false)
+      startContinuousMonitoring(highAccuracy: isNearBoundary(location))
       return
     }
     let previousDirection = effectiveDirection()
@@ -359,7 +359,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate, URLSes
       defaults.removeObject(forKey: candidateFixCountKey)
       defaults.removeObject(forKey: candidateStartedAtKey)
       clearCandidateEvidence()
-      startContinuousMonitoring(highAccuracy: false)
+      startContinuousMonitoring(highAccuracy: isNearBoundary(location))
       return
     }
     let previousCandidate = defaults.string(forKey: candidateDirectionKey)
@@ -391,13 +391,14 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate, URLSes
     // Two consecutive accurate fixes prevent a transient GPS jump from
     // rewriting state during post-force-stop reconciliation.
     guard candidateCount >= 2 else { return }
+    guard location.horizontalAccuracy <= 35 else { return }
     guard direction != "OUT" || candidateMoving || candidateCrossesGate(to: location) else { return }
     defaults.removeObject(forKey: candidateDirectionKey)
     defaults.removeObject(forKey: candidateFixCountKey)
     defaults.removeObject(forKey: candidateStartedAtKey)
     clearCandidateEvidence()
     append(direction: direction)
-    startContinuousMonitoring(highAccuracy: false)
+    startContinuousMonitoring(highAccuracy: isNearBoundary(location))
   }
 
   private func startContinuousMonitoring(highAccuracy: Bool = false) {
@@ -512,6 +513,16 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate, URLSes
     let q = xy(p, a), e = xy(b, a), length = e.0 * e.0 + e.1 * e.1
     let t = length == 0 ? 0 : max(0, min(1, (q.0 * e.0 + q.1 * e.1) / length))
     return hypot(q.0 - t * e.0, q.1 - t * e.1)
+  }
+
+  private func isNearBoundary(_ location: CLLocation) -> Bool {
+    if location.horizontalAccuracy > 15 { return true }
+    let points = polygon()
+    guard points.count >= 3 else { return false }
+    let point = Point(lat: location.coordinate.latitude, lng: location.coordinate.longitude)
+    return points.indices.map {
+      pointSegmentDistance(point, points[$0], points[($0 + 1) % points.count])
+    }.min() ?? .greatestFiniteMagnitude <= 20
   }
 
   private func clearCandidateEvidence() {

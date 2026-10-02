@@ -150,8 +150,9 @@ class RecordListToolbar extends StatelessWidget {
                   ChoiceChip(
                     visualDensity: VisualDensity.compact,
                     selected: scope == RecordListScope.active,
-                    label: Text(
-                        activeCount == null ? 'Active' : 'Active ($activeCount)'),
+                    label: Text(activeCount == null
+                        ? 'Active'
+                        : 'Active ($activeCount)'),
                     onSelected: (_) => onScopeChanged(RecordListScope.active),
                   ),
                   const SizedBox(width: 8),
@@ -180,7 +181,8 @@ class RecordListToolbar extends StatelessWidget {
                           value: RecordListSort.oldest,
                           child: Text('Oldest first')),
                       PopupMenuItem(
-                          value: RecordListSort.status, child: Text('By status')),
+                          value: RecordListSort.status,
+                          child: Text('By status')),
                       PopupMenuItem(
                           value: RecordListSort.title, child: Text('A-Z')),
                     ],

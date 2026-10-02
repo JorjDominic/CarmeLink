@@ -50,6 +50,7 @@ class TripwireLocationBurstService : Service() {
     private val locationClient by lazy { LocationServices.getFusedLocationProviderClient(this) }
     private var running = false
     private var highAccuracyMode = false
+    private var foregroundStarted = false
     private val healthHandler = Handler(Looper.getMainLooper())
     private val healthCheck = object : Runnable {
         override fun run() {
@@ -76,24 +77,36 @@ class TripwireLocationBurstService : Service() {
                     CrossingNotificationHelper.show(this@TripwireLocationBurstService, direction)
                 }
             }
-            updateLocationMode(hasCandidateTransition())
+            updateLocationMode(
+                hasCandidateTransition() ||
+                    TripwireCrossingVerifier.shouldUseHighAccuracy(
+                        this@TripwireLocationBurstService,
+                        location,
+                    ),
+            )
         }
     }
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startForeground(
-            NOTIFICATION_ID,
-            NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_stat_carmelink)
-                .setContentTitle("CarmeLink location monitoring")
-                .setContentText("Dormitory boundary alerts are active")
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .build(),
-        )
+        try {
+            startForeground(
+                NOTIFICATION_ID,
+                NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_stat_carmelink)
+                    .setContentTitle("CarmeLink location monitoring")
+                    .setContentText("Dormitory boundary alerts are active")
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setOngoing(true)
+                    .setOnlyAlertOnce(true)
+                    .build(),
+            )
+            foregroundStarted = true
+        } catch (_: RuntimeException) {
+            stopSelf()
+            return
+        }
         val filter = IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION).apply {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) addAction(LocationManager.MODE_CHANGED_ACTION)
         }
@@ -102,6 +115,7 @@ class TripwireLocationBurstService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!foregroundStarted) return START_NOT_STICKY
         if (intent?.action == ACTION_STOP) {
             stopMonitoring()
             return START_NOT_STICKY
@@ -157,6 +171,10 @@ class TripwireLocationBurstService : Service() {
 
     private fun hasCandidateTransition(): Boolean {
         val prefs = getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE)
+        val lastTransitionAt = prefs.getLong("last_geofence_transition_at", 0L)
+        if (lastTransitionAt > 0L && System.currentTimeMillis() - lastTransitionAt <= 120_000L) {
+            return true
+        }
         if (prefs.getInt("candidate_fix_count", 0) <= 0) return false
         val startedAt = prefs.getLong("candidate_started_at", 0L)
         if (startedAt > 0L && System.currentTimeMillis() - startedAt <= 120_000L) return true
@@ -185,6 +203,24 @@ class TripwireLocationBurstService : Service() {
         running = false
         highAccuracyMode = false
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // Standard Android task removal must not stop the foreground monitor.
+        // Manufacturer-level force-stop policies can still block every app
+        // component until the user launches the app again.
+        if (getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE)
+                .getBoolean("registered", false)
+        ) {
+            try {
+                ContextCompat.startForegroundService(
+                    this,
+                    Intent(this, TripwireLocationBurstService::class.java)
+                        .setAction(ACTION_START),
+                )
+            } catch (_: RuntimeException) { }
+        }
+        super.onTaskRemoved(rootIntent)
     }
 
     private fun checkMonitoringHealth() {

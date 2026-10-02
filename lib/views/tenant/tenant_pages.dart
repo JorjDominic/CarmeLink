@@ -5412,6 +5412,12 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
           final automaticReady = monitoringActive;
           final pendingTransitions =
               (_monitoringStatus['pendingCount'] as num?)?.toInt() ?? 0;
+          final aggressiveTaskRemoval =
+              _monitoringStatus['aggressiveTaskRemoval'] == true;
+          final batteryExempt =
+              _monitoringStatus['batteryOptimizationExempt'] == true;
+          final deviceManufacturer =
+              _monitoringStatus['manufacturer']?.toString() ?? 'Android';
 
           final isInside = controller.isInside;
           final isOutside = controller.isOutside;
@@ -5696,6 +5702,45 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                                 'Enable Background Access',
                                 style: TextStyle(fontSize: 12),
                               ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (aggressiveTaskRemoval && !batteryExempt) ...[
+                const SizedBox(height: 12),
+                CarmelitaCard(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.battery_alert_outlined,
+                          color: Color(0xFFC77800)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$deviceManufacturer background setup required',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 3),
+                            const Text(
+                              'Set CarmeLink battery use to Unrestricted, enable Auto-start, and lock it in Recents. Some devices otherwise convert a Recents swipe into Force Stop.',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              onPressed: () => TripwireGeofenceService.instance
+                                  .openBackgroundSettings(),
+                              icon:
+                                  const Icon(Icons.settings_outlined, size: 17),
+                              label: const Text('Open battery settings'),
                             ),
                           ],
                         ),

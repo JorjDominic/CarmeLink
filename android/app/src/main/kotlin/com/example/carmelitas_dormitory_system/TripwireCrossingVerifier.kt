@@ -7,7 +7,8 @@ import kotlin.math.*
 
 /** Exact polygon + official-gate verifier. The OS circle is only a wake-up hint. */
 object TripwireCrossingVerifier {
-    private const val MAX_ACCURACY_METERS = 35f
+    private const val MAX_ACCURACY_METERS = 45f
+    private const val MAX_CONFIRM_ACCURACY_METERS = 35f
     private const val MAX_AGE_MILLIS = 120_000L
     private const val CANDIDATE_DIRECTION = "candidate_direction"
     private const val CANDIDATE_FIX_COUNT = "candidate_fix_count"
@@ -20,6 +21,18 @@ object TripwireCrossingVerifier {
     private const val MIN_CANDIDATE_FIX_SPACING_MILLIS = 8_000L
     private const val MIN_EDGE_BUFFER_METERS = 8.0
     private const val MIN_WALKING_SPEED_METERS_PER_SECOND = 0.5f
+    private const val HIGH_ACCURACY_EDGE_METERS = 20.0
+
+    fun shouldUseHighAccuracy(context: Context, location: Location): Boolean {
+        if (location.accuracy < 0 || location.accuracy > 15f) return true
+        val prefs = context.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE)
+        val polygon = parsePolygon(prefs.getString("polygon", "[]"))
+        if (polygon.size < 3) return false
+        val point = Point(location.latitude, location.longitude)
+        return polygon.indices.minOf { index ->
+            pointToSegmentMeters(point, polygon[index], polygon[(index + 1) % polygon.size])
+        } <= HIGH_ACCURACY_EDGE_METERS
+    }
 
     fun accept(context: Context, location: Location): String? {
         // Quality gate — reject stale or inaccurate fixes.
@@ -127,6 +140,8 @@ object TripwireCrossingVerifier {
         }
         editor.apply()
         if (candidateCount < REQUIRED_MATCHING_FIXES) return null
+        // Ensure final confirmation meets strict accuracy standards
+        if (location.accuracy > MAX_CONFIRM_ACCURACY_METERS) return null
 
         // A stationary phone must not become OUT merely because indoor GPS
         // settles a few metres beyond the polygon. For departure, require

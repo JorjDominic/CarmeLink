@@ -222,4 +222,15 @@ class TripwireGeofenceService {
       return const {'registered': false, 'supported': false};
     }
   }
+
+  Future<void> openBackgroundSettings() async {
+    if (kIsWeb) return;
+    try {
+      await _channel
+          .invokeMethod<void>('openBackgroundSettings')
+          .timeout(_platformTimeout);
+    } on MissingPluginException {
+      // iOS and unsupported platforms use the normal location settings flow.
+    }
+  }
 }

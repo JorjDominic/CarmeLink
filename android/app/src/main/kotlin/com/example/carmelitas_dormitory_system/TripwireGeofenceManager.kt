@@ -80,6 +80,7 @@ class TripwireGeofenceManager(private val context: Context) {
         Intent(context, TripwireLocationBurstService::class.java).setAction(action)
 
     private fun startPersistentMonitoring() {
+        if (!MainActivity.isInForeground) return
         try {
             ContextCompat.startForegroundService(context, monitoringIntent())
         } catch (_: RuntimeException) {

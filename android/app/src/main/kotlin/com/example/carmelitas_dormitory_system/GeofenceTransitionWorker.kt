@@ -3,11 +3,15 @@ package com.example.carmelitas_dormitory_system
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Location
 import androidx.core.content.ContextCompat
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.Tasks
+import java.util.concurrent.TimeUnit
 
 /**
  * WorkManager worker that handles a geofence transition while the app is
@@ -20,12 +24,11 @@ import com.google.android.gms.tasks.Tasks
  * attempting to start the foreground service.
  *
  * This worker:
- *   1. Reads the last known GPS fix from the Fused Location Provider.
+ *   1. Requests two fresh, time-separated high-accuracy fixes.
  *   2. Runs TripwireCrossingVerifier.accept() against the stored polygon.
  *   3. If a crossing is confirmed, calls TripwireGeofenceManager.appendEvent()
  *      which automatically enqueues TripwireSyncWorker to upload the event.
- *   4. If no confirmed crossing yet (first fix), stores a "wake hint" so the
- *      next fix from the foreground service can complete the confirmation.
+ *   4. Stores the OS transition as a wake hint for recovery diagnostics.
  */
 class GeofenceTransitionWorker(
     context: Context,
@@ -34,6 +37,12 @@ class GeofenceTransitionWorker(
 
     companion object {
         const val KEY_TRANSITION = "geofence_transition_type"
+        const val KEY_LATITUDE = "trigger_latitude"
+        const val KEY_LONGITUDE = "trigger_longitude"
+        const val KEY_ACCURACY = "trigger_accuracy"
+        const val KEY_SPEED = "trigger_speed"
+        const val KEY_HAS_SPEED = "trigger_has_speed"
+        const val KEY_LOCATION_TIME = "trigger_location_time"
         // GEOFENCE_TRANSITION_ENTER = 1, GEOFENCE_TRANSITION_EXIT = 2
         const val TRANSITION_ENTER = 1
         const val TRANSITION_EXIT = 2
@@ -62,31 +71,58 @@ class GeofenceTransitionWorker(
             ) != PackageManager.PERMISSION_GRANTED
         ) return Result.success()
 
-        // Attempt to get the last known location and run the verifier once.
-        // This single fix is often inaccurate enough to be rejected by the
-        // verifier (accuracy gate is 35 m) but it primes the candidate state
-        // so that the foreground service needs only ONE more fix to confirm.
+        fun recordIfAccepted(location: Location): Boolean {
+            val direction = TripwireCrossingVerifier.accept(applicationContext, location)
+                ?: return false
+            val queued = TripwireGeofenceManager.appendEvent(
+                applicationContext,
+                direction,
+                System.currentTimeMillis(),
+            )
+            if (queued) CrossingNotificationHelper.show(applicationContext, direction)
+            return true
+        }
+
+        // Use Play Services' triggering fix as the first observation. This is
+        // available immediately even when a new background GPS request is
+        // throttled, and one fresh fix still has to confirm the crossing.
         return try {
             val flpClient = LocationServices.getFusedLocationProviderClient(applicationContext)
-            val location = Tasks.await(flpClient.lastLocation) // blocking; fine inside a Worker
-            if (location != null) {
-                val direction = TripwireCrossingVerifier.accept(applicationContext, location)
-                if (direction != null) {
-                    val queued = TripwireGeofenceManager.appendEvent(
-                        applicationContext,
-                        direction,
-                        System.currentTimeMillis(),
-                    )
-                    if (queued) {
-                        // Show a local notification so the tenant is aware even
-                        // if the foreground service did not start.
-                        CrossingNotificationHelper.show(applicationContext, direction)
+            val hasTriggerLocation = inputData.getLong(KEY_LOCATION_TIME, 0L) > 0L
+            if (hasTriggerLocation) {
+                val triggerLocation = Location("geofence").apply {
+                    latitude = inputData.getDouble(KEY_LATITUDE, 0.0)
+                    longitude = inputData.getDouble(KEY_LONGITUDE, 0.0)
+                    accuracy = inputData.getFloat(KEY_ACCURACY, Float.MAX_VALUE)
+                    time = inputData.getLong(KEY_LOCATION_TIME, System.currentTimeMillis())
+                    if (inputData.getBoolean(KEY_HAS_SPEED, false)) {
+                        speed = inputData.getFloat(KEY_SPEED, 0f)
                     }
                 }
+                if (recordIfAccepted(triggerLocation)) return Result.success()
+                Thread.sleep(8_000L)
+            }
+
+            val freshFixCount = if (hasTriggerLocation) 1 else 2
+            repeat(freshFixCount) { index ->
+                val request = CurrentLocationRequest.Builder()
+                    .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
+                    .setMaxUpdateAgeMillis(0L)
+                    .setDurationMillis(12_000L)
+                    .build()
+                val location = Tasks.await(
+                    flpClient.getCurrentLocation(request, null),
+                    15,
+                    TimeUnit.SECONDS,
+                )
+                if (location != null && recordIfAccepted(location)) return Result.success()
+                if (!hasTriggerLocation && index == 0) Thread.sleep(8_000L)
             }
             Result.success()
+        } catch (_: SecurityException) {
+            Result.failure()
         } catch (_: Exception) {
-            Result.success() // Non-critical; foreground service will catch up
+            Result.retry()
         }
     }
 }

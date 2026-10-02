@@ -15,6 +15,14 @@ void main() {
     'android/app/src/main/kotlin/com/example/carmelitas_dormitory_system/'
     'TripwireLocationBurstService.kt',
   );
+  final androidGeofenceReceiver = File(
+    'android/app/src/main/kotlin/com/example/carmelitas_dormitory_system/'
+    'GeofenceBroadcastReceiver.kt',
+  );
+  final androidGeofenceWorker = File(
+    'android/app/src/main/kotlin/com/example/carmelitas_dormitory_system/'
+    'GeofenceTransitionWorker.kt',
+  );
   final iosDelegate = File('ios/Runner/AppDelegate.swift');
   final dartTripwire = File('lib/services/tripwire_geofence_service.dart');
 
@@ -128,6 +136,29 @@ void main() {
       expect(manifest.contains('android:stopWithTask="false"'), isTrue);
     });
 
+    test('Android closed-app transitions avoid forbidden FGS promotion', () {
+      final receiver = androidGeofenceReceiver.readAsStringSync();
+      final worker = androidGeofenceWorker.readAsStringSync();
+
+      expect(receiver.contains('GeofenceTransitionWorker'), isTrue);
+      expect(receiver.contains('startForegroundService'), isFalse);
+      expect(receiver.contains('setExpedited'), isTrue);
+      expect(receiver.contains('event.triggeringLocation'), isTrue);
+      expect(receiver.contains('ExistingWorkPolicy.APPEND_OR_REPLACE'), isTrue);
+      expect(worker.contains('CurrentLocationRequest.Builder()'), isTrue);
+      expect(worker.contains('setMaxUpdateAgeMillis(0L)'), isTrue);
+      expect(worker.contains('Location("geofence")'), isTrue);
+      expect(worker.contains('Thread.sleep(8_000L)'), isTrue);
+    });
+
+    test('Android foreground promotion failure cannot crash the process', () {
+      final source = androidMonitor.readAsStringSync();
+
+      expect(source.contains('foregroundStarted = true'), isTrue);
+      expect(source.contains('catch (_: RuntimeException)'), isTrue);
+      expect(source.contains('if (!foregroundStarted)'), isTrue);
+    });
+
     test('iOS retains continuous background polygon monitoring', () {
       final source = iosDelegate.readAsStringSync();
       final plist = File('ios/Runner/Info.plist').readAsStringSync();
@@ -150,12 +181,17 @@ void main() {
 
       expect(android.contains('PRIORITY_BALANCED_POWER_ACCURACY'), isTrue);
       expect(android.contains('hasCandidateTransition()'), isTrue);
-      expect(android.contains('HIGH_ACCURACY_EDGE_METERS'), isFalse);
+      expect(android.contains('shouldUseHighAccuracy'), isTrue);
+      expect(
+          androidVerifier
+              .readAsStringSync()
+              .contains('HIGH_ACCURACY_EDGE_METERS'),
+          isTrue);
       expect(android.contains('setMinUpdateIntervalMillis(15_000L)'), isTrue);
       expect(ios.contains('kCLLocationAccuracyNearestTenMeters'), isTrue);
       expect(ios.contains('startContinuousMonitoring(highAccuracy: true)'),
           isTrue);
-      expect(ios.contains('nearBoundary'), isFalse);
+      expect(ios.contains('isNearBoundary'), isTrue);
       expect(android.contains('candidate_started_at'), isTrue);
       expect(ios.contains('expireCandidateIfNeeded()'), isTrue);
       expect(ios.contains('pausesLocationUpdatesAutomatically = !highAccuracy'),
