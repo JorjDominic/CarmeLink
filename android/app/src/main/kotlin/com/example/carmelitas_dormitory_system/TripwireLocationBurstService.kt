@@ -92,10 +92,13 @@ class TripwireLocationBurstService : Service() {
             return
         }
 
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 15_000L)
-            .setMinUpdateIntervalMillis(8_000L)
-            .setMinUpdateDistanceMeters(5f)
-            .setMaxUpdateAgeMillis(10_000L)
+        // Do not require additional movement between fixes. Entry commonly
+        // leaves only one accurate fix before the tenant stops or GPS quality
+        // drops indoors; the verifier still requires two matching fresh fixes.
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5_000L)
+            .setMinUpdateIntervalMillis(3_000L)
+            .setMinUpdateDistanceMeters(0f)
+            .setMaxUpdateAgeMillis(5_000L)
             .build()
         try {
             running = true

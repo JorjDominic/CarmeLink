@@ -324,7 +324,9 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   private func startContinuousMonitoring() {
     guard defaults.bool(forKey: registeredKey) else { return }
     manager.desiredAccuracy = kCLLocationAccuracyBest
-    manager.distanceFilter = 5
+    // Keep delivering fixes after the tenant stops just inside. Direction
+    // changes still require two accurate, matching fixes before being stored.
+    manager.distanceFilter = kCLDistanceFilterNone
     manager.startUpdatingLocation()
   }
 
@@ -702,6 +704,8 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       "configVersion": defaults.integer(forKey: "tripwire_config_version"),
       "direction": defaults.string(forKey: confirmedDirectionKey) ?? NSNull(),
       "pendingDirection": defaults.string(forKey: queuedDirectionKey) ?? NSNull(),
+      "candidateDirection": defaults.string(forKey: candidateDirectionKey) ?? NSNull(),
+      "candidateFixCount": defaults.integer(forKey: candidateFixCountKey),
       "pendingCount": pendingEvents().count,
       "lastSyncError": defaults.string(forKey: "tripwire_last_sync_error") ?? NSNull(),
       "lastNotificationError": defaults.string(forKey: "tripwire_last_notification_error") ?? NSNull(),

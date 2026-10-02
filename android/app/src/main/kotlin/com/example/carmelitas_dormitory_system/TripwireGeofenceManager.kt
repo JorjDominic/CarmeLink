@@ -316,6 +316,8 @@ class TripwireGeofenceManager(private val context: Context) {
         "configVersion" to prefs.getInt("config_version", 1),
         "direction" to prefs.getString("confirmed_direction", null),
         "pendingDirection" to prefs.getString(QUEUED_DIRECTION, null),
+        "candidateDirection" to prefs.getString("candidate_direction", null),
+        "candidateFixCount" to prefs.getInt("candidate_fix_count", 0),
         "pendingCount" to try { JSONArray(prefs.getString(QUEUE, "[]")).length() } catch (_: Exception) { 0 },
         "lastSyncError" to prefs.getString("last_sync_error", null),
         "lastSyncedAt" to prefs.getLong("last_synced_at", 0L).takeIf { it > 0L },

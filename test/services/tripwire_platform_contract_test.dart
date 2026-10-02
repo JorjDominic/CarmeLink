@@ -108,7 +108,7 @@ void main() {
           File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
 
       expect(source.contains('return START_STICKY'), isTrue);
-      expect(source.contains('setMinUpdateDistanceMeters(5f)'), isTrue);
+      expect(source.contains('setMinUpdateDistanceMeters(0f)'), isTrue);
       expect(source.contains('stopBurst()'), isFalse);
       expect(manifest.contains('android:stopWithTask="false"'), isTrue);
     });
@@ -119,6 +119,8 @@ void main() {
 
       expect(source.contains('startContinuousMonitoring()'), isTrue);
       expect(source.contains('manager.startUpdatingLocation()'), isTrue);
+      expect(source.contains('manager.distanceFilter = kCLDistanceFilterNone'),
+          isTrue);
       expect(source.contains('manager.allowsBackgroundLocationUpdates = true'),
           isTrue);
       expect(plist.contains('<string>location</string>'), isTrue);
