@@ -591,6 +591,8 @@ class _GuardianPresenceMonitoringPageState
   String _filter = 'pending'; // 'pending', 'approved', 'rejected', 'all'
   TableRefreshSubscription? _subscription;
   String? _processingRequestId;
+  bool _sendingPresenceRequest = false;
+  DateTime? _presenceRequestAvailableAt;
 
   @override
   void initState() {
@@ -623,6 +625,39 @@ class _GuardianPresenceMonitoringPageState
   void dispose() {
     _subscription?.dispose();
     super.dispose();
+  }
+
+  Future<void> _requestPresenceUpdate() async {
+    final tenant = GuardianController.instance.selectedTenant;
+    if (tenant == null || _sendingPresenceRequest) return;
+    setState(() => _sendingPresenceRequest = true);
+    try {
+      await GuardianAlertService.requestTenantStatusUpdate(tenant.tenantId);
+      if (!mounted) return;
+      setState(() {
+        _presenceRequestAvailableAt =
+            DateTime.now().add(const Duration(minutes: 30));
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Reminder sent to ${tenant.name}. Another can be sent after 30 minutes.',
+          ),
+          backgroundColor: const Color(0xFF56886B),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _sendingPresenceRequest = false);
+    }
   }
 
   Future<void> _handleDecision({
@@ -1041,6 +1076,62 @@ class _GuardianPresenceMonitoringPageState
                     ],
                   );
                 }(),
+                const SizedBox(height: 14),
+                CarmelitaCard(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.notification_add_outlined,
+                        color: Color(0xFFB03A2E),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Request presence update',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Remind ${controller.linkedTenantName} to turn on Location and open CarmeLink. This does not change their IN/OUT status.',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      FilledButton.icon(
+                        onPressed: !controller.hasLinkedTenant ||
+                                _sendingPresenceRequest ||
+                                (_presenceRequestAvailableAt?.isAfter(
+                                      DateTime.now(),
+                                    ) ??
+                                    false)
+                            ? null
+                            : _requestPresenceUpdate,
+                        icon: _sendingPresenceRequest
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.send_outlined, size: 18),
+                        label: const Text('Send'),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 14),
                 CarmelitaCard(
                   padding: const EdgeInsets.all(14),
