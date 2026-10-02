@@ -195,9 +195,11 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
               ),
               const SizedBox(height: 8),
 
-              // Metric Summary Cards - using default compact=false to ensure ample height and no vertical overflows
+              // Compact summary keeps the maintenance queue readable without oversized cards.
               MutedDashboardGrid(
-                compact: false,
+                compact: true,
+                denseFourColumn: true,
+                prominentCompactText: true,
                 items: [
                   MutedDashboardItem(
                     label: 'Open Issues',
