@@ -10,7 +10,7 @@
 
 ## Current build changes
 
-- Native geofencing is now a hybrid verifier on both Android and iOS: circular
+- Native geofencing is a hybrid verifier on both Android and iOS: circular
   OS regions wake location collection, while polygon state and the official gate
   corridor confirm transitions.
 - Gate endpoints, tolerance, enablement, and configuration version are backed by
@@ -22,10 +22,25 @@
   signing, activation safety gates, and audited billing actions are present.
 - iOS native monitoring waits for Always permission and treats monitoring and
   location errors as recoverable.
+- Guardian presence monitoring includes breakdown details (tenant status, date/time,
+  room & bed, and request status) for both presence update requests and curfew requests.
+- Geofencing flow cards and unapproved employee curfew cards are dismissable/collapsible;
+  mobile filter bars across Geofencing, Contracts, Tenants, Guardians, and Owners
+  are consolidated to single-line horizontally scrollable bars.
+- Tenant location monitoring health is tracked via `location_monitoring_incidents`
+  and RPC `set_my_location_monitoring_health`:
+  - Native Android (`PROVIDERS_CHANGED_ACTION` & `MODE_CHANGED_ACTION`) and iOS
+    (`CLLocationManager`) detect when Location Services or background permissions
+    are turned off and immediately report to the backend.
+  - Periodic escalation is scheduled via pg_cron calling `process-location-monitoring-alerts`.
+  - **Planned Immediate Guardian FCM Alert:** Extending the location health outage
+    pipeline so that when a tenant turns off location services, an immediate FCM
+    push notification and in-app alert are dispatched directly to their linked
+    guardian(s) (`⚠️ Location Alert: [Tenant Name] turned off location services`).
 
 > Snapshot/reference only. Use [`STATUS.md`](STATUS.md) for current completion decisions and gap ownership.
 
-> Repository state reviewed: September 25, 2026  
+> Repository state reviewed: October 2, 2026  
 > Status is based on reachable Flutter code, services/controllers, Supabase migrations and Edge Functions, native Android/iOS code, static analysis, tests, and build results. Remote deployment is not assumed merely because SQL exists locally.
 
 ## Current implementation ownership
@@ -159,6 +174,7 @@ These are pending improvements, not claims about the current build.
 | iOS native tripwire | Partial | Core Location circular region/significant changes queue events; Flutter drains them when running. | No native background uploader; register reports success before authorization/monitor confirmation. |
 | Polygon parity | Partial | Foreground Dart supports polygon; native Android/iOS adapters monitor a circle and directly queue circular transitions. | Choose one official model or add coordinate-aware polygon confirmation. |
 | Geofence notifications | Implemented, verify live | Stored event invokes `notify-geofence`, resolves staff/guardians, inserts app notifications, and attempts FCM. | Validate recipients, deduplication, secrets, and killed-app delivery. |
+| Location monitoring outage notification | Planned / In progress | Native OS reports `LOCATION_SERVICES_DISABLED` or denied permissions via `set_my_location_monitoring_health`. Backend currently schedules 30-min escalation alerts (`process-location-monitoring-alerts`). Immediate linked-guardian FCM push on disable is queued for implementation. | Wire immediate edge/DB trigger to dispatch FCM notification to linked guardians upon incident creation; verify on real Android/iOS devices when toggling location off. |
 | Dorm Wi-Fi corroboration | Deferred / possible addition | Proposed router/controller association evidence could provide a non-authoritative `LIKELY_IN` signal when GPS is unavailable. It is not implemented and must not write verified gate events. | Requires managed-network integration, opt-in enrollment, private-MAC handling, dwell/de-duplication logic, coverage testing, retention policy, and clear confidence/source labels. Mobile SSID scanning alone is unreliable for closed apps, especially on iOS. |
 
 ## Messaging, announcements, and notifications
