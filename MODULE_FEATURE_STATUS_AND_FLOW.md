@@ -1,5 +1,10 @@
 # CarmeLink Module and Feature Status
 
+> October 3, 2026 branch update: September 30 geofencing is retained with
+> selectively restored guardian requests, UI improvements and separate
+> location-off alerts. See [branch changes and validation](OCTOBER_ADDITIONS_ON_SEPTEMBER_BASELINE.md).
+> Backend deployment and real-device delivery are not assumed.
+
 > Updated September 30, 2026. Overall readiness and release blockers live in
 > `STATUS.md`; geofencing implementation and device validation live in
 > `GEOFENCING_IMPLEMENTATION.md`. This file remains the module-level matrix.
