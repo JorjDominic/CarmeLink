@@ -593,6 +593,8 @@ class _GuardianPresenceMonitoringPageState
   String? _processingRequestId;
   bool _sendingPresenceRequest = false;
   DateTime? _presenceRequestAvailableAt;
+  List<GuardianPresenceUpdateRequest> _statusRequests = const [];
+  bool _loadingStatusRequests = false;
 
   @override
   void initState() {
@@ -603,6 +605,7 @@ class _GuardianPresenceMonitoringPageState
       if (mounted) {
         GuardianController.instance.loadCurfewRequests();
         GuardianController.instance.loadGateEvents();
+        _loadStatusRequests();
         GuardianAlertService.load().then((_) {
           if (mounted) setState(() {});
         });
@@ -611,11 +614,17 @@ class _GuardianPresenceMonitoringPageState
 
     _subscription = TableRefreshSubscription(
       'guardian-curfew-monitoring',
-      ['curfew_requests', 'gate_events', 'tenant_details'],
+      [
+        'curfew_requests',
+        'gate_events',
+        'tenant_details',
+        'guardian_status_update_requests',
+      ],
       () {
         if (mounted) {
           GuardianController.instance.loadCurfewRequests(force: true);
           GuardianController.instance.loadGateEvents(force: true);
+          _loadStatusRequests();
         }
       },
     );
@@ -625,6 +634,25 @@ class _GuardianPresenceMonitoringPageState
   void dispose() {
     _subscription?.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadStatusRequests() async {
+    final tenant = GuardianController.instance.selectedTenant;
+    if (tenant == null) return;
+    if (mounted) setState(() => _loadingStatusRequests = true);
+    try {
+      final list =
+          await GuardianAlertService.loadStatusRequests(tenant.tenantId);
+      if (mounted) {
+        setState(() => _statusRequests = list);
+      }
+    } catch (_) {
+      // Gracefully maintain current list on background load error
+    } finally {
+      if (mounted) {
+        setState(() => _loadingStatusRequests = false);
+      }
+    }
   }
 
   Future<void> _requestPresenceUpdate() async {
@@ -646,6 +674,7 @@ class _GuardianPresenceMonitoringPageState
           backgroundColor: const Color(0xFF56886B),
         ),
       );
+      _loadStatusRequests();
     } catch (error) {
       if (!mounted) return;
       final message = error.toString().replaceFirst('Exception: ', '');
@@ -1012,7 +1041,7 @@ class _GuardianPresenceMonitoringPageState
                   ...displayedRequests.map(
                     (req) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _GuardianCurfewRequestCard(
+                      child: GuardianCurfewRequestCard(
                         request: req,
                         isProcessing: _processingRequestId == req.id,
                         onEndorse: () => _promptEndorseDialog(req),
@@ -1131,6 +1160,15 @@ class _GuardianPresenceMonitoringPageState
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 14),
+                GuardianStatusRequestBreakdown(
+                  requests: _statusRequests,
+                  isLoading: _loadingStatusRequests,
+                  tenantName: controller.linkedTenantName,
+                  tenantPresence: controller.linkedTenantPresence,
+                  room: controller.room,
+                  onRefresh: _loadStatusRequests,
                 ),
                 const SizedBox(height: 14),
                 CarmelitaCard(
@@ -1257,12 +1295,13 @@ class _GuardianPresenceMonitoringPageState
   }
 }
 
-class _GuardianCurfewRequestCard extends StatelessWidget {
-  const _GuardianCurfewRequestCard({
+class GuardianCurfewRequestCard extends StatelessWidget {
+  const GuardianCurfewRequestCard({
     required this.request,
     required this.isProcessing,
     required this.onEndorse,
     required this.onDecline,
+    super.key,
   });
 
   final CurfewRequest request;
@@ -1337,6 +1376,17 @@ class _GuardianCurfewRequestCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const Divider(height: 1),
+          const SizedBox(height: 12),
+          // Request & Resident Breakdown
+          _CurfewRequestBreakdownSection(
+            tenantPresence: GuardianController.instance.linkedTenantPresence,
+            departureTime: request.departureTime,
+            room: GuardianController.instance.room,
+            roomSubtitle: GuardianController.instance.linkedTenantRoomSubtitle,
+            statusLabel: request.statusLabel,
+            isApproved: request.isApproved,
+            isRejected: request.isRejected,
+          ),
           const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2278,27 +2328,31 @@ class _GuardianAnnouncementsPageState extends State<GuardianAnnouncementsPage> {
                         ),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _categories.map((cat) {
-                      final isSelected = _selectedCategory == cat.$1;
-                      return FilterChip(
-                        avatar: Icon(
-                          cat.$3,
-                          size: 16,
-                          color: isSelected
-                              ? Colors.white
-                              : _categoryColor(cat.$1),
-                        ),
-                        label: Text(cat.$2),
-                        selected: isSelected,
-                        onSelected: (_) {
-                          setState(() => _selectedCategory = cat.$1);
-                          setSheetState(() {});
-                        },
-                      );
-                    }).toList(),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _categories.map((cat) {
+                        final isSelected = _selectedCategory == cat.$1;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            avatar: Icon(
+                              cat.$3,
+                              size: 16,
+                              color: isSelected
+                                  ? Colors.white
+                                  : _categoryColor(cat.$1),
+                            ),
+                            label: Text(cat.$2),
+                            selected: isSelected,
+                            onSelected: (_) {
+                              setState(() => _selectedCategory = cat.$1);
+                              setSheetState(() {});
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
                   const SizedBox(height: 22),
                   SizedBox(
@@ -2786,4 +2840,501 @@ class EmergencySafetyAlertsPage extends StatelessWidget {
                 subtitle: Text(
                     'For immediate danger, contact local emergency services. This page is a directory, not a live SOS or push-alert feature.'))),
       ]));
+}
+
+/// Breakdown UI for a resident curfew/leave request showing:
+/// - Status of tenant (Inside / Outside / Unavailable)
+/// - Date & Time (Departure date & time)
+/// - Room & Bed space
+/// - Request Status (Pending / Approved / Rejected)
+class _CurfewRequestBreakdownSection extends StatelessWidget {
+  const _CurfewRequestBreakdownSection({
+    required this.tenantPresence,
+    required this.departureTime,
+    required this.room,
+    required this.roomSubtitle,
+    required this.statusLabel,
+    required this.isApproved,
+    required this.isRejected,
+  });
+
+  final String tenantPresence;
+  final DateTime departureTime;
+  final Room? room;
+  final String roomSubtitle;
+  final String statusLabel;
+  final bool isApproved;
+  final bool isRejected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isInside = tenantPresence == 'Inside' || tenantPresence == 'IN';
+    final isOutside = tenantPresence == 'Outside' || tenantPresence == 'OUT';
+    final presenceColor = isInside
+        ? const Color(0xFF56886B)
+        : (isOutside ? const Color(0xFFC77800) : const Color(0xFFB03A2E));
+
+    final roomDisplay = room != null
+        ? 'Room ${room!.number} • ${room!.bedSpace}'
+        : (roomSubtitle.isNotEmpty ? roomSubtitle : 'Assigned room');
+
+    final requestStatusColor = isApproved
+        ? const Color(0xFF56886B)
+        : (isRejected ? const Color(0xFFB3261E) : const Color(0xFFAA8A45));
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color:
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: .28),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: .4),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.analytics_outlined,
+                size: 14,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'REQUEST & RESIDENT BREAKDOWN',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Tenant Status',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.black54,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: presenceColor,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          tenantPresence,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Date & Time',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.black54,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${shortDate(departureTime)} • ${timeText(departureTime)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Room & Bed',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.black54,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      roomDisplay,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Request Status',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.black54,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      statusLabel,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        color: requestStatusColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Breakdown UI for guardian presence update requests showing:
+/// - Status of tenant (Inside / Outside / Unavailable)
+/// - Date & Time (Requested at)
+/// - Room & Bed space
+/// - Status (Delivery / Notification dispatch status)
+class GuardianStatusRequestBreakdown extends StatefulWidget {
+  const GuardianStatusRequestBreakdown({
+    required this.requests,
+    required this.isLoading,
+    required this.tenantName,
+    required this.tenantPresence,
+    required this.room,
+    required this.onRefresh,
+    super.key,
+  });
+
+  final List<GuardianPresenceUpdateRequest> requests;
+  final bool isLoading;
+  final String tenantName;
+  final String tenantPresence;
+  final Room? room;
+  final VoidCallback onRefresh;
+
+  @override
+  State<GuardianStatusRequestBreakdown> createState() =>
+      _GuardianStatusRequestBreakdownState();
+}
+
+class _GuardianStatusRequestBreakdownState
+    extends State<GuardianStatusRequestBreakdown> {
+  bool _expanded = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final roomDisplay = widget.room != null
+        ? 'Room ${widget.room!.number} • ${widget.room!.bedSpace}'
+        : 'Assigned room';
+
+    final isInside =
+        widget.tenantPresence == 'Inside' || widget.tenantPresence == 'IN';
+    final isOutside =
+        widget.tenantPresence == 'Outside' || widget.tenantPresence == 'OUT';
+    final presenceColor = isInside
+        ? const Color(0xFF56886B)
+        : (isOutside ? const Color(0xFFC77800) : const Color(0xFFB03A2E));
+
+    return CarmelitaCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.analytics_outlined,
+                size: 20,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Presence update request breakdown',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'Recent reminders sent to ${widget.tenantName}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Refresh requests',
+                visualDensity: VisualDensity.compact,
+                icon: widget.isLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh, size: 18),
+                onPressed: widget.isLoading ? null : widget.onRefresh,
+              ),
+              IconButton(
+                tooltip: _expanded ? 'Collapse' : 'Expand',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  _expanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  size: 20,
+                ),
+                onPressed: () => setState(() => _expanded = !_expanded),
+              ),
+            ],
+          ),
+          if (_expanded) ...[
+            const SizedBox(height: 12),
+            if (widget.isLoading && widget.requests.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else if (widget.requests.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: .25),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'No presence update requests sent yet. Tap "Send" above to prompt your resident to refresh their presence.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...widget.requests.map((req) {
+                final isPushDelivered = req.pushDeliveredAt != null;
+                final isDispatched = req.dispatchedAt != null;
+                final deliveryColor = isPushDelivered
+                    ? const Color(0xFF56886B)
+                    : (isDispatched
+                        ? const Color(0xFF627FA8)
+                        : const Color(0xFFAA8A45));
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: .32),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant
+                          .withValues(alpha: .4),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.schedule_send_outlined,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${shortDate(req.requestedAt)} • ${timeText(req.requestedAt)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: deliveryColor.withValues(alpha: .12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              req.deliveryStatus,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: deliveryColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      const Divider(height: 1),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Tenant & Status',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.black54,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 7,
+                                      height: 7,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: presenceColor,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        '${widget.tenantName} (${widget.tenantPresence})',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 12,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Room & Bed',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.black54,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  roomDisplay,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (req.dispatchedAt != null ||
+                          req.pushDeliveredAt != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          [
+                            if (req.dispatchedAt != null)
+                              'Notification queued ${timeText(req.dispatchedAt!)}',
+                            if (req.pushDeliveredAt != null)
+                              'Push delivered ${timeText(req.pushDeliveredAt!)}',
+                          ].join(' • '),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }),
+          ],
+        ],
+      ),
+    );
+  }
 }
