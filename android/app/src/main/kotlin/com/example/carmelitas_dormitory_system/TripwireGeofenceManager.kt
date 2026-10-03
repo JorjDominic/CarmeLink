@@ -201,6 +201,7 @@ class TripwireGeofenceManager(private val context: Context) {
             try {
                 client.addGeofences(request, pendingIntent)
                     .addOnSuccessListener {
+                        LocationMonitoringHealth.start(context)
                         // Registration can follow recovery from Android Force
                         // Stop. Start a bounded accurate burst while the app is
                         // visibly open so two fixes can reconcile stale state
@@ -257,6 +258,7 @@ class TripwireGeofenceManager(private val context: Context) {
     }
 
     fun unregister(result: MethodChannel.Result) {
+        LocationMonitoringHealth.stop(context)
         client.removeGeofences(pendingIntent).addOnCompleteListener {
             prefs.edit().clear().apply()
             result.success(true)

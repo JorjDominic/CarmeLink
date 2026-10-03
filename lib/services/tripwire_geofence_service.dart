@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../controllers/tenant_controller.dart';
 import '../core/config/supabase_config.dart';
 import 'gate_service.dart';
 import 'geofence_service.dart';
+import 'push_notification_service.dart';
 
 /// Coordinates the native, low-power IN/OUT tripwire with authenticated sync.
 ///
@@ -43,6 +45,12 @@ class TripwireGeofenceService {
 
       GeofenceLocationService.applyBoundaryConfiguration(row);
       final baseline = await _locationService.checkCurrentPresence();
+      try {
+        await _updateMonitoringReminder(baseline);
+      } catch (error) {
+        // Reminder failures must not prevent the original tripwire registration.
+        debugPrint('Could not show location monitoring reminder: $error');
+      }
       final serverDirection = await _loadServerDirection(tenantId);
       final session = SupabaseConfig.client.auth.currentSession;
       if (session == null) return;
@@ -91,6 +99,38 @@ class TripwireGeofenceService {
     } catch (error) {
       debugPrint('Could not start native tripwire monitoring: $error');
     }
+  }
+
+  Future<void> _updateMonitoringReminder(GeofenceCheckResult result) async {
+    const reminderKey = 'tripwire_flutter_last_location_reminder_at';
+    final preferences = await SharedPreferences.getInstance();
+    if (!result.isUnavailable) {
+      await preferences.remove(reminderKey);
+      return;
+    }
+    if (result.failureReason != GeofenceFailureReason.locationServiceDisabled &&
+        result.failureReason != GeofenceFailureReason.permissionDenied) {
+      return;
+    }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final last = preferences.getInt(reminderKey) ?? 0;
+    if (now - last < const Duration(hours: 1).inMilliseconds) return;
+    await preferences.setInt(reminderKey, now);
+    final permissionMissing =
+        result.failureReason == GeofenceFailureReason.permissionDenied;
+    await PushNotificationService.instance.showLocalNotification(
+      id: 1003,
+      title: 'Location monitoring is off',
+      body: permissionMissing
+          ? 'Allow precise location all the time to restore entry and exit alerts.'
+          : 'Turn on Location to restore dormitory entry and exit alerts.',
+      payload: {
+        'route_type': 'location_settings',
+        'reason': permissionMissing
+            ? 'LOCATION_PERMISSION_DENIED'
+            : 'LOCATION_SERVICES_DISABLED',
+      },
+    );
   }
 
   Future<String?> _loadServerDirection(String tenantId) async {

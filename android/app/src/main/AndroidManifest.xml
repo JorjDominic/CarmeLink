@@ -66,6 +66,15 @@
             android:name=".GeofenceBroadcastReceiver"
             android:enabled="true"
             android:exported="false" />
+        <receiver
+            android:name=".LocationMonitoringHealthReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.location.PROVIDERS_CHANGED" />
+                <action android:name="android.location.MODE_CHANGED" />
+            </intent-filter>
+        </receiver>
         <service
             android:name=".TripwireLocationBurstService"
             android:enabled="true"

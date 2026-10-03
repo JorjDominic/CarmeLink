@@ -10,6 +10,7 @@ class TripwireBootReceiver : BroadcastReceiver() {
             intent.action == Intent.ACTION_MY_PACKAGE_REPLACED
         ) {
             TripwireGeofenceManager(context.applicationContext).restore()
+            LocationMonitoringHealth.start(context.applicationContext)
         }
     }
 }

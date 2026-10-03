@@ -95,6 +95,8 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   private let confirmedDirectionKey = "tripwire_confirmed_direction"
   private let candidateDirectionKey = "tripwire_candidate_direction"
   private let candidateFixCountKey = "tripwire_candidate_fix_count"
+  private let monitoringAvailableKey = "tripwire_monitoring_available"
+  private let monitoringReasonKey = "tripwire_monitoring_reason"
   private var burstTimeout: DispatchWorkItem?
   private var burstActive = false
   private var syncing = false
@@ -172,6 +174,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       manager.requestAlwaysAuthorization()
     }
     syncPendingEvents()
+    evaluateMonitoringHealth()
   }
 
   func restoreIfNeeded() {
@@ -187,6 +190,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       manager.requestAlwaysAuthorization()
     }
     syncPendingEvents()
+    evaluateMonitoringHealth()
   }
 
   private func startMonitoring(latitude: Double, longitude: Double, radius: Double) {
@@ -228,6 +232,15 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   }
 
   func unregister() {
+    defaults.removeObject(forKey: monitoringAvailableKey)
+    defaults.removeObject(forKey: monitoringReasonKey)
+    defaults.removeObject(forKey: "tripwire_last_location_reminder_at")
+    UNUserNotificationCenter.current().removePendingNotificationRequests(
+      withIdentifiers: ["carmelink_location_monitoring_off_repeat"]
+    )
+    UNUserNotificationCenter.current().removeDeliveredNotifications(
+      withIdentifiers: ["carmelink_location_monitoring_off"]
+    )
     stopLocationBurst()
     for region in manager.monitoredRegions where region.identifier == regionIdentifier || region.identifier == gateRegionIdentifier {
       manager.stopMonitoring(for: region)
@@ -272,6 +285,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   }
 
   func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    evaluateMonitoringHealth()
     guard
       defaults.bool(forKey: registeredKey),
       let location = locations.last,
@@ -415,6 +429,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     if status == .authorizedAlways || status == .authorizedWhenInUse {
       restoreIfNeeded()
     } else if status == .denied || status == .restricted {
+      reportMonitoringHealth(available: false, reason: "LOCATION_PERMISSION_DENIED")
       stopLocationBurst()
     }
   }
@@ -423,6 +438,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     if status == .authorizedAlways || status == .authorizedWhenInUse {
       restoreIfNeeded()
     } else if status == .denied || status == .restricted {
+      reportMonitoringHealth(available: false, reason: "LOCATION_PERMISSION_DENIED")
       stopLocationBurst()
     }
   }
@@ -431,7 +447,73 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     // Permission denial, disabled Location Services, and temporary position
     // failures are recoverable states. Do not let them destabilize the app.
     NSLog("CarmeLink location update failed: %@", error.localizedDescription)
+    evaluateMonitoringHealth()
     stopLocationBurst()
+  }
+
+  private func evaluateMonitoringHealth() {
+    guard defaults.bool(forKey: registeredKey) else { return }
+    if !CLLocationManager.locationServicesEnabled() {
+      reportMonitoringHealth(available: false, reason: "LOCATION_SERVICES_DISABLED")
+    } else if manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted {
+      reportMonitoringHealth(available: false, reason: "LOCATION_PERMISSION_DENIED")
+    } else if manager.authorizationStatus != .authorizedAlways {
+      reportMonitoringHealth(available: false, reason: "BACKGROUND_LOCATION_DENIED")
+    } else {
+      reportMonitoringHealth(available: true, reason: nil)
+    }
+  }
+
+  private func reportMonitoringHealth(available: Bool, reason: String?) {
+    guard defaults.bool(forKey: registeredKey) else { return }
+    let previous = defaults.object(forKey: monitoringAvailableKey) as? Bool
+    let previousReason = defaults.string(forKey: monitoringReasonKey)
+    guard previous != available || previousReason != reason else { return }
+    defaults.set(available, forKey: monitoringAvailableKey)
+    if let reason { defaults.set(reason, forKey: monitoringReasonKey) }
+    else { defaults.removeObject(forKey: monitoringReasonKey) }
+
+    if !available { showLocationDisabledReminder(reason: reason) }
+    else {
+      // Reset the cooldown so a new off/on/off cycle alerts immediately.
+      defaults.removeObject(forKey: "tripwire_last_location_reminder_at")
+      UNUserNotificationCenter.current().removePendingNotificationRequests(
+        withIdentifiers: ["carmelink_location_monitoring_off_repeat"]
+      )
+      UNUserNotificationCenter.current().removeDeliveredNotifications(
+        withIdentifiers: ["carmelink_location_monitoring_off"]
+      )
+    }
+    var healthBody: [String: Any] = ["p_available": available, "p_platform": "ios"]
+    if let reason { healthBody["p_reason"] = reason }
+    post(
+      path: "/rest/v1/rpc/set_my_location_monitoring_health",
+      body: healthBody
+    ) { [weak self] code, _, _ in
+      guard !(200..<300).contains(code) else { return }
+      // Retry on a later health callback rather than caching a failed report.
+      self?.defaults.removeObject(forKey: self?.monitoringAvailableKey ?? "tripwire_monitoring_available")
+    }
+  }
+
+  private func showLocationDisabledReminder(reason: String?) {
+    let last = defaults.double(forKey: "tripwire_last_location_reminder_at")
+    guard Date().timeIntervalSince1970 - last >= 3600 else { return }
+    defaults.set(Date().timeIntervalSince1970, forKey: "tripwire_last_location_reminder_at")
+    let content = UNMutableNotificationContent()
+    content.title = "Location monitoring is off"
+    content.body = reason == "BACKGROUND_LOCATION_DENIED"
+      ? "Allow Location Always in Settings to restore dormitory entry and exit alerts."
+      : "Turn on Location in Settings to restore dormitory entry and exit alerts."
+    content.sound = .default
+    content.userInfo = ["route_type": "location_settings"]
+    UNUserNotificationCenter.current().add(UNNotificationRequest(
+      identifier: "carmelink_location_monitoring_off", content: content, trigger: nil
+    ))
+    UNUserNotificationCenter.current().add(UNNotificationRequest(
+      identifier: "carmelink_location_monitoring_off_repeat", content: content,
+      trigger: UNTimeIntervalNotificationTrigger(timeInterval: 3600, repeats: true)
+    ))
   }
 
   func locationManager(
