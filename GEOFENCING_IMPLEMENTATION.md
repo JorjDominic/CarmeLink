@@ -410,6 +410,10 @@ but delivery timing and reliability remain controlled by iOS.
 
 ## Recommended final architecture
 
+For a deferred supplementary signal when location is unavailable, see the
+[possible dorm Wi-Fi addition plan](DORM_WIFI_FUTURE_PLAN.md). Router details
+are pending; Wi-Fi evidence must remain separate from verified gate detection.
+
 ```text
 Native Android/iOS region monitoring
                 |

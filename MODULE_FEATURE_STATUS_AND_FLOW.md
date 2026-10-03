@@ -153,6 +153,10 @@ These are pending improvements, not claims about the current build.
 
 ## Gate presence and geofencing
 
+Possible future addition: [dormitory Wi-Fi presence evidence plan](DORM_WIFI_FUTURE_PLAN.md).
+Deferred until the router/controller is identified; no implementation or device
+purchase is currently planned.
+
 | Feature | State | Current processing flow | Remaining risk/gap |
 |---|---|---|---|
 | Gate timeline/current state | Implemented, verify live | `gate_events` is append-only. Trigger copies newest direction/time to `tenant_details`. Staff, tenant, and guardian read permitted history. | Confirm direct writes are revoked and summary matches latest event. |
