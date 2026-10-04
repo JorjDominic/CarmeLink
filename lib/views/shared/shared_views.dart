@@ -8,7 +8,6 @@ import '../../core/constants/app_assets.dart';
 import '../../core/runtime/app_surface.dart';
 import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/common_widgets.dart';
-import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../../services/auth_service.dart';
 import '../../services/geofence_service.dart';
@@ -1626,8 +1625,6 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = ThemeController.instance;
-    final isTenant =
-        SessionController.instance.currentUser?.role == UserRole.tenant;
 
     return PageFrame(
       title: 'Settings',
@@ -1720,22 +1717,6 @@ class SettingsPage extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (isTenant) ...[
-                    const Divider(),
-                    const ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      enabled: false,
-                      leading: Icon(Icons.phonelink_lock_outlined),
-                      title: Text(
-                        'Device binding',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      subtitle: Text(
-                        'Trusted-device registration is planned for Capstone 2.',
-                      ),
-                      trailing: StatusPill('Capstone 2 · Planned'),
-                    ),
-                  ],
                   const Divider(),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -2526,60 +2507,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       ),
     );
   }
-}
-
-class DeviceBindingPage extends StatelessWidget {
-  const DeviceBindingPage({super.key});
-  @override
-  Widget build(BuildContext context) => RoleGuard(
-        allowedRoles: const {UserRole.tenant},
-        child: PageFrame(
-          title: 'Device binding',
-          subtitle: 'One tenant account, one trusted device',
-          child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: Column(children: [
-                CarmelitaCard(
-                    child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.phonelink_lock_outlined),
-                      title: Text('Cryptographic Device Trust'),
-                      subtitle: Text(
-                          'Hardware-backed cryptographic token binding ties your tenant account to a single physical device to prevent proxy attendance.'),
-                    ),
-                    const Divider(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline,
-                              color: Colors.blue.shade800, size: 20),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Planned for Capstone 2. Geofence presence verification is currently active using on-device GPS boundary evaluation.',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.blue.shade900,
-                                  height: 1.3),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                )),
-              ])),
-        ),
-      );
 }
 
 class DormitoryInfoPage extends StatelessWidget {

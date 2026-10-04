@@ -5,6 +5,14 @@
 > to prevent contradictory readiness claims. Repository implementation is not
 > equivalent to deployed-backend or physical-device proof.
 
+## October 4, 2026 device-linking UI update
+
+- Hidden the deferred trusted-device linking UI: removed its Settings tile,
+  planned-feature badge, and unused device-binding page across shared mobile
+  and web screens. Trusted-device binding remains unimplemented and deferred;
+  push-device registration continues to serve notification delivery.
+- Updated the existing UI closure regression to expect no device-binding UI.
+
 ## September 30, 2026 current-build update
 
 Source baseline: `3d8a2f9` (`Geofencing fix - automatic in and out`).

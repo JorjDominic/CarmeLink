@@ -20,25 +20,14 @@ void main() {
           isTrue);
     });
 
-    test('device binding is clearly planned and cannot trigger a fake flow',
-        () {
+    test('device binding UI is hidden while the feature is deferred', () {
       final source =
           File('lib/views/shared/shared_views.dart').readAsStringSync();
-      final settingsStart = source.indexOf('class SettingsPage');
-      final devicePageStart = source.indexOf('class DeviceBindingPage');
-
-      expect(settingsStart, greaterThanOrEqualTo(0));
-      expect(devicePageStart, greaterThan(settingsStart));
-
-      final settings = source.substring(settingsStart, devicePageStart);
-      expect(
-        settings.contains(
-          'Trusted-device registration is planned for Capstone 2.',
-        ),
-        isTrue,
-      );
-      expect(settings.contains('enabled: false'), isTrue);
-      expect(settings.contains('const DeviceBindingPage()'), isFalse);
+      expect(source.contains('class SettingsPage'), isTrue);
+      expect(source.contains('DeviceBindingPage'), isFalse);
+      expect(source.contains('Device binding'), isFalse);
+      expect(source.contains('Trusted-device registration'), isFalse);
+      expect(source.contains('Cryptographic Device Trust'), isFalse);
     });
 
     test(
