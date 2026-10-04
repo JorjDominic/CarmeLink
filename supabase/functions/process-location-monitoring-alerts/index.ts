@@ -22,8 +22,8 @@ Deno.serve(async (request) => {
 
     const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString()
     const { data: incidents, error } = await admin.from('location_monitoring_incidents')
-      .select('id, tenant_id, reason, started_at').is('recovered_at', null)
-      .is('escalated_at', null).lte('started_at', cutoff)
+      .select('id, tenant_id, reason, started_at, guardian_notified_at, escalated_at').is('recovered_at', null)
+      .or(`guardian_notified_at.is.null,and(escalated_at.is.null,started_at.lte.${cutoff})`)
     if (error) throw error
     let created = 0, delivered = 0
     let authorization: Awaited<ReturnType<typeof fcmAccessToken>> | null = null
@@ -31,21 +31,32 @@ Deno.serve(async (request) => {
       const { data: profile } = await admin.from('profiles').select('full_name')
         .eq('id', incident.tenant_id).maybeSingle()
       const tenantName = profile?.full_name?.trim() || 'A tenant'
+      const escalating = !incident.escalated_at && incident.started_at <= cutoff
+      const notifyingGuardians = !incident.guardian_notified_at
       const recipients = new Set<string>()
-      const { data: staff } = await admin.from('profiles').select('id').in('role', ['owner', 'caretaker'])
-      staff?.forEach((p) => recipients.add(p.id))
-      const { data: links } = await admin.from('guardian_tenant_links').select('guardian_id')
+      if (escalating) {
+        const { data: staff, error: staffError } = await admin.from('profiles').select('id').in('role', ['owner', 'caretaker'])
+        if (staffError) throw staffError
+        staff?.forEach((p) => recipients.add(p.id))
+      }
+      const { data: links, error: linksError } = await admin.from('guardian_tenant_links').select('guardian_id')
         .eq('tenant_id', incident.tenant_id)
+      if (linksError) throw linksError
       links?.forEach((l) => recipients.add(l.guardian_id))
-      const title = `Location monitoring unavailable: ${tenantName}`
-      const body = `${tenantName}'s dormitory boundary monitoring has been unavailable for at least 30 minutes.`
+      const title = escalating
+        ? `Location monitoring unavailable: ${tenantName}`
+        : `Location monitoring is off: ${tenantName}`
+      const body = escalating
+        ? `${tenantName}'s dormitory boundary monitoring has been unavailable for at least 30 minutes.`
+        : `${tenantName}'s location monitoring is off. Entry and exit alerts are unavailable until location services and permissions are restored.`
       for (const recipientId of recipients) {
         const { data: notification, error: insertError } = await admin.from('app_notifications').insert({
           recipient_id: recipientId, notification_type: 'gate', title, body,
           route_type: 'location_monitoring_incident', route_id: incident.id,
           data: { tenant_id: incident.tenant_id, reason: incident.reason },
         }).select('id').single()
-        if (insertError || !notification) continue
+        if (insertError) throw insertError
+        if (!notification) throw new Error('Notification was not created')
         created++
         const { data: devices } = await admin.from('push_device_tokens').select('fcm_token')
           .eq('user_id', recipientId).is('revoked_at', null)
@@ -59,8 +70,13 @@ Deno.serve(async (request) => {
           if (response.ok) delivered++
         }
       }
-      await admin.from('location_monitoring_incidents').update({ escalated_at: new Date().toISOString() })
+      const notifiedAt = new Date().toISOString()
+      const { error: updateError } = await admin.from('location_monitoring_incidents').update({
+        ...(notifyingGuardians ? { guardian_notified_at: notifiedAt } : {}),
+        ...(escalating ? { escalated_at: notifiedAt } : {}),
+      })
         .eq('id', incident.id).is('recovered_at', null)
+      if (updateError) throw updateError
     }
     return json({ created, delivered })
   } catch (error) {
