@@ -15,6 +15,7 @@ import 'contract_onboarding_checklist_page.dart';
 import 'onboarding_invitation_page.dart';
 import 'tenant_onboarding_flow.dart';
 import 'rent_adjustment_dialog.dart';
+import '../shared/security_deposit_card.dart';
 
 Future<bool?> showContractEditor(
   BuildContext context, {
@@ -307,6 +308,25 @@ class _ContractCard extends StatelessWidget {
                 tooltip: 'Adjust future rent',
                 onPressed: onAdjustRent,
                 icon: const Icon(Icons.price_change_outlined)),
+          IconButton(
+              tooltip: 'Security deposit receipt',
+              onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Security deposit receipt'),
+                      content: SizedBox(
+                          width: 480,
+                          child: SingleChildScrollView(
+                              child: SecurityDepositCard(
+                                  contractId: contract.id))),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Close'))
+                      ],
+                    ),
+                  ),
+              icon: const Icon(Icons.savings_outlined)),
           TextButton.icon(
               onPressed: onDocuments,
               icon: const Icon(Icons.description_outlined),

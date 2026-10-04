@@ -188,7 +188,7 @@ class Payment {
     return due.isBefore(today);
   }
 
-  bool get canSubmitProof => isDue || isRejected;
+  bool get canSubmitProof => !isDeposit && (isDue || isRejected);
 
   String get formattedAmount => '₱${amount.toStringAsFixed(2)}';
 

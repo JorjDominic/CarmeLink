@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../shared/security_deposit_card.dart';
 import '../../controllers/guardian_controller.dart';
 import '../../controllers/messaging_controller.dart';
 import '../../controllers/session_controller.dart';
@@ -245,7 +246,7 @@ class _GuardianDashboardPageState extends State<GuardianDashboardPage> {
                                 ? 'No linked resident'
                                 : controller.payments.isEmpty
                                     ? 'No pending charges'
-                                    : '${controller.payments.where((p) => !p.isVerified).length} unverified/due',
+                                    : '${controller.payments.where((p) => !p.isDeposit && !(p.isRent && !p.isDueNow && p.outstandingAmount > 0) && !p.isVerified && !p.isVoided).length} unverified/due',
                     icon: Icons.payments_outlined,
                     color: const Color(0xFFAA8A45),
                     onTap: () => Navigator.of(context).push(
@@ -2135,13 +2136,21 @@ class GuardianPaymentStatusPage extends StatelessWidget {
             MetricCard(
               label: 'Outstanding total',
               value: money(controller.outstandingTotal),
-              detail: controller.payments.isEmpty
+              detail: controller.payments
+                      .where((p) =>
+                          !p.isDeposit &&
+                          !(p.isRent && !p.isDueNow && p.outstandingAmount > 0))
+                      .isEmpty
                   ? 'No pending dues'
                   : 'Unverified and unpaid records',
               icon: Icons.account_balance_wallet_outlined,
             ),
             const SizedBox(height: 16),
-            if (controller.payments.isEmpty)
+            if (controller.payments
+                .where((p) =>
+                    !p.isDeposit &&
+                    !(p.isRent && !p.isDueNow && p.outstandingAmount > 0))
+                .isEmpty)
               CarmelitaCard(
                 child: ListTile(
                   leading: const Icon(Icons.receipt_long_outlined,
@@ -2161,6 +2170,9 @@ class GuardianPaymentStatusPage extends StatelessWidget {
               CarmelitaCard(
                 child: Column(
                   children: controller.payments
+                      .where((p) =>
+                          !p.isDeposit &&
+                          !(p.isRent && !p.isDueNow && p.outstandingAmount > 0))
                       .map(
                         (payment) => TimelineTile(
                           icon: Icons.receipt_long_outlined,
@@ -2173,6 +2185,13 @@ class GuardianPaymentStatusPage extends StatelessWidget {
                       .toList(),
                 ),
               ),
+            if (controller.hasLinkedTenant) ...[
+              const SizedBox(height: 16),
+              SecurityDepositCard(
+                key: ValueKey(controller.selectedTenant!.tenantId),
+                tenantId: controller.selectedTenant!.tenantId,
+              ),
+            ],
           ],
         ),
       ),
@@ -2886,8 +2905,7 @@ class _CurfewRequestBreakdownSection extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color:
-            theme.colorScheme.surfaceContainerHighest.withValues(alpha: .28),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .28),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withValues(alpha: .4),

@@ -5,6 +5,29 @@
 > to prevent contradictory readiness claims. Repository implementation is not
 > equivalent to deployed-backend or physical-device proof.
 
+## October 4, 2026 Payments and security-deposit update
+
+- Payments defaults to current bills, prioritizes older unpaid balances, keeps
+  verified history behind filters, and collapses future rent into a read-only
+  schedule. Payment actions exclude deposits and future rent. Dashboard amount
+  due uses the current outstanding balance; future rent is labeled scheduled.
+- Tenant and guardian deposits use a separate receipt summary. Owners record
+  or correct the received total with a date, method, reference, and audit note
+  from Contracts; move-out uses the same confirmed amount automatically.
+- Added migration `202610040002_separate_security_deposit_receipts.sql` for
+  protected receipt/audit records, legacy receipt reconciliation, rent-only
+  contract billing, deposit-payment restrictions, and move-out/refund sync.
+  Existing paid/part-paid/pending history is preserved; unpaid contract deposit
+  charges are voided with a documented audit action. Unassigned verified
+  receipts require explicit owner linking without rewriting ledger facts.
+- Validation: full Flutter suite passed (557 tests), plus a later 62-test
+  Payments/dashboard/responsive check; changed-source analysis passed. Local
+  PostgreSQL smoke checks passed for migration, permissions, legacy preservation,
+  receipt correction, auto-fill, deductions, refund sync, and finalized locks.
+- Deployment: this source update and its database migration are not yet
+  deployed. Apply the migration before releasing the updated mobile/web UI;
+  physical/live workflow verification remains required.
+
 ## October 4, 2026 device-linking UI update
 
 - Hidden the deferred trusted-device linking UI: removed its Settings tile,

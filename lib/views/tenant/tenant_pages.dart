@@ -26,6 +26,7 @@ import '../widgets/feature_widgets.dart';
 import 'onboarding_form_page.dart';
 import 'tenant_requirements_page.dart';
 import '../shared/signature_pad_dialog.dart';
+import '../shared/security_deposit_card.dart';
 
 class TenantDashboardPage extends StatelessWidget {
   const TenantDashboardPage({super.key});
@@ -51,10 +52,9 @@ class TenantDashboardPage extends StatelessWidget {
           final firstName =
               session.currentUser?.name.trim().split(' ').first ?? 'Resident';
 
-          final nonDepositPayments =
-              controller.payments.where((p) => !p.isDeposit).toList();
-          final nextDue = controller.nextDuePayment ??
-              (nonDepositPayments.isNotEmpty ? nonDepositPayments.first : null);
+          final nextDue = controller.nextDuePayment;
+          final scheduledRent =
+              nextDue != null && nextDue.isRent && !nextDue.isDueNow;
           final outstanding = controller.outstandingBalance;
           final maintenance = controller.maintenance.isEmpty
               ? null
@@ -171,13 +171,11 @@ class TenantDashboardPage extends StatelessWidget {
                   ),
                   MutedDashboardItem(
                     label: 'Amount due',
-                    value: nextDue != null
-                        ? money(nextDue.amount)
-                        : controller.paymentsLoadedOnce
-                            ? money(0)
-                            : '—',
+                    value: controller.paymentsLoadedOnce
+                        ? money(outstanding)
+                        : '—',
                     detail: nextDue != null
-                        ? '${nextDue.label} • Due ${shortDate(nextDue.dueDate)}'
+                        ? '${scheduledRent ? 'Next scheduled' : 'Next due'}: ${shortDate(nextDue.dueDate)}'
                         : (outstanding > 0
                             ? '₱${outstanding.toStringAsFixed(2)} balance'
                             : controller.paymentsLoading
@@ -224,10 +222,16 @@ class TenantDashboardPage extends StatelessWidget {
                   icon: Icons.payments_outlined,
                   title: nextDue.isOverdue
                       ? '${nextDue.label} is overdue'
-                      : '${nextDue.label} is due soon',
+                      : scheduledRent
+                          ? '${nextDue.label} is scheduled'
+                          : '${nextDue.label} is due soon',
                   subtitle:
-                      '${money(nextDue.amount)} • Due ${shortDate(nextDue.dueDate)}',
-                  status: nextDue.isOverdue ? 'Overdue' : nextDue.status,
+                      '${money(nextDue.outstandingAmount)} • ${scheduledRent ? 'Scheduled' : 'Due'} ${shortDate(nextDue.dueDate)}',
+                  status: nextDue.isOverdue
+                      ? 'Overdue'
+                      : scheduledRent
+                          ? 'Not due yet'
+                          : nextDue.status,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const PaymentsPage(),
@@ -237,9 +241,13 @@ class TenantDashboardPage extends StatelessWidget {
               else if (controller.paymentsLoadedOnce)
                 AttentionCard(
                   icon: Icons.payments_outlined,
-                  title: 'All bills are up to date',
-                  subtitle: 'No outstanding dormitory charges at this time.',
-                  status: 'Clear',
+                  title: outstanding > 0
+                      ? 'Review current bills'
+                      : 'All bills are up to date',
+                  subtitle: outstanding > 0
+                      ? 'View remaining balances and payment verification status.'
+                      : 'No outstanding dormitory charges at this time.',
+                  status: outstanding > 0 ? 'Review' : 'Clear',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const PaymentsPage(),
@@ -1344,7 +1352,7 @@ class PaymentsPage extends StatefulWidget {
 
 class _PaymentsPageState extends State<PaymentsPage> {
   late final TableRefreshSubscription _subscription;
-  String _selectedFilter = 'all';
+  String _selectedFilter = 'current';
   RecordListSort _paymentSort = RecordListSort.newest;
 
   @override
@@ -1392,28 +1400,51 @@ class _PaymentsPageState extends State<PaymentsPage> {
               c.paymentsLoading ? null : () => c.loadPayments(force: true),
         ),
       ],
-      floatingActionButton: FloatingActionButton.extended(
-        tooltip: 'Upload payment proof',
-        backgroundColor: const Color(0xFF627FA8),
-        foregroundColor: Colors.white,
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const UploadPaymentProofPage()),
-        ),
-        icon: const Icon(Icons.upload_file_outlined),
-        label: const Text('Pay now'),
+      floatingActionButton: AnimatedBuilder(
+        animation: c,
+        builder: (context, _) => c.payments
+                .any((p) => p.canSubmitProof && !(p.isRent && !p.isDueNow))
+            ? FloatingActionButton.extended(
+                tooltip: 'Upload payment proof',
+                backgroundColor: const Color(0xFF627FA8),
+                foregroundColor: Colors.white,
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const UploadPaymentProofPage())),
+                icon: const Icon(Icons.upload_file_outlined),
+                label: const Text('Pay now'),
+              )
+            : const SizedBox.shrink(),
       ),
       child: AnimatedBuilder(
         animation: c,
         builder: (context, _) {
           final nextDue = c.nextDuePayment;
-          final allPayments = c.payments;
-          final duePayments = c.duePayments;
-          final pendingPayments = c.pendingPayments;
-          final verifiedPayments = c.verifiedPayments;
+          final futurePayments = c.payments
+              .where((p) =>
+                  p.isRent &&
+                  !p.isDueNow &&
+                  !p.isVoided &&
+                  p.outstandingAmount > 0)
+              .toList()
+            ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+          final allPayments = c.payments
+              .where((p) => !p.isDeposit && !futurePayments.contains(p))
+              .toList();
+          final currentPayments = allPayments
+              .where((p) =>
+                  !p.isVoided && !p.isVerified && p.outstandingAmount > 0)
+              .toList();
+          final duePayments =
+              c.duePayments.where(allPayments.contains).toList();
+          final pendingPayments =
+              c.pendingPayments.where(allPayments.contains).toList();
+          final verifiedPayments =
+              c.verifiedPayments.where(allPayments.contains).toList();
           final overdueCount = c.overduePayments.length;
 
           final displayedPayments = List<Payment>.from(
             switch (_selectedFilter) {
+              'current' => currentPayments,
               'due' => duePayments,
               'pending' => pendingPayments,
               'verified' => verifiedPayments,
@@ -1423,7 +1454,13 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 RecordListSort.oldest => a.dueDate.compareTo(b.dueDate),
                 RecordListSort.status => a.status.compareTo(b.status),
                 RecordListSort.title => a.label.compareTo(b.label),
-                _ => b.dueDate.compareTo(a.dueDate),
+                _ => a.outstandingAmount > 0 && b.outstandingAmount <= 0
+                    ? -1
+                    : b.outstandingAmount > 0 && a.outstandingAmount <= 0
+                        ? 1
+                        : a.outstandingAmount > 0
+                            ? a.dueDate.compareTo(b.dueDate)
+                            : b.dueDate.compareTo(a.dueDate),
               });
 
           return Column(
@@ -1493,7 +1530,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
                           ),
                           StatusPill(overdueCount > 0
                               ? '$overdueCount overdue'
-                              : 'Up to date'),
+                              : c.outstandingBalance > 0
+                                  ? 'Payment due'
+                                  : 'Up to date'),
                           const SizedBox(width: 4),
                           const Icon(Icons.chevron_right_rounded, size: 20),
                         ]),
@@ -1527,6 +1566,13 @@ class _PaymentsPageState extends State<PaymentsPage> {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
+                          FilterChip(
+                            selected: _selectedFilter == 'current',
+                            label: Text('Current (${currentPayments.length})'),
+                            onSelected: (_) =>
+                                setState(() => _selectedFilter = 'current'),
+                          ),
+                          const SizedBox(width: 8),
                           FilterChip(
                             selected: _selectedFilter == 'all',
                             label: Text('All (${allPayments.length})'),
@@ -1568,7 +1614,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                     itemBuilder: (_) => const [
                       PopupMenuItem(
                           value: RecordListSort.newest,
-                          child: Text('Newest first')),
+                          child: Text('Current bills first')),
                       PopupMenuItem(
                           value: RecordListSort.oldest,
                           child: Text('Oldest first')),
@@ -1587,7 +1633,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
               ),
               const SizedBox(height: 12),
               SectionTitle(
-                'Payment records',
+                _selectedFilter == 'current'
+                    ? 'Current bills'
+                    : 'Payment history and records',
                 trailing: c.paymentsLoading
                     ? const SizedBox(
                         width: 16,
@@ -1600,10 +1648,14 @@ class _PaymentsPageState extends State<PaymentsPage> {
               if (displayedPayments.isEmpty)
                 EmptyState(
                   icon: Icons.receipt_long_outlined,
-                  title: 'No payment records',
+                  title: _selectedFilter == 'current'
+                      ? 'Nothing due now'
+                      : 'No payment records',
                   message: _selectedFilter == 'all'
                       ? 'Invoices and billing statements will appear here.'
-                      : 'No $_selectedFilter payments found.',
+                      : _selectedFilter == 'current'
+                          ? 'View verified payments in history or expand the future rent schedule.'
+                          : 'No $_selectedFilter payments found.',
                 )
               else
                 PagedRecordList(
@@ -1617,6 +1669,12 @@ class _PaymentsPageState extends State<PaymentsPage> {
                       .map((p) => _TenantPaymentCard(payment: p))
                       .toList(),
                 ),
+              const SizedBox(height: 16),
+              const SecurityDepositCard(),
+              if (futurePayments.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _FutureRentSchedule(payments: futurePayments),
+              ],
             ],
           );
         },
@@ -1655,11 +1713,12 @@ class TenantBillingDetailsPage extends StatelessWidget {
           final dueNowBills = openBills
               .where((p) => !p.isDeposit && !(p.isRent && !p.isDueNow))
               .toList();
-          final depositBills = openBills.where((p) => p.isDeposit).toList();
+
           final futureRentBills =
               openBills.where((p) => p.isRent && !p.isDueNow).toList();
           final completedBills = payments
-              .where((p) => p.isVoided || p.outstandingAmount <= 0)
+              .where((p) =>
+                  !p.isDeposit && (p.isVoided || p.outstandingAmount <= 0))
               .toList();
           final rent = dueNowBills
               .where((p) => p.isRent)
@@ -1700,18 +1759,8 @@ class TenantBillingDetailsPage extends StatelessWidget {
                       _BillingBreakdownRow(
                           label: 'Other approved charges', amount: other),
                     const Divider(height: 24),
-                    _BillingBreakdownRow(
-                      label: 'Refundable security deposit',
-                      amount: depositBills.fold<double>(
-                          0, (sum, p) => sum + p.outstandingAmount),
-                    ),
-                    _BillingBreakdownRow(
-                      label: 'Future scheduled rent',
-                      amount: futureRentBills.fold<double>(
-                          0, (sum, p) => sum + p.outstandingAmount),
-                    ),
                     Text(
-                      'Deposit and future rent are shown separately and are not included in Total outstanding.',
+                      'Future rent and the security deposit are separate from the amount due now.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 8),
@@ -1739,34 +1788,11 @@ class TenantBillingDetailsPage extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _TenantPaymentCard(payment: payment),
                     )),
-              if (depositBills.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                SectionTitle('Security deposit (${depositBills.length})'),
-                const SizedBox(height: 6),
-                Text(
-                  'Held separately and refundable after the lease, subject to documented deductions.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 10),
-                ...depositBills.map((payment) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _TenantPaymentCard(payment: payment),
-                    )),
-              ],
+              const SizedBox(height: 12),
+              const SecurityDepositCard(),
               if (futureRentBills.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                SectionTitle(
-                    'Future scheduled rent (${futureRentBills.length})'),
-                const SizedBox(height: 6),
-                Text(
-                  'Scheduled contract installments. These are not included in the amount due now.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 10),
-                ...futureRentBills.map((payment) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _TenantPaymentCard(payment: payment),
-                    )),
+                _FutureRentSchedule(payments: futureRentBills),
               ],
               const SizedBox(height: 12),
               SectionTitle('Completed and voided (${completedBills.length})'),
@@ -1849,6 +1875,33 @@ class _CompactPaymentSummaryRow extends StatelessWidget {
       ],
     );
   }
+}
+
+class _FutureRentSchedule extends StatelessWidget {
+  const _FutureRentSchedule({required this.payments});
+  final List<Payment> payments;
+
+  @override
+  Widget build(BuildContext context) => CarmelitaCard(
+        child: Material(
+          type: MaterialType.transparency,
+          child: ExpansionTile(
+            key: const Key('future-rent-schedule'),
+            tilePadding: EdgeInsets.zero,
+            title: const Text('Future rent schedule'),
+            subtitle: const Text('Not due yet · View scheduled installments'),
+            children: payments
+                .map((payment) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(payment.label),
+                      subtitle: Text(
+                          'Scheduled ${shortDate(payment.dueDate)} · Not due yet'),
+                      trailing: Text(money(payment.outstandingAmount)),
+                    ))
+                .toList(),
+          ),
+        ),
+      );
 }
 
 class _TenantPaymentCard extends StatelessWidget {
@@ -2506,7 +2559,7 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
   @override
   Widget build(BuildContext context) {
     final unpaidBills = TenantController.instance.payments
-        .where((p) => p.isDue || p.isRejected)
+        .where((p) => p.canSubmitProof && !(p.isRent && !p.isDueNow))
         .toList();
 
     return PageFrame(

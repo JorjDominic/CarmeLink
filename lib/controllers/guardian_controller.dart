@@ -72,8 +72,10 @@ class GuardianController extends ChangeNotifier {
   bool get loadedOnce => _loadedOnce;
 
   double get outstandingTotal => _payments
-      .where(
-          (payment) => payment.isDue || payment.isPending || payment.isRejected)
+      .where((payment) =>
+          !payment.isDeposit &&
+          !(payment.isRent && !payment.isDueNow) &&
+          (payment.isDue || payment.isPending || payment.isRejected))
       .fold<double>(0, (sum, payment) => sum + payment.outstandingAmount);
 
   List<GateEvent> get gateEvents => List.unmodifiable(_gateEvents);

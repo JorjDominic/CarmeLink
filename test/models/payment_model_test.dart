@@ -341,6 +341,8 @@ void main() {
       );
 
       expect(depositPayment.isDeposit, isTrue);
+      expect(depositPayment.canSubmitProof, isFalse,
+          reason: 'Deposits are receipt records, not tenant-payable bills');
       expect(depositPayment.isOverdue, isFalse,
           reason: 'Security deposits should never be marked as overdue debt');
 

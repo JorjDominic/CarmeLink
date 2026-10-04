@@ -14,6 +14,7 @@ import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/move_out_settlement_service.dart';
 import '../../services/table_refresh_subscription.dart';
+import 'security_deposit_card.dart';
 
 class MoveOutSettlementPage extends StatefulWidget {
   const MoveOutSettlementPage({super.key});
@@ -459,17 +460,22 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
   }
 
   Future<void> _setDeposit(MoveOutSettlementRecord settlement) async {
-    final value = await _moneyDialog(
-      context,
-      title: 'Deposit received',
-      label: 'Confirmed amount received',
-      initial: settlement.depositReceivedAmount,
-    );
-    if (value == null) return;
-    await _run(() => widget.service.setDepositReceived(
-          caseId: widget.record.id,
-          amount: value,
-        ));
+    await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+              title: const Text('Security deposit receipt'),
+              content: SizedBox(
+                  width: 480,
+                  child: SingleChildScrollView(
+                      child: SecurityDepositCard(
+                          contractId: widget.record.contractId))),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'))
+              ],
+            ));
+    if (mounted) _reload();
   }
 
   Future<void> _addDeduction() async {
@@ -870,12 +876,12 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
           SectionTitle(
             'Deposit settlement',
             subtitle:
-                'Deposit remains separate from ordinary tenant-payable charges.',
+                'Confirmed receipts carry over automatically. Deposit remains separate from bills.',
             trailing: widget.isOwner && !settlementFinal
                 ? TextButton.icon(
                     onPressed: () => _setDeposit(s),
                     icon: const Icon(Icons.edit_outlined, size: 17),
-                    label: const Text('Deposit received'),
+                    label: const Text('Review receipt'),
                   )
                 : null,
           ),
@@ -1602,40 +1608,6 @@ Future<String?> _textDialog(BuildContext context,
                       Navigator.pop(dialogContext, value);
                     },
                     child: const Text('Continue'))
-              ]));
-  controller.dispose();
-  return result;
-}
-
-Future<double?> _moneyDialog(BuildContext context,
-    {required String title,
-    required String label,
-    required double initial}) async {
-  final controller = TextEditingController(text: initial.toStringAsFixed(2));
-  final result = await showDialog<double>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-              title: Text(title),
-              content: TextField(
-                  controller: controller,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration:
-                      InputDecoration(labelText: label, prefixText: '₱ ')),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    child: const Text('Cancel')),
-                FilledButton(
-                    onPressed: () {
-                      final value = double.tryParse(controller.text.trim());
-                      if (value == null || value < 0) {
-                        showAppSnackBar(dialogContext, 'Enter a valid amount.');
-                        return;
-                      }
-                      Navigator.pop(dialogContext, value);
-                    },
-                    child: const Text('Save'))
               ]));
   controller.dispose();
   return result;

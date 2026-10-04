@@ -50,6 +50,63 @@ void main() {
   ];
 
   group('PaymentsPage Widget Test', () {
+    testWidgets('future rent stays collapsed and deposits are not bills',
+        (tester) async {
+      TenantController.instance.setPaymentsForTesting([
+        testPayments.first,
+        Payment(
+            id: 'future',
+            label: 'Far future rent',
+            amount: 3500,
+            dueDate: DateTime.now().add(const Duration(days: 65)),
+            status: 'Upcoming',
+            category: 'rent'),
+        Payment(
+            id: 'deposit',
+            label: 'Legacy deposit bill',
+            amount: 5000,
+            dueDate: DateTime.now().subtract(const Duration(days: 1)),
+            status: 'Due',
+            category: 'deposit'),
+      ]);
+      await tester.pumpWidget(buildTestable(const PaymentsPage()));
+      await tester.pumpAndSettle();
+      expect(find.text('All (1)'), findsOneWidget);
+      expect(find.text('September Dorm Rent'), findsOneWidget);
+      expect(find.text('Legacy deposit bill'), findsNothing);
+      expect(find.text('Far future rent'), findsNothing);
+      final schedule = find.byKey(const Key('future-rent-schedule'));
+      await tester.ensureVisible(schedule);
+      await tester.tap(find.text('Future rent schedule'));
+      await tester.pumpAndSettle();
+      expect(find.text('Far future rent'), findsOneWidget);
+    });
+
+    testWidgets('future rent and a deposit alone do not prompt payment',
+        (tester) async {
+      TenantController.instance.setPaymentsForTesting([
+        Payment(
+            id: 'future',
+            label: 'Next installment',
+            amount: 3500,
+            dueDate: DateTime.now().add(const Duration(days: 35)),
+            status: 'Due',
+            category: 'rent'),
+        Payment(
+            id: 'deposit',
+            label: 'Deposit',
+            amount: 5000,
+            dueDate: DateTime.now(),
+            status: 'Due',
+            category: 'deposit'),
+      ]);
+      await tester.pumpWidget(buildTestable(const PaymentsPage()));
+      await tester.pumpAndSettle();
+      expect(find.text('Pay now'), findsNothing);
+      expect(find.text('Submit proof'), findsNothing);
+      expect(TenantController.instance.outstandingBalance, 0);
+    });
+
     testWidgets('renders account summary, filters, and payment cards',
         (tester) async {
       TenantController.instance.setPaymentsForTesting(testPayments);
@@ -74,7 +131,7 @@ void main() {
       // Payment titles
       expect(find.text('September Dorm Rent'), findsOneWidget);
       expect(find.text('Electricity Fee'), findsOneWidget);
-      expect(find.text('August Water Bill'), findsOneWidget);
+      expect(find.text('August Water Bill'), findsNothing);
 
       // Overdue badge on September rent
       expect(find.textContaining('Overdue • Due'), findsOneWidget);
@@ -87,10 +144,10 @@ void main() {
       await tester.pumpWidget(buildTestable(const PaymentsPage()));
       await tester.pump();
 
-      // Initially all 3 are displayed
+      // Current bills are shown first; verified history is separate.
       expect(find.text('September Dorm Rent'), findsOneWidget);
       expect(find.text('Electricity Fee'), findsOneWidget);
-      expect(find.text('August Water Bill'), findsOneWidget);
+      expect(find.text('August Water Bill'), findsNothing);
 
       // Tap 'Due' chip
       await tester.tap(find.text('Due (1)'));
@@ -109,6 +166,7 @@ void main() {
       expect(find.text('August Water Bill'), findsNothing);
 
       // Tap 'Verified' chip
+      await tester.ensureVisible(find.text('Verified (1)'));
       await tester.tap(find.text('Verified (1)'));
       await tester.pumpAndSettle();
 
@@ -137,7 +195,8 @@ void main() {
 
       expect(find.text('Showing 10 of 12 records'), findsOneWidget);
       expect(find.textContaining('Load more (2 remaining)'), findsOneWidget);
-      expect(find.text('Payment 1'), findsNothing);
+      expect(find.text('Payment 1'), findsOneWidget);
+      expect(find.text('Payment 12'), findsNothing);
 
       final loadMore = find.textContaining('Load more (2 remaining)');
       await tester.ensureVisible(loadMore);
@@ -218,6 +277,9 @@ void main() {
       await tester.pump();
 
       final viewReceiptBtn = find.text('View receipt');
+      await tester.ensureVisible(find.text('Verified (1)'));
+      await tester.tap(find.text('Verified (1)'));
+      await tester.pumpAndSettle();
       expect(viewReceiptBtn, findsOneWidget);
 
       await tester.ensureVisible(viewReceiptBtn);
