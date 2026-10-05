@@ -26,6 +26,11 @@ object LocationMonitoringHealth {
         val prefs = context.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE)
         if (!prefs.getBoolean("registered", false)) return
         check(context)
+        try {
+            ContextCompat.startForegroundService(context, Intent(context, LocationHealthService::class.java))
+        } catch (_: RuntimeException) {
+            // Background starts can be restricted. Periodic work remains the fallback.
+        }
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             CHECK_WORK, ExistingPeriodicWorkPolicy.KEEP,
             PeriodicWorkRequestBuilder<LocationMonitoringHealthCheckWorker>(15, TimeUnit.MINUTES).build(),
@@ -33,6 +38,7 @@ object LocationMonitoringHealth {
     }
 
     fun stop(context: Context) {
+        context.stopService(Intent(context, LocationHealthService::class.java))
         WorkManager.getInstance(context).cancelUniqueWork(CHECK_WORK)
         WorkManager.getInstance(context).cancelUniqueWork(REPORT_WORK)
         context.getSystemService(NotificationManager::class.java).cancel(NOTICE_ID)
@@ -97,12 +103,29 @@ object LocationMonitoringHealth {
         val reportPending = !prefs.contains("monitoring_health_reported_available") ||
             prefs.getBoolean("monitoring_health_reported_available", true) != available ||
             prefs.getString("monitoring_health_reported_reason", null) != reason
-        if (changed || reportPending) WorkManager.getInstance(context).enqueueUniqueWork(
-            REPORT_WORK, ExistingWorkPolicy.APPEND_OR_REPLACE,
-            OneTimeWorkRequestBuilder<MonitoringHealthWorker>()
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                .build(),
-        )
+        val alreadyQueued = prefs.contains("monitoring_health_queued_available") &&
+            prefs.getBoolean("monitoring_health_queued_available", true) == available &&
+            prefs.getString("monitoring_health_queued_reason", null) == reason
+        if (changed || (reportPending && !alreadyQueued)) {
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                REPORT_WORK, ExistingWorkPolicy.APPEND_OR_REPLACE,
+                OneTimeWorkRequestBuilder<MonitoringHealthWorker>()
+                    // Preserve OFF then ON reports even if both occur while offline.
+                    .setInputData(Data.Builder()
+                        .putString("tenant_id", prefs.getString("tenant_id", null))
+                        .putBoolean("available", available).putString("reason", reason).build())
+                    .apply {
+                        // Older Android versions require a foreground Worker implementation.
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                        }
+                    }
+                    .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                    .build(),
+            )
+            prefs.edit().putBoolean("monitoring_health_queued_available", available)
+                .putString("monitoring_health_queued_reason", reason).apply()
+        }
     }
 }
 

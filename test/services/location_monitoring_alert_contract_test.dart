@@ -38,7 +38,7 @@ void main() {
     expect(sql, isNot(contains('latitude')));
     expect(sql, isNot(contains('longitude')));
     final processor =
-        File('supabase/functions/process-location-monitoring-alerts/index.ts')
+        File('supabase/functions/process-location-monitoring-alerts/handler.ts')
             .readAsStringSync();
     expect(processor, contains('30 * 60 * 1000'));
     expect(processor, contains(".is('recovered_at', null)"));

@@ -11,11 +11,16 @@ class MonitoringHealthWorker(context: Context, params: WorkerParameters) : Worke
     override fun doWork(): Result {
         val prefs = applicationContext.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE)
         if (!prefs.getBoolean("registered", false)) return Result.success()
+        val tenantId = inputData.getString("tenant_id")
+        if (tenantId != null && tenantId != prefs.getString("tenant_id", null)) return Result.success()
         val url = prefs.getString("supabase_url", null) ?: return Result.failure()
         val key = prefs.getString("publishable_key", null) ?: return Result.failure()
         var token = prefs.getString("access_token", null) ?: return Result.retry()
-        val available = prefs.getBoolean("monitoring_health_available", true)
-        val reason = prefs.getString("monitoring_health_reason", null)
+        val hasSnapshot = inputData.keyValueMap.containsKey("available")
+        val available = if (hasSnapshot) inputData.getBoolean("available", true)
+            else prefs.getBoolean("monitoring_health_available", true)
+        val reason = if (hasSnapshot) inputData.getString("reason")
+            else prefs.getString("monitoring_health_reason", null)
         val body = JSONObject().put("p_available", available).put("p_platform", "android")
         if (!available && reason != null) body.put("p_reason", reason)
         return try {
@@ -30,7 +35,12 @@ class MonitoringHealthWorker(context: Context, params: WorkerParameters) : Worke
                     .putString("monitoring_health_reported_reason", reason).apply()
                 Result.success()
             }
-            else if (code == 401 || code >= 500) Result.retry() else Result.failure()
+            else if (code == 401 || code == 429 || code >= 500) Result.retry() else {
+                // Allow the observer to schedule a fresh report after a terminal rejection.
+                prefs.edit().remove("monitoring_health_queued_available")
+                    .remove("monitoring_health_queued_reason").apply()
+                Result.failure()
+            }
         } catch (_: Exception) { Result.retry() }
     }
 

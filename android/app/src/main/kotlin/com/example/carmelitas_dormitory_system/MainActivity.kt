@@ -14,7 +14,7 @@ class MainActivity : FlutterActivity() {
     override fun onStart() {
         super.onStart()
         isInForeground = true
-        LocationMonitoringHealth.check(applicationContext)
+        LocationMonitoringHealth.start(applicationContext)
     }
 
     override fun onStop() {
