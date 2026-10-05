@@ -34,6 +34,11 @@ class TripwireGeofenceService {
   Future<void> start(String tenantId) async {
     if (kIsWeb) return;
     try {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        // Check native settings before any network/GPS work. Android owns the
+        // reminder and its recovery/cooldown state, including while backgrounded.
+        await _channel.invokeMethod<void>('checkMonitoringHealth').timeout(_platformTimeout);
+      }
       final row = await SupabaseConfig.client
           .from('dorm_boundary_config')
           .select()
@@ -102,6 +107,7 @@ class TripwireGeofenceService {
   }
 
   Future<void> _updateMonitoringReminder(GeofenceCheckResult result) async {
+    if (defaultTargetPlatform == TargetPlatform.android) return;
     const reminderKey = 'tripwire_flutter_last_location_reminder_at';
     final preferences = await SharedPreferences.getInstance();
     if (!result.isUnavailable) {

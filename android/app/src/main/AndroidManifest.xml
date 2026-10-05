@@ -86,6 +86,7 @@
         </service>
         <service
             android:name=".TripwireLocationBurstService"
+            android:stopWithTask="false"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location" />

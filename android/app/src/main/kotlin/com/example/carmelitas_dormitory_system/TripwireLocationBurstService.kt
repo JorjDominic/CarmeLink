@@ -3,7 +3,6 @@ package com.example.carmelitas_dormitory_system
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -19,65 +18,76 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 
 /**
- * Short, bounded high-accuracy session started by an OS geofence callback.
- * It bridges the gap between a circular wake-up region and the exact polygon
- * crossing. It stops after a confirmed transition or after two minutes.
+ * Ongoing location monitor started while the tenant app is visible.
+ * Near the polygon it samples precisely; farther away it reduces power use.
+ * OS callbacks can also start a bounded two-minute verification session.
  */
 class TripwireLocationBurstService : Service() {
     companion object {
+        @Volatile var monitoring = false
+            private set
         private const val CHANNEL_ID = "carmelink_tripwire_monitoring"
         private const val UPDATES_CHANNEL_ID = "carmelink_updates"
         private const val NOTIFICATION_ID = 9108
-        private const val ENTRY_NOTIFICATION_ID = 1001
-        private const val EXIT_NOTIFICATION_ID = 1002
         private const val MAX_DURATION_MILLIS = 120_000L
     }
 
     private val locationClient by lazy { LocationServices.getFusedLocationProviderClient(this) }
     private var running = false
+    private var continuous = false
+    private var precise = true
     private val timeout = Runnable { stopBurst() }
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
             for (location in result.locations) {
-                val direction = TripwireCrossingVerifier.accept(this@TripwireLocationBurstService, location)
+                val direction = TripwireGeofenceManager.verifyAndAppend(this@TripwireLocationBurstService, location)
                 if (direction != null) {
-                    val queued = TripwireGeofenceManager.appendEvent(
-                        this@TripwireLocationBurstService,
-                        direction,
-                        // Use the detection time. Some Android providers and
-                        // emulators expose a stale fix timestamp even though
-                        // this high-accuracy callback has just been delivered.
-                        System.currentTimeMillis(),
-                    )
-                    if (queued && !MainActivity.isInForeground) {
-                        showCrossingNotification(direction)
-                    }
-                    stopBurst()
-                    return
+                    CrossingNotifications.show(this@TripwireLocationBurstService, direction)
+                    if (!continuous) { stopBurst(); return }
                 }
+                if (continuous) updateSampling(TripwireCrossingVerifier.needsPreciseSampling(
+                    this@TripwireLocationBurstService, location))
             }
         }
     }
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
-        startForeground(
-            NOTIFICATION_ID,
-            NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_stat_carmelink)
-                .setContentTitle("CarmeLink gate verification")
-                .setContentText("Confirming a dormitory boundary crossing")
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .build(),
-        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (!running) startBurst()
-        return START_NOT_STICKY
+        val prefs = getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE)
+        if (!prefs.getBoolean("registered", false)) { stopSelf(startId); return START_NOT_STICKY }
+        // Sticky restart recovers ongoing monitoring; geofence callbacks can
+        // also request bounded verification when no monitor has been started.
+        continuous = continuous || intent == null || intent.getBooleanExtra("continuous", false)
+        if (running) {
+            monitoring = continuous
+            if (continuous) android.os.Handler(Looper.getMainLooper()).removeCallbacks(timeout)
+            return if (continuous) START_STICKY else START_NOT_STICKY
+        }
+        createNotificationChannel()
+        try {
+            startForeground(
+                NOTIFICATION_ID,
+                NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_stat_carmelink)
+                    .setContentTitle(if (continuous) "CarmeLink boundary monitoring" else "CarmeLink gate verification")
+                    .setContentText(if (continuous) "Entry and exit detection is active" else "Confirming a dormitory boundary crossing")
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setOngoing(true)
+                    .setOnlyAlertOnce(true)
+                    .build(),
+            )
+        } catch (error: RuntimeException) {
+            prefs.edit().putString("last_verification_error", "${error.javaClass.simpleName}: ${error.message}").apply()
+            GeofenceVerificationWorker.enqueue(applicationContext)
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        startBurst()
+        monitoring = continuous && running
+        return if (continuous) START_STICKY else START_NOT_STICKY
     }
 
     private fun startBurst() {
@@ -91,15 +101,29 @@ class TripwireLocationBurstService : Service() {
             return
         }
 
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5_000L)
-            .setMinUpdateIntervalMillis(3_000L)
-            .setMaxUpdateAgeMillis(5_000L)
-            .setDurationMillis(MAX_DURATION_MILLIS)
-            .build()
+        updateSampling(true)
+        if (!continuous) android.os.Handler(Looper.getMainLooper()).postDelayed(timeout, MAX_DURATION_MILLIS)
+    }
+
+    private fun updateSampling(highAccuracy: Boolean) {
+        if (running && precise == highAccuracy) return
+        val request = LocationRequest.Builder(
+            if (highAccuracy) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+            if (highAccuracy) 5_000L else 30_000L)
+            .setMinUpdateIntervalMillis(if (highAccuracy) 3_000L else 15_000L)
+            .setMinUpdateDistanceMeters(if (highAccuracy) 0f else 10f)
+            .setMaxUpdateAgeMillis(5_000L).build()
         try {
+            if (running) locationClient.removeLocationUpdates(callback)
+            precise = highAccuracy
             running = true
             locationClient.requestLocationUpdates(request, callback, Looper.getMainLooper())
-            android.os.Handler(Looper.getMainLooper()).postDelayed(timeout, MAX_DURATION_MILLIS)
+                .addOnFailureListener { error ->
+                    getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE).edit()
+                        .putString("last_verification_error", "Location updates failed: ${error.message}").apply()
+                    GeofenceVerificationWorker.enqueue(applicationContext)
+                    stopBurst()
+                }
         } catch (_: SecurityException) {
             stopBurst()
         }
@@ -119,6 +143,7 @@ class TripwireLocationBurstService : Service() {
     }
 
     override fun onDestroy() {
+        monitoring = false
         android.os.Handler(Looper.getMainLooper()).removeCallbacks(timeout)
         if (running) locationClient.removeLocationUpdates(callback)
         running = false
@@ -151,33 +176,4 @@ class TripwireLocationBurstService : Service() {
         }
     }
 
-    private fun showCrossingNotification(direction: String) {
-        val isEntry = direction == "IN"
-        val launchIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("route_type", "gate")
-            putExtra("direction", direction)
-        }
-        val contentIntent = PendingIntent.getActivity(
-            this,
-            if (isEntry) ENTRY_NOTIFICATION_ID else EXIT_NOTIFICATION_ID,
-            launchIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification = NotificationCompat.Builder(this, UPDATES_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_carmelink)
-            .setContentTitle(if (isEntry) "Entry detected" else "Exit detected")
-            .setContentText(
-                if (isEntry) "CarmeLink is syncing your entry."
-                else "CarmeLink is syncing your departure.",
-            )
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .setContentIntent(contentIntent)
-            .build()
-        getSystemService(NotificationManager::class.java).notify(
-            if (isEntry) ENTRY_NOTIFICATION_ID else EXIT_NOTIFICATION_ID,
-            notification,
-        )
-    }
 }

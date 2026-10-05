@@ -6,9 +6,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.location.Location
 import androidx.core.content.ContextCompat
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingRequest
@@ -25,44 +27,79 @@ class TripwireGeofenceManager(private val context: Context) {
         const val GATE_REGION_ID = "carmelita_official_gate"
         private const val QUEUE = "pending_events"
         const val QUEUED_DIRECTION = "queued_direction"
+        val EVENT_LOCK = Any()
+
+        fun resumeMonitoring(context: Context) {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("registered", false)) return
+            if (!TripwireLocationBurstService.monitoring && MainActivity.isInForeground) try {
+                ContextCompat.startForegroundService(context, Intent(context, TripwireLocationBurstService::class.java)
+                    .putExtra("continuous", true))
+            } catch (error: RuntimeException) {
+                prefs.edit().putString("last_verification_error", "Monitor restart denied: ${error.javaClass.simpleName}").apply()
+                GeofenceVerificationWorker.enqueue(context)
+            }
+            if (prefs.getString(QUEUE, "[]") != "[]") {
+                WorkManager.getInstance(context).enqueueUniqueWork("carmelink-tripwire-sync", ExistingWorkPolicy.APPEND_OR_REPLACE,
+                    OneTimeWorkRequestBuilder<TripwireSyncWorker>().setConstraints(TripwireSyncWorker.constraints).build())
+            }
+            if (prefs.getString("pending_notifications", "[]") != "[]") CrossingNotificationWorker.schedule(context)
+        }
+
+        fun verifyAndAppend(context: Context, location: Location): String? = synchronized(EVENT_LOCK) {
+            // Multiple native collectors may receive the same cached fix.
+            // Count each fresh observation once, retaining the existing verifier.
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("registered", false) || location.accuracy !in 0f..35f ||
+                kotlin.math.abs(System.currentTimeMillis() - location.time) > 120_000L) return@synchronized null
+            if (location.elapsedRealtimeNanos <= prefs.getLong("last_verified_fix_nanos", -1L)) return@synchronized null
+            prefs.edit().putLong("last_verified_fix_nanos", location.elapsedRealtimeNanos).apply()
+            val direction = TripwireCrossingVerifier.accept(context, location) ?: return@synchronized null
+            prefs.edit().remove("last_verification_error").apply()
+            if (appendEvent(context, direction)) direction else null
+        }
 
         fun appendEvent(context: Context, direction: String, observedAt: Long = System.currentTimeMillis()): Boolean {
-            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val tenantId = prefs.getString("tenant_id", null) ?: return false
-            val previous = prefs.getString(QUEUED_DIRECTION, null)
-                ?: prefs.getString("confirmed_direction", null)
-            if (previous == direction) return false
+            synchronized(EVENT_LOCK) {
+                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                val tenantId = prefs.getString("tenant_id", null) ?: return false
+                val previous = prefs.getString(QUEUED_DIRECTION, null)
+                    ?: prefs.getString("confirmed_direction", null)
+                if (previous == direction) return false
 
-            val queue = try {
-                JSONArray(prefs.getString(QUEUE, "[]"))
-            } catch (_: Exception) {
-                JSONArray()
+                val queue = try {
+                    JSONArray(prefs.getString(QUEUE, "[]"))
+                } catch (_: Exception) {
+                    JSONArray()
+                }
+                val event = JSONObject()
+                    .put("event_id", UUID.randomUUID().toString())
+                    .put("tenant_id", tenantId)
+                    .put("direction", direction)
+                    .put("observed_at", observedAt)
+                    .put("platform", "android")
+                queue.put(event)
+
+                val bounded = JSONArray()
+                val start = maxOf(0, queue.length() - 24)
+                for (index in start until queue.length()) bounded.put(queue.get(index))
+                prefs.edit()
+                    .putString(QUEUE, bounded.toString())
+                    // A detected crossing is only pending until Supabase accepts it.
+                    // Keep it separate from the last server-confirmed direction.
+                    .putString(QUEUED_DIRECTION, direction)
+                    .commit()
+                WorkManager.getInstance(context).enqueueUniqueWork(
+                    "carmelink-tripwire-sync",
+                    ExistingWorkPolicy.APPEND_OR_REPLACE,
+                    OneTimeWorkRequestBuilder<TripwireSyncWorker>()
+                        .apply { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                            setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST) }
+                        .setConstraints(TripwireSyncWorker.constraints)
+                        .build(),
+                )
+                return true
             }
-            val event = JSONObject()
-                .put("event_id", UUID.randomUUID().toString())
-                .put("tenant_id", tenantId)
-                .put("direction", direction)
-                .put("observed_at", observedAt)
-                .put("platform", "android")
-            queue.put(event)
-
-            val bounded = JSONArray()
-            val start = maxOf(0, queue.length() - 24)
-            for (index in start until queue.length()) bounded.put(queue.get(index))
-            prefs.edit()
-                .putString(QUEUE, bounded.toString())
-                // A detected crossing is only pending until Supabase accepts it.
-                // Keep it separate from the last server-confirmed direction.
-                .putString(QUEUED_DIRECTION, direction)
-                .apply()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                "carmelink-tripwire-sync",
-                ExistingWorkPolicy.APPEND_OR_REPLACE,
-                OneTimeWorkRequestBuilder<TripwireSyncWorker>()
-                    .setConstraints(TripwireSyncWorker.constraints)
-                    .build(),
-            )
-            return true
         }
     }
 
@@ -138,11 +175,12 @@ class TripwireGeofenceManager(private val context: Context) {
             editor.remove(QUEUE)
             editor.remove("confirmed_direction")
             editor.remove(QUEUED_DIRECTION)
+            editor.remove("pending_notifications").remove("last_verified_fix_nanos")
         }
         if (initialDirection == "IN" || initialDirection == "OUT") {
             editor.putString("confirmed_direction", initialDirection)
         }
-        editor.remove("candidate_direction").remove("candidate_fix_count")
+        editor.remove("candidate_direction").remove("candidate_fix_count").remove("last_verified_fix_nanos")
         editor.apply()
 
         // Seed the movement segment without creating an event. The next OS
@@ -209,9 +247,10 @@ class TripwireGeofenceManager(private val context: Context) {
                         try {
                             ContextCompat.startForegroundService(
                                 context,
-                                Intent(context, TripwireLocationBurstService::class.java),
+                                Intent(context, TripwireLocationBurstService::class.java).putExtra("continuous", true),
                             )
                         } catch (_: RuntimeException) {
+                            GeofenceVerificationWorker.enqueue(context)
                             // Initial-trigger and later region callbacks remain
                             // available if the OS refuses this recovery burst.
                         }
@@ -258,6 +297,11 @@ class TripwireGeofenceManager(private val context: Context) {
     }
 
     fun unregister(result: MethodChannel.Result) {
+        prefs.edit().putBoolean("registered", false).apply()
+        context.stopService(Intent(context, TripwireLocationBurstService::class.java))
+        WorkManager.getInstance(context).cancelUniqueWork("carmelink-geofence-verification")
+        WorkManager.getInstance(context).cancelUniqueWork("carmelink-tripwire-sync")
+        WorkManager.getInstance(context).cancelUniqueWork("carmelink-crossing-notifications")
         LocationMonitoringHealth.stop(context)
         client.removeGeofences(pendingIntent).addOnCompleteListener {
             prefs.edit().clear().apply()
@@ -286,26 +330,28 @@ class TripwireGeofenceManager(private val context: Context) {
         return events
     }
 
-    fun acknowledge(eventId: String) {
-        val queue = try { JSONArray(prefs.getString(QUEUE, "[]")) } catch (_: Exception) { JSONArray() }
-        val remaining = JSONArray()
-        var acknowledgedDirection: String? = null
-        for (index in 0 until queue.length()) {
-            val item = queue.getJSONObject(index)
-            if (item.optString("event_id") != eventId) {
-                remaining.put(item)
-            } else {
-                acknowledgedDirection = item.optString("direction").takeIf { it == "IN" || it == "OUT" }
+    fun acknowledge(eventId: String, confirm: Boolean = true) {
+        synchronized(EVENT_LOCK) {
+            val queue = try { JSONArray(prefs.getString(QUEUE, "[]")) } catch (_: Exception) { JSONArray() }
+            val remaining = JSONArray()
+            var acknowledgedDirection: String? = null
+            for (index in 0 until queue.length()) {
+                val item = queue.getJSONObject(index)
+                if (item.optString("event_id") != eventId) {
+                    remaining.put(item)
+                } else {
+                    acknowledgedDirection = item.optString("direction").takeIf { it == "IN" || it == "OUT" }
+                }
             }
+            val editor = prefs.edit().putString(QUEUE, remaining.toString())
+            if (confirm) acknowledgedDirection?.let { editor.putString("confirmed_direction", it) }
+            if (remaining.length() == 0) {
+                editor.remove(QUEUED_DIRECTION)
+            } else {
+                editor.putString(QUEUED_DIRECTION, remaining.getJSONObject(remaining.length() - 1).getString("direction"))
+            }
+            editor.commit()
         }
-        val editor = prefs.edit().putString(QUEUE, remaining.toString())
-        acknowledgedDirection?.let { editor.putString("confirmed_direction", it) }
-        if (remaining.length() == 0) {
-            editor.remove(QUEUED_DIRECTION)
-        } else {
-            editor.putString(QUEUED_DIRECTION, remaining.getJSONObject(remaining.length() - 1).getString("direction"))
-        }
-        editor.apply()
     }
 
     fun status(): Map<String, Any?> = mapOf(
@@ -316,6 +362,15 @@ class TripwireGeofenceManager(private val context: Context) {
         "pendingDirection" to prefs.getString(QUEUED_DIRECTION, null),
         "pendingCount" to try { JSONArray(prefs.getString(QUEUE, "[]")).length() } catch (_: Exception) { 0 },
         "lastSyncError" to prefs.getString("last_sync_error", null),
+        "lastVerificationError" to prefs.getString("last_verification_error", null),
+        "backgroundMonitorRunning" to TripwireLocationBurstService.monitoring,
+        "pendingNotificationCount" to try { JSONArray(prefs.getString("pending_notifications", "[]")).length() } catch (_: Exception) { 0 },
+        "lastGeofenceCallbackAt" to prefs.getLong("last_geofence_callback_at", 0L),
+        "lastNotificationError" to prefs.getString("last_notification_error", null),
+        "healthObserverRunning" to LocationHealthService.running,
+        "healthObserverError" to prefs.getString("monitoring_observer_error", null),
+        "healthNotificationError" to prefs.getString("monitoring_health_notification_error", null),
+        "monitoringAvailable" to if (prefs.contains("monitoring_health_available")) prefs.getBoolean("monitoring_health_available", true) else null,
         "lastSyncedAt" to prefs.getLong("last_synced_at", 0L).takeIf { it > 0L },
     )
 }

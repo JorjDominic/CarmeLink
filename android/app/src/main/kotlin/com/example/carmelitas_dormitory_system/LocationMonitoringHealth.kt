@@ -7,10 +7,12 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.work.*
@@ -21,14 +23,44 @@ object LocationMonitoringHealth {
     private const val CHECK_WORK = "carmelink-location-health-check"
     private const val REPORT_WORK = "carmelink-location-health-report"
     private const val NOTICE_ID = 1003
+    private var fallbackReceiver: BroadcastReceiver? = null
+
+    fun observerFailed(context: Context, error: RuntimeException) {
+        val description = "${error.javaClass.simpleName}: ${error.message}"
+        Log.w("CarmeLinkHealth", "Location availability observer could not start", error)
+        context.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE).edit()
+            .putString("monitoring_observer_error", description)
+            .putLong("monitoring_observer_failed_at", System.currentTimeMillis()).apply()
+    }
+
+    @Synchronized
+    private fun attachFallbackReceiver(context: Context) {
+        if (fallbackReceiver != null) return
+        val receiver = LocationMonitoringHealthReceiver()
+        val filter = IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION).apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) addAction(LocationManager.MODE_CHANGED_ACTION)
+        }
+        ContextCompat.registerReceiver(context.applicationContext, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        fallbackReceiver = receiver
+    }
+
+    fun observe(context: Context) {
+        if (!context.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE)
+                .getBoolean("registered", false)) return
+        attachFallbackReceiver(context)
+        check(context)
+    }
 
     fun start(context: Context) {
         val prefs = context.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE)
         if (!prefs.getBoolean("registered", false)) return
-        check(context)
-        try {
+        // Keep observing while the process lives, even if foreground promotion
+        // is rejected and the service has to stop.
+        observe(context)
+        if (!LocationHealthService.running) try {
             ContextCompat.startForegroundService(context, Intent(context, LocationHealthService::class.java))
-        } catch (_: RuntimeException) {
+        } catch (error: RuntimeException) {
+            observerFailed(context, error)
             // Background starts can be restricted. Periodic work remains the fallback.
         }
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
@@ -37,13 +69,17 @@ object LocationMonitoringHealth {
         )
     }
 
+    @Synchronized
     fun stop(context: Context) {
+        fallbackReceiver?.let { context.applicationContext.unregisterReceiver(it) }
+        fallbackReceiver = null
         context.stopService(Intent(context, LocationHealthService::class.java))
         WorkManager.getInstance(context).cancelUniqueWork(CHECK_WORK)
         WorkManager.getInstance(context).cancelUniqueWork(REPORT_WORK)
         context.getSystemService(NotificationManager::class.java).cancel(NOTICE_ID)
     }
 
+    @Synchronized
     fun check(context: Context) {
         val prefs = context.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE)
         if (!prefs.getBoolean("registered", false)) return
@@ -67,13 +103,22 @@ object LocationMonitoringHealth {
         prefs.edit().putBoolean("monitoring_health_available", available)
             .putString("monitoring_health_reason", reason).apply()
         val notifications = context.getSystemService(NotificationManager::class.java)
+        val activeReminder = notifications.activeNotifications.any {
+            it.id == NOTICE_ID && (Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+                it.notification.channelId == "carmelink_location_health")
+        }
         if (available) {
             notifications.cancel(NOTICE_ID)
             prefs.edit().remove("monitoring_health_last_reminder").apply()
         } else {
             val now = System.currentTimeMillis()
             val last = prefs.getLong("monitoring_health_last_reminder", 0L)
-            if (changed || now - last >= TimeUnit.HOURS.toMillis(1)) {
+            val action = LocationReminderPolicy.decide(changed, activeReminder, last, now)
+            val alert = action == LocationReminderPolicy.Action.ALERT
+            // A stale cooldown must never hide the reminder entirely after a
+            // process restart, dismissal, or a missed ON/OFF cycle. Restore it
+            // silently within the cooldown; a confirmed new outage alerts.
+            if (action != LocationReminderPolicy.Action.KEEP) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     notifications.createNotificationChannel(NotificationChannel(
                         "carmelink_location_health", "Location monitoring reminders", NotificationManager.IMPORTANCE_HIGH,
@@ -86,17 +131,31 @@ object LocationMonitoringHealth {
                 }
                 val contentIntent = PendingIntent.getActivity(context, NOTICE_ID, settings,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                val allowed = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
-                    context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                val allowed = notifications.areNotificationsEnabled() &&
+                    (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) &&
+                    (Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+                        notifications.getNotificationChannel("carmelink_location_health")?.importance != NotificationManager.IMPORTANCE_NONE)
                 if (allowed) {
-                    notifications.notify(NOTICE_ID, NotificationCompat.Builder(context, "carmelink_location_health")
-                        .setSmallIcon(R.drawable.ic_stat_carmelink)
-                        .setContentTitle("Location monitoring is off")
-                        .setContentText(if (reason == "LOCATION_SERVICES_DISABLED")
-                            "Turn on Location to restore dormitory entry and exit alerts."
-                            else "Allow precise location all the time to restore entry and exit alerts.")
-                        .setContentIntent(contentIntent).setAutoCancel(true).build())
-                    prefs.edit().putLong("monitoring_health_last_reminder", now).apply()
+                    try {
+                        notifications.notify(NOTICE_ID, NotificationCompat.Builder(context, "carmelink_location_health")
+                            .setSmallIcon(R.drawable.ic_stat_carmelink)
+                            .setContentTitle("Location monitoring is off")
+                            .setContentText(if (reason == "LOCATION_SERVICES_DISABLED")
+                                "Turn on Location to restore dormitory entry and exit alerts."
+                                else "Allow precise location all the time to restore entry and exit alerts.")
+                            .setPriority(NotificationCompat.PRIORITY_HIGH)
+                            .setContentIntent(contentIntent).setOngoing(true).setAutoCancel(false)
+                            .setSilent(!alert).build())
+                        if (alert) prefs.edit().putLong("monitoring_health_last_reminder", now).apply()
+                        prefs.edit().remove("monitoring_health_notification_error").apply()
+                    } catch (error: RuntimeException) {
+                        Log.w("CarmeLinkHealth", "Could not post location reminder", error)
+                        prefs.edit().putString("monitoring_health_notification_error",
+                            "${error.javaClass.simpleName}: ${error.message}").apply()
+                    }
+                } else {
+                    prefs.edit().putString("monitoring_health_notification_error", "Notifications or reminder channel disabled").apply()
                 }
             }
         }

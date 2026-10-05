@@ -10,9 +10,15 @@ import androidx.core.content.ContextCompat
 class GeofenceBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val event = GeofencingEvent.fromIntent(intent) ?: return
-        if (event.hasError()) return
+        val prefs = context.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE)
+        if (event.hasError()) {
+            prefs.edit().putString("last_verification_error", "Geofence callback error: ${event.errorCode}").apply()
+            return
+        }
         if (event.geofenceTransition != Geofence.GEOFENCE_TRANSITION_ENTER &&
             event.geofenceTransition != Geofence.GEOFENCE_TRANSITION_EXIT) return
+        prefs.edit().putLong("last_geofence_callback_at", System.currentTimeMillis()).apply()
+        GeofenceVerificationWorker.enqueue(context)
         try {
             ContextCompat.startForegroundService(
                 context,

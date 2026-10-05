@@ -4,27 +4,20 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.location.LocationManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
 
 /** Settings observer only: never requests location or evaluates crossings. */
 class LocationHealthService : Service() {
-    private val handler = Handler(Looper.getMainLooper())
-    private var receiverRegistered = false
-    private val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            LocationMonitoringHealth.check(applicationContext)
-        }
+    companion object {
+        @Volatile var running = false
+            private set
     }
+    private val handler = Handler(Looper.getMainLooper())
     private val check = object : Runnable {
         override fun run() {
             if (!getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE)
@@ -37,8 +30,16 @@ class LocationHealthService : Service() {
         }
     }
 
-    override fun onCreate() {
-        super.onCreate()
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE)
+                .getBoolean("registered", false)) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        if (running) return START_STICKY
+        LocationMonitoringHealth.observe(applicationContext)
+        // Promote after Android has delivered the start/restart command, rather
+        // than during construction of a service being recreated in background.
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(NotificationChannel(
@@ -54,23 +55,23 @@ class LocationHealthService : Service() {
                 .setContentTitle("CarmeLink safety monitoring")
                 .setContentText("Checking that location monitoring remains available")
                 .setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true).build())
-        } catch (_: RuntimeException) {
-            stopSelf()
-            return
+        } catch (error: RuntimeException) {
+            LocationMonitoringHealth.observerFailed(this, error)
+            LocationMonitoringHealth.check(applicationContext)
+            stopSelf(startId)
+            return START_NOT_STICKY
         }
-        val filter = IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION).apply {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) addAction(LocationManager.MODE_CHANGED_ACTION)
-        }
-        ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-        receiverRegistered = true
+        running = true
+        getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE).edit()
+            .remove("monitoring_observer_error")
+            .putLong("monitoring_observer_started_at", System.currentTimeMillis()).apply()
         handler.post(check)
+        return START_STICKY
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
-
     override fun onDestroy() {
+        running = false
         handler.removeCallbacksAndMessages(null)
-        if (receiverRegistered) unregisterReceiver(receiver)
         super.onDestroy()
     }
 

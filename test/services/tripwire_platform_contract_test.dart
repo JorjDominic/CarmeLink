@@ -69,6 +69,21 @@ void main() {
       expect(ios.contains('region.notifyOnExit = true'), isTrue);
     });
 
+    test('closed-app verification and delivery have independent recovery paths', () {
+      const native = 'android/app/src/main/kotlin/com/example/carmelitas_dormitory_system/';
+      final receiver = File('${native}GeofenceBroadcastReceiver.kt').readAsStringSync();
+      final monitor = File('${native}TripwireLocationBurstService.kt').readAsStringSync();
+      final sync = File('${native}TripwireSyncWorker.kt').readAsStringSync();
+      final delivery = File('${native}CrossingNotificationWorker.kt').readAsStringSync();
+      expect(receiver, contains('GeofenceVerificationWorker.enqueue(context)'));
+      expect(monitor, contains('if (continuous) START_STICKY else START_NOT_STICKY'));
+      expect(monitor, contains('TripwireGeofenceManager.verifyAndAppend'));
+      expect(sync, contains('CrossingNotificationWorker.enqueue'));
+      expect(sync, contains('manager.acknowledge(event.getString("event_id"))'));
+      expect(delivery, contains('pending_notifications'));
+      expect(delivery, contains('Result.retry()'));
+    });
+
     test('first fix remains a baseline and does not fabricate a crossing', () {
       final android = androidVerifier.readAsStringSync();
       final ios = iosDelegate.readAsStringSync();

@@ -17,6 +17,13 @@ class MainActivity : FlutterActivity() {
         LocationMonitoringHealth.start(applicationContext)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Retry when the activity is visible if an earlier start was rejected.
+        LocationMonitoringHealth.start(applicationContext)
+        TripwireGeofenceManager.resumeMonitoring(applicationContext)
+    }
+
     override fun onStop() {
         isInForeground = false
         super.onStop()
@@ -27,6 +34,10 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "carmelitas/tripwire_geofence")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "checkMonitoringHealth" -> {
+                        LocationMonitoringHealth.start(applicationContext)
+                        result.success(true)
+                    }
                     "register" -> {
                         val latitude = call.argument<Double>("latitude")
                         val longitude = call.argument<Double>("longitude")

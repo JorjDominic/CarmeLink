@@ -25,7 +25,7 @@ void main() {
     expect(burst, contains('MAX_DURATION_MILLIS = 120_000L'));
     expect(burst, contains('stopBurst()'));
     expect(burst, isNot(contains('LocationMonitoringHealth')));
-    expect(burst, isNot(contains('START_STICKY')));
+    expect(burst, contains('if (continuous) START_STICKY else START_NOT_STICKY'));
   });
 
   test('health backend stores no coordinates and escalates unresolved outages',

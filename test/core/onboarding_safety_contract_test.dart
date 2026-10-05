@@ -29,7 +29,7 @@ void main() {
       'supabase/migrations/202609280001_guardian_curfew_and_presence_preferences.sql',
     ).readAsStringSync();
     final notifier =
-        File('supabase/functions/notify-geofence/index.ts').readAsStringSync();
+        File('supabase/functions/notify-geofence/handler.ts').readAsStringSync();
     final processor = File(
       'supabase/functions/process-guardian-presence-alerts/index.ts',
     ).readAsStringSync();

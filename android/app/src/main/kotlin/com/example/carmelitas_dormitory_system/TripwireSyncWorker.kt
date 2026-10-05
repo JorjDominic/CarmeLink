@@ -1,197 +1,58 @@
 package com.example.carmelitas_dormitory_system
 
 import android.content.Context
-import androidx.work.Constraints
-import androidx.work.NetworkType
-import androidx.work.Worker
-import androidx.work.WorkerParameters
+import androidx.work.*
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/** Uploads minimized tripwire events without launching the application UI. */
+/** Upload transitions idempotently; hand server notification IDs to a separate outbox. */
 class TripwireSyncWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
     companion object {
-        /** WorkManager Constraints that enforce a network connection before running. */
-        val constraints: Constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
+        val constraints: Constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
     }
-
-    private val prefs = context.getSharedPreferences(
-        TripwireGeofenceManager.PREFS,
-        Context.MODE_PRIVATE,
-    )
 
     override fun doWork(): Result {
-        val baseUrl = prefs.getString("supabase_url", null) ?: return Result.failure()
-        val apiKey = prefs.getString("publishable_key", null) ?: return Result.failure()
-        var accessToken = prefs.getString("access_token", null) ?: return Result.retry()
-        val queue = try {
+        val prefs = applicationContext.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE)
+        val snapshot = synchronized(TripwireGeofenceManager.EVENT_LOCK) {
             JSONArray(prefs.getString("pending_events", "[]"))
-        } catch (_: Exception) {
-            return Result.failure()
         }
-        if (queue.length() == 0) return Result.success()
-
-        val remaining = JSONArray()
-        for (index in 0 until queue.length()) {
-            val event = queue.getJSONObject(index)
-            val age = System.currentTimeMillis() - event.optLong("observed_at")
-            if (age > 24L * 60L * 60L * 1000L) continue
-
-            val response: Pair<Int, String>
-            try {
-                var r = send(baseUrl, apiKey, accessToken, event)
-                if (r.first == HttpURLConnection.HTTP_UNAUTHORIZED) {
-                    accessToken = refreshSession(baseUrl, apiKey) ?: run {
-                        for (pending in index until queue.length()) remaining.put(queue.get(pending))
-                        persist(remaining)
-                        return Result.retry()
-                    }
-                    r = send(baseUrl, apiKey, accessToken, event)
-                }
-                response = r
-            } catch (e: IOException) {
-                // Network became unavailable mid-flight (e.g. Wi-Fi→mobile
-                // handoff at the dorm gate).  Keep all remaining events and
-                // let WorkManager retry when connectivity is restored.
-                for (pending in index until queue.length()) remaining.put(queue.get(pending))
-                persist(remaining)
-                recordError("Network error while syncing gate event: ${e.message ?: "unknown error"}")
+        val manager = TripwireGeofenceManager(applicationContext)
+        for (index in 0 until snapshot.length()) {
+            val event = snapshot.getJSONObject(index)
+            if (event.getString("tenant_id") != prefs.getString("tenant_id", null)) return Result.success()
+            if (System.currentTimeMillis() - event.getLong("observed_at") > 24L * 60L * 60L * 1000L) {
+                manager.acknowledge(event.getString("event_id"), confirm = false)
+                continue
+            }
+            val response = try {
+                TripwireApi(applicationContext).post("/rest/v1/rpc/record_tenant_geofence_transition",
+                    JSONObject().put("p_direction", event.getString("direction"))
+                        .put("p_observed_at", isoTimestamp(event.getLong("observed_at")))
+                        .put("p_client_event_id", event.getString("event_id")))
+            } catch (error: Exception) {
+                prefs.edit().putString("last_sync_error", "Gate event network failure: ${error.javaClass.simpleName}").apply()
                 return Result.retry()
             }
-
             if (response.first !in 200..299) {
-                for (pending in index until queue.length()) remaining.put(queue.get(pending))
-                persist(remaining)
-                recordError("Gate event sync failed (${response.first}): ${response.second.take(500)}")
-                return if (response.first in 400..499) Result.failure() else Result.retry()
+                prefs.edit().putString("last_sync_error", "Gate event sync failed (${response.first}): ${response.second.take(500)}").apply()
+                return if (response.first in listOf(401, 408, 429) || response.first >= 500) Result.retry() else Result.failure()
             }
-
-            prefs.edit()
-                .putString("confirmed_direction", event.getString("direction"))
-                .putLong("last_synced_at", System.currentTimeMillis())
-                .remove("last_sync_error")
-                .apply()
-
-            val eventId = response.second.trim().removeSurrounding("\"")
-            if (eventId.isNotBlank()) {
-                val notificationResponse = try {
-                    post(
-                        "$baseUrl/functions/v1/notify-geofence",
-                        apiKey,
-                        accessToken,
-                        JSONObject().put("event_id", eventId),
-                    ).first
-                } catch (_: IOException) {
-                    // The gate event is already safely stored. Notification
-                    // delivery must not cause the same event to remain pending.
-                    -1
-                }
-                if (notificationResponse !in 200..299) {
-                    prefs.edit().putString(
-                        "last_notification_error",
-                        "Notification delivery failed ($notificationResponse)",
-                    ).apply()
-                } else {
-                    prefs.edit().remove("last_notification_error").apply()
-                }
+            val serverEventId = response.second.trim().removeSurrounding("\"")
+            if (serverEventId.isBlank() || serverEventId == "null") {
+                prefs.edit().putString("last_sync_error", "Server did not return a gate event ID").apply()
+                return Result.retry()
             }
+            // Persist delivery before acknowledging the uploaded event. Replaying
+            // after a crash uses the same client ID and cannot create another gate event.
+            CrossingNotificationWorker.enqueue(applicationContext, serverEventId, event.getString("tenant_id"))
+            manager.acknowledge(event.getString("event_id"))
+            prefs.edit().putLong("last_synced_at", System.currentTimeMillis()).remove("last_sync_error").apply()
         }
-        persist(remaining)
         return Result.success()
-    }
-
-    private fun send(
-        baseUrl: String,
-        apiKey: String,
-        token: String,
-        event: JSONObject,
-    ): Pair<Int, String> {
-        val body = JSONObject()
-            .put("p_direction", event.getString("direction"))
-            .put("p_observed_at", isoTimestamp(event.getLong("observed_at")))
-            .put("p_client_event_id", event.getString("event_id"))
-        return post(
-            "$baseUrl/rest/v1/rpc/record_tenant_geofence_transition",
-            apiKey,
-            token,
-            body,
-        )
-    }
-
-    private fun refreshSession(baseUrl: String, apiKey: String): String? {
-        val refreshToken = prefs.getString("refresh_token", null) ?: return null
-        val (code, payload) = try {
-            post(
-                "$baseUrl/auth/v1/token?grant_type=refresh_token",
-                apiKey,
-                null,
-                JSONObject().put("refresh_token", refreshToken),
-            )
-        } catch (_: IOException) {
-            return null
-        }
-        if (code !in 200..299) return null
-        val json = JSONObject(payload)
-        val access = json.optString("access_token").takeIf { it.isNotBlank() } ?: return null
-        val refresh = json.optString("refresh_token").takeIf { it.isNotBlank() } ?: refreshToken
-        prefs.edit().putString("access_token", access).putString("refresh_token", refresh).apply()
-        return access
-    }
-
-    /**
-     * Executes an HTTP POST and returns (statusCode, body).
-     *
-     * @throws IOException if the connection fails (no network, DNS failure,
-     *   timeout, etc.).  Callers must handle this and return [Result.retry].
-     */
-    private fun post(
-        target: String,
-        apiKey: String,
-        token: String?,
-        body: JSONObject,
-    ): Pair<Int, String> {
-        val connection = URL(target).openConnection() as HttpURLConnection
-        return try {
-            connection.requestMethod = "POST"
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 10_000
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("apikey", apiKey)
-            if (token != null) connection.setRequestProperty("Authorization", "Bearer $token")
-            connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
-            val code = connection.responseCode
-            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            code to (stream?.bufferedReader()?.use { it.readText() } ?: "")
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    private fun persist(events: JSONArray) {
-        val editor = prefs.edit().putString("pending_events", events.toString())
-        if (events.length() == 0) {
-            editor.remove(TripwireGeofenceManager.QUEUED_DIRECTION)
-        } else {
-            editor.putString(
-                TripwireGeofenceManager.QUEUED_DIRECTION,
-                events.getJSONObject(events.length() - 1).getString("direction"),
-            )
-        }
-        editor.apply()
-    }
-
-    private fun recordError(message: String) {
-        prefs.edit().putString("last_sync_error", message).apply()
     }
 
     private fun isoTimestamp(milliseconds: Long): String =

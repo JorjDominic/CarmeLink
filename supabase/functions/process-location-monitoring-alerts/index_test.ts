@@ -18,7 +18,16 @@ function fixture() {
   let tokens = true
   let acceptPush = false
   let sends = 0
+  let claimed = false
+  let requestedIncident: unknown = null
   const admin = {
+    rpc(_name: string, params: { p_incident_id: unknown }) {
+      requestedIncident = params.p_incident_id
+      const matches = params.p_incident_id === null || params.p_incident_id === incident.id
+      const data = !claimed && !incident.guardian_notified_at && matches ? [incident] : []
+      if (data.length) claimed = true
+      return Promise.resolve({ data, error: null })
+    },
     from(table: string) {
       let operation = 'select'
       let payload: Record<string, unknown> = {}
@@ -66,8 +75,10 @@ function fixture() {
             data = [{ guardian_id: 'guardian' }]
           }
           if (table === 'location_monitoring_incidents') {
-            if (operation === 'update') Object.assign(incident, payload)
-            else data = incident.guardian_notified_at ? [] : [incident]
+            if (operation === 'update') {
+              Object.assign(incident, payload)
+              if (payload.dispatch_claimed_until === null) claimed = false
+            } else data = incident.guardian_notified_at ? [] : [incident]
           }
           if (table === 'app_notifications') {
             if (
@@ -92,11 +103,12 @@ function fixture() {
       return query
     },
   }
-  const run = () =>
+  const run = (incidentId?: string) =>
     handleRequest(
       new Request('https://example.test', {
         method: 'POST',
         headers: { Authorization: 'Bearer test' },
+        body: incidentId ? JSON.stringify({ incident_id: incidentId }) : '{}',
       }),
       {
         createAdmin: () => admin as unknown as SupabaseClient,
@@ -112,6 +124,7 @@ function fixture() {
     notifications,
     run,
     sends: () => sends,
+    requestedIncident: () => requestedIncident,
     setTokens: (value: boolean) => {
       tokens = value
     },
@@ -138,6 +151,30 @@ Deno.test('failed FCM is retried with the same notification and marked only afte
   )
   await f.run()
   assert(f.sends() === 2, 'successful recipient was sent again')
+})
+
+Deno.test('immediate dispatch targets the reported incident without a cron run', async () => {
+  const f = fixture()
+  const id = 'aabbccdd-1111-2222-3333-444455556666'
+  f.incident.id = id
+  f.accept()
+  assert((await f.run(id)).status === 200, 'immediate dispatch failed')
+  assert(f.requestedIncident() === id, 'did not target reported incident')
+  assert(f.sends() === 1, 'initial push was not sent immediately')
+})
+
+Deno.test('concurrent webhook and cron do not both send the same incident', async () => {
+  const f = fixture()
+  f.accept()
+  const responses = await Promise.all([f.run(), f.run()])
+  assert(responses.every((response) => response.status === 200), 'concurrent request failed')
+  assert(f.sends() === 1, 'concurrent requests duplicated the push')
+})
+
+Deno.test('malformed incident ID is rejected before processing alerts', async () => {
+  const f = fixture()
+  assert((await f.run('invalid')).status === 400, 'invalid ID was accepted')
+  assert(f.sends() === 0, 'invalid request sent notifications')
 })
 
 Deno.test('missing device token remains pending until a device registers', async () => {

@@ -52,16 +52,26 @@ export async function handleRequest(request: Request, dependencies: {
       .maybeSingle()
     if (!credential) return json({ error: 'Unauthorized' }, 401)
 
+    const rawBody = await request.text()
+    let body: { incident_id?: unknown }
+    try {
+      body = rawBody ? JSON.parse(rawBody) : {}
+    } catch {
+      return json({ error: 'Invalid JSON' }, 400)
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return json({ error: 'Invalid request' }, 400)
+    }
+    if (
+      body.incident_id !== undefined && (typeof body.incident_id !== 'string' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.incident_id))
+    ) {
+      return json({ error: 'Invalid incident_id' }, 400)
+    }
     const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString()
-    const { data: incidents, error } = await admin.from(
-      'location_monitoring_incidents',
-    )
-      .select(
-        'id, tenant_id, reason, started_at, guardian_notified_at, escalated_at',
-      ).is('recovered_at', null)
-      .or(
-        `guardian_notified_at.is.null,and(escalated_at.is.null,started_at.lte.${cutoff})`,
-      )
+    const { data: incidents, error } = await admin.rpc('claim_location_monitoring_alerts', {
+      p_incident_id: body.incident_id ?? null,
+    })
     if (error) throw error
     let created = 0, delivered = 0
     let authorization: Awaited<ReturnType<typeof fcmAccessToken>> | null = null
@@ -185,11 +195,17 @@ export async function handleRequest(request: Request, dependencies: {
         if (!sent) allDelivered = false
       }
       // Leave unsuccessful incidents pending for the next scheduled attempt.
-      if (!allDelivered) continue
+      if (!allDelivered) {
+        const { error: releaseError } = await admin.from('location_monitoring_incidents')
+          .update({ dispatch_claimed_until: null }).eq('id', incident.id)
+        if (releaseError) throw releaseError
+        continue
+      }
       const notifiedAt = new Date().toISOString()
       const { error: updateError } = await admin.from(
         'location_monitoring_incidents',
       ).update({
+        dispatch_claimed_until: null,
         ...(notifyingGuardians ? { guardian_notified_at: notifiedAt } : {}),
         ...(escalating ? { escalated_at: notifiedAt } : {}),
       })

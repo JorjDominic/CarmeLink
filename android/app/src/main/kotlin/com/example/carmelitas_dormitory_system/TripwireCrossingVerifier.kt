@@ -13,6 +13,19 @@ object TripwireCrossingVerifier {
     private const val CANDIDATE_FIX_COUNT = "candidate_fix_count"
     private const val REQUIRED_MATCHING_FIXES = 2
 
+    // Sampling policy only; accept() retains the existing crossing rules.
+    fun needsPreciseSampling(context: Context, location: Location): Boolean {
+        if (location.accuracy > 15f) return true
+        val prefs = context.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE)
+        if (prefs.getInt(CANDIDATE_FIX_COUNT, 0) > 0) return true
+        val polygon = parsePolygon(prefs.getString("polygon", "[]"))
+        if (polygon.size < 3) return true
+        return polygon.indices.minOf { index ->
+            pointToSegmentMeters(Point(location.latitude, location.longitude),
+                polygon[index], polygon[(index + 1) % polygon.size])
+        } <= 50.0
+    }
+
     fun accept(context: Context, location: Location): String? {
         // Quality gate — reject stale or inaccurate fixes.
         if (location.accuracy < 0 || location.accuracy > MAX_ACCURACY_METERS) return null
