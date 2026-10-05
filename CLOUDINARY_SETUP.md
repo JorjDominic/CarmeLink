@@ -1,5 +1,8 @@
 # Secure Cloudinary setup
 
+> Reviewed September 30, 2026. Secret deployment must still be verified in the
+> target environment; see `STATUS.md`.
+
 CarmeLink stores maintenance photos and payment receipts as Cloudinary
 `authenticated` assets. Flutter never receives the Cloudinary API secret and
 cannot upload directly to Cloudinary.

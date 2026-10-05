@@ -4,6 +4,7 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 
 import 'controllers/session_controller.dart';
+import 'controllers/tenant_access_controller.dart';
 import 'controllers/theme_controller.dart';
 import 'core/constants/app_assets.dart';
 import 'core/runtime/app_surface.dart';
@@ -59,6 +60,13 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     final navigator = _navigatorKey.currentState;
     final user = sessionController.currentUser;
     if (navigator == null || user == null) return;
+
+    // Tenant notification routes lead into operational features. Keep them
+    // closed until the same centralized onboarding check unlocks the shell.
+    if (user.role == UserRole.tenant &&
+        !TenantAccessController.instance.canAccessCore) {
+      return;
+    }
 
     if (data['route_type'] == 'conversation') {
       final Widget destination = switch (user.role) {

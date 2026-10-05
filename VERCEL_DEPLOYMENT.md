@@ -1,5 +1,8 @@
 # Vercel deployment
 
+> Reviewed September 30, 2026. Deployment completion and production evidence
+> are tracked in `STATUS.md`.
+
 CarmeLink's public website and staff portal can be hosted as a static Flutter
 web application on Vercel. The tenant and guardian mobile applications remain
 separate, and native background geofencing is not available in a browser.

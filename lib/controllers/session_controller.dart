@@ -16,6 +16,7 @@ import 'messaging_controller.dart';
 import 'owner_controller.dart';
 import 'tenant_controller.dart';
 import 'theme_controller.dart';
+import 'tenant_access_controller.dart';
 
 class SessionController extends ChangeNotifier {
   SessionController._();
@@ -62,6 +63,7 @@ class SessionController extends ChangeNotifier {
         _currentUser = null;
         _passwordRecovery = false;
         TenantController.instance.clear();
+        TenantAccessController.instance.clear();
         MessagingController.instance.clear();
         RoomService.invalidateCache();
         TenantService.invalidateCache();
@@ -220,6 +222,7 @@ class SessionController extends ChangeNotifier {
     _justSignedOut = true;
 
     TenantController.instance.clear();
+    TenantAccessController.instance.clear();
     GuardianController.instance.clear();
     OwnerController.instance.clear();
     RoomService.invalidateCache();

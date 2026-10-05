@@ -2,17 +2,20 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../controllers/tenant_controller.dart';
 import '../core/config/supabase_config.dart';
 import 'gate_service.dart';
 import 'geofence_service.dart';
+import 'push_notification_service.dart';
 
 /// Coordinates the native, low-power IN/OUT tripwire with authenticated sync.
 ///
-/// Native code captures minimized transitions while Flutter is suspended. This
-/// service establishes the initial baseline without logging it, then drains
-/// confirmed transitions through the existing secure Supabase boundary.
+/// Native code captures minimized transitions while Flutter is suspended. On
+/// registration it seeds native monitoring from the last server-recorded
+/// direction, allowing accurate native fixes to reconcile a crossing missed
+/// during an Android force-stop or another monitoring interruption.
 class TripwireGeofenceService {
   TripwireGeofenceService._();
 
@@ -42,6 +45,8 @@ class TripwireGeofenceService {
 
       GeofenceLocationService.applyBoundaryConfiguration(row);
       final baseline = await _locationService.checkCurrentPresence();
+      await _updateMonitoringReminder(baseline);
+      final serverDirection = await _loadServerDirection(tenantId);
       final session = SupabaseConfig.client.auth.currentSession;
       if (session == null) return;
       final rawPolygon = row['polygon_points'];
@@ -59,7 +64,11 @@ class TripwireGeofenceService {
         'latitude': (row['center_latitude'] as num).toDouble(),
         'longitude': (row['center_longitude'] as num).toDouble(),
         'radiusMeters': (row['radius_meters'] as num).toDouble(),
-        'initialDirection': baseline.isUnavailable ? null : baseline.direction,
+        // Prefer durable server state. If it differs from the current physical
+        // side, native code requires two accurate matching fixes before it
+        // records a reconciliation transition.
+        'initialDirection': serverDirection ??
+            (baseline.isUnavailable ? null : baseline.direction),
         'polygon': polygon,
         'edgeBufferMeters':
             (row['edge_buffer_meters'] as num?)?.toDouble() ?? 3.0,
@@ -84,6 +93,56 @@ class TripwireGeofenceService {
       // Desktop and unsupported test platforms do not install native adapters.
     } catch (error) {
       debugPrint('Could not start native tripwire monitoring: $error');
+    }
+  }
+
+  Future<void> _updateMonitoringReminder(GeofenceCheckResult result) async {
+    const reminderKey = 'tripwire_flutter_last_location_reminder_at';
+    final preferences = await SharedPreferences.getInstance();
+    if (!result.isUnavailable) {
+      await preferences.remove(reminderKey);
+      return;
+    }
+    if (result.failureReason != GeofenceFailureReason.locationServiceDisabled &&
+        result.failureReason != GeofenceFailureReason.permissionDenied) {
+      return;
+    }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final last = preferences.getInt(reminderKey) ?? 0;
+    if (now - last < const Duration(hours: 1).inMilliseconds) return;
+    await preferences.setInt(reminderKey, now);
+    final permissionMissing =
+        result.failureReason == GeofenceFailureReason.permissionDenied;
+    await PushNotificationService.instance.showLocalNotification(
+      id: 1003,
+      title: 'Location monitoring is off',
+      body: permissionMissing
+          ? 'Allow precise location all the time to restore entry and exit alerts.'
+          : 'Turn on Location to restore dormitory entry and exit alerts.',
+      payload: {
+        'route_type': 'location_settings',
+        'reason': permissionMissing
+            ? 'LOCATION_PERMISSION_DENIED'
+            : 'LOCATION_SERVICES_DISABLED',
+      },
+    );
+  }
+
+  Future<String?> _loadServerDirection(String tenantId) async {
+    try {
+      final row = await SupabaseConfig.client
+          .from('tenant_details')
+          .select('current_gate_status')
+          .eq('profile_id', tenantId)
+          .maybeSingle();
+      final direction = row?['current_gate_status'];
+      return direction == 'IN' || direction == 'OUT'
+          ? direction as String
+          : null;
+    } catch (error) {
+      debugPrint(
+          'Could not load server gate status for reconciliation: $error');
+      return null;
     }
   }
 
@@ -161,6 +220,17 @@ class TripwireGeofenceService {
       return value ?? const {'registered': false};
     } catch (_) {
       return const {'registered': false, 'supported': false};
+    }
+  }
+
+  Future<void> openBackgroundSettings() async {
+    if (kIsWeb) return;
+    try {
+      await _channel
+          .invokeMethod<void>('openBackgroundSettings')
+          .timeout(_platformTimeout);
+    } on MissingPluginException {
+      // iOS and unsupported platforms use the normal location settings flow.
     }
   }
 }

@@ -1,9 +1,68 @@
 # CarmeLink Living Status and Gap Tracker
 
-> Current-build review: September 27, 2026 at `5ecba11` (`Vercel Deployment Fix`).
-> Repository verification: `flutter analyze` passes with no issues and
-> `flutter test` passes all 460 tests. Deployment, RLS, and physical-device
-> results are separate and remain open where listed below.
+> **Authoritative project status — September 30, 2026.** Historical progress,
+> completion-audit, and Markdown-reconciliation trackers were consolidated here
+> to prevent contradictory readiness claims. Repository implementation is not
+> equivalent to deployed-backend or physical-device proof.
+
+## September 30, 2026 current-build update
+
+Source baseline: `3d8a2f9` (`Geofencing fix - automatic in and out`).
+
+### Completed in source
+
+- Phase 8 move-out and settlement workflow, service, policy, migration, staff
+  workspace integration, tenant/staff discoverability, and contract tests.
+- Feedback remains explicitly non-persistent instead of presenting a false
+  successful submission.
+- Automatic geofencing now treats the property polygon as authoritative;
+  official-gate intersection is optional wake-up evidence rather than a
+  prerequisite for `IN/OUT`.
+- Android and iOS now reconcile stale server presence after monitoring resumes,
+  using two consecutive accurate fixes before recording a correction.
+- Android recovery starts a bounded native location burst and preserves its
+  connectivity-constrained offline uploader. iOS retains region plus
+  significant-change monitoring, native queueing, and launch restoration.
+- Tenant monitoring status and explanatory UI now match the implemented
+  polygon/gate behavior.
+
+### Verification completed
+
+- Focused geofencing/platform/UI suite: 42 tests passed.
+- Broader geofencing/UI suite before reconciliation: 46 tests passed.
+- Flutter analysis of changed Dart sources: no issues.
+- Android native Kotlin compilation: passed with JBR 21.
+- Merge review: clean working tree before this work, no unresolved markers,
+  relevant merge-contract tests passed; several old merge lines were retained
+  as comments rather than active code and remain documented as such.
+
+### Still open before release
+
+- Execute the two-pass physical iPhone matrix documented in
+  `GEOFENCING_IMPLEMENTATION.md`: once before Apple Developer Program enrollment
+  and again with enrolled signing/TestFlight afterward.
+- Execute equivalent Android tests for background, recents swipe, Settings
+  Force Stop followed by launch-time recovery, reboot, OEM battery controls,
+  offline crossing, and restored connectivity.
+- Android cannot execute while the app remains Force Stopped in Settings; the
+  implemented recovery begins after the user manually launches it again.
+- Confirm iOS relaunch behavior, timing, Background App Refresh dependency,
+  wake-region radius, significant-change fallback, APNs, and offline retry on
+  multiple physical devices.
+- Remote migration parity, role-by-role RLS/RPC/Storage tests, production
+  secrets, Android release signing, Apple signing/APNs, monitoring, backups,
+  and incident readiness remain production gates.
+
+### Documentation consolidation
+
+The former `DEVELOPMENT_PROGRESS.md`, `SYSTEM_COMPLETION_AUDIT.md`, and
+`MD_RECONCILIATION_CHANGELOG.md` were historical snapshots with overlapping and
+outdated test totals. Their still-relevant release gaps are maintained here.
+The former tripwire plan and mitigation files were consolidated into
+`GEOFENCING_IMPLEMENTATION.md`.
+
+> Historical baseline below was reviewed September 27, 2026. The September 30
+> update above supersedes its test totals and geofencing conclusions.
 
 ## Requested product backlog — September 27, 2026
 
@@ -329,9 +388,9 @@ If the team chooses to implement one of these in Capstone 1, move it into the cu
 
 | Check | Last result | Date |
 |---|---|---|
-| `flutter analyze` | Pass — no issues | 2026-09-27 |
-| `flutter test` | Pass — 460 tests | 2026-09-28 |
-| `flutter build apk --debug` | Pass | 2026-09-25 |
+| Flutter analysis of changed Dart sources | Pass — no issues | 2026-09-30 |
+| Focused geofence/platform/UI tests | Pass — 42 tests | 2026-09-30 |
+| Android Kotlin compilation | Pass — `:app:compileDebugKotlin` | 2026-09-30 |
 | Remote migration parity | Not verified | — |
 | Remote role/RLS matrix | Not verified | — |
 | Android physical-device suite | Not verified | — |

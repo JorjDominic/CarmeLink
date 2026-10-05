@@ -25,6 +25,23 @@ import UserNotifications
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  /// Called when the OS wakes the app to deliver background URLSession events.
+  /// The tripwire background session uses identifier "com.carmelitas.carmelink.tripwire.sync".
+  /// Touching `tripwire.backgroundSession` here ensures the session is created and
+  /// its delegate receives the pending completion callbacks.
+  override func application(
+    _ application: UIApplication,
+    handleEventsForBackgroundURLSession identifier: String,
+    completionHandler: @escaping () -> Void
+  ) {
+    if identifier == "com.carmelitas.carmelink.tripwire.sync" {
+      _ = tripwire.backgroundSession // ensure lazy init
+      tripwire.backgroundSessionCompletionHandler = completionHandler
+    } else {
+      completionHandler()
+    }
+  }
+
   private func handleTripwireCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
     case "register":
@@ -82,7 +99,7 @@ import UserNotifications
   }
 }
 
-final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
+final class TripwireLocationManager: NSObject, CLLocationManagerDelegate, URLSessionDataDelegate {
   static let shared = TripwireLocationManager()
 
   private let manager = CLLocationManager()
@@ -93,17 +110,45 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   private let registeredKey = "tripwire_registered"
   private let queuedDirectionKey = "tripwire_queued_direction"
   private let confirmedDirectionKey = "tripwire_confirmed_direction"
+  private let candidateDirectionKey = "tripwire_candidate_direction"
+  private let candidateFixCountKey = "tripwire_candidate_fix_count"
+  private let candidateStartedAtKey = "tripwire_candidate_started_at"
+  private let candidateLastFixAtKey = "tripwire_candidate_last_fix_at"
+  private let candidateOriginLatKey = "tripwire_candidate_origin_lat"
+  private let candidateOriginLngKey = "tripwire_candidate_origin_lng"
+  private let candidateMovingKey = "tripwire_candidate_moving"
+  private let monitoringAvailableKey = "tripwire_monitoring_available"
+  private let monitoringReasonKey = "tripwire_monitoring_reason"
   private var burstTimeout: DispatchWorkItem?
   private var burstActive = false
   private var syncing = false
   private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
   private var burstBackgroundTask: UIBackgroundTaskIdentifier = .invalid
 
+  // Background URLSession for gate event uploads. Upload tasks survive iOS
+  // app suspension and are completed by the OS even if the app is killed.
+  // URLSession.shared dataTask dies when iOS background time expires.
+  // Internal so AppDelegate can touch it in handleEventsForBackgroundURLSession.
+  lazy var backgroundSession: URLSession = {
+    let config = URLSessionConfiguration.background(withIdentifier: "com.carmelitas.carmelink.tripwire.sync")
+    config.isDiscretionary = false
+    config.sessionSendsLaunchEvents = true
+    return URLSession(configuration: config, delegate: self, delegateQueue: nil)
+  }()
+  // Pending completion handlers keyed by URLSessionTask.taskIdentifier.
+  private var pendingHandlers: [Int: (Int, Data?, Error?) -> Void] = [:]
+  private var pendingData: [Int: Data] = [:]
+  /// Stored by AppDelegate from handleEventsForBackgroundURLSession and
+  /// called once all pending background tasks have fired their delegates.
+  var backgroundSessionCompletionHandler: (() -> Void)?
+
   private override init() {
     super.init()
     manager.delegate = self
     manager.pausesLocationUpdatesAutomatically = false
     manager.allowsBackgroundLocationUpdates = true
+    manager.showsBackgroundLocationIndicator = true
+    manager.activityType = .fitness
   }
 
   func register(
@@ -153,6 +198,10 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     if initialDirection == "IN" || initialDirection == "OUT" {
       defaults.set(initialDirection, forKey: confirmedDirectionKey)
     }
+    defaults.removeObject(forKey: candidateDirectionKey)
+    defaults.removeObject(forKey: candidateFixCountKey)
+    defaults.removeObject(forKey: candidateStartedAtKey)
+    clearCandidateEvidence()
 
     // Start monitoring if authorized for Always OR When In Use.
     // When In Use will still receive region callbacks while active/suspended,
@@ -160,11 +209,13 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     let status = manager.authorizationStatus
     if status == .authorizedAlways || status == .authorizedWhenInUse {
       startMonitoring(latitude: latitude, longitude: longitude, radius: radius)
+      startContinuousMonitoring(highAccuracy: false)
     }
     if status == .authorizedWhenInUse {
       manager.requestAlwaysAuthorization()
     }
     syncPendingEvents()
+    evaluateMonitoringHealth()
   }
 
   func restoreIfNeeded() {
@@ -176,10 +227,12 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       longitude: defaults.double(forKey: "tripwire_longitude"),
       radius: defaults.double(forKey: "tripwire_radius")
     )
+    startContinuousMonitoring(highAccuracy: false)
     if status == .authorizedWhenInUse {
       manager.requestAlwaysAuthorization()
     }
     syncPendingEvents()
+    evaluateMonitoringHealth()
   }
 
   private func startMonitoring(latitude: Double, longitude: Double, radius: Double) {
@@ -221,7 +274,10 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   }
 
   func unregister() {
-    stopLocationBurst()
+    burstTimeout?.cancel()
+    burstTimeout = nil
+    burstActive = false
+    manager.stopUpdatingLocation()
     for region in manager.monitoredRegions where region.identifier == regionIdentifier || region.identifier == gateRegionIdentifier {
       manager.stopMonitoring(for: region)
     }
@@ -265,11 +321,13 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   }
 
   func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    reportMonitoringHealth(available: true, reason: nil)
+    expireCandidateIfNeeded()
     guard
       defaults.bool(forKey: registeredKey),
       let location = locations.last,
       location.horizontalAccuracy >= 0,
-      location.horizontalAccuracy <= 35,
+      location.horizontalAccuracy <= 45,
       abs(location.timestamp.timeIntervalSinceNow) <= 120
     else { return }
     guard let direction = verifiedDirection(for: location) else { return }
@@ -284,16 +342,83 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       // The first significant-location callback establishes state; it is not
       // evidence that a crossing occurred after monitoring began.
       defaults.set(direction, forKey: confirmedDirectionKey)
+      defaults.removeObject(forKey: candidateDirectionKey)
+      defaults.removeObject(forKey: candidateFixCountKey)
+      defaults.removeObject(forKey: candidateStartedAtKey)
+      clearCandidateEvidence()
+      startContinuousMonitoring(highAccuracy: isNearBoundary(location))
       return
     }
     let previousDirection = effectiveDirection()
-    // When gate line is enabled, additionally require the movement path to
-    // cross the gate segment. Without a gate line, polygon evaluation alone
-    // is sufficient to confirm a crossing.
-    guard previousDirection != direction else { return }
-    guard movementCrossesGate(from: previousLocation ?? location, to: location) else { return }
+    // The accurate polygon result is authoritative. The optional gate region
+    // remains a low-latency wake-up hint, but sparse background fixes are not
+    // required to intersect its short segment. Requiring that intersection
+    // discarded real exits when iOS delivered its fix beyond the gate.
+    guard previousDirection != direction else {
+      defaults.removeObject(forKey: candidateDirectionKey)
+      defaults.removeObject(forKey: candidateFixCountKey)
+      defaults.removeObject(forKey: candidateStartedAtKey)
+      clearCandidateEvidence()
+      startContinuousMonitoring(highAccuracy: isNearBoundary(location))
+      return
+    }
+    let previousCandidate = defaults.string(forKey: candidateDirectionKey)
+    let newCandidate = previousCandidate != direction
+    let lastCandidateFixAt = defaults.double(forKey: candidateLastFixAtKey)
+    let sufficientlySeparated = location.timestamp.timeIntervalSince1970 - lastCandidateFixAt >= 8
+    let candidateCount: Int
+    if !newCandidate && sufficientlySeparated {
+      candidateCount = defaults.integer(forKey: candidateFixCountKey) + 1
+    } else if !newCandidate {
+      candidateCount = max(defaults.integer(forKey: candidateFixCountKey), 1)
+    } else {
+      candidateCount = 1
+    }
+    let candidateMoving = (!newCandidate && defaults.bool(forKey: candidateMovingKey)) || location.speed >= 0.5
+    defaults.set(direction, forKey: candidateDirectionKey)
+    defaults.set(candidateCount, forKey: candidateFixCountKey)
+    defaults.set(candidateMoving, forKey: candidateMovingKey)
+    if newCandidate {
+      defaults.set(Date().timeIntervalSince1970, forKey: candidateStartedAtKey)
+      let origin = previousLocation ?? location
+      defaults.set(origin.coordinate.latitude, forKey: candidateOriginLatKey)
+      defaults.set(origin.coordinate.longitude, forKey: candidateOriginLngKey)
+    }
+    if newCandidate || sufficientlySeparated {
+      defaults.set(location.timestamp.timeIntervalSince1970, forKey: candidateLastFixAtKey)
+    }
+    startContinuousMonitoring(highAccuracy: true)
+    // Two consecutive accurate fixes prevent a transient GPS jump from
+    // rewriting state during post-force-stop reconciliation.
+    guard candidateCount >= 2 else { return }
+    guard location.horizontalAccuracy <= 35 else { return }
+    guard direction != "OUT" || candidateMoving || candidateCrossesGate(to: location) else { return }
+    defaults.removeObject(forKey: candidateDirectionKey)
+    defaults.removeObject(forKey: candidateFixCountKey)
+    defaults.removeObject(forKey: candidateStartedAtKey)
+    clearCandidateEvidence()
     append(direction: direction)
-    stopLocationBurst()
+    startContinuousMonitoring(highAccuracy: isNearBoundary(location))
+  }
+
+  private func startContinuousMonitoring(highAccuracy: Bool = false) {
+    guard defaults.bool(forKey: registeredKey) else { return }
+    manager.desiredAccuracy = highAccuracy
+      ? kCLLocationAccuracyBest : kCLLocationAccuracyNearestTenMeters
+    manager.distanceFilter = highAccuracy ? kCLDistanceFilterNone : 15
+    manager.pausesLocationUpdatesAutomatically = !highAccuracy
+    manager.startUpdatingLocation()
+  }
+
+  private func expireCandidateIfNeeded() {
+    guard defaults.integer(forKey: candidateFixCountKey) > 0 else { return }
+    let startedAt = defaults.double(forKey: candidateStartedAtKey)
+    guard startedAt == 0 || Date().timeIntervalSince1970 - startedAt > 120 else { return }
+    defaults.removeObject(forKey: candidateDirectionKey)
+    defaults.removeObject(forKey: candidateFixCountKey)
+    defaults.removeObject(forKey: candidateStartedAtKey)
+    clearCandidateEvidence()
+    startContinuousMonitoring(highAccuracy: false)
   }
 
   // ─── Fine-accuracy location burst ─────────────────────────────────────────
@@ -326,9 +451,13 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   private func stopLocationBurst() {
     burstTimeout?.cancel()
     burstTimeout = nil
-    if burstActive { manager.stopUpdatingLocation() }
     burstActive = false
-    manager.distanceFilter = kCLDistanceFilterNone
+    if defaults.bool(forKey: registeredKey) {
+      startContinuousMonitoring(highAccuracy: false)
+    } else {
+      manager.stopUpdatingLocation()
+      manager.distanceFilter = kCLDistanceFilterNone
+    }
     if burstBackgroundTask != .invalid {
       UIApplication.shared.endBackgroundTask(burstBackgroundTask)
       burstBackgroundTask = .invalid
@@ -369,31 +498,9 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       pointSegmentDistance(p, points[$0], points[($0 + 1) % points.count])
     }.min() ?? .greatestFiniteMagnitude
     // Hysteresis: if we're within the edge buffer, keep the last known direction.
-    if edgeDistance <= defaults.double(forKey: "tripwire_edge_buffer"),
+    if edgeDistance <= max(defaults.double(forKey: "tripwire_edge_buffer"), 8),
        let previous = effectiveDirection() { return previous }
     return inside ? "IN" : "OUT"
-  }
-
-  /// Returns true when the movement path between two fixes should be treated
-  /// as a confirmed boundary crossing.
-  ///
-  /// When the virtual gate line IS configured, we also require the movement
-  /// vector to intersect (or come within tolerance of) the gate segment —
-  /// this prevents false triggers from someone standing near the boundary.
-  ///
-  /// When the gate line is NOT configured (gateEnabled = false), polygon
-  /// evaluation in verifiedDirection() is the sole arbiter, so we always
-  /// return true here to let it through.
-  private func movementCrossesGate(from: CLLocation, to: CLLocation) -> Bool {
-    guard defaults.bool(forKey: "tripwire_gate_enabled") else {
-      // No gate line — polygon direction change is sufficient.
-      return true
-    }
-    let start = Point(lat: defaults.double(forKey: "tripwire_gate_start_lat"), lng: defaults.double(forKey: "tripwire_gate_start_lng"))
-    let end = Point(lat: defaults.double(forKey: "tripwire_gate_end_lat"), lng: defaults.double(forKey: "tripwire_gate_end_lng"))
-    let a = Point(lat: from.coordinate.latitude, lng: from.coordinate.longitude)
-    let b = Point(lat: to.coordinate.latitude, lng: to.coordinate.longitude)
-    return segmentDistance(a, b, start, end) <= defaults.double(forKey: "tripwire_gate_tolerance")
   }
 
   private func xy(_ p: Point, _ origin: Point) -> (Double, Double) {
@@ -408,14 +515,51 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     return hypot(q.0 - t * e.0, q.1 - t * e.1)
   }
 
+  private func isNearBoundary(_ location: CLLocation) -> Bool {
+    if location.horizontalAccuracy > 15 { return true }
+    let points = polygon()
+    guard points.count >= 3 else { return false }
+    let point = Point(lat: location.coordinate.latitude, lng: location.coordinate.longitude)
+    return points.indices.map {
+      pointSegmentDistance(point, points[$0], points[($0 + 1) % points.count])
+    }.min() ?? .greatestFiniteMagnitude <= 20
+  }
+
+  private func clearCandidateEvidence() {
+    defaults.removeObject(forKey: candidateLastFixAtKey)
+    defaults.removeObject(forKey: candidateOriginLatKey)
+    defaults.removeObject(forKey: candidateOriginLngKey)
+    defaults.removeObject(forKey: candidateMovingKey)
+  }
+
+  private func candidateCrossesGate(to location: CLLocation) -> Bool {
+    guard defaults.bool(forKey: "tripwire_gate_enabled"),
+          defaults.object(forKey: candidateOriginLatKey) != nil,
+          defaults.object(forKey: candidateOriginLngKey) != nil else { return false }
+    let origin = Point(
+      lat: defaults.double(forKey: candidateOriginLatKey),
+      lng: defaults.double(forKey: candidateOriginLngKey)
+    )
+    let current = Point(lat: location.coordinate.latitude, lng: location.coordinate.longitude)
+    let gateStart = Point(
+      lat: defaults.double(forKey: "tripwire_gate_start_lat"),
+      lng: defaults.double(forKey: "tripwire_gate_start_lng")
+    )
+    let gateEnd = Point(
+      lat: defaults.double(forKey: "tripwire_gate_end_lat"),
+      lng: defaults.double(forKey: "tripwire_gate_end_lng")
+    )
+    return segmentDistance(origin, current, gateStart, gateEnd) <=
+      max(defaults.double(forKey: "tripwire_gate_tolerance"), 8)
+  }
+
   private func segmentDistance(_ a: Point, _ b: Point, _ c: Point, _ d: Point) -> Double {
-    // Gate corridors are deliberately tolerant; endpoint-to-segment distance
-    // plus the intersection test covers sparse background fixes.
     let aa = xy(a, a), bb = xy(b, a), cc = xy(c, a), dd = xy(d, a)
     func cross(_ p: (Double, Double), _ q: (Double, Double), _ r: (Double, Double)) -> Double {
       (q.0-p.0)*(r.1-p.1) - (q.1-p.1)*(r.0-p.0)
     }
-    if cross(aa,bb,cc) * cross(aa,bb,dd) <= 0 && cross(cc,dd,aa) * cross(cc,dd,bb) <= 0 { return 0 }
+    if cross(aa,bb,cc) * cross(aa,bb,dd) <= 0 &&
+       cross(cc,dd,aa) * cross(cc,dd,bb) <= 0 { return 0 }
     return min(pointSegmentDistance(a,c,d), pointSegmentDistance(b,c,d),
                pointSegmentDistance(c,a,b), pointSegmentDistance(d,a,b))
   }
@@ -427,6 +571,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     if status == .authorizedAlways || status == .authorizedWhenInUse {
       restoreIfNeeded()
     } else if status == .denied || status == .restricted {
+      reportMonitoringHealth(available: false, reason: "LOCATION_PERMISSION_DENIED")
       stopLocationBurst()
     }
   }
@@ -435,6 +580,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     if status == .authorizedAlways || status == .authorizedWhenInUse {
       restoreIfNeeded()
     } else if status == .denied || status == .restricted {
+      reportMonitoringHealth(available: false, reason: "LOCATION_PERMISSION_DENIED")
       stopLocationBurst()
     }
   }
@@ -443,7 +589,67 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     // Permission denial, disabled Location Services, and temporary position
     // failures are recoverable states. Do not let them destabilize the app.
     NSLog("CarmeLink location update failed: %@", error.localizedDescription)
+    evaluateMonitoringHealth()
     stopLocationBurst()
+  }
+
+  private func evaluateMonitoringHealth() {
+    if !CLLocationManager.locationServicesEnabled() {
+      reportMonitoringHealth(available: false, reason: "LOCATION_SERVICES_DISABLED")
+    } else if manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted {
+      reportMonitoringHealth(available: false, reason: "LOCATION_PERMISSION_DENIED")
+    } else if manager.authorizationStatus != .authorizedAlways {
+      reportMonitoringHealth(available: false, reason: "BACKGROUND_LOCATION_DENIED")
+    } else {
+      reportMonitoringHealth(available: true, reason: nil)
+    }
+  }
+
+  private func reportMonitoringHealth(available: Bool, reason: String?) {
+    let previous = defaults.object(forKey: monitoringAvailableKey) as? Bool
+    let previousReason = defaults.string(forKey: monitoringReasonKey)
+    guard previous != available || previousReason != reason else { return }
+    defaults.set(available, forKey: monitoringAvailableKey)
+    if let reason { defaults.set(reason, forKey: monitoringReasonKey) }
+    else { defaults.removeObject(forKey: monitoringReasonKey) }
+
+    if !available { showLocationDisabledReminder(reason: reason) }
+    else {
+      // Reset the cooldown so a new off/on/off cycle alerts immediately.
+      defaults.removeObject(forKey: "tripwire_last_location_reminder_at")
+      UNUserNotificationCenter.current().removePendingNotificationRequests(
+        withIdentifiers: ["carmelink_location_monitoring_off_repeat"]
+      )
+      UNUserNotificationCenter.current().removeDeliveredNotifications(
+        withIdentifiers: ["carmelink_location_monitoring_off"]
+      )
+    }
+    var healthBody: [String: Any] = ["p_available": available, "p_platform": "ios"]
+    if let reason { healthBody["p_reason"] = reason }
+    post(
+      path: "/rest/v1/rpc/set_my_location_monitoring_health",
+      body: healthBody
+    ) { _, _, _ in }
+  }
+
+  private func showLocationDisabledReminder(reason: String?) {
+    let last = defaults.double(forKey: "tripwire_last_location_reminder_at")
+    guard Date().timeIntervalSince1970 - last >= 3600 else { return }
+    defaults.set(Date().timeIntervalSince1970, forKey: "tripwire_last_location_reminder_at")
+    let content = UNMutableNotificationContent()
+    content.title = "Location monitoring is off"
+    content.body = reason == "BACKGROUND_LOCATION_DENIED"
+      ? "Allow Location Always in Settings to restore dormitory entry and exit alerts."
+      : "Turn on Location in Settings to restore dormitory entry and exit alerts."
+    content.sound = .default
+    content.userInfo = ["route_type": "location_settings"]
+    UNUserNotificationCenter.current().add(UNNotificationRequest(
+      identifier: "carmelink_location_monitoring_off", content: content, trigger: nil
+    ))
+    UNUserNotificationCenter.current().add(UNNotificationRequest(
+      identifier: "carmelink_location_monitoring_off_repeat", content: content,
+      trigger: UNTimeIntervalNotificationTrigger(timeInterval: 3600, repeats: true)
+    ))
   }
 
   func locationManager(
@@ -649,16 +855,62 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     }
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
-    request.httpBody = payload
-    request.timeoutInterval = 15
+    request.timeoutInterval = 30
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.setValue(apiKey, forHTTPHeaderField: "apikey")
     if includeAuthorization, let token = defaults.string(forKey: "tripwire_access_token") {
       request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     }
-    URLSession.shared.dataTask(with: request) { data, response, error in
-      completion((response as? HTTPURLResponse)?.statusCode ?? 0, data, error)
-    }.resume()
+
+    // Use a background URLSession upload task. Unlike URLSession.shared dataTask,
+    // upload tasks in a background session are managed by the OS and can complete
+    // even after iOS suspends the app at the end of its background execution time.
+    // This is the key fix for geofence events not uploading when the app is swiped
+    // from Recents and iOS fires didEnterRegion / didExitRegion.
+    do {
+      let tempFile = FileManager.default.temporaryDirectory
+        .appendingPathComponent("carmelink_\(UUID().uuidString).json")
+      try payload.write(to: tempFile)
+      let task = backgroundSession.uploadTask(with: request, fromFile: tempFile)
+      pendingHandlers[task.taskIdentifier] = { code, data, error in
+        try? FileManager.default.removeItem(at: tempFile)
+        completion(code, data, error)
+      }
+      task.resume()
+    } catch {
+      // Fallback: if temp file write fails, use shared session (foreground only).
+      URLSession.shared.dataTask(with: { var r = request; r.httpBody = payload; return r }()) { data, response, error in
+        completion((response as? HTTPURLResponse)?.statusCode ?? 0, data, error)
+      }.resume()
+    }
+  }
+
+  // ─── URLSessionDataDelegate (background upload completion) ────────────────
+
+  func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+    let id = dataTask.taskIdentifier
+    if pendingData[id] == nil { pendingData[id] = Data() }
+    pendingData[id]?.append(data)
+  }
+
+  func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      let id = task.taskIdentifier
+      let data = self.pendingData.removeValue(forKey: id)
+      let handler = self.pendingHandlers.removeValue(forKey: id)
+      let code = (task.response as? HTTPURLResponse)?.statusCode ?? 0
+      handler?(code, data, error)
+    }
+  }
+
+  /// Called by the OS when all background URLSession events for this session have
+  /// been delivered. Must call the stored completion handler so iOS can snapshot.
+  func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+    DispatchQueue.main.async { [weak self] in
+      self?.backgroundSessionCompletionHandler?()
+      self?.backgroundSessionCompletionHandler = nil
+    }
   }
 
   private func failSync(_ message: String) {
@@ -700,6 +952,8 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       "configVersion": defaults.integer(forKey: "tripwire_config_version"),
       "direction": defaults.string(forKey: confirmedDirectionKey) ?? NSNull(),
       "pendingDirection": defaults.string(forKey: queuedDirectionKey) ?? NSNull(),
+      "candidateDirection": defaults.string(forKey: candidateDirectionKey) ?? NSNull(),
+      "candidateFixCount": defaults.integer(forKey: candidateFixCountKey),
       "pendingCount": pendingEvents().count,
       "lastSyncError": defaults.string(forKey: "tripwire_last_sync_error") ?? NSNull(),
       "lastNotificationError": defaults.string(forKey: "tripwire_last_notification_error") ?? NSNull(),

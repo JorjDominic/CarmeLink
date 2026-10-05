@@ -1,5 +1,10 @@
 package com.example.carmelitas_dormitory_system
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -71,9 +76,29 @@ class MainActivity : FlutterActivity() {
                             result.success(true)
                         }
                     }
-                    "status" -> result.success(
-                        TripwireGeofenceManager(applicationContext).status(),
-                    )
+                    "status" -> {
+                        val status = TripwireGeofenceManager(applicationContext).status().toMutableMap()
+                        val power = getSystemService(PowerManager::class.java)
+                        status["batteryOptimizationExempt"] =
+                            power.isIgnoringBatteryOptimizations(packageName)
+                        status["manufacturer"] = Build.MANUFACTURER
+                        status["aggressiveTaskRemoval"] = Build.MANUFACTURER.lowercase() in setOf(
+                            "infinix", "tecno", "itel", "transsion", "xiaomi", "oppo", "realme", "vivo",
+                        )
+                        result.success(status)
+                    }
+                    "openBackgroundSettings" -> {
+                        try {
+                            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            })
+                        } catch (_: Exception) {
+                            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.parse("package:$packageName")
+                            })
+                        }
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             }

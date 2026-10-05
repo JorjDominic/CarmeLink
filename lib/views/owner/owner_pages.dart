@@ -6585,37 +6585,57 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                     'Tripwire history is supporting evidence, not live tracking',
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _FilterChip(
-                    label: 'All (${allTenants.length})',
-                    selected: _presenceFilter == 'all',
-                    badgeColor: const Color(0xFF627FA8),
-                    onTap: () => setState(() => _presenceFilter = 'all'),
-                  ),
-                  _FilterChip(
-                    label: 'Inside (${controller.tenantsInsideCount})',
-                    selected: _presenceFilter == 'in',
-                    badgeColor: const Color(0xFF56886B),
-                    onTap: () => setState(() => _presenceFilter = 'in'),
-                  ),
-                  _FilterChip(
-                    label: 'Outside (${controller.tenantsOutsideCount})',
-                    selected: _presenceFilter == 'out',
-                    badgeColor: const Color(0xFF627FA8),
-                    onTap: () => setState(() => _presenceFilter = 'out'),
-                  ),
-                  _FilterChip(
-                    label:
-                        'Unavailable (${controller.tenantsUnavailableCount})',
-                    selected: _presenceFilter == 'unavailable',
-                    badgeColor: const Color(0xFFC77800),
-                    onTap: () =>
-                        setState(() => _presenceFilter = 'unavailable'),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final chips = <Widget>[
+                    _FilterChip(
+                      label: 'All (${allTenants.length})',
+                      selected: _presenceFilter == 'all',
+                      badgeColor: const Color(0xFF627FA8),
+                      onTap: () => setState(() => _presenceFilter = 'all'),
+                    ),
+                    _FilterChip(
+                      label: 'Inside (${controller.tenantsInsideCount})',
+                      selected: _presenceFilter == 'in',
+                      badgeColor: const Color(0xFF56886B),
+                      onTap: () => setState(() => _presenceFilter = 'in'),
+                    ),
+                    _FilterChip(
+                      label: 'Outside (${controller.tenantsOutsideCount})',
+                      selected: _presenceFilter == 'out',
+                      badgeColor: const Color(0xFF627FA8),
+                      onTap: () => setState(() => _presenceFilter = 'out'),
+                    ),
+                    _FilterChip(
+                      label:
+                          'Unavailable (${controller.tenantsUnavailableCount})',
+                      selected: _presenceFilter == 'unavailable',
+                      badgeColor: const Color(0xFFC77800),
+                      onTap: () =>
+                          setState(() => _presenceFilter = 'unavailable'),
+                    ),
+                  ];
+
+                  if (constraints.maxWidth >= 700) {
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: chips,
+                    );
+                  }
+
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (var index = 0; index < chips.length; index++) ...[
+                          if (index > 0) const SizedBox(width: 8),
+                          chips[index],
+                        ],
+                      ],
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 12),
               if (filteredTenants.isEmpty)
@@ -9054,27 +9074,31 @@ class _AnnouncementsManagementPageState
                         ),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _categories.map((cat) {
-                      final isSelected = _selectedCategory == cat.$1;
-                      return FilterChip(
-                        avatar: Icon(
-                          cat.$3,
-                          size: 16,
-                          color: isSelected
-                              ? Colors.white
-                              : _categoryColor(cat.$1),
-                        ),
-                        label: Text(cat.$2),
-                        selected: isSelected,
-                        onSelected: (_) {
-                          setState(() => _selectedCategory = cat.$1);
-                          setSheetState(() {});
-                        },
-                      );
-                    }).toList(),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _categories.map((cat) {
+                        final isSelected = _selectedCategory == cat.$1;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            avatar: Icon(
+                              cat.$3,
+                              size: 16,
+                              color: isSelected
+                                  ? Colors.white
+                                  : _categoryColor(cat.$1),
+                            ),
+                            label: Text(cat.$2),
+                            selected: isSelected,
+                            onSelected: (_) {
+                              setState(() => _selectedCategory = cat.$1);
+                              setSheetState(() {});
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
                   const SizedBox(height: 18),
                   Text(
@@ -9086,20 +9110,24 @@ class _AnnouncementsManagementPageState
                         ),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _audiences.map((aud) {
-                      final isSelected = _selectedAudience == aud.$1;
-                      return ChoiceChip(
-                        label: Text(aud.$2),
-                        selected: isSelected,
-                        onSelected: (_) {
-                          setState(() => _selectedAudience = aud.$1);
-                          setSheetState(() {});
-                        },
-                      );
-                    }).toList(),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _audiences.map((aud) {
+                        final isSelected = _selectedAudience == aud.$1;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(aud.$2),
+                            selected: isSelected,
+                            onSelected: (_) {
+                              setState(() => _selectedAudience = aud.$1);
+                              setSheetState(() {});
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
                   const SizedBox(height: 22),
                   SizedBox(

@@ -1,5 +1,9 @@
 # CarmeLink
 
+> Documentation refreshed September 30, 2026. Use `STATUS.md` for current
+> readiness and open release gates, and `GEOFENCING_IMPLEMENTATION.md` for the
+> implemented mobile geofencing design and physical-device test matrix.
+
 > Current implementation status and known gaps are tracked in [`STATUS.md`](STATUS.md). Treat it as the canonical status source; longer planning/audit documents are supporting references.
 
 Production domain: `https://carmelitasdormitory.site`
@@ -10,8 +14,8 @@ gives tenants, guardians, and dormitory staff role-specific tools for payments,
 maintenance, gate activity, curfew, visitors, announcements, and communication.
 
 This README is a guide to every user-facing page currently implemented in the app.
-Development assignments and completion status are tracked separately in
-[`DEVELOPMENT_PROGRESS.md`](DEVELOPMENT_PROGRESS.md).
+Current completion, assignments, and release gaps are tracked in
+[`STATUS.md`](STATUS.md).
 
 > [!IMPORTANT]
 > The current repository is a strong functional prototype, not a verified
@@ -21,8 +25,7 @@ Development assignments and completion status are tracked separately in
 > migration/RLS parity, deployed secrets/functions, release signing, physical
 > FCM/geofence testing, and iOS Firebase/APNs remain release requirements.
 > Passing local tests does not prove every workflow against the live backend.
-> See the implementation sequence in
-> [`DEVELOPMENT_PROGRESS.md`](DEVELOPMENT_PROGRESS.md) and the complete
+> See the current priorities in [`STATUS.md`](STATUS.md) and the complete
 > requirements in
 > [`CARMELINK_FULL_SYSTEM_PLAN.md`](CARMELINK_FULL_SYSTEM_PLAN.md).
 
@@ -325,6 +328,13 @@ Selecting an area opens a focused page containing its related pages. Each manage
 #### Gate monitoring
 
 Displays geofence entry and exit events and alerts. Staff can review uncertain or flagged location events and record a manual decision.
+
+> **Future option — dorm Wi-Fi corroboration:** A managed router/controller may
+> later provide a supporting `LIKELY_IN` signal when GPS is unavailable. This
+> is not implemented, must remain separate from verified gate events, and
+> requires consent, enrollment, private-MAC support, dwell/de-duplication,
+> coverage testing, and restricted retention. Mobile SSID scanning alone is
+> not a reliable closed-app solution. See `GEOFENCING_IMPLEMENTATION.md`.
 
 #### Profile
 
@@ -657,11 +667,11 @@ For implementation details, see the official [Supabase user invitation guide](ht
 
 ## Implementation status
 
-Current local baseline (September 27, 2026, `5ecba11`): `flutter analyze`
-passes and all 460 tests pass. Native Android/iOS tripwires use circular OS
-regions as wake-up hints, then require polygon direction and official gate
-corridor confirmation before queueing a transition. This behavior is not yet
-production-proven on physical devices.
+Current geofencing baseline (September 30, 2026): focused tests and static
+analysis pass, and Android native Kotlin compilation succeeds. Native
+Android/iOS tripwires use circular OS regions as wake-up hints; the property
+polygon decides `IN/OUT`, while the official gate is an optional faster wake-up
+hint. This behavior is not yet production-proven on physical devices.
 
 - Authentication uses Supabase Auth. Role routing is based on a protected
   profile record rather than email text or client metadata.
@@ -670,7 +680,8 @@ production-proven on physical devices.
   emergency-contact Call action.
 - Receipt OCR uses on-device text recognition and remains a suggestion rather
   than authoritative payment evidence.
-- Foreground geofencing and native hybrid tripwires exist. Polygon/corridor
+- Foreground geofencing and native hybrid tripwires exist. Polygon transitions,
+  two-fix recovery reconciliation, offline queues, and optional gate wake-up
   semantics are implemented; physical background behavior remains under
   validation.
 - Secure media paths support protected Supabase Storage and Cloudinary-backed
@@ -679,7 +690,8 @@ production-proven on physical devices.
   payments/utilities, maintenance, visitors, curfew, conduct/appeals, and
   inspection completion. Secondary module hooks, preferences, and live device
   delivery are incomplete or unverified.
-- Current local verification: `flutter analyze` passes and all 460 tests pass.
+- Current change verification is recorded in `STATUS.md`; do not reuse older
+  repository-wide test totals as current evidence.
 
 Before release, synchronize migrations to clean staging, complete the negative
 role/RLS/Storage matrix, deploy and verify Edge Function secrets, configure

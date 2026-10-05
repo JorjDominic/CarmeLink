@@ -1,5 +1,9 @@
 # CarmeLink — Full System Plan
 
+> Architecture baseline retained September 30, 2026. This long-form plan is not
+> the current completion tracker. See `STATUS.md` for present implementation and
+> release gates, and `GEOFENCING_IMPLEMENTATION.md` for current tripwire behavior.
+
 ## Proposed System: Carmelita's Dormitory Management System
 
 CarmeLink is a role-based dormitory management platform for Carmelita's Dormitory. It is designed to centralize tenant records, guardian relationships, room and bed assignments, payments, maintenance, curfew and gate monitoring, visitor requests, announcements, messaging, safety reports, contracts, and administrative reporting in one system.
@@ -2738,11 +2742,14 @@ The production system should use the minimum data necessary for each function an
 
 # 52. Development Phases — Two-Developer Parallel Plan
 
-The phases below follow the current ZIP and the ownership model in `DEVELOPMENT_PROGRESS.md`. They are not meant to force both developers to finish one entire phase before moving. The goal is to expose a stable backend contract from Developer 1, then let Developer 2 connect the matching Tenant/Guardian workflow in parallel.
+The phases below follow the current ZIP and the ownership summary in `STATUS.md`.
+They are not meant to force both developers to finish one entire phase before
+moving. The goal is to expose a stable backend contract from Developer 1, then
+let Developer 2 connect the matching Tenant/Guardian workflow in parallel.
 
 ### September 27 source reconciliation
 
-Current named ownership in `DEVELOPMENT_PROGRESS.md` supersedes the older
+Current named ownership in `STATUS.md` supersedes the older
 Developer 1/Developer 2 labels below. A full source/history audit of current
 `main` also found that multiple Developer 2 checkboxes were stale after Japle
 commits were merged. The checkmarks updated below reflect repository
@@ -3439,7 +3446,7 @@ required signer. Guardian ID/signature and witness signature are optional by
 default but configurable per contract. Electronic signature capture remains
 planned and cannot be treated as a replacement for the physical process until
 the client approves it. The canonical detailed staff/tenant run-through is in
-`DEVELOPMENT_PROGRESS.md` under **Canonical new-tenant workflow**.
+this onboarding section and the current implementation notes in `STATUS.md`.
 
 ### Security and document rules
 

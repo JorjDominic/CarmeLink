@@ -7,8 +7,32 @@ import kotlin.math.*
 
 /** Exact polygon + official-gate verifier. The OS circle is only a wake-up hint. */
 object TripwireCrossingVerifier {
-    private const val MAX_ACCURACY_METERS = 35f
+    private const val MAX_ACCURACY_METERS = 45f
+    private const val MAX_CONFIRM_ACCURACY_METERS = 35f
     private const val MAX_AGE_MILLIS = 120_000L
+    private const val CANDIDATE_DIRECTION = "candidate_direction"
+    private const val CANDIDATE_FIX_COUNT = "candidate_fix_count"
+    private const val CANDIDATE_STARTED_AT = "candidate_started_at"
+    private const val CANDIDATE_LAST_FIX_AT = "candidate_last_fix_at"
+    private const val CANDIDATE_ORIGIN_LATITUDE = "candidate_origin_latitude_bits"
+    private const val CANDIDATE_ORIGIN_LONGITUDE = "candidate_origin_longitude_bits"
+    private const val CANDIDATE_MOVING = "candidate_moving"
+    private const val REQUIRED_MATCHING_FIXES = 2
+    private const val MIN_CANDIDATE_FIX_SPACING_MILLIS = 8_000L
+    private const val MIN_EDGE_BUFFER_METERS = 8.0
+    private const val MIN_WALKING_SPEED_METERS_PER_SECOND = 0.5f
+    private const val HIGH_ACCURACY_EDGE_METERS = 20.0
+
+    fun shouldUseHighAccuracy(context: Context, location: Location): Boolean {
+        if (location.accuracy < 0 || location.accuracy > 15f) return true
+        val prefs = context.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE)
+        val polygon = parsePolygon(prefs.getString("polygon", "[]"))
+        if (polygon.size < 3) return false
+        val point = Point(location.latitude, location.longitude)
+        return polygon.indices.minOf { index ->
+            pointToSegmentMeters(point, polygon[index], polygon[(index + 1) % polygon.size])
+        } <= HIGH_ACCURACY_EDGE_METERS
+    }
 
     fun accept(context: Context, location: Location): String? {
         // Quality gate — reject stale or inaccurate fixes.
@@ -21,14 +45,16 @@ object TripwireCrossingVerifier {
         // regardless of whether the virtual gate line is configured.
         if (polygon.size < 3) return null
 
-        val gateEnabled = prefs.getBoolean("gate_enabled", false)
         // Pending events represent the latest physical state, but are not
         // promoted to confirmed_direction until the server stores them.
         val previousDirection = prefs.getString(TripwireGeofenceManager.QUEUED_DIRECTION, null)
             ?: prefs.getString("confirmed_direction", null)
 
         val inside = pointInPolygon(location.latitude, location.longitude, polygon)
-        val edgeBuffer = prefs.getFloat("edge_buffer_meters", 3f).toDouble()
+        val edgeBuffer = max(
+            prefs.getFloat("edge_buffer_meters", 3f).toDouble(),
+            MIN_EDGE_BUFFER_METERS,
+        )
         val edgeDistance = polygon.indices.minOf { index ->
             pointToSegmentMeters(
                 Point(location.latitude, location.longitude),
@@ -42,12 +68,12 @@ object TripwireCrossingVerifier {
             else -> "OUT"
         }
 
-        val previous = if (prefs.contains("last_latitude_bits") && prefs.contains("last_longitude_bits")) {
-            Point(
-                Double.fromBits(prefs.getLong("last_latitude_bits", 0)),
-                Double.fromBits(prefs.getLong("last_longitude_bits", 0)),
-            )
-        } else null
+        val previousLocation = if (
+            prefs.contains("last_latitude_bits") && prefs.contains("last_longitude_bits")
+        ) Point(
+            Double.fromBits(prefs.getLong("last_latitude_bits", 0L)),
+            Double.fromBits(prefs.getLong("last_longitude_bits", 0L)),
+        ) else null
 
         prefs.edit()
             .putLong("last_latitude_bits", location.latitude.toBits())
@@ -57,34 +83,87 @@ object TripwireCrossingVerifier {
 
         if (previousDirection == null) {
             // Establish baseline — first fix after cold-start is not a crossing.
-            prefs.edit().putString("confirmed_direction", direction).apply()
+            prefs.edit()
+                .putString("confirmed_direction", direction)
+                .remove(CANDIDATE_DIRECTION)
+                .remove(CANDIDATE_FIX_COUNT)
+                .remove(CANDIDATE_STARTED_AT)
+                .remove(CANDIDATE_LAST_FIX_AT)
+                .remove(CANDIDATE_ORIGIN_LATITUDE)
+                .remove(CANDIDATE_ORIGIN_LONGITUDE)
+                .remove(CANDIDATE_MOVING)
+                .apply()
             return null
         }
-        if (direction == previousDirection) return null // No crossing.
-
-        // Direction changed — now decide whether to commit it.
-        if (gateEnabled && previous != null) {
-            // Gate line is configured: additionally require the movement path
-            // to cross (or come within tolerance of) the gate segment.
-            // This prevents false triggers from someone stationary near the fence.
-            val gateStart = Point(
-                Double.fromBits(prefs.getLong("gate_start_latitude_bits", 0)),
-                Double.fromBits(prefs.getLong("gate_start_longitude_bits", 0)),
-            )
-            val gateEnd = Point(
-                Double.fromBits(prefs.getLong("gate_end_latitude_bits", 0)),
-                Double.fromBits(prefs.getLong("gate_end_longitude_bits", 0)),
-            )
-            val tolerance = prefs.getFloat("gate_tolerance_meters", 15f).toDouble()
-            val crossedGate = segmentDistanceMeters(
-                previous, Point(location.latitude, location.longitude),
-                gateStart, gateEnd,
-            ) <= tolerance
-            return if (crossedGate) direction else null
+        if (direction == previousDirection) {
+            prefs.edit()
+                .remove(CANDIDATE_DIRECTION)
+                .remove(CANDIDATE_FIX_COUNT)
+                .remove(CANDIDATE_STARTED_AT)
+                .remove(CANDIDATE_LAST_FIX_AT)
+                .remove(CANDIDATE_ORIGIN_LATITUDE)
+                .remove(CANDIDATE_ORIGIN_LONGITUDE)
+                .remove(CANDIDATE_MOVING)
+                .apply()
+            return null // No crossing.
         }
 
-        // No gate line configured (or no previous location to compute movement):
-        // polygon direction change alone is sufficient evidence of a crossing.
+        // A first fix on the opposite side may be a transient GPS jump. Require
+        // a second consecutive accurate fix before recording either a normal
+        // background crossing or post-force-stop state reconciliation.
+        val previousCandidate = prefs.getString(CANDIDATE_DIRECTION, null)
+        val lastCandidateFixAt = prefs.getLong(CANDIDATE_LAST_FIX_AT, 0L)
+        val sufficientlySeparated = location.time - lastCandidateFixAt >=
+            MIN_CANDIDATE_FIX_SPACING_MILLIS
+        val candidateCount = if (previousCandidate == direction && sufficientlySeparated) {
+            prefs.getInt(CANDIDATE_FIX_COUNT, 0) + 1
+        } else if (previousCandidate == direction) {
+            prefs.getInt(CANDIDATE_FIX_COUNT, 1)
+        } else {
+            1
+        }
+        val newCandidate = previousCandidate != direction
+        val candidateMoving = (!newCandidate && prefs.getBoolean(CANDIDATE_MOVING, false)) ||
+            (location.hasSpeed() && location.speed >= MIN_WALKING_SPEED_METERS_PER_SECOND)
+        val editor = prefs.edit()
+            .putString(CANDIDATE_DIRECTION, direction)
+            .putInt(CANDIDATE_FIX_COUNT, candidateCount)
+            .putBoolean(CANDIDATE_MOVING, candidateMoving)
+        if (newCandidate) {
+            editor.putLong(CANDIDATE_STARTED_AT, System.currentTimeMillis())
+            val origin = previousLocation ?: Point(location.latitude, location.longitude)
+            editor.putLong(CANDIDATE_ORIGIN_LATITUDE, origin.lat.toBits())
+                .putLong(CANDIDATE_ORIGIN_LONGITUDE, origin.lng.toBits())
+        }
+        if (newCandidate || sufficientlySeparated) {
+            editor.putLong(CANDIDATE_LAST_FIX_AT, location.time)
+        }
+        editor.apply()
+        if (candidateCount < REQUIRED_MATCHING_FIXES) return null
+        // Ensure final confirmation meets strict accuracy standards
+        if (location.accuracy > MAX_CONFIRM_ACCURACY_METERS) return null
+
+        // A stationary phone must not become OUT merely because indoor GPS
+        // settles a few metres beyond the polygon. For departure, require
+        // walking evidence or a movement segment through the configured gate.
+        if (direction == "OUT" && !candidateMoving && !candidateCrossesGate(prefs, location)) {
+            return null
+        }
+        prefs.edit()
+            .remove(CANDIDATE_DIRECTION)
+            .remove(CANDIDATE_FIX_COUNT)
+            .remove(CANDIDATE_STARTED_AT)
+            .remove(CANDIDATE_LAST_FIX_AT)
+            .remove(CANDIDATE_ORIGIN_LATITUDE)
+            .remove(CANDIDATE_ORIGIN_LONGITUDE)
+            .remove(CANDIDATE_MOVING)
+            .apply()
+
+        // The precise polygon result is authoritative. The optional gate region
+        // is only an additional low-latency wake-up hint; requiring sparse
+        // movement fixes to intersect that short segment discarded valid exits
+        // when Android delivered a callback beyond the gate. Accuracy,
+        // freshness, hysteresis, and duplicate checks still protect this event.
         return direction
     }
 
@@ -126,6 +205,31 @@ object TripwireCrossingVerifier {
         return hypot(p.x - t * end.x, p.y - t * end.y)
     }
 
+    private fun candidateCrossesGate(
+        prefs: android.content.SharedPreferences,
+        location: Location,
+    ): Boolean {
+        if (!prefs.getBoolean("gate_enabled", false)) return false
+        if (!prefs.contains(CANDIDATE_ORIGIN_LATITUDE) ||
+            !prefs.contains(CANDIDATE_ORIGIN_LONGITUDE)
+        ) return false
+        val origin = Point(
+            Double.fromBits(prefs.getLong(CANDIDATE_ORIGIN_LATITUDE, 0L)),
+            Double.fromBits(prefs.getLong(CANDIDATE_ORIGIN_LONGITUDE, 0L)),
+        )
+        val current = Point(location.latitude, location.longitude)
+        val gateStart = Point(
+            Double.fromBits(prefs.getLong("gate_start_latitude_bits", 0L)),
+            Double.fromBits(prefs.getLong("gate_start_longitude_bits", 0L)),
+        )
+        val gateEnd = Point(
+            Double.fromBits(prefs.getLong("gate_end_latitude_bits", 0L)),
+            Double.fromBits(prefs.getLong("gate_end_longitude_bits", 0L)),
+        )
+        val tolerance = max(prefs.getFloat("gate_tolerance_meters", 3.75f).toDouble(), 8.0)
+        return segmentDistanceMeters(origin, current, gateStart, gateEnd) <= tolerance
+    }
+
     private fun segmentDistanceMeters(a: Point, b: Point, c: Point, d: Point): Double {
         if (segmentsIntersect(xy(a, a), xy(b, a), xy(c, a), xy(d, a))) return 0.0
         return minOf(
@@ -135,9 +239,10 @@ object TripwireCrossingVerifier {
     }
 
     private fun segmentsIntersect(a: XY, b: XY, c: XY, d: XY): Boolean {
-        fun cross(p: XY, q: XY, r: XY) = (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)
-        val abC = cross(a, b, c); val abD = cross(a, b, d)
-        val cdA = cross(c, d, a); val cdB = cross(c, d, b)
-        return abC * abD <= 0.0 && cdA * cdB <= 0.0
+        fun cross(p: XY, q: XY, r: XY) =
+            (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)
+        return cross(a, b, c) * cross(a, b, d) <= 0.0 &&
+            cross(c, d, a) * cross(c, d, b) <= 0.0
     }
+
 }

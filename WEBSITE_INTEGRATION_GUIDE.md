@@ -1,5 +1,9 @@
 # CarmeLink — Owner & Caretaker Web Dashboard Integration Guide
 
+> Reviewed during the September 30, 2026 documentation consolidation. This is
+> a web integration reference, not a completion tracker; use `STATUS.md` for
+> current readiness.
+
 This guide provides comprehensive technical instructions for connecting a web frontend (React, Next.js, Vue, Svelte, or Flutter Web) to the **CarmeLink** Supabase backend. It covers connection setup, authentication & role authorization, database schemas, Edge Functions, storage buckets, and real-time subscriptions.
 
 ---
@@ -893,4 +897,3 @@ export function subscribeToStaffUpdates(callbacks: {
    * All Edge Functions (`create-user`, `manage-user`) are equipped with permissive CORS headers (`Access-Control-Allow-Origin: *`). If you experience CORS errors, verify that your client passes `Authorization: Bearer <token>` and `apikey: <anon_key>` correctly.
 4. **Dates and Timezones**:
    * Store and read dates using ISO-8601 (`timestamptz`). When filtering date columns such as `due_date` (PostgreSQL `date`), use the `'YYYY-MM-DD'` string format.
-

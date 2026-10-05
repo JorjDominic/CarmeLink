@@ -76,6 +76,19 @@ class TripwireGeofenceManager(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         )
 
+    private fun monitoringIntent(action: String = TripwireLocationBurstService.ACTION_START) =
+        Intent(context, TripwireLocationBurstService::class.java).setAction(action)
+
+    private fun startPersistentMonitoring() {
+        if (!MainActivity.isInForeground) return
+        try {
+            ContextCompat.startForegroundService(context, monitoringIntent())
+        } catch (_: RuntimeException) {
+            // A geofence callback or the next visible app start retries this
+            // if Android temporarily rejects a background service start.
+        }
+    }
+
     fun register(
         latitude: Double,
         longitude: Double,
@@ -142,6 +155,8 @@ class TripwireGeofenceManager(private val context: Context) {
         if (initialDirection == "IN" || initialDirection == "OUT") {
             editor.putString("confirmed_direction", initialDirection)
         }
+        editor.remove("candidate_direction").remove("candidate_fix_count")
+            .remove("candidate_started_at")
         editor.apply()
 
         // Seed the movement segment without creating an event. The next OS
@@ -199,7 +214,13 @@ class TripwireGeofenceManager(private val context: Context) {
         client.removeGeofences(pendingIntent).addOnCompleteListener {
             try {
                 client.addGeofences(request, pendingIntent)
-                    .addOnSuccessListener { result.success(true) }
+                    .addOnSuccessListener {
+                        // Keep exact polygon monitoring alive after the task is
+                        // removed from Recents. Android still stops it after a
+                        // user-initiated Force Stop until the app is reopened.
+                        startPersistentMonitoring()
+                        result.success(true)
+                    }
                     .addOnFailureListener { error ->
                         prefs.edit().putBoolean("registered", false).apply()
                         result.error("registration_failed", error.message, null)
@@ -242,6 +263,7 @@ class TripwireGeofenceManager(private val context: Context) {
 
     fun unregister(result: MethodChannel.Result) {
         client.removeGeofences(pendingIntent).addOnCompleteListener {
+            context.stopService(monitoringIntent(TripwireLocationBurstService.ACTION_STOP))
             prefs.edit().clear().apply()
             result.success(true)
         }
@@ -296,6 +318,8 @@ class TripwireGeofenceManager(private val context: Context) {
         "configVersion" to prefs.getInt("config_version", 1),
         "direction" to prefs.getString("confirmed_direction", null),
         "pendingDirection" to prefs.getString(QUEUED_DIRECTION, null),
+        "candidateDirection" to prefs.getString("candidate_direction", null),
+        "candidateFixCount" to prefs.getInt("candidate_fix_count", 0),
         "pendingCount" to try { JSONArray(prefs.getString(QUEUE, "[]")).length() } catch (_: Exception) { 0 },
         "lastSyncError" to prefs.getString("last_sync_error", null),
         "lastSyncedAt" to prefs.getLong("last_synced_at", 0L).takeIf { it > 0L },

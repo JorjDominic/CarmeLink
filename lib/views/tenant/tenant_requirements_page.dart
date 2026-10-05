@@ -113,7 +113,7 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
       if (!mounted) return;
       await showDialog<void>(
         context: context,
-        builder: (_) => _DocumentPreviewDialog(
+        builder: (_) => ContractDocumentPreviewDialog(
           title: item.label,
           mimeType: _mimeType(item.originalFilename?.split('.').last),
           bytes: bytes,
@@ -754,8 +754,8 @@ class _RequirementCard extends StatelessWidget {
   }
 }
 
-class _DocumentPreviewDialog extends StatelessWidget {
-  const _DocumentPreviewDialog({
+class ContractDocumentPreviewDialog extends StatelessWidget {
+  const ContractDocumentPreviewDialog({
     required this.title,
     required this.mimeType,
     required this.bytes,

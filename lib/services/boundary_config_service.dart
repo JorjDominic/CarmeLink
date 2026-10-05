@@ -78,8 +78,11 @@ class BoundaryConfigService {
     await loadActiveConfig();
   }
 
-  /// Configures the official gate corridor used by the second-stage verifier.
-  /// Passing [enabled] as false safely disables automatic crossing events.
+  /// Configures the optional official-gate wake-up corridor.
+  ///
+  /// The property polygon remains authoritative for IN/OUT decisions. Passing
+  /// [enabled] as false removes the extra gate wake-up hint without disabling
+  /// automatic boundary events.
   Future<void> updateGateConfig({
     required bool enabled,
     LatLngPoint? start,

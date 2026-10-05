@@ -4747,27 +4747,31 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
                         ),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _categories.map((cat) {
-                      final isSelected = _selectedCategory == cat.$1;
-                      return FilterChip(
-                        avatar: Icon(
-                          cat.$3,
-                          size: 16,
-                          color: isSelected
-                              ? Colors.white
-                              : _categoryColor(cat.$1),
-                        ),
-                        label: Text(cat.$2),
-                        selected: isSelected,
-                        onSelected: (_) {
-                          setState(() => _selectedCategory = cat.$1);
-                          setSheetState(() {});
-                        },
-                      );
-                    }).toList(),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _categories.map((cat) {
+                        final isSelected = _selectedCategory == cat.$1;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            avatar: Icon(
+                              cat.$3,
+                              size: 16,
+                              color: isSelected
+                                  ? Colors.white
+                                  : _categoryColor(cat.$1),
+                            ),
+                            label: Text(cat.$2),
+                            selected: isSelected,
+                            onSelected: (_) {
+                              setState(() => _selectedCategory = cat.$1);
+                              setSheetState(() {});
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
                   const SizedBox(height: 22),
                   SizedBox(
@@ -4898,33 +4902,35 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
           ),
           if (hasActiveFilter) ...[
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  'Filter:',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.taupe,
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                InputChip(
-                  visualDensity: VisualDensity.compact,
-                  label: Text(_categoryTitle(_selectedCategory)),
-                  avatar: Icon(_categoryIcon(_selectedCategory), size: 14),
-                  onDeleted: () => setState(() => _selectedCategory = 'all'),
-                ),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Text(
+                    'Filter:',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.taupe,
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
-                  onPressed: () => setState(() => _selectedCategory = 'all'),
-                  child: const Text('Clear', style: TextStyle(fontSize: 12)),
-                ),
-              ],
+                  const SizedBox(width: 6),
+                  InputChip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text(_categoryTitle(_selectedCategory)),
+                    avatar: Icon(_categoryIcon(_selectedCategory), size: 14),
+                    onDeleted: () => setState(() => _selectedCategory = 'all'),
+                  ),
+                  const SizedBox(width: 4),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                    ),
+                    onPressed: () => setState(() => _selectedCategory = 'all'),
+                    child: const Text('Clear', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
             ),
           ],
           const SizedBox(height: 12),
@@ -5403,9 +5409,15 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
               showAllPresenceRecords ? events : events.take(5).toList();
           final monitoringActive = _monitoringStatus['registered'] == true;
           final gateConfigured = _monitoringStatus['gateEnabled'] == true;
-          final automaticReady = monitoringActive && gateConfigured;
+          final automaticReady = monitoringActive;
           final pendingTransitions =
               (_monitoringStatus['pendingCount'] as num?)?.toInt() ?? 0;
+          final aggressiveTaskRemoval =
+              _monitoringStatus['aggressiveTaskRemoval'] == true;
+          final batteryExempt =
+              _monitoringStatus['batteryOptimizationExempt'] == true;
+          final deviceManufacturer =
+              _monitoringStatus['manufacturer']?.toString() ?? 'Android';
 
           final isInside = controller.isInside;
           final isOutside = controller.isOutside;
@@ -5560,10 +5572,10 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                                     pendingTransitions > 0
                                         ? '$pendingTransitions crossing event(s) waiting to sync.'
                                         : automaticReady
-                                            ? 'Wake-up and Point 1 → Point 2 gate detection are registered.'
-                                            : !gateConfigured
-                                                ? 'The official gate configuration has not reached this device yet.'
-                                                : 'Enable Always / Allow all the time location access.',
+                                            ? gateConfigured
+                                                ? 'Property boundary monitoring and the optional gate wake-up are registered.'
+                                                : 'Property boundary monitoring is registered; the optional gate wake-up is not configured.'
+                                            : 'Enable Always / Allow all the time location access.',
                                     style:
                                         Theme.of(context).textTheme.bodySmall,
                                   ),
@@ -5698,6 +5710,45 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                   ),
                 ),
               ],
+              if (aggressiveTaskRemoval && !batteryExempt) ...[
+                const SizedBox(height: 12),
+                CarmelitaCard(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.battery_alert_outlined,
+                          color: Color(0xFFC77800)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$deviceManufacturer background setup required',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 3),
+                            const Text(
+                              'Set CarmeLink battery use to Unrestricted, enable Auto-start, and lock it in Recents. Some devices otherwise convert a Recents swipe into Force Stop.',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              onPressed: () => TripwireGeofenceService.instance
+                                  .openBackgroundSettings(),
+                              icon:
+                                  const Icon(Icons.settings_outlined, size: 17),
+                              label: const Text('Open battery settings'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               if (!automaticReady) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -5729,9 +5780,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              !gateConfigured
-                                  ? 'Refresh monitoring after the Point 1 → Point 2 gate configuration is deployed.'
-                                  : 'Turn on location services and grant Always / Allow all the time access so crossings can be logged while CarmeLink is closed.',
+                              'Turn on location services and grant Always / Allow all the time access so crossings can be logged while CarmeLink is closed.',
                               style: TextStyle(fontSize: 13),
                             ),
                             const SizedBox(height: 8),
@@ -5792,10 +5841,10 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
                     label: 'Detection signal',
                     value: automaticReady ? 'Active' : 'Needs attention',
                     detail: automaticReady
-                        ? 'Wake circle + Point 1 → Point 2 gate'
-                        : !gateConfigured
-                            ? 'Gate configuration pending'
-                            : 'Check Always location access',
+                        ? gateConfigured
+                            ? 'Property polygon + optional gate wake-up'
+                            : 'Property polygon monitoring'
+                        : 'Check Always location access',
                     icon: !automaticReady
                         ? Icons.location_disabled_outlined
                         : Icons.gps_fixed_outlined,

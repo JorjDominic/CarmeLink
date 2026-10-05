@@ -1,6 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+
+class GuardianPresenceUpdateRequest {
+  const GuardianPresenceUpdateRequest({
+    required this.id,
+    required this.tenantId,
+    required this.requestedAt,
+    this.dispatchedAt,
+    this.pushDeliveredAt,
+  });
+
+  final String id;
+  final String tenantId;
+  final DateTime requestedAt;
+  final DateTime? dispatchedAt;
+  final DateTime? pushDeliveredAt;
+
+  String get deliveryStatus => pushDeliveredAt != null
+      ? 'Push delivered'
+      : dispatchedAt != null
+          ? 'In-app notification created'
+          : 'Pending dispatch';
+
+  factory GuardianPresenceUpdateRequest.fromRow(Map<String, dynamic> row) {
+    DateTime? parse(dynamic value) =>
+        value == null ? null : DateTime.tryParse(value.toString())?.toLocal();
+    return GuardianPresenceUpdateRequest(
+      id: row['id']?.toString() ?? '',
+      tenantId: row['tenant_id']?.toString() ?? '',
+      requestedAt: parse(row['requested_at']) ?? DateTime.now(),
+      dispatchedAt: parse(row['dispatched_at']),
+      pushDeliveredAt: parse(row['push_delivered_at']),
+    );
+  }
+}
 
 /// Service managing the independent guardian personal alert notification preference.
 ///
@@ -23,6 +58,50 @@ class GuardianAlertService {
   static bool get gateExitEnabled => _gateExitEnabled;
   static bool get outsideAfterCutoffEnabled => _outsideAfterCutoffEnabled;
   static bool get insideAfterCutoffEnabled => _insideAfterCutoffEnabled;
+
+  /// Asks the linked tenant to refresh presence without changing their status.
+  /// Link validation and rate limiting are enforced again by the backend.
+  static Future<void> requestTenantStatusUpdate(String tenantId) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null || client.auth.currentUser == null) {
+      throw Exception('Sign in as a guardian to send a reminder.');
+    }
+    try {
+      final response = await client.functions.invoke(
+        'request-tenant-status-update',
+        body: {'tenant_id': tenantId},
+      );
+      if (response.status < 200 || response.status >= 300) {
+        final data = response.data;
+        final message = data is Map ? data['error']?.toString() : null;
+        throw Exception(message ?? 'Unable to send the presence reminder.');
+      }
+    } on FunctionException catch (error) {
+      final details = error.details;
+      final message = details is Map ? details['error']?.toString() : null;
+      throw Exception(message ?? 'Unable to send the presence reminder.');
+    }
+  }
+
+  static Future<List<GuardianPresenceUpdateRequest>> loadStatusRequests(
+    String tenantId, {
+    int limit = 5,
+  }) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null || client.auth.currentUser == null) return const [];
+    final rows = await client
+        .from('guardian_status_update_requests')
+        .select('id, tenant_id, requested_at, dispatched_at, push_delivered_at')
+        .eq('tenant_id', tenantId)
+        .order('requested_at', ascending: false)
+        .limit(limit);
+    return (rows as List)
+        .whereType<Map>()
+        .map((row) => GuardianPresenceUpdateRequest.fromRow(
+              Map<String, dynamic>.from(row),
+            ))
+        .toList(growable: false);
+  }
 
   @visibleForTesting
   static void setPreferredAlertTime(TimeOfDay time) {
