@@ -373,15 +373,15 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
           children: [
             Text(
               item.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+              softWrap: true,
               style: const TextStyle(fontWeight: FontWeight.w800),
             ),
             if (item.body.trim().isNotEmpty)
               Text(
                 item.body,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                maxLines: 3,
+                softWrap: true,
               ),
           ],
         ),
@@ -655,6 +655,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                           Navigator.of(dialogContext).pop();
                           _select(value);
                         },
+                        showUtilityDestinations: false,
                       ),
                     ),
                   ),
@@ -854,21 +855,12 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                     children: [
                       _WebStaffSidebar(
                         roleLabel: widget.roleLabel,
-                        unreadMessageCount: unreadMessageCount,
-                        unreadNotificationCount: _unreadNotificationCount,
                         destinations: activeDestinations,
                         mainDestinationCount: widget.destinations.length,
                         selectedIndex: activeIndex,
                         expandedGroups: _expandedWebGroups,
                         onGroupToggle: _toggleWebGroup,
                         onSelected: _select,
-                        onOpenMessages: _openMessages,
-                        onOpenNotifications: _openNotifications,
-                        onOpenPage: (label, page) => _openWebWorkspacePage(
-                          page,
-                          label: label,
-                          group: 'Account',
-                        ),
                       ),
                       const VerticalDivider(width: 1),
                       Expanded(
@@ -881,6 +873,11 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                                   'Workspace',
                               pageLabel:
                                   _workspaceLabelOverride ?? destination.label,
+                              unreadMessageCount: unreadMessageCount,
+                              unreadNotificationCount: _unreadNotificationCount,
+                              onMessages: _openMessages,
+                              onNotifications: _openNotifications,
+                              onProfile: () => _selectByLabel('Profile'),
                             ),
                             Expanded(
                               child: _webWorkspace(page, activeIndex),
@@ -898,6 +895,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
                         unreadNotificationCount: _unreadNotificationCount,
                         onMessages: _openMessages,
                         onNotifications: _openNotifications,
+                        onProfile: () => _selectByLabel('Profile'),
                         onMenu: _openMenu,
                       ),
                       Expanded(child: _webWorkspace(page, activeIndex)),
@@ -933,6 +931,7 @@ class _CompactWebNavigationBar extends StatefulWidget {
     required this.unreadNotificationCount,
     required this.onMessages,
     required this.onNotifications,
+    required this.onProfile,
     required this.onMenu,
   });
 
@@ -941,6 +940,7 @@ class _CompactWebNavigationBar extends StatefulWidget {
   final int unreadNotificationCount;
   final VoidCallback onMessages;
   final VoidCallback onNotifications;
+  final VoidCallback onProfile;
   final Future<void> Function() onMenu;
 
   @override
@@ -1041,21 +1041,29 @@ class _CompactWebNavigationBarState extends State<_CompactWebNavigationBar>
                 onPressed: widget.onNotifications,
               ),
               const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 11,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerLow,
+              Tooltip(
+                message: 'Account',
+                child: InkWell(
+                  key: const Key('web-header-account'),
+                  onTap: widget.onProfile,
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: theme.dividerColor),
-                ),
-                child: Text(
-                  widget.roleLabel,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w800,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: theme.dividerColor),
+                    ),
+                    child: Text(
+                      widget.roleLabel,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1075,11 +1083,21 @@ class _WebWorkspaceContextBar extends StatelessWidget {
     required this.roleLabel,
     required this.groupLabel,
     required this.pageLabel,
+    required this.unreadMessageCount,
+    required this.unreadNotificationCount,
+    required this.onMessages,
+    required this.onNotifications,
+    required this.onProfile,
   });
 
   final String roleLabel;
   final String groupLabel;
   final String pageLabel;
+  final int unreadMessageCount;
+  final int unreadNotificationCount;
+  final VoidCallback onMessages;
+  final VoidCallback onNotifications;
+  final VoidCallback onProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -1118,6 +1136,7 @@ class _WebWorkspaceContextBar extends StatelessWidget {
                   ),
                   Text(
                     groupLabel,
+                    softWrap: true,
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: colors.onSurfaceVariant,
                     ),
@@ -1129,6 +1148,7 @@ class _WebWorkspaceContextBar extends StatelessWidget {
                   ),
                   Text(
                     pageLabel,
+                    softWrap: true,
                     style: theme.textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: colors.onSurface,
@@ -1136,6 +1156,23 @@ class _WebWorkspaceContextBar extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(width: 8),
+            _CountedIconButton(
+              tooltip: 'Messages',
+              icon: Icons.chat_bubble_outline,
+              unreadCount: unreadMessageCount,
+              onPressed: onMessages,
+            ),
+            _NotificationIconButton(
+              unreadCount: unreadNotificationCount,
+              onPressed: onNotifications,
+            ),
+            IconButton(
+              key: const Key('web-header-account'),
+              tooltip: 'Account',
+              onPressed: onProfile,
+              icon: const Icon(Icons.account_circle_outlined),
             ),
           ],
         ),
@@ -1147,31 +1184,21 @@ class _WebWorkspaceContextBar extends StatelessWidget {
 class _WebStaffSidebar extends StatelessWidget {
   const _WebStaffSidebar({
     required this.roleLabel,
-    required this.unreadMessageCount,
-    required this.unreadNotificationCount,
     required this.destinations,
     required this.mainDestinationCount,
     required this.selectedIndex,
     required this.expandedGroups,
     required this.onGroupToggle,
     required this.onSelected,
-    required this.onOpenMessages,
-    required this.onOpenNotifications,
-    required this.onOpenPage,
   });
 
   final String roleLabel;
-  final int unreadMessageCount;
-  final int unreadNotificationCount;
   final List<AppDestination> destinations;
   final int mainDestinationCount;
   final int selectedIndex;
   final Set<String> expandedGroups;
   final ValueChanged<String> onGroupToggle;
   final ValueChanged<int> onSelected;
-  final VoidCallback onOpenMessages;
-  final VoidCallback onOpenNotifications;
-  final void Function(String label, Widget page) onOpenPage;
 
   Map<String, List<int>> get _toolGroups {
     final groups = <String, List<int>>{};
@@ -1214,16 +1241,16 @@ class _WebStaffSidebar extends StatelessWidget {
           ),
           title: Text(
             item.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+            softWrap: true,
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           subtitle: item.webDescription == null
               ? null
               : Text(
                   item.webDescription!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  softWrap: true,
                   style: const TextStyle(fontSize: 10.5),
                 ),
           trailing: item.isWorkInProgress ? const _WipBadge() : null,
@@ -1398,37 +1425,7 @@ class _WebStaffSidebar extends StatelessWidget {
                         },
                       ),
                     ],
-                    const Divider(height: 22),
-                    ListTile(
-                      key: const Key('web-staff-messages'),
-                      dense: true,
-                      leading: _MenuIconWithBadge(
-                        icon: Icons.chat_bubble_outline,
-                        count: unreadMessageCount,
-                      ),
-                      title: const Text('Messages'),
-                      onTap: onOpenMessages,
-                    ),
-                    ListTile(
-                      key: const Key('web-staff-notifications'),
-                      dense: true,
-                      leading: _MenuIconWithBadge(
-                        icon: Icons.notifications_outlined,
-                        count: unreadNotificationCount,
-                      ),
-                      title: const Text('Notifications'),
-                      onTap: onOpenNotifications,
-                    ),
-                    ListTile(
-                      key: const Key('web-staff-settings'),
-                      dense: true,
-                      leading: const Icon(Icons.settings_outlined),
-                      title: const Text('Settings'),
-                      onTap: () => onOpenPage(
-                        'Settings',
-                        const SettingsPage(),
-                      ),
-                    ),
+                    const SizedBox(height: 4),
                   ],
                 ),
               ),
@@ -1747,6 +1744,7 @@ class _RoleMenu extends StatelessWidget {
     required this.unreadMessageCount,
     required this.unreadNotificationCount,
     required this.onSelect,
+    this.showUtilityDestinations = true,
   });
 
   final String roleLabel;
@@ -1757,6 +1755,7 @@ class _RoleMenu extends StatelessWidget {
   final int unreadMessageCount;
   final int unreadNotificationCount;
   final ValueChanged<int> onSelect;
+  final bool showUtilityDestinations;
 
   @override
   Widget build(BuildContext context) {
@@ -1887,42 +1886,44 @@ class _RoleMenu extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 10),
-          const Divider(),
-          ListTile(
-            minTileHeight: 54,
-            leading: _MenuIconWithBadge(
-              icon: Icons.chat_bubble_outline,
-              count: unreadMessageCount,
+          if (showUtilityDestinations) ...[
+            const SizedBox(height: 10),
+            const Divider(),
+            ListTile(
+              minTileHeight: 54,
+              leading: _MenuIconWithBadge(
+                icon: Icons.chat_bubble_outline,
+                count: unreadMessageCount,
+              ),
+              title: const Text('Messages'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: onOpenMessages,
             ),
-            title: const Text('Messages'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: onOpenMessages,
-          ),
-          ListTile(
-            minTileHeight: 54,
-            leading: _MenuIconWithBadge(
-              icon: Icons.notifications_outlined,
-              count: unreadNotificationCount,
+            ListTile(
+              minTileHeight: 54,
+              leading: _MenuIconWithBadge(
+                icon: Icons.notifications_outlined,
+                count: unreadNotificationCount,
+              ),
+              title: const Text('Notifications'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: onOpenNotifications,
             ),
-            title: const Text('Notifications'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: onOpenNotifications,
-          ),
-          ListTile(
-            minTileHeight: 54,
-            leading: const Icon(Icons.settings_outlined),
-            title: const Text('Settings'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const SettingsPage(),
-                ),
-              );
-            },
-          ),
+            ListTile(
+              minTileHeight: 54,
+              leading: const Icon(Icons.settings_outlined),
+              title: const Text('Settings'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const SettingsPage(),
+                  ),
+                );
+              },
+            ),
+          ],
         ],
       ),
     );

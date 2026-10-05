@@ -539,6 +539,70 @@ void _openMoveOutSettlement(BuildContext context) {
   );
 }
 
+Future<void> _logoutCurrentUser(BuildContext context) async {
+  try {
+    await SessionController.instance.signOut();
+    if (!context.mounted) return;
+
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).popUntil((route) => route.isFirst);
+  } catch (_) {
+    if (!context.mounted) return;
+    showAppSnackBar(
+      context,
+      'Logout failed. Please retry.',
+    );
+  }
+}
+
+class _ProfileAccountActions extends StatelessWidget {
+  const _ProfileAccountActions();
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 20),
+          const SectionTitle('Account'),
+          const SizedBox(height: 10),
+          CarmelitaCard(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsPage()),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: const ListTile(
+              dense: true,
+              visualDensity: VisualDensity(vertical: -2),
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.settings_outlined),
+              title: Text(
+                'Settings',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+              ),
+              subtitle: Text(
+                'Appearance, privacy, notifications, and password',
+                softWrap: true,
+                style: TextStyle(fontSize: 11),
+              ),
+              trailing: Icon(Icons.chevron_right_rounded),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const Key('profile-logout'),
+              onPressed: () => _logoutCurrentUser(context),
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Logout'),
+            ),
+          ),
+        ],
+      );
+}
+
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
   @override
@@ -663,25 +727,7 @@ class _OwnerProfileContent extends StatelessWidget {
               trailing: Icon(Icons.chevron_right_rounded),
             ),
           ),
-          const SizedBox(height: 20),
-          const SectionTitle('Account'),
-          const SizedBox(height: 10),
-          CarmelitaCard(
-            onTap: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const SettingsPage())),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: const ListTile(
-              dense: true,
-              visualDensity: VisualDensity(vertical: -2),
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.settings_outlined),
-              title: Text('Settings',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-              subtitle: Text('Appearance, privacy, password, and sign out',
-                  style: TextStyle(fontSize: 11)),
-              trailing: Icon(Icons.chevron_right_rounded),
-            ),
-          ),
+          const _ProfileAccountActions(),
         ],
       );
 }
@@ -737,7 +783,7 @@ class _LegacyGenericProfile extends StatelessWidget {
                       leading: const Icon(Icons.settings_outlined),
                       title: const Text('Settings'),
                       subtitle: const Text(
-                          'Appearance, privacy, password, and sign out'),
+                          'Appearance, privacy, notifications, and password'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => Navigator.of(context).push(MaterialPageRoute(
                           builder: (_) => const SettingsPage()))),
@@ -821,25 +867,7 @@ class _GuardianProfileContent extends StatelessWidget {
             label: 'Linked tenant',
             value: const ProfileService().guardianLinkedTenant(user.id),
           ),
-          const SizedBox(height: 20),
-          const SectionTitle('Account'),
-          const SizedBox(height: 10),
-          CarmelitaCard(
-            onTap: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const SettingsPage())),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: const ListTile(
-              dense: true,
-              visualDensity: VisualDensity(vertical: -2),
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.settings_outlined),
-              title: Text('Settings',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-              subtitle: Text('Appearance, privacy, password, and sign out',
-                  style: TextStyle(fontSize: 11)),
-              trailing: Icon(Icons.chevron_right_rounded),
-            ),
-          ),
+          const _ProfileAccountActions(),
         ],
       );
 }
@@ -946,25 +974,7 @@ class _TenantProfileContent extends StatelessWidget {
               trailing: Icon(Icons.chevron_right_rounded),
             ),
           ),
-          const SizedBox(height: 20),
-          const SectionTitle('Account'),
-          const SizedBox(height: 10),
-          CarmelitaCard(
-            onTap: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const SettingsPage())),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: const ListTile(
-              dense: true,
-              visualDensity: VisualDensity(vertical: -2),
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.settings_outlined),
-              title: Text('Settings',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-              subtitle: Text('Appearance, privacy, password, and sign out',
-                  style: TextStyle(fontSize: 11)),
-              trailing: Icon(Icons.chevron_right_rounded),
-            ),
-          ),
+          const _ProfileAccountActions(),
         ],
       );
 }
@@ -1628,7 +1638,7 @@ class SettingsPage extends StatelessWidget {
 
     return PageFrame(
       title: 'Settings',
-      subtitle: 'Appearance, privacy, and account',
+      subtitle: 'Appearance, privacy, notifications, and security',
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) => Column(
@@ -1804,31 +1814,6 @@ class SettingsPage extends StatelessWidget {
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const FeedbackPage()),
                 ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  try {
-                    await SessionController.instance.signOut();
-                    if (!context.mounted) return;
-
-                    Navigator.of(
-                      context,
-                      rootNavigator: true,
-                    ).popUntil((route) => route.isFirst);
-                  } catch (_) {
-                    if (!context.mounted) return;
-                    showAppSnackBar(
-                      context,
-                      'Sign-out failed. Please retry.',
-                    );
-                  }
-                },
-                icon: const Icon(Icons.logout_rounded),
-                label: const Text('Sign out'),
               ),
             ),
           ],
