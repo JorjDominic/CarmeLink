@@ -1345,7 +1345,27 @@ class PaymentsPage extends StatefulWidget {
 class _PaymentsPageState extends State<PaymentsPage> {
   late final TableRefreshSubscription _subscription;
   String _selectedFilter = 'all';
-  RecordListSort _paymentSort = RecordListSort.newest;
+  RecordListSort _paymentSort = RecordListSort.oldest;
+
+  int _paymentPriority(Payment payment) {
+    if (payment.isOverdue) return 0;
+    if (payment.isRejected) return 1;
+    if (payment.isPending) return 2;
+    if (!payment.isDeposit && payment.isDue) return 3;
+    if (payment.isUpcoming || (payment.isRent && !payment.isDueNow)) return 4;
+    if (payment.isVerified) return 5;
+    if (payment.isVoided) return 6;
+    return 4;
+  }
+
+  int _compareDueSoon(Payment a, Payment b) {
+    final rank = _paymentPriority(a).compareTo(_paymentPriority(b));
+    if (rank != 0) return rank;
+    if (_paymentPriority(a) <= 4) {
+      return a.dueDate.compareTo(b.dueDate);
+    }
+    return b.dueDate.compareTo(a.dueDate);
+  }
 
   @override
   void initState() {
@@ -1420,7 +1440,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
               _ => allPayments,
             },
           )..sort((a, b) => switch (_paymentSort) {
-                RecordListSort.oldest => a.dueDate.compareTo(b.dueDate),
+                RecordListSort.oldest => _compareDueSoon(a, b),
                 RecordListSort.status => a.status.compareTo(b.status),
                 RecordListSort.title => a.label.compareTo(b.label),
                 _ => b.dueDate.compareTo(a.dueDate),
@@ -1567,11 +1587,11 @@ class _PaymentsPageState extends State<PaymentsPage> {
                     onSelected: (value) => setState(() => _paymentSort = value),
                     itemBuilder: (_) => const [
                       PopupMenuItem(
-                          value: RecordListSort.newest,
-                          child: Text('Newest first')),
-                      PopupMenuItem(
                           value: RecordListSort.oldest,
-                          child: Text('Oldest first')),
+                          child: Text('Due soon first')),
+                      PopupMenuItem(
+                          value: RecordListSort.newest,
+                          child: Text('Latest due date first')),
                       PopupMenuItem(
                           value: RecordListSort.status,
                           child: Text('By status')),
@@ -1647,11 +1667,11 @@ class TenantBillingDetailsPage extends StatelessWidget {
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
-          final payments = List<Payment>.from(controller.payments)
-            ..sort((a, b) => b.dueDate.compareTo(a.dueDate));
+          final payments = List<Payment>.from(controller.payments);
           final openBills = payments
               .where((p) => !p.isVoided && p.outstandingAmount > 0)
-              .toList();
+              .toList()
+            ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
           final dueNowBills = openBills
               .where((p) => !p.isDeposit && !(p.isRent && !p.isDueNow))
               .toList();
@@ -1660,7 +1680,8 @@ class TenantBillingDetailsPage extends StatelessWidget {
               openBills.where((p) => p.isRent && !p.isDueNow).toList();
           final completedBills = payments
               .where((p) => p.isVoided || p.outstandingAmount <= 0)
-              .toList();
+              .toList()
+            ..sort((a, b) => b.dueDate.compareTo(a.dueDate));
           final rent = dueNowBills
               .where((p) => p.isRent)
               .fold<double>(0, (sum, p) => sum + p.outstandingAmount);
