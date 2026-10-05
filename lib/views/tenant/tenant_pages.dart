@@ -2989,11 +2989,6 @@ class TenantReportsHubPage extends StatelessWidget {
           controller.loadConcerns(force: true),
         ]);
       },
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showReportTypePicker(context),
-        icon: const Icon(Icons.add),
-        label: const Text('Report issue'),
-      ),
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
@@ -3187,75 +3182,6 @@ class TenantReportsHubPage extends StatelessWidget {
           );
         },
       ),
-    );
-  }
-
-  void _showReportTypePicker(BuildContext context) {
-    final navigator = Navigator.of(context);
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      useSafeArea: true,
-      builder: (sheetContext) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'What would you like to report?',
-              style: Theme.of(sheetContext).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
-            _reportTypeTile(
-              sheetContext,
-              title: 'Maintenance issue',
-              subtitle: 'Room, fixture, utility, or property problem',
-              icon: Icons.build_outlined,
-              page: const SubmitMaintenancePage(),
-              navigator: navigator,
-            ),
-            _reportTypeTile(
-              sheetContext,
-              title: 'Confidential concern',
-              subtitle: 'Safety, rules, or roommate concern',
-              icon: Icons.shield_outlined,
-              page: const ConfidentialConcernPage(),
-              navigator: navigator,
-            ),
-            _reportTypeTile(
-              sheetContext,
-              title: 'Missed cleaning duty',
-              subtitle: 'Private cleaning non-compliance report',
-              icon: Icons.cleaning_services_outlined,
-              page: const TenantCleaningSchedulePage(),
-              navigator: navigator,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _reportTypeTile(
-    BuildContext sheetContext, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Widget page,
-    required NavigatorState navigator,
-  }) {
-    return ListTile(
-      leading: CircleAvatar(child: Icon(icon)),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () {
-        Navigator.of(sheetContext).pop();
-        navigator.push(
-          MaterialPageRoute(builder: (_) => page),
-        );
-      },
     );
   }
 

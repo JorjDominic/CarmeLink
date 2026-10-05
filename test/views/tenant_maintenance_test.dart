@@ -33,22 +33,7 @@ void main() {
       expect(find.text('Maintenance'), findsOneWidget);
       expect(find.text('Confidential concern'), findsOneWidget);
       expect(find.text('Missed cleaning duty'), findsOneWidget);
-      expect(find.text('Report issue'), findsOneWidget);
-    });
-
-    testWidgets('report action offers all three reporting workflows',
-        (tester) async {
-      TenantController.instance.setMaintenanceForTesting([]);
-
-      await tester.pumpWidget(buildTestable(const TenantReportsHubPage()));
-      await tester.pump();
-      await tester.tap(find.text('Report issue'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('What would you like to report?'), findsOneWidget);
-      expect(find.text('Maintenance issue'), findsOneWidget);
-      expect(find.text('Confidential concern'), findsWidgets);
-      expect(find.text('Missed cleaning duty'), findsWidgets);
+      expect(find.text('Report issue'), findsNothing);
     });
 
     testWidgets(
