@@ -1420,21 +1420,6 @@ class _PaymentsPageState extends State<PaymentsPage> {
               c.paymentsLoading ? null : () => c.loadPayments(force: true),
         ),
       ],
-      floatingActionButton: AnimatedBuilder(
-        animation: c,
-        builder: (context, _) => c.payments
-                .any((p) => p.canSubmitProof && !(p.isRent && !p.isDueNow))
-            ? FloatingActionButton.extended(
-                tooltip: 'Upload payment proof',
-                backgroundColor: const Color(0xFF627FA8),
-                foregroundColor: Colors.white,
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const UploadPaymentProofPage())),
-                icon: const Icon(Icons.upload_file_outlined),
-                label: const Text('Pay now'),
-              )
-            : const SizedBox.shrink(),
-      ),
       child: AnimatedBuilder(
         animation: c,
         builder: (context, _) {
