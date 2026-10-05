@@ -150,8 +150,9 @@ class RecordListToolbar extends StatelessWidget {
                   ChoiceChip(
                     visualDensity: VisualDensity.compact,
                     selected: scope == RecordListScope.active,
-                    label: Text(
-                        activeCount == null ? 'Active' : 'Active ($activeCount)'),
+                    label: Text(activeCount == null
+                        ? 'Active'
+                        : 'Active ($activeCount)'),
                     onSelected: (_) => onScopeChanged(RecordListScope.active),
                   ),
                   const SizedBox(width: 8),
@@ -180,7 +181,8 @@ class RecordListToolbar extends StatelessWidget {
                           value: RecordListSort.oldest,
                           child: Text('Oldest first')),
                       PopupMenuItem(
-                          value: RecordListSort.status, child: Text('By status')),
+                          value: RecordListSort.status,
+                          child: Text('By status')),
                       PopupMenuItem(
                           value: RecordListSort.title, child: Text('A-Z')),
                     ],
@@ -975,10 +977,11 @@ class PageFrame extends StatelessWidget {
         currentRole == UserRole.owner || currentRole == UserRole.caretaker;
     final ownerOperationalPage = isStaff && title != 'Dashboard';
     final compactHeader = MediaQuery.sizeOf(context).width < 500;
-    final canShowNotifications =
+    final canShowNotifications = !webPortal &&
         SessionController.instance.currentUser != null &&
-            title.toLowerCase() != 'notifications';
-    final canShowMessages = (navScope != null ||
+        title.toLowerCase() != 'notifications';
+    final canShowMessages = !webPortal &&
+        (navScope != null ||
             (isStaff && AdaptiveRoleShell.activeMessagePage != null)) &&
         title.toLowerCase() != 'messages';
     final ownerSection = isStaff &&

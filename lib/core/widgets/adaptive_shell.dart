@@ -603,6 +603,43 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }
 
+  void _openWebCommunicationPage(
+    Widget page, {
+    required String label,
+  }) {
+    if (_workspaceLabelOverride == label) return;
+    if (mounted) {
+      setState(() {
+        _workspaceLabelOverride = label;
+        _workspaceGroupOverride = 'Communication';
+      });
+    }
+    unawaited(_persistWorkspaceDestination(label));
+
+    void openOnWorkspaceNavigator() {
+      final navigator = _webWorkspaceNavigatorKey.currentState;
+      if (navigator == null) return;
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          settings: RouteSettings(
+            name: '/staff/communication/${label.toLowerCase()}',
+          ),
+          builder: (_) => page,
+        ),
+        (route) => route.isFirst,
+      );
+    }
+
+    if (_webWorkspaceNavigatorKey.currentState != null) {
+      openOnWorkspaceNavigator();
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) openOnWorkspaceNavigator();
+    });
+  }
+
   Widget _webWorkspace(Widget page, int activeIndex) {
     return Navigator(
       key: _webWorkspaceNavigatorKey,
@@ -800,10 +837,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 
   void _openNotifications() {
     if (CarmeLinkSurfaceScope.isWebPortal(context)) {
-      _openWebWorkspacePage(
+      _openWebCommunicationPage(
         _notificationsPage(),
         label: 'Notifications',
-        group: 'Communication',
       );
       return;
     }
@@ -814,10 +850,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 
   void _openMessages() {
     if (CarmeLinkSurfaceScope.isWebPortal(context)) {
-      _openWebWorkspacePage(
+      _openWebCommunicationPage(
         widget.messagePage,
         label: 'Messages',
-        group: 'Communication',
       );
       return;
     }
