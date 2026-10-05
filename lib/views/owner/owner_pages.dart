@@ -1964,10 +1964,17 @@ class _OperationsHubPageState extends State<OperationsHubPage> {
                   itemBuilder: (context, index) => _OperationCategoryCard(
                     category: filtered[index],
                     badge: _categoryBadge(filtered[index], controller),
-                    onTap: () => _ownerPush(
-                      context,
-                      OperationsCategoryPage(category: filtered[index]),
-                    ),
+                    onTap: () {
+                      final category = filtered[index];
+                      if (category.items.length == 1) {
+                        _ownerPush(context, category.items.first.page);
+                        return;
+                      }
+                      _ownerPush(
+                        context,
+                        OperationsCategoryPage(category: category),
+                      );
+                    },
                   ),
                 );
               }),
