@@ -4,17 +4,21 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Julian Phase 1 navigation contract', () {
-    test('web utility actions live in the header without sidebar duplicates',
+    test(
+        'web utility actions live in the top header without sidebar duplicates',
         () {
-      final source =
+      final adaptive =
           File('lib/core/widgets/adaptive_shell.dart').readAsStringSync();
+      final chrome = File(
+        'lib/web/dashboard/widgets/staff_workspace_chrome.dart',
+      ).readAsStringSync();
 
-      expect(source.contains("Key('web-header-account')"), isTrue);
-      expect(source.contains("tooltip: 'Notifications'"), isTrue);
-      expect(source.contains("tooltip: 'Messages'"), isTrue);
-      expect(source.contains("Key('web-staff-messages')"), isFalse);
-      expect(source.contains("Key('web-staff-notifications')"), isFalse);
-      expect(source.contains("Key('web-staff-settings')"), isFalse);
+      expect(chrome.contains("Key('web-header-account')"), isTrue);
+      expect(chrome.contains("tooltip: 'Notifications'"), isTrue);
+      expect(chrome.contains("tooltip: 'Messages'"), isTrue);
+      expect(adaptive.contains("Key('web-staff-messages')"), isFalse);
+      expect(adaptive.contains("Key('web-staff-notifications')"), isFalse);
+      expect(adaptive.contains("Key('web-staff-settings')"), isFalse);
     });
 
     test('compact web menu hides duplicate utilities while mobile keeps them',

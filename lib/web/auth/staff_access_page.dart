@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
 import '../../views/auth/auth_views.dart';
-import '../theme/web_theme.dart';
 import '../widgets/web_brand.dart';
 
 class StaffAccessPage extends StatefulWidget {
@@ -45,9 +44,13 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: WebPalette.background,
+        backgroundColor: scheme.surface,
+        foregroundColor: scheme.onSurface,
         title: const WebBrand(compact: true),
         leading: IconButton(
           onPressed: widget.onBack,
@@ -62,10 +65,10 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
             constraints: const BoxConstraints(maxWidth: 430),
             child: Card(
               elevation: 0,
-              color: WebPalette.surface,
+              color: scheme.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
-                side: const BorderSide(color: WebPalette.border),
+                side: BorderSide(color: theme.dividerColor),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(28),
@@ -75,17 +78,28 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.admin_panel_settings_outlined,
-                          size: 44, color: WebPalette.plum),
+                      Icon(
+                        Icons.admin_panel_settings_outlined,
+                        size: 44,
+                        color: scheme.primary,
+                      ),
                       const SizedBox(height: 18),
-                      const Text('Staff sign in',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: 28, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Staff sign in',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: scheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 8),
-                      const Text(
-                          'Authorized owner and caretaker accounts only.',
-                          textAlign: TextAlign.center),
+                      Text(
+                        'Authorized owner and caretaker accounts only.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
                       const SizedBox(height: 26),
                       TextFormField(
                         controller: _email,
@@ -116,11 +130,14 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
                             tooltip: _obscurePassword
                                 ? 'Show password'
                                 : 'Hide password',
-                            icon: Icon(_obscurePassword
-                                ? Icons.visibility
-                                : Icons.visibility_off),
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
                             onPressed: () => setState(
-                                () => _obscurePassword = !_obscurePassword),
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
                           ),
                         ),
                         validator: (value) => (value == null || value.isEmpty)
@@ -143,30 +160,38 @@ class _StaffAccessPageState extends State<StaffAccessPage> {
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 12),
-                        Text(_error!,
-                            style: const TextStyle(color: WebPalette.danger)),
+                        Text(
+                          _error!,
+                          style: TextStyle(color: scheme.error),
+                        ),
                       ],
                       const SizedBox(height: 22),
                       FilledButton(
                         onPressed: _busy ? null : _signIn,
                         style: FilledButton.styleFrom(
-                          backgroundColor: WebPalette.plum,
+                          backgroundColor: scheme.primary,
+                          foregroundColor: scheme.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         child: _busy
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white))
+                                  strokeWidth: 2,
+                                  color: scheme.onPrimary,
+                                ),
+                              )
                             : const Text('Sign in'),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                          'Use an existing staff account. Public registration is disabled.',
-                          textAlign: TextAlign.center,
-                          style:
-                              TextStyle(fontSize: 12, color: WebPalette.muted)),
+                      Text(
+                        'Use an existing staff account. Public registration is disabled.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                 ),

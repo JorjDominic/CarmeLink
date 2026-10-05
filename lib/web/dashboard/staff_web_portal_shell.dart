@@ -237,9 +237,15 @@ abstract final class StaffWebDestinations {
 
 /// RoleGuard remains in front of every route; Supabase RLS remains authoritative.
 class StaffWebPortalShell extends StatefulWidget {
-  const StaffWebPortalShell({super.key, required this.role});
+  const StaffWebPortalShell({
+    super.key,
+    required this.role,
+    this.workspaceBuilder,
+  });
 
   final UserRole role;
+  final Widget Function(BuildContext context, Widget workspace)?
+      workspaceBuilder;
 
   @override
   State<StaffWebPortalShell> createState() => _StaffWebPortalShellState();
@@ -397,6 +403,7 @@ class _StaffWebPortalShellState extends State<StaffWebPortalShell>
           destinations: StaffWebDestinations.primary(widget.role),
           webDestinations: StaffWebDestinations.desktopTools(widget.role),
           notificationPageBuilder: _notificationDestination,
+          webShellBuilder: widget.workspaceBuilder,
         ),
       );
 }

@@ -81,6 +81,7 @@ class AdaptiveRoleShell extends StatefulWidget {
     required this.messagePage,
     this.webDestinations = const [],
     this.notificationPageBuilder,
+    this.webShellBuilder,
     super.key,
   });
 
@@ -97,6 +98,12 @@ class AdaptiveRoleShell extends StatefulWidget {
   /// role shell navigator.
   final Widget? Function(AppNotificationItem notification)?
       notificationPageBuilder;
+
+  /// Optional browser-only chrome wrapper. The builder runs inside
+  /// [CarmelitaNavScope], so top-level staff header actions can reuse the
+  /// live workspace navigation, unread counts, and role-aware destinations.
+  final Widget Function(BuildContext context, Widget workspace)?
+      webShellBuilder;
 
   static Widget? activeMessagePage;
 
@@ -847,78 +854,88 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       unreadNotificationCount: _unreadNotificationCount,
       selectIndex: _select,
       selectLabel: _selectByLabel,
-      child: Scaffold(
-        extendBody: !webPortal,
-        body: webPortal
-            ? desktopWeb
-                ? Row(
+      child: Builder(
+        builder: (scopeContext) {
+          final workspace = Scaffold(
+            extendBody: !webPortal,
+            body: webPortal
+                ? desktopWeb
+                    ? Row(
+                        children: [
+                          _WebStaffSidebar(
+                            roleLabel: widget.roleLabel,
+                            destinations: activeDestinations,
+                            mainDestinationCount: widget.destinations.length,
+                            selectedIndex: activeIndex,
+                            expandedGroups: _expandedWebGroups,
+                            onGroupToggle: _toggleWebGroup,
+                            onSelected: _select,
+                          ),
+                          const VerticalDivider(width: 1),
+                          Expanded(
+                            child: Column(
+                              children: [
+                                _WebWorkspaceContextBar(
+                                  roleLabel: widget.roleLabel,
+                                  groupLabel: _workspaceGroupOverride ??
+                                      destination.webGroup ??
+                                      'Workspace',
+                                  pageLabel: _workspaceLabelOverride ??
+                                      destination.label,
+                                  unreadMessageCount: unreadMessageCount,
+                                  unreadNotificationCount:
+                                      _unreadNotificationCount,
+                                  onMessages: _openMessages,
+                                  onNotifications: _openNotifications,
+                                  onProfile: () => _selectByLabel('Profile'),
+                                ),
+                                Expanded(
+                                  child: _webWorkspace(page, activeIndex),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        children: [
+                          _CompactWebNavigationBar(
+                            roleLabel: widget.roleLabel,
+                            unreadMessageCount: unreadMessageCount,
+                            unreadNotificationCount: _unreadNotificationCount,
+                            onMessages: _openMessages,
+                            onNotifications: _openNotifications,
+                            onProfile: () => _selectByLabel('Profile'),
+                            onMenu: _openMenu,
+                          ),
+                          Expanded(child: _webWorkspace(page, activeIndex)),
+                        ],
+                      )
+                : Stack(
+                    fit: StackFit.expand,
                     children: [
-                      _WebStaffSidebar(
-                        roleLabel: widget.roleLabel,
-                        destinations: activeDestinations,
-                        mainDestinationCount: widget.destinations.length,
-                        selectedIndex: activeIndex,
-                        expandedGroups: _expandedWebGroups,
-                        onGroupToggle: _toggleWebGroup,
-                        onSelected: _select,
-                      ),
-                      const VerticalDivider(width: 1),
-                      Expanded(
-                        child: Column(
-                          children: [
-                            _WebWorkspaceContextBar(
-                              roleLabel: widget.roleLabel,
-                              groupLabel: _workspaceGroupOverride ??
-                                  destination.webGroup ??
-                                  'Workspace',
-                              pageLabel:
-                                  _workspaceLabelOverride ?? destination.label,
-                              unreadMessageCount: unreadMessageCount,
-                              unreadNotificationCount: _unreadNotificationCount,
-                              onMessages: _openMessages,
-                              onNotifications: _openNotifications,
-                              onProfile: () => _selectByLabel('Profile'),
-                            ),
-                            Expanded(
-                              child: _webWorkspace(page, activeIndex),
-                            ),
-                          ],
+                      page,
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: _FloatingIslandNavigation(
+                          destinations: widget.destinations,
+                          selectedIndex: activeIndex,
+                          unreadMessageCount: unreadMessageCount,
+                          onSelected: _select,
                         ),
                       ),
                     ],
-                  )
-                : Column(
-                    children: [
-                      _CompactWebNavigationBar(
-                        roleLabel: widget.roleLabel,
-                        unreadMessageCount: unreadMessageCount,
-                        unreadNotificationCount: _unreadNotificationCount,
-                        onMessages: _openMessages,
-                        onNotifications: _openNotifications,
-                        onProfile: () => _selectByLabel('Profile'),
-                        onMenu: _openMenu,
-                      ),
-                      Expanded(child: _webWorkspace(page, activeIndex)),
-                    ],
-                  )
-            : Stack(
-                fit: StackFit.expand,
-                children: [
-                  page,
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: _FloatingIslandNavigation(
-                      destinations: widget.destinations,
-                      selectedIndex: activeIndex,
-                      unreadMessageCount: unreadMessageCount,
-                      onSelected: _select,
-                    ),
                   ),
-                ],
-              ),
-        bottomNavigationBar: null,
+            bottomNavigationBar: null,
+          );
+
+          if (webPortal && widget.webShellBuilder != null) {
+            return widget.webShellBuilder!(scopeContext, workspace);
+          }
+          return workspace;
+        },
       ),
     );
   }
@@ -1030,43 +1047,6 @@ class _CompactWebNavigationBarState extends State<_CompactWebNavigationBar>
                   ),
                 ),
               ),
-              _CountedIconButton(
-                tooltip: 'Messages',
-                icon: Icons.chat_bubble_outline,
-                unreadCount: widget.unreadMessageCount,
-                onPressed: widget.onMessages,
-              ),
-              _NotificationIconButton(
-                unreadCount: widget.unreadNotificationCount,
-                onPressed: widget.onNotifications,
-              ),
-              const SizedBox(width: 4),
-              Tooltip(
-                message: 'Account',
-                child: InkWell(
-                  key: const Key('web-header-account'),
-                  onTap: widget.onProfile,
-                  borderRadius: BorderRadius.circular(999),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: scheme.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: theme.dividerColor),
-                    ),
-                    child: Text(
-                      widget.roleLabel,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -1156,23 +1136,6 @@ class _WebWorkspaceContextBar extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            _CountedIconButton(
-              tooltip: 'Messages',
-              icon: Icons.chat_bubble_outline,
-              unreadCount: unreadMessageCount,
-              onPressed: onMessages,
-            ),
-            _NotificationIconButton(
-              unreadCount: unreadNotificationCount,
-              onPressed: onNotifications,
-            ),
-            IconButton(
-              key: const Key('web-header-account'),
-              tooltip: 'Account',
-              onPressed: onProfile,
-              icon: const Icon(Icons.account_circle_outlined),
             ),
           ],
         ),
@@ -1445,66 +1408,6 @@ class _WebStaffSidebar extends StatelessWidget {
       ),
     );
   }
-}
-
-class _CountedIconButton extends StatelessWidget {
-  const _CountedIconButton({
-    required this.tooltip,
-    required this.icon,
-    required this.unreadCount,
-    required this.onPressed,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final int unreadCount;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) => Stack(
-        clipBehavior: Clip.none,
-        children: [
-          IconButton(
-            tooltip: tooltip,
-            onPressed: onPressed,
-            icon: Icon(icon),
-          ),
-          if (unreadCount > 0)
-            Positioned(
-              right: 2,
-              top: 2,
-              child: _UnreadCountBadge(count: unreadCount, compact: true),
-            ),
-        ],
-      );
-}
-
-class _NotificationIconButton extends StatelessWidget {
-  const _NotificationIconButton({
-    required this.unreadCount,
-    required this.onPressed,
-  });
-
-  final int unreadCount;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) => Stack(
-        clipBehavior: Clip.none,
-        children: [
-          IconButton(
-            tooltip: 'Notifications',
-            onPressed: onPressed,
-            icon: const Icon(Icons.notifications_outlined),
-          ),
-          if (unreadCount > 0)
-            Positioned(
-              right: 2,
-              top: 2,
-              child: _UnreadCountBadge(count: unreadCount, compact: true),
-            ),
-        ],
-      );
 }
 
 class _MenuIconWithBadge extends StatelessWidget {

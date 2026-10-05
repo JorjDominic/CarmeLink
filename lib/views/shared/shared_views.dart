@@ -539,10 +539,44 @@ void _openMoveOutSettlement(BuildContext context) {
   );
 }
 
+Future<bool> _confirmLogout(BuildContext context) async {
+  return await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Logout?'),
+          content: const Text(
+            'You will be signed out of CarmeLink. Continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              icon: const Icon(Icons.logout_outlined),
+              label: const Text('Logout'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+}
+
 Future<void> _logoutCurrentUser(BuildContext context) async {
+  if (!await _confirmLogout(context)) return;
+
   try {
     await SessionController.instance.signOut();
     if (!context.mounted) return;
+
+    if (CarmeLinkSurfaceScope.isWebPortal(context)) {
+      Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+        '/',
+        (route) => false,
+      );
+      return;
+    }
 
     Navigator.of(
       context,
