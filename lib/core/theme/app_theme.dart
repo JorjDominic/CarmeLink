@@ -5,14 +5,14 @@ class AppTheme {
   static const _lightBackground = AppColors.lightBackground;
   static const _lightSurface = AppColors.lightSurface;
   static const _lightSurfaceMuted = AppColors.lightSurfaceMuted;
-  static const _darkBackground = Color(0xFF151310);
-  static const _darkSurface = Color(0xFF211D19);
-  static const _darkSurfaceMuted = Color(0xFF2B2520);
-  static const _darkBorder = Color(0xFF3C342E);
+  static const _darkBackground = Color(0xFF18191A);
+  static const _darkSurface = Color(0xFF242526);
+  static const _darkSurfaceMuted = Color(0xFF3A3B3C);
+  static const _darkBorder = Color(0xFF3E4042);
   static const _lightText = AppColors.lightText;
-  static const _darkText = Color(0xFFF7F0E7);
+  static const _darkText = Color(0xFFE4E6EB);
   static const _lightPrimary = AppColors.lightPrimary;
-  static const _darkPrimary = Color(0xFFD9C0A7);
+  static const _darkPrimary = Color(0xFFC7A98E);
 
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
@@ -57,29 +57,29 @@ class AppTheme {
       surface: _darkSurface,
     ).copyWith(
       primary: _darkPrimary,
-      onPrimary: const Color(0xFF2B211A),
-      primaryContainer: const Color(0xFF4A392D),
-      onPrimaryContainer: const Color(0xFFF2E2D2),
-      secondary: const Color(0xFFB59A84),
-      onSecondary: const Color(0xFF2B211A),
-      secondaryContainer: const Color(0xFF44352B),
-      onSecondaryContainer: const Color(0xFFE8D6C5),
-      tertiary: const Color(0xFFC8AD91),
-      onTertiary: const Color(0xFF2B211A),
-      tertiaryContainer: const Color(0xFF49392E),
-      onTertiaryContainer: const Color(0xFFF0DFCF),
+      onPrimary: const Color(0xFF1C1E21),
+      primaryContainer: const Color(0xFF4A382D),
+      onPrimaryContainer: const Color(0xFFF2E7DE),
+      secondary: const Color(0xFFB0B3B8),
+      onSecondary: const Color(0xFF1C1E21),
+      secondaryContainer: const Color(0xFF303132),
+      onSecondaryContainer: const Color(0xFFE4E6EB),
+      tertiary: const Color(0xFFD2B89F),
+      onTertiary: const Color(0xFF1C1E21),
+      tertiaryContainer: const Color(0xFF49382D),
+      onTertiaryContainer: const Color(0xFFF3E8DE),
       surface: _darkSurface,
-      surfaceContainerLowest: const Color(0xFF100E0C),
-      surfaceContainerLow: const Color(0xFF191613),
+      surfaceContainerLowest: const Color(0xFF121314),
+      surfaceContainerLow: const Color(0xFF1F2021),
       surfaceContainer: _darkSurface,
-      surfaceContainerHigh: _darkSurfaceMuted,
-      surfaceContainerHighest: const Color(0xFF352E29),
+      surfaceContainerHigh: const Color(0xFF303132),
+      surfaceContainerHighest: _darkSurfaceMuted,
       onSurface: _darkText,
-      onSurfaceVariant: const Color(0xFFD5C6B8),
-      outline: _darkBorder,
-      outlineVariant: const Color(0xFF4A4039),
-      inverseSurface: const Color(0xFFF0E7DE),
-      onInverseSurface: const Color(0xFF2A231E),
+      onSurfaceVariant: const Color(0xFFB0B3B8),
+      outline: const Color(0xFF4E4F50),
+      outlineVariant: _darkBorder,
+      inverseSurface: const Color(0xFFE4E6EB),
+      onInverseSurface: const Color(0xFF1C1E21),
       inversePrimary: _lightPrimary,
     );
 
@@ -188,7 +188,8 @@ class AppTheme {
         },
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: scaffold,
+        backgroundColor:
+            brightness == Brightness.dark ? scheme.surface : scaffold,
         foregroundColor: scheme.onSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -287,12 +288,11 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: brightness == Brightness.dark
-            ? const Color(0xFFEFE5D9)
+            ? scheme.surfaceContainerHighest
             : const Color(0xFF2A211B),
         contentTextStyle: TextStyle(
-          color: brightness == Brightness.dark
-              ? const Color(0xFF241C17)
-              : Colors.white,
+          color:
+              brightness == Brightness.dark ? scheme.onSurface : Colors.white,
           fontWeight: FontWeight.w600,
         ),
         shape: const RoundedRectangleBorder(
