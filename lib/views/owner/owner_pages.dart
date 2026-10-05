@@ -26,11 +26,8 @@ import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../shared/account_management_page.dart';
 import '../shared/staff_quick_panel.dart';
-<<<<<<< HEAD
 import '../shared/staff_curfew_requests_page.dart';
-=======
 import '../shared/cleaning_schedule_management_page.dart';
->>>>>>> a826aa7 (Simplify staff operations navigation)
 import '../shared/employee_curfew_profile_pages.dart';
 import '../shared/conduct_case_pages.dart';
 import '../shared/retention_settings_page.dart';
@@ -6594,7 +6591,6 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                     'Tripwire history is supporting evidence, not live tracking',
               ),
               const SizedBox(height: 8),
-<<<<<<< HEAD
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -6629,39 +6625,6 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                     ),
                   ],
                 ),
-=======
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _FilterChip(
-                    label: 'All (${allTenants.length})',
-                    selected: _presenceFilter == 'all',
-                    badgeColor: const Color(0xFF627FA8),
-                    onTap: () => setState(() => _presenceFilter = 'all'),
-                  ),
-                  _FilterChip(
-                    label: 'Inside (${controller.tenantsInsideCount})',
-                    selected: _presenceFilter == 'in',
-                    badgeColor: const Color(0xFF56886B),
-                    onTap: () => setState(() => _presenceFilter = 'in'),
-                  ),
-                  _FilterChip(
-                    label: 'Outside (${controller.tenantsOutsideCount})',
-                    selected: _presenceFilter == 'out',
-                    badgeColor: const Color(0xFF627FA8),
-                    onTap: () => setState(() => _presenceFilter = 'out'),
-                  ),
-                  _FilterChip(
-                    label:
-                        'Unavailable (${controller.tenantsUnavailableCount})',
-                    selected: _presenceFilter == 'unavailable',
-                    badgeColor: const Color(0xFFC77800),
-                    onTap: () =>
-                        setState(() => _presenceFilter = 'unavailable'),
-                  ),
-                ],
->>>>>>> a826aa7 (Simplify staff operations navigation)
               ),
               const SizedBox(height: 12),
               if (filteredTenants.isEmpty)

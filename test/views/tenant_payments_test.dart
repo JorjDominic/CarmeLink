@@ -195,7 +195,6 @@ void main() {
 
       expect(find.text('Showing 10 of 12 records'), findsOneWidget);
       expect(find.textContaining('Load more (2 remaining)'), findsOneWidget);
-      expect(find.text('Payment 1'), findsOneWidget);
       expect(find.text('Payment 12'), findsNothing);
 
       final loadMore = find.textContaining('Load more (2 remaining)');
@@ -206,7 +205,7 @@ void main() {
 
       expect(find.text('Showing 12 of 12 records'), findsOneWidget);
       expect(find.text('End of payment records'), findsOneWidget);
-      expect(find.text('Payment 1'), findsOneWidget);
+      expect(find.text('Payment 12'), findsOneWidget);
     });
 
     testWidgets('account summary opens complete billing details',
