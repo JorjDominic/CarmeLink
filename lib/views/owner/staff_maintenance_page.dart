@@ -97,6 +97,7 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
@@ -163,7 +164,7 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
-                            color: AppColors.darkBrown,
+                            color: scheme.onSurface,
                           ),
                     ),
                   ),
@@ -306,7 +307,7 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                     vertical: 12,
                   ),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: scheme.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: const BorderSide(color: AppColors.softBorder),
@@ -324,18 +325,22 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _buildFilterChip('All', 'all', allReports.length),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Pending', 'pending', pendingCount),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Assigned', 'assigned', assignedCount),
+                    _buildFilterChip(context, 'All', 'all', allReports.length),
                     const SizedBox(width: 8),
                     _buildFilterChip(
-                        'In Progress', 'in_progress', inProgressCount),
+                        context, 'Pending', 'pending', pendingCount),
                     const SizedBox(width: 8),
-                    _buildFilterChip('Resolved', 'resolved', resolvedCount),
+                    _buildFilterChip(
+                        context, 'Assigned', 'assigned', assignedCount),
                     const SizedBox(width: 8),
-                    _buildFilterChip('Cancelled', 'cancelled', cancelledCount),
+                    _buildFilterChip(
+                        context, 'In Progress', 'in_progress', inProgressCount),
+                    const SizedBox(width: 8),
+                    _buildFilterChip(
+                        context, 'Resolved', 'resolved', resolvedCount),
+                    const SizedBox(width: 8),
+                    _buildFilterChip(
+                        context, 'Cancelled', 'cancelled', cancelledCount),
                   ],
                 ),
               ),
@@ -387,10 +392,10 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                               ? 'No maintenance requests logged yet.'
                               : 'No reports match the selected filters.',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.darkBrown,
+                            color: scheme.onSurface,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -472,10 +477,10 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                                       report.category,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 15,
-                                        color: AppColors.darkBrown,
+                                        color: scheme.onSurface,
                                       ),
                                     ),
                                     const SizedBox(height: 2),
@@ -627,24 +632,30 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
     );
   }
 
-  Widget _buildFilterChip(String label, String value, int count) {
+  Widget _buildFilterChip(
+    BuildContext context,
+    String label,
+    String value,
+    int count,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
     final isSelected = _selectedStatus == value;
     return FilterChip(
       label: Text('$label ($count)'),
       selected: isSelected,
       onSelected: (_) => setState(() => _selectedStatus = value),
-      selectedColor: AppColors.brown,
-      checkmarkColor: Colors.white,
+      selectedColor: scheme.primary,
+      checkmarkColor: scheme.onPrimary,
       labelStyle: TextStyle(
         fontSize: 12,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-        color: isSelected ? Colors.white : AppColors.darkBrown,
+        color: isSelected ? scheme.onPrimary : scheme.onSurface,
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: scheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(
-          color: isSelected ? AppColors.brown : AppColors.softBorder,
+          color: isSelected ? scheme.primary : scheme.outlineVariant,
         ),
       ),
     );
@@ -801,6 +812,7 @@ class _StaffMaintenanceDetailsPageState
   @override
   Widget build(BuildContext context) {
     final report = _report;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -864,7 +876,7 @@ class _StaffMaintenanceDetailsPageState
                                       .titleLarge
                                       ?.copyWith(
                                         fontWeight: FontWeight.bold,
-                                        color: AppColors.darkBrown,
+                                        color: scheme.onSurface,
                                       ),
                                 ),
                               ),
@@ -967,7 +979,7 @@ class _StaffMaintenanceDetailsPageState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
+                          Row(
                             children: [
                               Icon(Icons.notes,
                                   size: 18, color: AppColors.brown),
@@ -977,7 +989,7 @@ class _StaffMaintenanceDetailsPageState
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
-                                  color: AppColors.darkBrown,
+                                  color: scheme.onSurface,
                                 ),
                               ),
                             ],
@@ -1011,10 +1023,10 @@ class _StaffMaintenanceDetailsPageState
                                   'Location: ${report.location}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
-                                    color: AppColors.darkBrown,
+                                    color: scheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -1048,7 +1060,7 @@ class _StaffMaintenanceDetailsPageState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
+                          Row(
                             children: [
                               Icon(Icons.camera_alt_outlined,
                                   size: 18, color: AppColors.brown),
@@ -1058,7 +1070,7 @@ class _StaffMaintenanceDetailsPageState
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
-                                  color: AppColors.darkBrown,
+                                  color: scheme.onSurface,
                                 ),
                               ),
                             ],
@@ -1179,7 +1191,7 @@ class _StaffMaintenanceDetailsPageState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
+                          Row(
                             children: [
                               Icon(Icons.tune,
                                   size: 18, color: AppColors.brown),
@@ -1189,7 +1201,7 @@ class _StaffMaintenanceDetailsPageState
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
-                                  color: AppColors.darkBrown,
+                                  color: scheme.onSurface,
                                 ),
                               ),
                             ],
@@ -1363,10 +1375,10 @@ class _StaffMaintenanceDetailsPageState
                               const SizedBox(width: 8),
                               Text(
                                 'Audit Trail & History (${_history.length})',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
-                                  color: AppColors.darkBrown,
+                                  color: scheme.onSurface,
                                 ),
                               ),
                             ],
@@ -1464,10 +1476,10 @@ class _StaffMaintenanceDetailsPageState
                                           const SizedBox(height: 4),
                                           Text(
                                             'Updated by $actor',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w600,
-                                              color: AppColors.darkBrown,
+                                              color: scheme.onSurface,
                                             ),
                                           ),
                                           if (notes.isNotEmpty) ...[

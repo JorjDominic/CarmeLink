@@ -2195,14 +2195,12 @@ const _operationCategories = [
   ),
   _OperationCategory(
     'Communication',
-    'Announcements, messages, and contact directory',
+    'Announcements and contact directory',
     Icons.forum_outlined,
     Color(0xFFB47A52),
     [
       _OperationItem('Announcements', 'Post updates', Icons.campaign_outlined,
           AnnouncementsManagementPage()),
-      _OperationItem('Messages', 'Send and receive messages',
-          Icons.chat_bubble_outline, OwnerMessagingPage()),
       _OperationItem('Contact directory', 'View important contacts',
           Icons.emergency_outlined, EmergencyContactsPage()),
     ],
