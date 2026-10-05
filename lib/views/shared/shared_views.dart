@@ -595,34 +595,37 @@ class _ProfileAccountActions extends StatelessWidget {
   const _ProfileAccountActions();
 
   @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 20),
-          const SectionTitle('Account'),
-          const SizedBox(height: 10),
-          CarmelitaCard(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SettingsPage()),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: const ListTile(
-              dense: true,
-              visualDensity: VisualDensity(vertical: -2),
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.settings_outlined),
-              title: Text(
-                'Settings',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-              ),
-              subtitle: Text(
-                'Appearance, privacy, notifications, and password',
-                softWrap: true,
-                style: TextStyle(fontSize: 11),
-              ),
-              trailing: Icon(Icons.chevron_right_rounded),
-            ),
+  Widget build(BuildContext context) {
+    final webPortal = CarmeLinkSurfaceScope.isWebPortal(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 20),
+        const SectionTitle('Account'),
+        const SizedBox(height: 10),
+        CarmelitaCard(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const SettingsPage()),
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: const ListTile(
+            dense: true,
+            visualDensity: VisualDensity(vertical: -2),
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.settings_outlined),
+            title: Text(
+              'Settings',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+            ),
+            subtitle: Text(
+              'Appearance, privacy, notifications, and password',
+              softWrap: true,
+              style: TextStyle(fontSize: 11),
+            ),
+            trailing: Icon(Icons.chevron_right_rounded),
+          ),
+        ),
+        if (!webPortal) ...[
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
@@ -634,7 +637,9 @@ class _ProfileAccountActions extends StatelessWidget {
             ),
           ),
         ],
-      );
+      ],
+    );
+  }
 }
 
 class ProfilePage extends StatelessWidget {
