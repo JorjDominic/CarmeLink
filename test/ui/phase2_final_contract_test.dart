@@ -77,13 +77,18 @@ void main() {
       expect(signIn.contains('Icons.lock_outline'), isTrue);
     });
 
-    test('dark theme explicitly uses warm Material surfaces', () {
+    test('dark theme uses neutral Meta-like surfaces with CarmeLink accent',
+        () {
       final source = File('lib/core/theme/app_theme.dart').readAsStringSync();
 
       expect(source.contains('surfaceContainerLowest:'), isTrue);
       expect(source.contains('surfaceContainerHighest:'), isTrue);
-      expect(source.contains('0xFF151310'), isTrue);
-      expect(source.contains('0xFF211D19'), isTrue);
+      expect(source.contains('0xFF18191A'), isTrue);
+      expect(source.contains('0xFF242526'), isTrue);
+      expect(source.contains('0xFF3A3B3C'), isTrue);
+      expect(source.contains('0xFFC7A98E'), isTrue);
+      expect(source.contains('0xFF151310'), isFalse);
+      expect(source.contains('0xFF211D19'), isFalse);
       expect(source.contains('Colors.blue'), isFalse);
     });
 
@@ -95,7 +100,7 @@ void main() {
       expect(source.contains('themeAnimationCurve:'), isTrue);
     });
 
-    test('settings sign-out waits for auth before navigation reset', () {
+    test('profile logout waits for auth before navigation reset', () {
       final source =
           File('lib/views/shared/shared_views.dart').readAsStringSync();
 
@@ -103,7 +108,7 @@ void main() {
         source.contains('await SessionController.instance.signOut();'),
         isTrue,
       );
-      expect(source.contains('Sign-out failed. Please retry.'), isTrue);
+      expect(source.contains('Logout failed. Please retry.'), isTrue);
     });
 
     test('Phase 3 to 5 tools remain discoverable', () {

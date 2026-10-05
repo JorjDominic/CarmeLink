@@ -33,6 +33,12 @@ void main() {
     expect(
         overview.contains('Theme.of(context).scaffoldBackgroundColor'), isTrue);
     expect(cards.contains('Theme.of(context).colorScheme.surface'), isTrue);
-    expect(chrome.contains('Theme.of(context).colorScheme.onSurface'), isTrue);
+
+    // StaffWorkspaceChrome caches Theme.of(context) and derives the active
+    // ColorScheme from that ThemeData. Keep this contract semantic instead of
+    // requiring one exact inline expression.
+    expect(chrome.contains('final theme = Theme.of(context);'), isTrue);
+    expect(chrome.contains('final scheme = theme.colorScheme;'), isTrue);
+    expect(chrome.contains('final onSurface = scheme.onSurface;'), isTrue);
   });
 }
