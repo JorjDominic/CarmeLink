@@ -135,6 +135,27 @@ void main() {
       expect(overnightReq.canReviewStaff, isFalse);
     });
 
+    test('overnight fallback enables only pending staff acknowledgment', () {
+      final request = CurfewRequest(
+        id: 'overnight-fallback',
+        tenantId: 'tenant-without-guardian',
+        destination: 'Home',
+        reason: 'Family visit',
+        departureTime: departure,
+        expectedReturnTime: expectedReturn,
+        requestType: 'overnight_leave',
+        status: 'pending_staff',
+      );
+      expect(request.canReviewStaff, isTrue);
+      expect(request.canReviewGuardian, isFalse);
+      expect(
+          request.copyWith(status: 'pending_guardian').canReviewStaff, isFalse);
+      for (final status in ['approved', 'rejected', 'cancelled', 'completed']) {
+        expect(request.copyWith(status: status).canReviewStaff, isFalse);
+        expect(request.copyWith(status: status).canReviewGuardian, isFalse);
+      }
+    });
+
     test('copyWith updates specified fields correctly', () {
       final base = CurfewRequest(
         id: 'cr-1',

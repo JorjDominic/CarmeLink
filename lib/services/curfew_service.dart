@@ -141,13 +141,6 @@ class CurfewService {
 
     final request = CurfewRequest.fromJson(row);
     unawaited(_notifyDecision(request));
-    unawaited(
-        AppNotificationService.instance.notifyCurfewGuardianDecisionToStaff(
-      requestId: request.id,
-      tenantId: request.tenantId,
-      requestType: request.requestTypeLabel,
-      approved: approve,
-    ));
     return request;
   }
 
@@ -200,6 +193,13 @@ class CurfewService {
 
     final request = CurfewRequest.fromJson(row);
     unawaited(_notifyDecision(request));
+    unawaited(
+        AppNotificationService.instance.notifyCurfewGuardianDecisionToStaff(
+      requestId: request.id,
+      tenantId: request.tenantId,
+      requestType: request.requestTypeLabel,
+      approved: approve,
+    ));
     return request;
   }
 

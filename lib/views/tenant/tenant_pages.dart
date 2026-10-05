@@ -6326,7 +6326,7 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
     setState(() => _submitting = true);
 
     try {
-      await TenantController.instance.submitCurfewRequest(
+      final request = await TenantController.instance.submitCurfewRequest(
         destination: destination,
         reason: reason,
         departureTime: _departureTime,
@@ -6335,9 +6335,9 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
       );
 
       if (mounted) {
-        final message = _requestType == 'late_return'
-            ? 'Late return request submitted directly for caretaker review!'
-            : 'Overnight leave submitted! Awaiting guardian approval.';
+        final message = request.isPendingGuardian
+            ? 'Request submitted. Awaiting linked guardian acknowledgment.'
+            : 'Request submitted. Awaiting owner or caretaker acknowledgment.';
         showAppSnackBar(context, message);
         Navigator.of(context).pop();
       }
@@ -6544,8 +6544,8 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
                       children: [
                         Text(
                           isLate
-                              ? 'Fast-track Caretaker Approval'
-                              : 'Two-tier Guardian & Caretaker Approval',
+                              ? 'Staff Acknowledgment'
+                              : 'Guardian or Staff Acknowledgment',
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
@@ -6555,7 +6555,7 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
                         Text(
                           isLate
                               ? 'Forwarded directly to the caretaker / owner on duty for prompt staff review. Your guardian will see this on their read-only curfew activity log.'
-                              : 'Since you will be off-premises overnight, your registered guardian must review and approve this first before caretaker sign-off.',
+                              : 'A linked guardian acknowledges overnight leave. If no guardian is linked, the owner or authorized caretaker acknowledges the request. No second sign-off is required.',
                           style: const TextStyle(fontSize: 12, height: 1.3),
                         ),
                       ],

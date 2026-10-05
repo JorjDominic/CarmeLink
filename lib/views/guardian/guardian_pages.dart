@@ -1534,7 +1534,7 @@ class GuardianCurfewRequestCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Resident requested an overnight stay away from the dormitory property. Your approval is the final decision; dormitory staff will be notified.',
+                        'Resident requested an overnight stay away from the dormitory property. Your acknowledgment authorizes this request; dormitory staff will be notified.',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -1578,7 +1578,7 @@ class GuardianCurfewRequestCard extends StatelessWidget {
                         onPressed: onEndorse,
                         icon: const Icon(Icons.check_circle_outline, size: 16),
                         label: const Text(
-                          'Approve Leave',
+                          'Acknowledge Leave',
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                         style: FilledButton.styleFrom(
@@ -1721,7 +1721,7 @@ class _GuardianCurfewEndorseSheetState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Approve Overnight Leave',
+                        'Acknowledge Overnight Leave',
                         style: TextStyle(
                             fontWeight: FontWeight.w800, fontSize: 17),
                       ),
@@ -1785,7 +1785,7 @@ class _GuardianCurfewEndorseSheetState
                         widget.onConfirmEndorse(_notesController.text.trim()),
                     icon: const Icon(Icons.check_circle_outline, size: 18),
                     label: const Text(
-                      'Approve Leave',
+                      'Acknowledge Leave',
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                     style: FilledButton.styleFrom(

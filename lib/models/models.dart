@@ -1453,7 +1453,7 @@ class CurfewRequest {
   bool get canCancel =>
       status == 'pending_guardian' || status == 'pending_staff';
   bool get canReviewGuardian => status == 'pending_guardian';
-  bool get canReviewStaff => status == 'pending_staff' && !isOvernightLeave;
+  bool get canReviewStaff => status == 'pending_staff';
 
   String get statusLabel {
     switch (status) {

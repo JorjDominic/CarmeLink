@@ -26,6 +26,7 @@ import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../shared/account_management_page.dart';
 import '../shared/staff_quick_panel.dart';
+import '../shared/staff_curfew_requests_page.dart';
 import '../shared/employee_curfew_profile_pages.dart';
 import '../shared/conduct_case_pages.dart';
 import '../shared/retention_settings_page.dart';
@@ -6387,6 +6388,11 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
       subtitle: 'Gate crossings, resident status, and exceptions',
       maxWidth: kIsWeb ? 1400 : 780,
       actions: [
+        IconButton(
+          tooltip: 'Curfew acknowledgments',
+          icon: const Icon(Icons.fact_check_outlined),
+          onPressed: () => _ownerPush(context, const StaffCurfewRequestsPage()),
+        ),
         IconButton(
           tooltip: 'Refresh presence & events',
           icon: controller.gateLoading || _eventPageLoading
