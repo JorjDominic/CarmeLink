@@ -409,7 +409,7 @@ class _ContractOnboardingChecklistPageState
             leading: IconButton(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.close)),
-            title: const Text('Contract checklist'),
+            title: const Text('Checklist'),
           ),
           body: body,
         ),
@@ -875,7 +875,7 @@ class _RequirementViewer extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
               icon: const Icon(Icons.close),
             ),
-            title: Text(title),
+            title: Tooltip(message: title, child: const Text('Document')),
           ),
           body: mimeType == 'application/pdf'
               ? PdfPreview(

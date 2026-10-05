@@ -1,3 +1,4 @@
+import '../shared/staff_message_contacts.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -940,6 +941,7 @@ class TenantDetailsPage extends StatelessWidget {
         needsContract || needsBed || needsGuardian || draftContract != null;
 
     return PageFrame(
+      heroTitle: 'Tenant',
       title: tenant.name,
       subtitle: 'Tenant details',
       actions: isStaff
@@ -2213,6 +2215,13 @@ class OperationsCategoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PageFrame(
+        heroTitle: switch (category.title) {
+          'Reports & Cases' => 'Reports',
+          'Access & Visitors' => 'Access',
+          'Rooms & Facilities' => 'Rooms',
+          'Billing & Payments' => 'Billing',
+          _ => category.title,
+        },
         title: category.title,
         subtitle: category.subtitle,
         useScriptTitle: false,
@@ -2477,7 +2486,7 @@ class LegacyRoomMonitoringPage extends StatelessWidget {
     final controller = OwnerController.instance;
 
     return PageFrame(
-      title: 'Room monitoring',
+      title: 'Rooms',
       subtitle: 'Visual vacant/occupied room board',
       child: AnimatedBuilder(
         animation: controller,
@@ -2701,7 +2710,7 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
     final controller = OwnerController.instance;
 
     return PageFrame(
-      title: 'Billing and payments',
+      title: 'Payments',
       subtitle: _workspace == 'bills'
           ? 'Issue bills and monitor tenant balances'
           : 'Review payment proofs submitted by tenants',
@@ -4787,7 +4796,7 @@ class _ReceiptViewerModal extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${payment.tenantName ?? "Tenant"} - Receipt Proof',
+              'Receipt',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
@@ -5107,7 +5116,7 @@ class ReportManagementPage extends StatelessWidget {
     }
 
     return PageFrame(
-      title: 'Report management',
+      title: 'Reports',
       subtitle: 'Review reporting workflows from one place',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -6454,7 +6463,7 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
         SessionController.instance.currentUser?.role == UserRole.owner;
 
     return PageFrame(
-      title: 'Presence & Curfew',
+      title: 'Curfew',
       subtitle: 'Gate crossings, resident status, and exceptions',
       useScriptTitle: false,
       maxWidth: kIsWeb ? 1400 : 780,
@@ -6690,7 +6699,8 @@ class _GeofenceMonitoringPageState extends State<GeofenceMonitoringPage> {
                     ),
                     const SizedBox(width: 8),
                     _FilterChip(
-                      label: 'Unavailable (${controller.tenantsUnavailableCount})',
+                      label:
+                          'Unavailable (${controller.tenantsUnavailableCount})',
                       selected: _presenceFilter == 'unavailable',
                       badgeColor: const Color(0xFFC77800),
                       onTap: () =>
@@ -8492,7 +8502,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
   @override
   Widget build(BuildContext context) {
     return PageFrame(
-      title: 'Visitor management',
+      title: 'Visitors',
       subtitle: 'Advance requests, approvals, arrivals, and departures',
       useScriptTitle: false,
       onRefresh: () => controller.loadVisitors(force: true),
@@ -8797,7 +8807,7 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
     return RoleGuard(
       allowedRoles: const {UserRole.owner},
       child: PageFrame(
-        title: 'Confidential reports',
+        title: 'Concerns',
         subtitle: 'Owner-authorized review with audit logging',
         onRefresh: () => controller.loadConcerns(force: true),
         child: AnimatedBuilder(
@@ -9235,7 +9245,7 @@ class _AnnouncementsManagementPageState
         _selectedCategory != 'all' || _selectedAudience != 'all';
 
     return PageFrame(
-      title: 'Announcements',
+      title: 'Notices',
       subtitle: 'Post and manage dormitory notices',
       actions: [
         IconButton(
@@ -10015,7 +10025,7 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
 
     return PageFrame(
       title: 'Messages',
-      subtitle: 'Tenant, guardian and staff conversations',
+      subtitle: 'Private tenant, guardian and staff conversations',
       child: AnimatedBuilder(
         animation: messaging,
         builder: (context, _) {
@@ -10041,6 +10051,8 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
                 ),
                 const SizedBox(height: 12),
               ],
+              const StaffMessageContacts(),
+              const SizedBox(height: 16),
               // Search bar
               TextField(
                 controller: _searchController,
@@ -10088,7 +10100,7 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
                     ),
                     const SizedBox(width: 8),
                     _FilterChip(
-                      label: 'Staff Channel',
+                      label: 'Staff',
                       selected: filter == 'staff',
                       badgeColor: Theme.of(context).colorScheme.primary,
                       onTap: () => messaging.setFilter('staff'),
@@ -10212,8 +10224,9 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
         widget.record?.subtitle ?? widget.conversation?.personRole ?? '';
 
     return PageFrame(
+      heroTitle: 'Chat',
       title: title,
-      subtitle: subtitle,
+      subtitle: subtitle.isEmpty ? title : '$title - $subtitle',
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 980),
         child: AnimatedBuilder(
@@ -10373,7 +10386,7 @@ class EmergencyContactsPage extends StatelessWidget {
           a.guardianName.toLowerCase().compareTo(b.guardianName.toLowerCase()));
 
     return PageFrame(
-      title: 'Dormitory contact directory',
+      title: 'Contacts',
       subtitle: 'Resident and guardian contact details for internal reference',
       useScriptTitle: false,
       child: tenants.isEmpty
@@ -10469,7 +10482,7 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
             .fold<double>(0, (sum, p) => sum + p.amount);
 
         return PageFrame(
-          title: 'Expense & income summary',
+          title: 'Finances',
           subtitle: 'Operational financial snapshot',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -10612,7 +10625,7 @@ class DisciplinaryRecordsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PageFrame(
-        title: 'Disciplinary records',
+        title: 'Discipline',
         subtitle: 'Verified violations and issued notices by tenant',
         child: Column(
           children: [
@@ -10742,7 +10755,7 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
             gateEvents.where((e) => e.status == 'Flagged').length;
 
         return PageFrame(
-          title: 'Reports & Analytics',
+          title: 'Analytics',
           subtitle: 'Operational intelligence and official PDF exports',
           actions: [
             IconButton(

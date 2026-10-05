@@ -1,8 +1,8 @@
+import '../shared/staff_message_contacts.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../controllers/messaging_controller.dart';
 import '../../controllers/session_controller.dart';
 import '../../controllers/tenant_controller.dart';
 import '../../core/constants/app_assets.dart';
@@ -1404,7 +1404,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
   Widget build(BuildContext context) {
     final c = TenantController.instance;
     return PageFrame(
-      title: 'Payments & utilities',
+      title: 'Payments',
       subtitle: 'Balances, due dates, and history',
       actions: [
         IconButton(
@@ -1689,8 +1689,6 @@ class _PaymentsPageState extends State<PaymentsPage> {
                       .map((p) => _TenantPaymentCard(payment: p))
                       .toList(),
                 ),
-              const SizedBox(height: 16),
-              const SecurityDepositCard(),
               if (futurePayments.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _FutureRentSchedule(payments: futurePayments),
@@ -1710,7 +1708,7 @@ class TenantBillingDetailsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = TenantController.instance;
     return PageFrame(
-      title: 'Billing details',
+      title: 'Billing',
       subtitle: 'Complete bills, balances, due dates, and payment history',
       onRefresh: () => controller.loadPayments(force: true),
       actions: [
@@ -1781,7 +1779,7 @@ class TenantBillingDetailsPage extends StatelessWidget {
                           label: 'Other approved charges', amount: other),
                     const Divider(height: 24),
                     Text(
-                      'Future rent and the security deposit are separate from the amount due now.',
+                      'Excludes future rent and security deposit.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 8),
@@ -1796,6 +1794,8 @@ class TenantBillingDetailsPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
+              const SecurityDepositCard(compact: true),
+              const SizedBox(height: 18),
               SectionTitle('Due now (${dueNowBills.length})'),
               const SizedBox(height: 10),
               if (dueNowBills.isEmpty)
@@ -1809,8 +1809,6 @@ class TenantBillingDetailsPage extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _TenantPaymentCard(payment: payment),
                     )),
-              const SizedBox(height: 12),
-              const SecurityDepositCard(),
               if (futureRentBills.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 _FutureRentSchedule(payments: futureRentBills),
@@ -2584,7 +2582,7 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
         .toList();
 
     return PageFrame(
-      title: 'Upload payment proof',
+      title: 'Upload receipt',
       subtitle: 'Submit transaction receipt for verification',
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680),
@@ -3794,7 +3792,7 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
   @override
   Widget build(BuildContext context) {
     return PageFrame(
-      title: 'Maintenance reports',
+      title: 'Maintenance',
       subtitle: 'Submitted issues and progress',
       onRefresh: () => controller.loadMaintenance(force: true),
       actions: [
@@ -4436,8 +4434,7 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
 
   @override
   Widget build(BuildContext context) => PageFrame(
-        title:
-            editing ? 'Edit maintenance report' : 'Submit maintenance report',
+        title: editing ? 'Edit report' : 'New report',
         subtitle: editing
             ? 'Update this report while it is still pending'
             : 'Describe the issue and exact location',
@@ -4587,7 +4584,7 @@ class InteractiveFloorPlanPage extends StatelessWidget {
   const InteractiveFloorPlanPage({super.key});
   @override
   Widget build(BuildContext context) => const PageFrame(
-      title: 'Interactive floor plan',
+      title: 'Floor plan',
       subtitle: 'Select an exact maintenance location',
       child: FloorPlanCanvas());
 }
@@ -4885,7 +4882,7 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
     final hasActiveFilter = _selectedCategory != 'all';
 
     return PageFrame(
-      title: 'Announcements',
+      title: 'Notices',
       subtitle: 'Dormitory notices and updates',
       actions: [
         IconButton(
@@ -5206,106 +5203,18 @@ class TenantMessagesPage extends StatefulWidget {
 
 class _TenantMessagesPageState extends State<TenantMessagesPage> {
   @override
-  void initState() {
-    super.initState();
-    final uid = SessionController.instance.currentUser?.id ?? '';
-    MessagingController.instance.loadTenantConversation(uid);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final messaging = MessagingController.instance;
-
-    return PageFrame(
-      title: 'Messages',
-      subtitle: 'Official Dormitory Communication',
-      child: AnimatedBuilder(
-        animation: messaging,
-        builder: (context, _) {
-          final lastMsg = messaging.activeMessages.isNotEmpty
-              ? messaging.activeMessages.last
-              : null;
-          final previewText = lastMsg?.body ??
-              messaging.activeConversation?.lastMessagePreview ??
-              'Tap to chat with Dormitory Management';
-
-          return ConversationListCard(
-            name: 'Caretaker / Management',
-            role: 'Owner & Caretaker',
-            lastMessage: lastMsg,
-            lastMessageText: previewText,
-            lastMessageTime:
-                lastMsg?.sentAt ?? messaging.activeConversation?.lastMessageAt,
-            unreadCount: messaging.unreadMessageCount,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const TenantConversationPage(),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const PageFrame(
+        title: 'Messages',
+        subtitle: 'Private conversations with owners and caretakers',
+        child: StaffMessageContacts(),
+      );
 }
 
-class TenantConversationPage extends StatefulWidget {
+class TenantConversationPage extends StatelessWidget {
   const TenantConversationPage({super.key});
 
   @override
-  State<TenantConversationPage> createState() => _TenantConversationPageState();
-}
-
-class _TenantConversationPageState extends State<TenantConversationPage> {
-  final message = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    final uid = SessionController.instance.currentUser?.id ?? '';
-    MessagingController.instance.loadTenantConversation(uid, openThread: true);
-  }
-
-  @override
-  void dispose() {
-    message.dispose();
-    MessagingController.instance.leaveActiveThread();
-    super.dispose();
-  }
-
-  Future<void> _handleSend() async {
-    final text = message.text.trim();
-    if (text.isEmpty) return;
-    message.clear();
-    await MessagingController.instance.sendMessage(text);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final messaging = MessagingController.instance;
-    return PageFrame(
-      title: 'Dormitory Management',
-      subtitle: 'Owner & Caretaker',
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 980),
-        child: AnimatedBuilder(
-          animation: messaging,
-          builder: (context, _) => ConversationThreadPanel(
-            messages: messaging.activeMessages,
-            composerController: message,
-            sending: messaging.sendingMessage,
-            emptyMessage:
-                'No messages yet. Send a message to start chatting with dormitory management.',
-            hintText: 'Write a message to management...',
-            onSend: _handleSend,
-            isMine: (item) => item.isMine(
-              SessionController.instance.currentUser?.id,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const TenantMessagesPage();
 }
 
 class TenantPresencePage extends StatefulWidget {
@@ -5440,7 +5349,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
     final controller = TenantController.instance;
 
     return PageFrame(
-      title: 'Presence & Curfew',
+      title: 'Curfew',
       subtitle: 'Your gate status, monitoring, and exceptions',
       maxWidth: 720,
       actions: [
@@ -5513,7 +5422,7 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const TripwireFlowCard(compact: true),
+              const TripwireFlowCard(compact: true, initiallyExpanded: false),
               const SizedBox(height: 16),
               const TenantEmployeeCurfewProfileCard(),
               const SizedBox(height: 16),
@@ -6378,7 +6287,7 @@ class _TenantCurfewExceptionPageState extends State<TenantCurfewExceptionPage> {
     final isLate = _requestType == 'late_return';
 
     return PageFrame(
-      title: 'Curfew exception',
+      title: 'Curfew request',
       subtitle: 'Request late return or overnight leave',
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680),
@@ -7299,7 +7208,7 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
           _ => b.createdAt.compareTo(a.createdAt),
         });
     return PageFrame(
-      title: 'Confidential concern',
+      title: 'Concern',
       subtitle: 'Safety, rules, or roommate concerns',
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720),
@@ -7502,7 +7411,7 @@ class _RulesPoliciesPageState extends State<RulesPoliciesPage> {
         rule.details.toLowerCase().contains(query) ||
         (rule.consequence?.toLowerCase().contains(query) ?? false));
     return PageFrame(
-        title: 'Rules & policies',
+        title: 'Rules',
         subtitle: 'Categorized clauses from the official lease',
         child: Column(children: [
           TextField(

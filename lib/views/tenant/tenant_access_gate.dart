@@ -85,7 +85,11 @@ class _TenantAccessGateState extends State<TenantAccessGate> {
         animation: _access,
         builder: (context, _) => Scaffold(
           appBar: AppBar(
-            title: const Text('Complete your setup'),
+            title: Text(switch (_access.state) {
+              TenantAccessState.loading => 'CarmeLink',
+              TenantAccessState.error => 'Account access',
+              _ => 'Setup',
+            }),
             actions: [
               IconButton(
                 tooltip: 'Profile',
@@ -111,7 +115,7 @@ class _TenantAccessGateState extends State<TenantAccessGate> {
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('Checking your onboarding status…'),
+            Text('Loading your account...'),
           ],
         ),
       );

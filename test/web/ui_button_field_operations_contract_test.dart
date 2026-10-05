@@ -38,8 +38,8 @@ void main() {
   test('access and safety pages use consistent non-script headers', () {
     final source = File('lib/views/owner/owner_pages.dart').readAsStringSync();
 
-    final presence = source.indexOf("title: 'Presence & Curfew'");
-    final visitor = source.indexOf("title: 'Visitor management'");
+    final presence = source.indexOf("title: 'Curfew'");
+    final visitor = source.indexOf("title: 'Visitors'");
     expect(presence, greaterThanOrEqualTo(0));
     expect(visitor, greaterThanOrEqualTo(0));
     expect(

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
 import '../../core/widgets/common_widgets.dart';
@@ -7,7 +7,14 @@ import '../../services/security_deposit_service.dart';
 import '../../services/table_refresh_subscription.dart';
 
 class SecurityDepositCard extends StatefulWidget {
-  const SecurityDepositCard({super.key, this.contractId, this.tenantId});
+  const SecurityDepositCard(
+      {super.key,
+      this.contractId,
+      this.tenantId,
+      this.embedded = false,
+      this.compact = false});
+  final bool embedded;
+  final bool compact;
   final String? contractId, tenantId;
 
   @override
@@ -84,13 +91,17 @@ class _SecurityDepositCardState extends State<SecurityDepositCard> {
     }
   }
 
+  Widget _container(Widget child) => widget.embedded
+      ? child
+      : CarmelitaCard(
+          padding: EdgeInsets.all(widget.compact ? 12 : 16), child: child);
+
   @override
   Widget build(BuildContext context) => FutureBuilder<SecurityDepositRecord?>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return CarmelitaCard(
-                child: Column(children: [
+            return _container(Column(children: [
               const Text('Security deposit details are unavailable.'),
               TextButton(onPressed: _reload, child: const Text('Retry')),
             ]));
@@ -103,8 +114,7 @@ class _SecurityDepositCardState extends State<SecurityDepositCard> {
           final owner =
               SessionController.instance.currentUser?.role == UserRole.owner;
           String money(double value) => '₱${value.toStringAsFixed(2)}';
-          return CarmelitaCard(
-              child: Column(
+          return _container(Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(children: [
@@ -112,21 +122,26 @@ class _SecurityDepositCardState extends State<SecurityDepositCard> {
                     child: Text('Security deposit',
                         style: TextStyle(fontWeight: FontWeight.w800))),
                 IconButton(
+                    visualDensity:
+                        widget.compact ? VisualDensity.compact : null,
                     tooltip: 'Refresh deposit',
                     onPressed: _reload,
                     icon: const Icon(Icons.refresh_rounded)),
               ]),
-              Text(record.contractNumber),
-              const SizedBox(height: 8),
-              StatusPill(record.status),
-              const SizedBox(height: 8),
+              if (!widget.compact) Text(record.contractNumber),
+              if (record.status != 'No deposit required') ...[
+                StatusPill(record.status),
+                const SizedBox(height: 8),
+              ],
               InfoRow(
                   label: 'Contract amount',
                   value: money(record.requiredAmount)),
               InfoRow(
                   label: 'Confirmed received',
                   value: money(record.receivedAmount)),
-              if (!record.settled && record.receivedAmount > 0)
+              if (!widget.compact &&
+                  !record.settled &&
+                  record.receivedAmount > 0)
                 InfoRow(
                     label: 'Held for settlement',
                     value: money(record.heldAmount)),
@@ -148,8 +163,8 @@ class _SecurityDepositCardState extends State<SecurityDepositCard> {
                     value: money(record.refundedAmount)),
               ],
               const SizedBox(height: 8),
-              const Text(
-                  'Recorded separately from bills. Management confirms money received; refunds and approved deductions are recorded at move-out.'),
+              Text('Separate from bills; settled at move-out.',
+                  style: Theme.of(context).textTheme.bodySmall),
               if (record.unassignedReceipts.isNotEmpty) ...[
                 const Divider(),
                 const Text(

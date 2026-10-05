@@ -148,7 +148,7 @@ class _OnboardingFormPageState extends State<OnboardingFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Onboarding Form'),
+        title: const Text('Onboarding'),
         centerTitle: false,
       ),
       body: SafeArea(
@@ -833,4 +833,3 @@ Future<void> showEnterOnboardingCodeDialog(BuildContext context) async {
     );
   }
 }
-

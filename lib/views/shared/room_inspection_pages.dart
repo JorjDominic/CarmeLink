@@ -294,6 +294,7 @@ class _StaffRoomInspectionsPageState extends State<StaffRoomInspectionsPage> {
     final visible = _visibleInspections(inspections, scope, sort);
 
     return PageFrame(
+      heroTitle: 'Inspections',
       title: 'Room ${widget.roomNumber} inspections',
       subtitle: '$active active • ${inspections.length} total',
       useScriptTitle: false,
@@ -940,6 +941,7 @@ class _StaffInspectionDetailPageState extends State<StaffInspectionDetailPage> {
   @override
   Widget build(BuildContext context) {
     return PageFrame(
+      heroTitle: 'Inspection',
       title: '${inspectionTypeLabel(inspection.inspectionType)} inspection',
       subtitle:
           'Room ${widget.roomNumber} • ${_inspectionDateTime(inspection.scheduledAt)}',
@@ -1210,7 +1212,7 @@ class _TenantRoomInspectionsPageState extends State<TenantRoomInspectionsPage> {
         .length;
     final visible = _visibleInspections(inspections, scope, sort);
     return PageFrame(
-      title: 'Room inspections',
+      title: 'Inspections',
       subtitle: 'Inspection notices, findings, and follow-up',
       onRefresh: () => _load(showSpinner: false),
       actions: [

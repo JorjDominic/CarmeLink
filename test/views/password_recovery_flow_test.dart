@@ -10,9 +10,12 @@ void main() {
       ),
     );
 
-    expect(find.text('Verify your email'), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(AppBar), matching: find.text('Verify email')),
+        findsOneWidget);
     expect(find.text('Six-digit verification code'), findsOneWidget);
-    expect(find.text('Verify email'), findsOneWidget);
+    expect(find.text('Verify email'), findsNWidgets(2));
     expect(find.text('Send code'), findsOneWidget);
     expect(find.text('Use a different account'), findsOneWidget);
 
@@ -28,7 +31,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Enter recovery code'), findsOneWidget);
+    expect(find.text('Recovery code'), findsOneWidget);
     expect(find.textContaining('r••'), findsOneWidget);
     expect(find.text('Six-digit code'), findsOneWidget);
     expect(find.text('Verify code'), findsOneWidget);

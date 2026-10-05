@@ -370,7 +370,7 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
     final visible = _visibleCases(cases, scope, sort);
 
     return PageFrame(
-      title: 'Conduct & cases',
+      title: 'Conduct',
       subtitle: '$active active • ${cases.length} total',
       useScriptTitle: false,
       onRefresh: () => _load(showSpinner: false),
@@ -871,6 +871,7 @@ class _StaffConductCaseDetailPageState
     final canAct = record.status != 'draft' && !closed;
 
     return PageFrame(
+      heroTitle: 'Case',
       title: record.title,
       subtitle: '${record.tenantName ?? 'Tenant'} • Conduct case',
       useScriptTitle: false,
@@ -1225,7 +1226,7 @@ class _TenantConductCasesPageState extends State<TenantConductCasesPage> {
         cases.where((record) => !conductCaseIsClosed(record.status)).length;
     final visible = _visibleCases(cases, scope, sort);
     return PageFrame(
-      title: 'Conduct & cases',
+      title: 'Conduct',
       subtitle: 'Your published conduct records and responses',
       onRefresh: () => _load(showSpinner: false),
       actions: [
@@ -1456,6 +1457,7 @@ class _TenantConductCaseDetailPageState
   @override
   Widget build(BuildContext context) {
     return PageFrame(
+      heroTitle: 'Case',
       title: record.title,
       subtitle: 'Conduct case',
       onRefresh: _refresh,

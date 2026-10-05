@@ -268,7 +268,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
     }
 
     return PageFrame(
-      title: 'Room monitoring',
+      title: 'Rooms',
       maxWidth: 1400,
       subtitle: _viewMode == RoomViewMode.list
           ? 'Rooms, occupancy, cleaning schedules and inspections'

@@ -167,7 +167,7 @@ class _GeofenceDevDashboardPageState extends State<GeofenceDevDashboardPage> {
     return RoleGuard(
         allowedRoles: const {UserRole.owner},
         child: PageFrame(
-          title: 'Geofence Dev Dashboard',
+          title: 'Geofence debug',
           subtitle:
               'Dormitory property map, ray-casting verification, and overrides',
           actions: [

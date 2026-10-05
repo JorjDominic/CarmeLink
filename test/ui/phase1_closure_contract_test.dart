@@ -173,7 +173,7 @@ void main() {
       final source =
           File('lib/views/shared/shared_views.dart').readAsStringSync();
 
-      expect(source.contains("title: 'Feedback preview'"), isTrue);
+      expect(source.contains("title: 'Feedback'"), isTrue);
       expect(source.contains('currently a UI preview'), isTrue);
       expect(source.contains('Feedback is not '), isTrue);
       expect(

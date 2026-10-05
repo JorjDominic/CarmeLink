@@ -12,7 +12,7 @@ Deno.serve(async (request) => {
     if (!messageId) return json({ error: 'Message ID is required' }, 400)
 
     const { data: message, error: messageError } = await auth.admin.from('messages')
-      .select('id, conversation_id, sender_id, conversations!inner(type, tenant_id, guardian_id), profiles!sender_id(full_name)')
+      .select('id, conversation_id, sender_id, conversations!inner(type, tenant_id, guardian_id, direct_participant_id, direct_staff_id), profiles!sender_id(full_name)')
       .eq('id', messageId).single()
     if (messageError) throw new Error(`Unable to load message: ${messageError.message}`)
     if (!message || message.sender_id !== auth.user.id) return json({ error: 'Message not found' }, 404)
@@ -22,7 +22,14 @@ Deno.serve(async (request) => {
       : message.conversations
     const senderProfile = Array.isArray(message.profiles) ? message.profiles[0] : message.profiles
     const recipients = new Set<string>()
-    if (conversation.type === 'tenant_management') {
+    if (conversation.type === 'direct_staff') {
+      if (![conversation.direct_participant_id, conversation.direct_staff_id].includes(message.sender_id)) {
+        return json({ error: 'Forbidden' }, 403)
+      }
+      const recipient = conversation.direct_participant_id === message.sender_id
+        ? conversation.direct_staff_id : conversation.direct_participant_id
+      if (recipient) recipients.add(recipient)
+    } else if (conversation.type === 'tenant_management') {
       if (message.sender_id === conversation.tenant_id) {
         const { data: staff } = await auth.admin.from('profiles').select('id').in('role', ['owner', 'caretaker'])
         staff?.forEach((profile) => recipients.add(profile.id))

@@ -10,7 +10,7 @@ void main() {
     ).readAsStringSync();
 
     for (final expected in [
-      "title: 'Billing & charges'",
+      "title: 'Billing'",
       "Key('phase7-utility-cart')",
       "Key('phase7-additional-charge')",
       "Key('phase7-payment-verification')",

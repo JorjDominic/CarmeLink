@@ -74,7 +74,11 @@ class TenantAccessController extends ChangeNotifier {
 
   Future<void> refresh() async {
     final generation = ++_requestGeneration;
-    _state = TenantAccessState.loading;
+    // Keep the confirmed tenant workspace mounted during revalidation.
+    // A failed or restricted result still revokes access below.
+    if (_state != TenantAccessState.approved) {
+      _state = TenantAccessState.loading;
+    }
     _error = null;
     notifyListeners();
 

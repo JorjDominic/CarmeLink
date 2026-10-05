@@ -817,6 +817,7 @@ class ConversationRecord {
     required this.type,
     this.tenantId,
     this.guardianId,
+    this.directPeerId,
     this.title = '',
     this.subtitle = '',
     this.participantName = '',
@@ -835,6 +836,7 @@ class ConversationRecord {
       type; // 'tenant_management', 'guardian_management', 'internal_staff'
   final String? tenantId;
   final String? guardianId;
+  final String? directPeerId;
   final String title;
   final String subtitle;
   final String participantName;
@@ -847,6 +849,7 @@ class ConversationRecord {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  bool get isDirectStaff => type == 'direct_staff';
   bool get isInternalStaff => type == 'internal_staff';
   bool get isTenantManagement => type == 'tenant_management';
   bool get isGuardianManagement => type == 'guardian_management';
@@ -867,7 +870,12 @@ class ConversationRecord {
     String? roomNumber;
     String? bedSpace;
 
-    if (type == 'internal_staff') {
+    if (type == 'direct_staff') {
+      participantName = row['direct_peer_name'] as String? ?? 'Private conversation';
+      participantRole = row['direct_peer_role'] as String? ?? '';
+      title = participantName;
+      subtitle = participantRole.isEmpty ? 'Private conversation' : '${participantRole[0].toUpperCase()}${participantRole.substring(1)}';
+    } else if (type == 'internal_staff') {
       title = 'Staff Channel';
       subtitle = 'Owner & Caretaker Coordination';
       participantName = 'Staff Room';
@@ -900,7 +908,7 @@ class ConversationRecord {
       }
     }
 
-    if (currentRole == 'tenant' || currentRole == 'guardian') {
+    if (type != 'direct_staff' && (currentRole == 'tenant' || currentRole == 'guardian')) {
       title = 'Dormitory Management';
       subtitle = 'Owner & Caretaker';
     }
@@ -915,6 +923,7 @@ class ConversationRecord {
       type: type,
       tenantId: row['tenant_id'] as String?,
       guardianId: row['guardian_id'] as String?,
+      directPeerId: row['direct_peer_id'] as String?,
       title: title,
       subtitle: subtitle,
       participantName: participantName,

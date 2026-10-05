@@ -2,6 +2,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 
 void main() {
+  test('private conversation retains peer identity for all user roles', () {
+    final row = <String, dynamic>{
+      'id': 'private-thread',
+      'type': 'direct_staff',
+      'direct_peer_id': 'owner-id',
+      'direct_peer_name': 'Dormitory Owner',
+      'direct_peer_role': 'owner',
+      'unread_count': 2,
+      'created_at': '2026-10-05T00:00:00Z',
+      'updated_at': '2026-10-05T00:00:00Z',
+    };
+    for (final role in ['tenant', 'guardian', 'owner', 'caretaker']) {
+      final record = ConversationRecord.fromRow(row, currentRole: role);
+      expect(record.isDirectStaff, isTrue);
+      expect(record.directPeerId, 'owner-id');
+      expect(record.title, 'Dormitory Owner');
+      expect(record.subtitle, 'Owner');
+      expect(record.unreadCount, 2);
+    }
+  });
+
   group('ChatMessage Model', () {
     final now = DateTime(2026, 9, 19, 10, 30);
 

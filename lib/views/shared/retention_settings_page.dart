@@ -286,7 +286,7 @@ class _RetentionSettingsPageState extends State<RetentionSettingsPage> {
         UserRole.caretaker,
       },
       child: PageFrame(
-        title: 'Security & retention',
+        title: 'Security',
         subtitle: 'Retention configuration and privacy review',
         useScriptTitle: false,
         onRefresh: () => _load(showSpinner: false),

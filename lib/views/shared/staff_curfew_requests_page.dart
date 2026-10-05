@@ -79,7 +79,7 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) => PageFrame(
-        title: 'Curfew Acknowledgments',
+        title: 'Requests',
         subtitle: 'Late returns and overnight leave without a linked guardian',
         actions: [
           IconButton(

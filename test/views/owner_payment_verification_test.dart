@@ -86,7 +86,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Page Title
-      expect(find.text('Billing and payments'), findsOneWidget);
+      expect(find.text('Payments'), findsOneWidget);
       expect(find.text('Bills'), findsOneWidget);
       expect(find.text('Payment review'), findsOneWidget);
 

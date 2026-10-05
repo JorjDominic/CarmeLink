@@ -164,7 +164,7 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Required Documents'),
+        title: const Text('Documents'),
         actions: [
           IconButton(
             tooltip: 'Refresh',
@@ -773,7 +773,7 @@ class ContractDocumentPreviewDialog extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
               icon: const Icon(Icons.close),
             ),
-            title: Text(title),
+            title: Tooltip(message: title, child: const Text('Document')),
           ),
           body: mimeType == 'application/pdf'
               ? PdfPreview(

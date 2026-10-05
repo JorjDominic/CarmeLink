@@ -1893,7 +1893,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
   @override
   Widget build(BuildContext context) {
     return PageFrame(
-      title: 'Feedback preview',
+      title: 'Feedback',
       subtitle: 'Validate the feedback form experience',
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720),
@@ -2112,7 +2112,7 @@ class _NotificationPreferencesPageState
     };
 
     return PageFrame(
-      title: 'Notification preferences',
+      title: 'Alerts',
       subtitle: 'Choose which updates you receive',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2297,7 +2297,7 @@ class _PrivacyPermissionsPageState extends State<PrivacyPermissionsPage> {
     };
 
     return PageFrame(
-      title: 'Privacy and permissions',
+      title: 'Privacy',
       subtitle: 'Control access used by CarmeLink',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

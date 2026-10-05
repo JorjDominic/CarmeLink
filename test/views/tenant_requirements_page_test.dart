@@ -11,7 +11,7 @@ void main() {
     );
 
     // Initial pump shows title in app bar and loading indicator
-    expect(find.text('Required Documents'), findsOneWidget);
+    expect(find.text('Documents'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 }

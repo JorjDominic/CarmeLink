@@ -1,3 +1,4 @@
+import '../shared/staff_message_contacts.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -65,7 +66,9 @@ class _GuardianShellState extends State<GuardianShell>
             : routeType)
         .toLowerCase();
     return switch (route) {
-      'message' || 'conversation' => const GuardianConversationPage(),
+      'message' || 'conversation' => notification.routeId?.isNotEmpty == true
+          ? DirectStaffConversationPage(conversationId: notification.routeId)
+          : const GuardianMessagesPage(),
       'payment' => const GuardianPaymentStatusPage(),
       'curfew' ||
       'gate' ||

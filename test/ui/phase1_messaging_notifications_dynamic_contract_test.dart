@@ -73,8 +73,10 @@ void main() {
       expect(common.contains('ListView.builder('), isTrue);
       expect(common.contains("Key('conversation-composer')"), isTrue);
       expect(common.contains("label: const Text('New messages')"), isTrue);
-      expect(tenant.contains('ConversationThreadPanel('), isTrue);
-      expect(guardian.contains('ConversationThreadPanel('), isTrue);
+      final direct = File('lib/views/shared/staff_message_contacts.dart').readAsStringSync();
+      expect(tenant.contains('StaffMessageContacts()'), isTrue);
+      expect(guardian.contains('StaffMessageContacts()'), isTrue);
+      expect(direct.contains('ConversationThreadPanel('), isTrue);
       expect(owner.contains('ConversationThreadPanel('), isTrue);
     });
 

@@ -763,7 +763,7 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
             leading: IconButton(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.close)),
-            title: const Text('Contract documents'),
+            title: const Text('Documents'),
           ),
           body: content,
         ),
@@ -775,7 +775,7 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
         height: 760,
         child: Column(children: [
           ListTile(
-            title: const Text('Contract documents'),
+            title: const Text('Documents'),
             subtitle: const Text('Generate, e-sign, verify, and activate'),
             trailing: IconButton(
                 onPressed: () => Navigator.pop(context),
@@ -1230,9 +1230,9 @@ class _ContractDocumentViewerState extends State<_ContractDocumentViewer> {
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          title: Text(
-            widget.document.originalFilename,
-            overflow: TextOverflow.ellipsis,
+          title: Tooltip(
+            message: widget.document.originalFilename,
+            child: const Text('Document'),
           ),
         ),
         body: FutureBuilder<Uint8List>(

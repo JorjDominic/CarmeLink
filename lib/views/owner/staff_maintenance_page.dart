@@ -146,7 +146,7 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
             allReports.where((r) => r.status == 'cancelled').length;
 
         return PageFrame(
-          title: 'Maintenance Management',
+          title: 'Maintenance',
           subtitle: 'Live tenant reports, status triage, and audit trail',
           onRefresh: () => _controller.loadStaffMaintenance(force: true),
           child: Column(
@@ -804,7 +804,7 @@ class _StaffMaintenanceDetailsPageState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Maintenance Triage'),
+        title: const Text('Review report'),
         actions: [
           IconButton(
             onPressed: _loading || _saving ? null : _load,

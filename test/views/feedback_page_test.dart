@@ -9,7 +9,10 @@ void main() {
       (tester) async {
     await tester.pumpWidget(app());
 
-    expect(find.text('Feedback preview'), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(AppBar), matching: find.text('Feedback')),
+        findsOneWidget);
     expect(find.text('Feedback type'), findsOneWidget);
     expect(find.textContaining('currently a UI preview'), findsOneWidget);
     expect(find.byTooltip('5 stars'), findsOneWidget);

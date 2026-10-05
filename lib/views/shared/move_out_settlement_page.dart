@@ -133,7 +133,7 @@ class _MoveOutSettlementPageState extends State<MoveOutSettlementPage> {
   Widget build(BuildContext context) {
     if (!_isTenant && !_isStaff) {
       return const PageFrame(
-        title: 'Move-out & settlement',
+        title: 'Move-out',
         child: WorkInProgressNotice(
           message:
               'Move-out settlement is available to tenants and authorized dormitory staff.',
@@ -142,7 +142,7 @@ class _MoveOutSettlementPageState extends State<MoveOutSettlementPage> {
     }
 
     return PageFrame(
-      title: _isTenant ? 'Move-out notice' : 'Move-out & settlement',
+      title: _isTenant ? 'Move-out' : 'Move-out',
       subtitle: _isTenant
           ? 'Submit and track your notice, final inspection, clearance, and deposit settlement.'
           : 'Coordinate notice, final inspection, clearance, deposit settlement, and closure handoff.',

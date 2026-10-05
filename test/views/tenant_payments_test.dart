@@ -227,7 +227,7 @@ void main() {
       await tester.tap(summaryTapTarget);
       await tester.pumpAndSettle();
 
-      expect(find.text('Billing details'), findsOneWidget);
+      expect(find.text('Billing'), findsOneWidget);
       expect(find.text('TOTAL OUTSTANDING'), findsOneWidget);
       expect(find.text('Due now (2)'), findsOneWidget);
       expect(find.text('Completed and voided (1)'), findsOneWidget);
@@ -258,7 +258,7 @@ void main() {
       await tester.tap(submitProofBtn);
       await tester.pumpAndSettle();
 
-      expect(find.text('Upload payment proof'), findsOneWidget);
+      expect(find.text('Upload receipt'), findsOneWidget);
       expect(find.text('Submit transaction receipt for verification'),
           findsOneWidget);
       expect(find.text('September Dorm Rent'), findsOneWidget);

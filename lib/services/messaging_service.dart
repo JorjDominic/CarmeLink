@@ -8,6 +8,35 @@ import '../models/models.dart';
 class MessagingService {
   const MessagingService();
 
+  Future<List<Map<String, dynamic>>> listStaffContacts() async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null || client.auth.currentUser == null) return const [];
+    final rows = await client.rpc('list_messaging_staff');
+    return (rows as List)
+        .map((row) => Map<String, dynamic>.from(row as Map))
+        .toList();
+  }
+
+  Future<List<ConversationRecord>> listDirectConversations() async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null || client.auth.currentUser == null) return const [];
+    final rows = await client.rpc('list_my_direct_staff_conversations');
+    return (rows as List)
+        .map((row) => ConversationRecord.fromRow(
+              Map<String, dynamic>.from(row as Map),
+            ))
+        .toList();
+  }
+
+  Future<ConversationRecord> getOrCreateDirectConversation(
+      String staffId) async {
+    final id = await SupabaseConfig.client.rpc(
+        'get_or_create_direct_staff_conversation',
+        params: {'p_staff_id': staffId});
+    final conversations = await listDirectConversations();
+    return conversations.firstWhere((record) => record.id == id);
+  }
+
   static const String _conversationColumns =
       'id, type, tenant_id, guardian_id, last_message_preview, last_message_at, created_at, updated_at, '
       'tenant_profile:profiles!tenant_id(full_name, role), '
@@ -190,7 +219,11 @@ class MessagingService {
           .select(_conversationColumns)
           .eq('id', conversationId)
           .maybeSingle();
-      if (row == null) return null;
+      if (row == null || row['type'] != 'direct_staff') return null;
+      if (row['type'] == 'direct_staff') {
+        return (await listDirectConversations())
+            .firstWhere((record) => record.id == conversationId);
+      }
       return ConversationRecord.fromRow(
         row,
         currentRole: currentRole ?? 'owner',
@@ -206,63 +239,9 @@ class MessagingService {
     String? filterType,
     String? currentRole,
   }) async {
-    final client = SupabaseConfig.clientSafe;
-    if (client == null) return const [];
-
-    try {
-      var query = client.from('conversations').select(_conversationColumns);
-
-      if (filterType != null && filterType.isNotEmpty) {
-        query = query.eq('type', filterType);
-      }
-
-      var rows = await query.order('last_message_at', ascending: false);
-
-      if ((rows as List).isEmpty &&
-          (currentRole == 'owner' || currentRole == 'caretaker')) {
-        await ensureInitialConversations();
-        rows = await query.order('last_message_at', ascending: false);
-      }
-
-      final currentUid = client.auth.currentUser?.id ?? '';
-      final unreadCounts = <String, int>{};
-      if (currentUid.isNotEmpty) {
-        try {
-          final unreadRows = await client
-              .from('messages')
-              .select('conversation_id, sender_id')
-              .eq('is_read', false);
-          for (final raw in unreadRows as List<dynamic>) {
-            final row = raw as Map<String, dynamic>;
-            if (row['sender_id'] == currentUid) continue;
-            final conversationId = row['conversation_id']?.toString();
-            if (conversationId == null || conversationId.isEmpty) continue;
-            unreadCounts.update(
-              conversationId,
-              (count) => count + 1,
-              ifAbsent: () => 1,
-            );
-          }
-        } catch (error) {
-          // Inbox content must remain usable even if an older deployment has
-          // not granted access to the unread-count query yet.
-          debugPrint('Unable to load message unread counts: $error');
-        }
-      }
-
-      return (rows as List<dynamic>).map<ConversationRecord>((raw) {
-        final row = Map<String, dynamic>.from(raw as Map<String, dynamic>);
-        final id = row['id']?.toString() ?? '';
-        row['unread_count'] = unreadCounts[id] ?? 0;
-        return ConversationRecord.fromRow(
-          row,
-          currentRole: currentRole ?? 'owner',
-        );
-      }).toList(growable: false);
-    } catch (e) {
-      debugPrint('Error fetching conversations: $e');
-      return const [];
-    }
+    final direct = await listDirectConversations();
+    if (filterType != null && filterType != 'direct_staff') return const [];
+    return direct;
   }
 
   /// Fetches message history for a specific conversation thread.

@@ -110,7 +110,7 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
   Widget build(BuildContext context) => RoleGuard(
         allowedRoles: const {UserRole.owner, UserRole.caretaker},
         child: PageFrame(
-          title: 'Account management',
+          title: 'Accounts',
           subtitle: 'Create and review dormitory accounts',
           actions: [
             IconButton(

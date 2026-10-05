@@ -539,7 +539,7 @@ class _OnboardingInvitationPageState extends State<OnboardingInvitationPage> {
               onPressed: () => Navigator.pop(context),
               icon: const Icon(Icons.close),
             ),
-            title: const Text('Tenant Onboarding'),
+            title: const Text('Onboarding'),
           ),
           body: content,
         ),

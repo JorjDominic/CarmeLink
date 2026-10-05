@@ -1,3 +1,4 @@
+import '../shared/staff_message_contacts.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -130,7 +131,9 @@ class _TenantShellState extends State<TenantShell> with WidgetsBindingObserver {
             : routeType)
         .toLowerCase();
     return switch (route) {
-      'message' || 'conversation' => const TenantConversationPage(),
+      'message' || 'conversation' => notification.routeId?.isNotEmpty == true
+          ? DirectStaffConversationPage(conversationId: notification.routeId)
+          : const TenantMessagesPage(),
       'payment' => const PaymentsPage(),
       'maintenance' => const MaintenanceReportsPage(),
       'visitor' => const VisitorRequestPage(),

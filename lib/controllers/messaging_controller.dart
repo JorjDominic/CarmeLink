@@ -51,56 +51,38 @@ class MessagingController extends ChangeNotifier {
         (sum, item) => sum + item.unreadCount,
       );
 
-  int get unreadMessageCount {
-    final currentUid = SupabaseConfig.clientSafe?.auth.currentUser?.id ??
-        SessionController.instance.currentUser?.id ??
-        '';
-    final role = SessionController.instance.currentUser?.role.name ?? '';
-    if (role == 'owner' || role == 'caretaker') {
-      return totalUnreadCount;
-    }
-    if (currentUid.isEmpty) return 0;
-    return _activeMessages
-        .where((message) =>
-            message.senderId != currentUid && !message.isRead)
-        .length;
-  }
+  int get unreadMessageCount => totalUnreadCount;
 
   Future<void> startForCurrentRole({bool force = false}) async {
     final user = SessionController.instance.currentUser;
-    final uid = SupabaseConfig.clientSafe?.auth.currentUser?.id ?? user?.id ?? '';
+    final uid =
+        SupabaseConfig.clientSafe?.auth.currentUser?.id ?? user?.id ?? '';
     if (user == null || uid.isEmpty) return;
-    switch (user.role.name) {
-      case 'owner':
-      case 'caretaker':
-        await loadConversations(force: force);
-        break;
-      case 'tenant':
-        if (force || _activeConversation == null || _activeThreadOpen) {
-          await loadTenantConversation(uid, openThread: false);
-        }
-        break;
-      case 'guardian':
-        if (force || _activeConversation == null || _activeThreadOpen) {
-          await loadGuardianConversation(
-            guardianId: uid,
-            openThread: false,
-          );
-        }
-        break;
+    if (_activeThreadOpen && _activeConversation?.isDirectStaff == true) {
+      await _fetchMessagesForActiveConversation(
+          markAsRead: true, subscribe: true);
+      return;
     }
+    await loadConversations(force: force);
   }
 
   List<ConversationRecord> get filteredConversations {
     return _conversations.where((conv) {
       // 1. Filter by category
-      if (_selectedFilter == 'tenant' && !conv.isTenantManagement) {
+      if (_selectedFilter == 'tenant' &&
+          !(conv.isTenantManagement ||
+              (conv.isDirectStaff && conv.participantRole == 'tenant'))) {
         return false;
       }
-      if (_selectedFilter == 'guardian' && !conv.isGuardianManagement) {
+      if (_selectedFilter == 'guardian' &&
+          !(conv.isGuardianManagement ||
+              (conv.isDirectStaff && conv.participantRole == 'guardian'))) {
         return false;
       }
-      if (_selectedFilter == 'staff' && !conv.isInternalStaff) {
+      if (_selectedFilter == 'staff' &&
+          !(conv.isInternalStaff ||
+              (conv.isDirectStaff &&
+                  ['owner', 'caretaker'].contains(conv.participantRole)))) {
         return false;
       }
 

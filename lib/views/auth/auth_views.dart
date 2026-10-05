@@ -433,24 +433,6 @@ class _SignInPageState extends State<SignInPage> {
                                       ? 'Signing in…'
                                       : 'Sign in'),
                                 )),
-                            const SizedBox(height: 22),
-                            Text('Test accounts',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w800)),
-                            const SizedBox(height: 10),
-                            Wrap(spacing: 8, runSpacing: 8, children: [
-                              _demoChip('Tenant', 'tenant@carmelita.test'),
-                              _demoChip('Guardian', 'guardian@carmelita.test'),
-                              _demoChip(
-                                  'Caretaker', 'caretaker@carmelita.test'),
-                              _demoChip('Owner', 'owner@carmelita.test'),
-                            ]),
-                            const SizedBox(height: 12),
-                            Text(
-                                'These accounts are for development only. Remove them before production.',
-                                style: Theme.of(context).textTheme.bodySmall),
                           ]),
                     ),
                   ),
@@ -460,13 +442,6 @@ class _SignInPageState extends State<SignInPage> {
           ),
         ),
       );
-
-  Widget _demoChip(String label, String value) => ActionChip(
-      label: Text(label),
-      onPressed: () => setState(() {
-            email.text = value;
-            password.text = 'CarmeLinkTest123!';
-          }));
 }
 
 class EmailVerificationCodePage extends StatefulWidget {
@@ -582,7 +557,7 @@ class _EmailVerificationCodePageState extends State<EmailVerificationCodePage> {
           }
         },
         child: PageFrame(
-          title: 'Verify your email',
+          title: 'Verify email',
           subtitle: codeSent
               ? 'Enter the code sent to your inbox'
               : 'Send a code when you are ready',
@@ -821,7 +796,7 @@ class _PasswordRecoveryCodePageState extends State<PasswordRecoveryCodePage> {
 
   @override
   Widget build(BuildContext context) => PageFrame(
-        title: 'Enter recovery code',
+        title: 'Recovery code',
         subtitle: _maskedEmail,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),

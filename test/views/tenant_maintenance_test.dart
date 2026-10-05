@@ -30,7 +30,7 @@ void main() {
       expect(find.text('Maintenance'), findsOneWidget);
       expect(find.text('Resolved'), findsOneWidget);
       expect(find.text('Confidential'), findsOneWidget);
-      expect(find.text('Maintenance reports'), findsOneWidget);
+      expect(find.text('Maintenance'), findsOneWidget);
       expect(find.text('Confidential concern'), findsOneWidget);
       expect(find.text('Missed cleaning duty'), findsOneWidget);
       expect(find.text('Report issue'), findsOneWidget);

@@ -125,7 +125,7 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
             final overdue = BillingManagementPolicy.overdueCount(payments);
 
             return PageFrame(
-              title: 'Billing & charges',
+              title: 'Billing',
               subtitle:
                   'Rent, utilities, manually approved charges, balances, and payment review.',
               onRefresh: _refresh,

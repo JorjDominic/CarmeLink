@@ -48,7 +48,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify MetricCards
-    expect(find.text('Rooms'), findsOneWidget);
+    expect(find.text('Rooms'), findsNWidgets(2));
     expect(find.text('Occupied beds'), findsOneWidget);
     expect(find.text('Available beds'), findsOneWidget);
 

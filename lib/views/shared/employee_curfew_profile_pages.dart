@@ -582,7 +582,7 @@ class _EmployeeCurfewProfilesPageState
         profiles.where((profile) => profile.status == 'approved').length;
 
     return PageFrame(
-      title: 'Employee curfew profiles',
+      title: 'Work curfew',
       subtitle: '$approved approved • ${profiles.length} total',
       useScriptTitle: false,
       onRefresh: () => _load(showSpinner: false),
@@ -816,14 +816,15 @@ class _TenantEmployeeCurfewProfileCardState
     if (current == null) {
       if (_dismissed) return const SizedBox.shrink();
       return CarmelitaCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Icon(Icons.schedule_outlined),
-            const SizedBox(width: 12),
+            const Icon(Icons.schedule_outlined, size: 18),
+            const SizedBox(width: 8),
             const Expanded(
               child: Text(
-                'No approved employee curfew profile applies today. Your normal curfew and approved exception requests remain unchanged.',
+                'No work exception today. Normal curfew and approved passes apply.',
               ),
             ),
             IconButton(

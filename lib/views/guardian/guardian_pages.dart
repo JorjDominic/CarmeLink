@@ -1,8 +1,7 @@
+import '../shared/staff_message_contacts.dart';
 import 'package:flutter/material.dart';
 import '../shared/security_deposit_card.dart';
 import '../../controllers/guardian_controller.dart';
-import '../../controllers/messaging_controller.dart';
-import '../../controllers/session_controller.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
@@ -367,7 +366,7 @@ class GuardianTenantInfoPage extends StatelessWidget {
     final controller = GuardianController.instance;
 
     return PageFrame(
-      title: 'Tenant information',
+      title: 'Tenant',
       subtitle: 'Linked resident profile & room assignment',
       onRefresh: () => controller.loadData(force: true),
       child: AnimatedBuilder(
@@ -2156,7 +2155,7 @@ class GuardianPaymentStatusPage extends StatelessWidget {
     final controller = GuardianController.instance;
 
     return PageFrame(
-      title: 'Payment status',
+      title: 'Payments',
       subtitle: 'Linked resident balances and verification',
       onRefresh: () => controller.loadData(force: true),
       child: AnimatedBuilder(
@@ -2173,69 +2172,73 @@ class GuardianPaymentStatusPage extends StatelessWidget {
             });
 
           return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            MetricCard(
-              label: 'Outstanding total',
-              value: money(controller.outstandingTotal),
-              detail: payments
-                      .where((p) =>
-                          !p.isDeposit &&
-                          !(p.isRent && !p.isDueNow && p.outstandingAmount > 0))
-                      .isEmpty
-                  ? 'No pending dues'
-                  : 'Unverified and unpaid records',
-              icon: Icons.account_balance_wallet_outlined,
-            ),
-            const SizedBox(height: 16),
-            if (payments
-                .where((p) =>
-                    !p.isDeposit &&
-                    !(p.isRent && !p.isDueNow && p.outstandingAmount > 0))
-                .isEmpty)
-              CarmelitaCard(
-                child: ListTile(
-                  leading: const Icon(Icons.receipt_long_outlined,
-                      color: Color(0xFF56886B)),
-                  title: const Text(
-                    'No payment records',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  subtitle: Text(
-                    controller.hasLinkedTenant
-                        ? 'No payment records found for ${controller.linkedTenantName}.'
-                        : 'No payment records available.',
-                  ),
-                ),
-              )
-            else
-              CarmelitaCard(
-                child: Column(
-                  children: payments
-                      .where((p) =>
-                          !p.isDeposit &&
-                          !(p.isRent && !p.isDueNow && p.outstandingAmount > 0))
-                      .map(
-                        (payment) => TimelineTile(
-                          icon: Icons.receipt_long_outlined,
-                          title: payment.label,
-                          subtitle: '${money(payment.amount)} • Due '
-                              '${shortDate(payment.dueDate)}',
-                          trailing: StatusPill(payment.status),
-                        ),
-                      )
-                      .toList(),
-                ),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              MetricCard(
+                label: 'Outstanding total',
+                value: money(controller.outstandingTotal),
+                detail: payments
+                        .where((p) =>
+                            !p.isDeposit &&
+                            !(p.isRent &&
+                                !p.isDueNow &&
+                                p.outstandingAmount > 0))
+                        .isEmpty
+                    ? 'No pending dues'
+                    : 'Unverified and unpaid records',
+                icon: Icons.account_balance_wallet_outlined,
               ),
-            if (controller.hasLinkedTenant) ...[
               const SizedBox(height: 16),
-              SecurityDepositCard(
-                key: ValueKey(controller.selectedTenant!.tenantId),
-                tenantId: controller.selectedTenant!.tenantId,
-              ),
+              if (payments
+                  .where((p) =>
+                      !p.isDeposit &&
+                      !(p.isRent && !p.isDueNow && p.outstandingAmount > 0))
+                  .isEmpty)
+                CarmelitaCard(
+                  child: ListTile(
+                    leading: const Icon(Icons.receipt_long_outlined,
+                        color: Color(0xFF56886B)),
+                    title: const Text(
+                      'No payment records',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Text(
+                      controller.hasLinkedTenant
+                          ? 'No payment records found for ${controller.linkedTenantName}.'
+                          : 'No payment records available.',
+                    ),
+                  ),
+                )
+              else
+                CarmelitaCard(
+                  child: Column(
+                    children: payments
+                        .where((p) =>
+                            !p.isDeposit &&
+                            !(p.isRent &&
+                                !p.isDueNow &&
+                                p.outstandingAmount > 0))
+                        .map(
+                          (payment) => TimelineTile(
+                            icon: Icons.receipt_long_outlined,
+                            title: payment.label,
+                            subtitle: '${money(payment.amount)} • Due '
+                                '${shortDate(payment.dueDate)}',
+                            trailing: StatusPill(payment.status),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              if (controller.hasLinkedTenant) ...[
+                const SizedBox(height: 16),
+                SecurityDepositCard(
+                  key: ValueKey(controller.selectedTenant!.tenantId),
+                  tenantId: controller.selectedTenant!.tenantId,
+                ),
+              ],
             ],
-          ],
-        );
+          );
         },
       ),
     );
@@ -2454,7 +2457,7 @@ class _GuardianAnnouncementsPageState extends State<GuardianAnnouncementsPage> {
     final hasActiveFilter = _selectedCategory != 'all';
 
     return PageFrame(
-      title: 'Announcements',
+      title: 'Notices',
       subtitle: 'Notices relevant to guardians',
       actions: [
         IconButton(
@@ -2773,117 +2776,25 @@ class GuardianMessagesPage extends StatefulWidget {
 
 class _GuardianMessagesPageState extends State<GuardianMessagesPage> {
   @override
-  void initState() {
-    super.initState();
-    final uid = SessionController.instance.currentUser?.id ?? '';
-    MessagingController.instance.loadGuardianConversation(guardianId: uid);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final messaging = MessagingController.instance;
-
-    return PageFrame(
-      title: 'Messages',
-      subtitle: 'Official Dormitory Communication',
-      child: AnimatedBuilder(
-        animation: messaging,
-        builder: (context, _) {
-          final lastMsg = messaging.activeMessages.isNotEmpty
-              ? messaging.activeMessages.last
-              : null;
-          final previewText = lastMsg?.body ??
-              messaging.activeConversation?.lastMessagePreview ??
-              'Tap to chat with Dormitory Management';
-
-          return ConversationListCard(
-            name: 'Caretaker / Management',
-            role: 'Owner & Caretaker',
-            lastMessage: lastMsg,
-            lastMessageText: previewText,
-            lastMessageTime:
-                lastMsg?.sentAt ?? messaging.activeConversation?.lastMessageAt,
-            unreadCount: messaging.unreadMessageCount,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const GuardianConversationPage(),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const PageFrame(
+        title: 'Messages',
+        subtitle: 'Private conversations with owners and caretakers',
+        child: StaffMessageContacts(),
+      );
 }
 
-class GuardianConversationPage extends StatefulWidget {
+class GuardianConversationPage extends StatelessWidget {
   const GuardianConversationPage({super.key});
 
   @override
-  State<GuardianConversationPage> createState() =>
-      _GuardianConversationPageState();
-}
-
-class _GuardianConversationPageState extends State<GuardianConversationPage> {
-  final message = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    final uid = SessionController.instance.currentUser?.id ?? '';
-    MessagingController.instance.loadGuardianConversation(
-      guardianId: uid,
-      openThread: true,
-    );
-  }
-
-  @override
-  void dispose() {
-    message.dispose();
-    MessagingController.instance.leaveActiveThread();
-    super.dispose();
-  }
-
-  Future<void> _handleSend() async {
-    final text = message.text.trim();
-    if (text.isEmpty) return;
-    message.clear();
-    await MessagingController.instance.sendMessage(text);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final messaging = MessagingController.instance;
-    return PageFrame(
-      title: 'Dormitory Management',
-      subtitle: 'Owner & Caretaker',
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 980),
-        child: AnimatedBuilder(
-          animation: messaging,
-          builder: (context, _) => ConversationThreadPanel(
-            messages: messaging.activeMessages,
-            composerController: message,
-            sending: messaging.sendingMessage,
-            emptyMessage:
-                'No messages yet. Send a message to start chatting with dormitory management.',
-            hintText: 'Write a message to management...',
-            onSend: _handleSend,
-            isMine: (item) => item.isMine(
-              SessionController.instance.currentUser?.id,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const GuardianMessagesPage();
 }
 
 class EmergencySafetyAlertsPage extends StatelessWidget {
   const EmergencySafetyAlertsPage({super.key});
   @override
   Widget build(BuildContext context) => const PageFrame(
-      title: 'Dormitory contact info',
+      title: 'Contacts',
       subtitle: 'Static office and emergency contact details',
       child: Column(children: [
         CarmelitaCard(

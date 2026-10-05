@@ -327,6 +327,7 @@ class _StaffRoomCleaningPageState extends State<StaffRoomCleaningPage> {
           _ => b.createdAt.compareTo(a.createdAt),
         });
     return PageFrame(
+      heroTitle: 'Cleaning',
       title: 'Room ${widget.roomNumber} cleaning',
       subtitle: 'Bed-based schedule and restricted compliance reports',
       useScriptTitle: false,
@@ -740,7 +741,7 @@ class _TenantCleaningSchedulePageState
     final data = contextData;
 
     return PageFrame(
-      title: 'Cleaning schedule',
+      title: 'Cleaning',
       subtitle: data == null
           ? 'Room cleaning duties'
           : 'Room ${data.roomNumber} • ${data.ownBedLabel}',

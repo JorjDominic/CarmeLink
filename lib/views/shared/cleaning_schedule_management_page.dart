@@ -141,7 +141,7 @@ class _CleaningScheduleManagementPageState
         .length;
 
     return PageFrame(
-      title: 'Cleaning schedules & reports',
+      title: 'Cleaning',
       subtitle: 'Automatic occupied-bed rotation with manual overrides',
       useScriptTitle: false,
       onRefresh: () => _load(showSpinner: false),

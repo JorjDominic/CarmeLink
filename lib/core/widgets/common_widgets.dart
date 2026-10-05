@@ -1142,18 +1142,22 @@ class PageFrame extends StatelessWidget {
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                heroTitle ?? title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontFamily: useScriptTitle ? 'GreatVibes' : null,
-                      fontSize: compactHeader
-                          ? (useScriptTitle ? 25 : 20)
-                          : (useScriptTitle ? 30 : null),
-                      fontWeight:
-                          useScriptTitle ? FontWeight.w600 : FontWeight.w700,
-                    ),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  heroTitle ?? title,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontFamily: useScriptTitle ? 'GreatVibes' : null,
+                        fontSize: compactHeader
+                            ? (useScriptTitle ? 25 : 20)
+                            : (useScriptTitle ? 30 : null),
+                        fontWeight:
+                            useScriptTitle ? FontWeight.w600 : FontWeight.w700,
+                      ),
+                ),
               ),
               if (subtitle != null && !ownerOperationalPage && !compactHeader)
                 Padding(

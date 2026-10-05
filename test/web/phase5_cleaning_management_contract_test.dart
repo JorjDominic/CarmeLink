@@ -33,7 +33,7 @@ void main() {
       ).readAsStringSync();
 
       expect(source.contains('Monday-to-Sunday round-robin order'), isTrue);
-      expect(source.contains("title: 'Cleaning schedules & reports'"), isTrue);
+      expect(source.contains("title: 'Cleaning'"), isTrue);
       expect(source.contains('Vacant beds are removed automatically'), isTrue);
       expect(source.contains('manual override'), isTrue);
       expect(source.contains('regenerateRoom(room.id)'), isTrue);

@@ -178,8 +178,7 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
                   icon: Icons.event_available_outlined,
                   label: '${capacity - occupied} beds available',
                 ),
-                const _LegendDot(
-                    label: 'Available', color: Color(0xFF56886B)),
+                const _LegendDot(label: 'Available', color: Color(0xFF56886B)),
                 const _LegendDot(label: 'Full', color: Color(0xFFAA6870)),
                 if (_mode == PlanMode.maintenance)
                   const _LegendDot(
@@ -211,8 +210,7 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
                         IconButton(
                           tooltip: 'Fit to screen',
                           onPressed: _reset,
-                          icon:
-                              const Icon(Icons.center_focus_strong_outlined),
+                          icon: const Icon(Icons.center_focus_strong_outlined),
                         ),
                         IconButton(
                           tooltip: 'Zoom in',
@@ -226,9 +224,8 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
                     height: 440,
                     clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerLowest,
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerLowest,
                       borderRadius: const BorderRadius.vertical(
                         bottom: Radius.circular(20),
                       ),
@@ -422,7 +419,8 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (context) => Scaffold(
         appBar: AppBar(
-          title: Text('${_floors[_floor]} • Floor Plan'),
+          title: Tooltip(
+              message: _floors[_floor], child: const Text('Floor plan')),
         ),
         body: InteractiveViewer(
           minScale: .5,
