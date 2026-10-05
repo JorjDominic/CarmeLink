@@ -328,8 +328,8 @@ class SignInPage extends StatefulWidget {
 }
 
 class _SignInPageState extends State<SignInPage> {
-  final email = TextEditingController(text: 'tenant@carmelita.test');
-  final password = TextEditingController(text: 'CarmeLinkTest123!');
+  final email = TextEditingController();
+  final password = TextEditingController();
   final session = SessionController.instance;
   bool _passwordVisible = false;
 
