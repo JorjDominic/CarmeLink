@@ -596,6 +596,7 @@ class _GuardianPresenceMonitoringPageState
   DateTime? _presenceRequestAvailableAt;
   List<GuardianPresenceUpdateRequest> _statusRequests = const [];
   bool _loadingStatusRequests = false;
+  bool _showAllPresenceRecords = false;
 
   @override
   void initState() {
@@ -873,12 +874,6 @@ class _GuardianPresenceMonitoringPageState
   @override
   Widget build(BuildContext context) {
     final controller = GuardianController.instance;
-    final allEvents = controller.gateEvents;
-    final events = allEvents.any((e) => e.person == controller.linkedTenantName)
-        ? allEvents
-            .where((e) => e.person == controller.linkedTenantName)
-            .toList()
-        : allEvents;
 
     return PageFrame(
       title: 'Curfew',
@@ -905,6 +900,21 @@ class _GuardianPresenceMonitoringPageState
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
+          final allEvents = controller.gateEvents;
+          final events = allEvents.any(
+            (event) => event.person == controller.linkedTenantName,
+          )
+              ? allEvents
+                  .where(
+                    (event) => event.person == controller.linkedTenantName,
+                  )
+                  .toList()
+              : allEvents;
+          final visiblePresenceEvents =
+              _showAllPresenceRecords ? events : events.take(5).toList();
+          final hiddenPresenceCount =
+              events.length - visiblePresenceEvents.length;
+
           final allRequests = controller.curfewRequests;
           final pendingCount = controller.pendingGuardianCurfewCount;
           final approvedCount = allRequests.where((r) => r.isApproved).length;
@@ -1255,7 +1265,7 @@ class _GuardianPresenceMonitoringPageState
                         'Verified arrivals and departures will appear here.',
                   )
                 else
-                  ...events.map(
+                  ...visiblePresenceEvents.map(
                     (event) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: CarmelitaCard(
@@ -1284,6 +1294,27 @@ class _GuardianPresenceMonitoringPageState
                               '${shortDate(event.time)} • ${timeText(event.time)} • ${event.verification}${event.notes != null && event.notes!.isNotEmpty ? ' (${event.notes})' : ''}',
                           trailing: StatusPill(event.status),
                         ),
+                      ),
+                    ),
+                  ),
+                if (events.length > 5)
+                  Align(
+                    alignment: Alignment.center,
+                    child: TextButton.icon(
+                      key: const Key('guardian-presence-records-toggle'),
+                      onPressed: () => setState(
+                        () =>
+                            _showAllPresenceRecords = !_showAllPresenceRecords,
+                      ),
+                      icon: Icon(
+                        _showAllPresenceRecords
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                      ),
+                      label: Text(
+                        _showAllPresenceRecords
+                            ? 'Show less'
+                            : 'Show more ($hiddenPresenceCount)',
                       ),
                     ),
                   ),
@@ -2130,13 +2161,24 @@ class GuardianPaymentStatusPage extends StatelessWidget {
       onRefresh: () => controller.loadData(force: true),
       child: AnimatedBuilder(
         animation: controller,
-        builder: (context, _) => Column(
+        builder: (context, _) {
+          final payments = List<Payment>.from(controller.payments)
+            ..sort((a, b) {
+              final aOpen = !a.isVerified && !a.isVoided;
+              final bOpen = !b.isVerified && !b.isVoided;
+              if (aOpen != bOpen) return aOpen ? -1 : 1;
+              return aOpen
+                  ? a.dueDate.compareTo(b.dueDate)
+                  : b.dueDate.compareTo(a.dueDate);
+            });
+
+          return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             MetricCard(
               label: 'Outstanding total',
               value: money(controller.outstandingTotal),
-              detail: controller.payments
+              detail: payments
                       .where((p) =>
                           !p.isDeposit &&
                           !(p.isRent && !p.isDueNow && p.outstandingAmount > 0))
@@ -2146,7 +2188,7 @@ class GuardianPaymentStatusPage extends StatelessWidget {
               icon: Icons.account_balance_wallet_outlined,
             ),
             const SizedBox(height: 16),
-            if (controller.payments
+            if (payments
                 .where((p) =>
                     !p.isDeposit &&
                     !(p.isRent && !p.isDueNow && p.outstandingAmount > 0))
@@ -2169,7 +2211,7 @@ class GuardianPaymentStatusPage extends StatelessWidget {
             else
               CarmelitaCard(
                 child: Column(
-                  children: controller.payments
+                  children: payments
                       .where((p) =>
                           !p.isDeposit &&
                           !(p.isRent && !p.isDueNow && p.outstandingAmount > 0))
@@ -2193,7 +2235,8 @@ class GuardianPaymentStatusPage extends StatelessWidget {
               ),
             ],
           ],
-        ),
+        );
+        },
       ),
     );
   }
@@ -3295,7 +3338,7 @@ class _GuardianStatusRequestBreakdownState
                                           fontWeight: FontWeight.w700,
                                           fontSize: 12,
                                         ),
-                                        overflow: TextOverflow.ellipsis,
+                                        softWrap: true,
                                       ),
                                     ),
                                   ],
