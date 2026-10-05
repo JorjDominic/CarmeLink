@@ -2552,6 +2552,38 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
   String? _processingPaymentId;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _showAllAdvanceRent = false;
+
+  int _paymentDisplayRank(Payment payment) {
+    if (payment.isPending) return 0;
+    if (payment.isOverdue) return 1;
+    if (!payment.isDeposit && payment.isDue) return 2;
+    if (payment.isUpcoming || (payment.isRent && !payment.isDueNow)) return 3;
+    if (payment.isRejected) return 4;
+    if (payment.isVerified) return 5;
+    if (payment.isVoided) return 6;
+    return 4;
+  }
+
+  int _comparePaymentsForDisplay(Payment a, Payment b) {
+    final rankComparison =
+        _paymentDisplayRank(a).compareTo(_paymentDisplayRank(b));
+    if (rankComparison != 0) return rankComparison;
+
+    final rank = _paymentDisplayRank(a);
+    if (rank <= 3) {
+      return a.dueDate.compareTo(b.dueDate);
+    }
+    return b.dueDate.compareTo(a.dueDate);
+  }
+
+  bool _isAdvanceRentOutsidePreview(Payment payment) {
+    if (payment.isPending || !payment.isRent || payment.isDueNow) return false;
+
+    final now = DateTime.now();
+    final previewEnd = DateTime(now.year, now.month + 3, 1);
+    return !payment.dueDate.isBefore(previewEnd);
+  }
 
   @override
   void initState() {
@@ -2774,8 +2806,8 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
             _ => workspacePayments,
           };
 
-          final displayed = _searchQuery.trim().isEmpty
-              ? filteredByTab
+          final searchFiltered = _searchQuery.trim().isEmpty
+              ? List<Payment>.from(filteredByTab)
               : filteredByTab.where((p) {
                   final q = _searchQuery.trim().toLowerCase();
                   return (p.tenantName?.toLowerCase().contains(q) ?? false) ||
@@ -2785,6 +2817,20 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                       (p.reference?.toLowerCase().contains(q) ?? false) ||
                       (p.paymentMethod?.toLowerCase().contains(q) ?? false);
                 }).toList();
+
+          searchFiltered.sort(_comparePaymentsForDisplay);
+
+          final shouldLimitAdvanceRent = _workspace == 'bills' &&
+              _filter == 'all' &&
+              _searchQuery.trim().isEmpty;
+          final hiddenAdvanceRentCount = shouldLimitAdvanceRent
+              ? searchFiltered.where(_isAdvanceRentOutsidePreview).length
+              : 0;
+          final displayed = shouldLimitAdvanceRent && !_showAllAdvanceRent
+              ? searchFiltered
+                  .where((payment) => !_isAdvanceRentOutsidePreview(payment))
+                  .toList()
+              : searchFiltered;
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2952,7 +2998,7 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                     child: CircularProgressIndicator(),
                   ),
                 )
-              else if (displayed.isEmpty)
+              else if (displayed.isEmpty && hiddenAdvanceRentCount == 0)
                 EmptyState(
                   icon: _filter == 'pending'
                       ? Icons.task_alt_outlined
@@ -2988,6 +3034,26 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                         context: context,
                         builder: (_) => _ChargeActionDialog(payment: payment),
                       ),
+                    ),
+                  ),
+                ),
+              if (shouldLimitAdvanceRent && hiddenAdvanceRentCount > 0)
+                Align(
+                  alignment: Alignment.center,
+                  child: TextButton.icon(
+                    key: const Key('owner-advance-rent-toggle'),
+                    onPressed: () => setState(
+                      () => _showAllAdvanceRent = !_showAllAdvanceRent,
+                    ),
+                    icon: Icon(
+                      _showAllAdvanceRent
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                    ),
+                    label: Text(
+                      _showAllAdvanceRent
+                          ? 'Show less advance rent'
+                          : 'See more advance rent ($hiddenAdvanceRentCount)',
                     ),
                   ),
                 ),
