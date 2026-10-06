@@ -545,6 +545,7 @@ class VisitorRequest {
     this.arrivedAt,
     this.departedAt,
     this.createdAt,
+    this.updatedAt,
   });
 
   final String id;
@@ -563,6 +564,7 @@ class VisitorRequest {
   final DateTime? arrivedAt;
   final DateTime? departedAt;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   bool get isPending => status.toLowerCase() == 'pending';
   bool get isApproved => status.toLowerCase() == 'approved';
@@ -570,6 +572,10 @@ class VisitorRequest {
   bool get isCancelled => status.toLowerCase() == 'cancelled';
   bool get hasArrived => status.toLowerCase() == 'arrived';
   bool get isCompleted => status.toLowerCase() == 'completed';
+  bool get isDepartureUnconfirmed =>
+      hasArrived &&
+      expectedDepartureAt != null &&
+      DateTime.now().isAfter(expectedDepartureAt!);
 
   String get statusLabel => status
       .split('_')
@@ -600,6 +606,7 @@ class VisitorRequest {
       arrivedAt: _optionalLocalDate(row['arrived_at']),
       departedAt: _optionalLocalDate(row['departed_at']),
       createdAt: _optionalLocalDate(row['created_at']),
+      updatedAt: _optionalLocalDate(row['updated_at']),
     );
   }
 
@@ -878,10 +885,13 @@ class ConversationRecord {
     String? bedSpace;
 
     if (type == 'direct_staff') {
-      participantName = row['direct_peer_name'] as String? ?? 'Private conversation';
+      participantName =
+          row['direct_peer_name'] as String? ?? 'Private conversation';
       participantRole = row['direct_peer_role'] as String? ?? '';
       title = participantName;
-      subtitle = participantRole.isEmpty ? 'Private conversation' : '${participantRole[0].toUpperCase()}${participantRole.substring(1)}';
+      subtitle = participantRole.isEmpty
+          ? 'Private conversation'
+          : '${participantRole[0].toUpperCase()}${participantRole.substring(1)}';
     } else if (type == 'internal_staff') {
       title = 'Staff Channel';
       subtitle = 'Owner & Caretaker Coordination';
@@ -915,7 +925,8 @@ class ConversationRecord {
       }
     }
 
-    if (type != 'direct_staff' && (currentRole == 'tenant' || currentRole == 'guardian')) {
+    if (type != 'direct_staff' &&
+        (currentRole == 'tenant' || currentRole == 'guardian')) {
       title = 'Dormitory Management';
       subtitle = 'Owner & Caretaker';
     }

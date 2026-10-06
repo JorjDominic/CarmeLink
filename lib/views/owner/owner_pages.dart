@@ -35,6 +35,7 @@ import '../shared/cleaning_schedule_management_page.dart';
 import '../shared/employee_curfew_profile_pages.dart';
 import '../shared/conduct_case_pages.dart';
 import '../shared/retention_settings_page.dart';
+import '../shared/visitor_schedule_editor.dart';
 import 'guardian_link_management_page.dart';
 import 'staff_maintenance_page.dart';
 import 'room_monitoring_page.dart';
@@ -2160,8 +2161,12 @@ const _operationCategories = [
           'Review incidents, responses, warnings and appeals',
           Icons.gavel_outlined,
           StaffConductCasesPage()),
-      _OperationItem('Dormitory configuration', 'Manage report choices and common areas',
-          Icons.settings_outlined, DormitoryConfigurationPage(), ownerOnly:true),
+      _OperationItem(
+          'Dormitory configuration',
+          'Manage report choices and common areas',
+          Icons.settings_outlined,
+          DormitoryConfigurationPage(),
+          ownerOnly: true),
       _OperationItem('Disciplinary records', 'Manage violations',
           Icons.rule_outlined, DisciplinaryRecordsPage(),
           ownerOnly: true),
@@ -2754,8 +2759,11 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
-          final targetPayment = NotificationTarget.recordIdOf(context, 'payment');
-          final allPayments = controller.payments.where((p) => targetPayment == null || p.id == targetPayment).toList();
+          final targetPayment =
+              NotificationTarget.recordIdOf(context, 'payment');
+          final allPayments = controller.payments
+              .where((p) => targetPayment == null || p.id == targetPayment)
+              .toList();
           final pendingCount = controller.pendingPaymentProofs;
           final overdueCount = controller.overduePaymentCount;
           final verifiedCount = allPayments.where((p) => p.isVerified).length;
@@ -2838,7 +2846,8 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
 
           searchFiltered.sort(_comparePaymentsForDisplay);
 
-          final shouldLimitAdvanceRent = targetPayment == null && _workspace == 'bills' &&
+          final shouldLimitAdvanceRent = targetPayment == null &&
+              _workspace == 'bills' &&
               _filter == 'all' &&
               _searchQuery.trim().isEmpty;
           final hiddenAdvanceRentCount = shouldLimitAdvanceRent
@@ -8454,6 +8463,19 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
     notes.dispose();
   }
 
+  Future<void> _reschedule(VisitorRequest request) async {
+    final changed = await editVisitorSchedule(
+      context,
+      request,
+      staffCanKeepApproval: true,
+    );
+    if (!changed || !mounted) return;
+    await controller.loadVisitors(force: true);
+    if (mounted) {
+      showAppSnackBar(context, 'Visitor schedule updated.');
+    }
+  }
+
   Future<void> _showHistory(VisitorRequest request) => showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -8520,8 +8542,12 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
               .toList();
           final visible = List<VisitorRequest>.from(
             NotificationTarget.recordIdOf(context, 'visitor') != null
-                ? controller.visitors.where((item) => item.id == NotificationTarget.recordIdOf(context, 'visitor'))
-                : scope == RecordListScope.active ? activeVisitors : historyVisitors,
+                ? controller.visitors.where((item) =>
+                    item.id ==
+                    NotificationTarget.recordIdOf(context, 'visitor'))
+                : scope == RecordListScope.active
+                    ? activeVisitors
+                    : historyVisitors,
           )..sort((a, b) => switch (sort) {
                 RecordListSort.oldest => a.schedule.compareTo(b.schedule),
                 RecordListSort.status => a.status.compareTo(b.status),
@@ -8644,10 +8670,39 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
                                   label: 'Review note',
                                   value: visitor.reviewNote!,
                                 ),
-                              TextButton.icon(
-                                onPressed: () => _showHistory(visitor),
-                                icon: const Icon(Icons.history_rounded),
-                                label: const Text('View history'),
+                              if (visitor.isDepartureUnconfirmed)
+                                ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                  title: const Text(
+                                    'Departure unconfirmed',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w800),
+                                  ),
+                                  subtitle: const Text(
+                                    'Expected departure has passed. Confirm the actual checkout when verified.',
+                                  ),
+                                ),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: () => _showHistory(visitor),
+                                    icon: const Icon(Icons.history_rounded),
+                                    label: const Text('View history'),
+                                  ),
+                                  if (visitor.isPending || visitor.isApproved)
+                                    OutlinedButton.icon(
+                                      onPressed: () => _reschedule(visitor),
+                                      icon: const Icon(
+                                          Icons.edit_calendar_outlined),
+                                      label: const Text('Change schedule'),
+                                    ),
+                                ],
                               ),
                               if (visitor.isPending) ...[
                                 if (_policyIssue(visitor) != null)
@@ -8837,8 +8892,11 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                 ]),
               );
             }
-            final reports = controller.concerns.where((report) =>
-                widget.initialReportId == null || report.id == widget.initialReportId).toList();
+            final reports = controller.concerns
+                .where((report) =>
+                    widget.initialReportId == null ||
+                    report.id == widget.initialReportId)
+                .toList();
             if (reports.isEmpty) {
               return const Center(
                 child: Text('No confidential reports have been submitted.'),
@@ -9241,7 +9299,8 @@ class _AnnouncementsManagementPageState
   @override
   Widget build(BuildContext context) {
     final rawList = _announcements ?? [];
-    final targetAnnouncement = NotificationTarget.recordIdOf(context, 'announcement');
+    final targetAnnouncement =
+        NotificationTarget.recordIdOf(context, 'announcement');
     final filtered = rawList.where((item) {
       if (targetAnnouncement != null) return item.id == targetAnnouncement;
       if (_selectedCategory != 'all' &&
@@ -10564,10 +10623,12 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      IconButton(
-                        tooltip: 'Export Statement (PDF)',
-                        icon: const Icon(Icons.picture_as_pdf_outlined,
-                            color: Colors.teal),
+                      OutlinedButton.icon(
+                        icon: const Icon(
+                          Icons.picture_as_pdf_outlined,
+                          color: Colors.teal,
+                        ),
+                        label: const Text('Print / Download PDF'),
                         onPressed: () {
                           _service.openReportPreview(
                             context,
@@ -10725,9 +10786,9 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
               ),
             ),
             const SizedBox(width: 6),
-            IconButton(
-              tooltip: 'Export PDF',
+            OutlinedButton.icon(
               icon: Icon(Icons.picture_as_pdf_outlined, color: color),
+              label: const Text('Print / Download PDF'),
               onPressed: () {
                 _reportService.openReportPreview(
                   context,
@@ -10828,6 +10889,11 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
 
               // Exportable Reports Hub Section Header
               const SectionTitle('Official PDF Reports & Data Exports'),
+              const SizedBox(height: 4),
+              Text(
+                'Open a PDF preview to print, download, or share where supported.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
               const SizedBox(height: 10),
 
               // Report 1: Financial & Rent Statement

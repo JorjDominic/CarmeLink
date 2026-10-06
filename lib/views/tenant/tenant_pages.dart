@@ -30,6 +30,7 @@ import 'onboarding_form_page.dart';
 import 'tenant_requirements_page.dart';
 import '../shared/signature_pad_dialog.dart';
 import '../shared/security_deposit_card.dart';
+import '../shared/visitor_schedule_editor.dart';
 
 class TenantDashboardPage extends StatelessWidget {
   const TenantDashboardPage({super.key});
@@ -1711,14 +1712,18 @@ class TenantBillingDetailsPage extends StatelessWidget {
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
-          final targetPayment = NotificationTarget.recordIdOf(context, 'payment');
-          final payments = controller.payments.where((p) => targetPayment == null || p.id == targetPayment).toList();
+          final targetPayment =
+              NotificationTarget.recordIdOf(context, 'payment');
+          final payments = controller.payments
+              .where((p) => targetPayment == null || p.id == targetPayment)
+              .toList();
           if (targetPayment != null) {
             if (controller.paymentsLoading && payments.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
             return payments.isEmpty
-                ? Text(controller.paymentsError ?? 'This payment is no longer available.')
+                ? Text(controller.paymentsError ??
+                    'This payment is no longer available.')
                 : _TenantPaymentCard(payment: payments.first);
           }
           final openBills = payments
@@ -3759,19 +3764,22 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
           final resolvedCount = reports.where((r) => r.isResolved).length;
           final cancelledCount = reports.where((r) => r.isCancelled).length;
 
-          final targetReport = NotificationTarget.recordIdOf(context, 'maintenance');
+          final targetReport =
+              NotificationTarget.recordIdOf(context, 'maintenance');
           final filteredReports = targetReport != null
               ? reports.where((report) => report.id == targetReport).toList()
               : switch (_selectedFilter) {
-            'Active' =>
-              reports.where((r) => !r.isResolved && !r.isCancelled).toList(),
-            'Pending' => reports.where((r) => r.isPending).toList(),
-            'In Progress' =>
-              reports.where((r) => r.isAssigned || r.isInProgress).toList(),
-            'Resolved' => reports.where((r) => r.isResolved).toList(),
-            'Cancelled' => reports.where((r) => r.isCancelled).toList(),
-            _ => reports,
-          };
+                  'Active' => reports
+                      .where((r) => !r.isResolved && !r.isCancelled)
+                      .toList(),
+                  'Pending' => reports.where((r) => r.isPending).toList(),
+                  'In Progress' => reports
+                      .where((r) => r.isAssigned || r.isInProgress)
+                      .toList(),
+                  'Resolved' => reports.where((r) => r.isResolved).toList(),
+                  'Cancelled' => reports.where((r) => r.isCancelled).toList(),
+                  _ => reports,
+                };
 
           if (controller.maintenanceLoading && reports.isEmpty) {
             return const Center(child: CircularProgressIndicator());
@@ -4054,25 +4062,43 @@ class SubmitMaintenancePage extends StatefulWidget {
 class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
   List<String> categories = [];
   List<String> configuredLocations = [];
+  late final TableRefreshSubscription _configurationSubscription;
   bool optionsLoading = true;
   String? optionsError;
   Future<void> _loadOptions() async {
-    setState(() { optionsLoading=true; optionsError=null; });
+    setState(() {
+      optionsLoading = true;
+      optionsError = null;
+    });
     try {
-      const service=DormitoryConfigurationService();
-      final results=await Future.wait([service.options('maintenance_category'),service.options('common_area')]);
-      final rooms=await service.maintenanceRoomLocations();
-      if(!mounted)return;
-      setState((){
-        categories=results[0].map((o)=>o.label).toList();
-        configuredLocations=[...rooms,...results[1].map((o)=>o.label)];
-        if(editing && !categories.contains(widget.report!.category))categories.insert(0,widget.report!.category);
-        if(editing && !configuredLocations.contains(widget.report!.location))configuredLocations.insert(0,widget.report!.location);
-        if(!categories.contains(category))category=categories.firstOrNull ?? '';
-        if(!configuredLocations.contains(location))location=configuredLocations.firstOrNull ?? '';
-        optionsLoading=false;
+      const service = DormitoryConfigurationService();
+      final results = await Future.wait([
+        service.options('maintenance_category'),
+        service.options('common_area')
+      ]);
+      final rooms = await service.maintenanceRoomLocations();
+      if (!mounted) return;
+      setState(() {
+        categories = results[0].map((o) => o.label).toList();
+        configuredLocations = [...rooms, ...results[1].map((o) => o.label)];
+        if (editing && !categories.contains(widget.report!.category))
+          categories.insert(0, widget.report!.category);
+        if (editing && !configuredLocations.contains(widget.report!.location))
+          configuredLocations.insert(0, widget.report!.location);
+        if (!categories.contains(category))
+          category = categories.firstOrNull ?? '';
+        if (!configuredLocations.contains(location))
+          location = configuredLocations.firstOrNull ?? '';
+        optionsLoading = false;
       });
-    } catch(e){if(mounted)setState((){optionsLoading=false;optionsError='Could not load report choices. Retry before submitting.';});}
+    } catch (e) {
+      if (mounted)
+        setState(() {
+          optionsLoading = false;
+          optionsError =
+              'Could not load report choices. Retry before submitting.';
+        });
+    }
   }
 
   static const urgencies = ['Low', 'Medium', 'High'];
@@ -4105,13 +4131,19 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
     super.initState();
     final report = widget.report;
     final room = TenantController.instance.room;
-    final defaultLocation = room != null ? 'Room ${room.number}' : ''; 
+    final defaultLocation = room != null ? 'Room ${room.number}' : '';
 
     description = TextEditingController(text: report?.description ?? '');
     category = report?.category ?? '';
-    _loadOptions();
     urgency = urgencies.contains(report?.urgency) ? report!.urgency : 'Medium';
     location = report?.location ?? defaultLocation;
+    _configurationSubscription = TableRefreshSubscription(
+      'tenant-maintenance-options',
+      const ['dormitory_options'],
+      _loadOptions,
+      catchUpInterval: const Duration(seconds: 15),
+    );
+    _loadOptions();
 
     if (report?.photoPath != null) {
       _loadExistingPhoto();
@@ -4120,6 +4152,7 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
 
   @override
   void dispose() {
+    _configurationSubscription.dispose();
     description.dispose();
     super.dispose();
   }
@@ -4358,10 +4391,15 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if(optionsLoading) const LinearProgressIndicator(),
-              if(optionsError!=null) ListTile(title:Text(optionsError!),trailing:IconButton(onPressed:_loadOptions,icon:const Icon(Icons.refresh))),
+              if (optionsLoading) const LinearProgressIndicator(),
+              if (optionsError != null)
+                ListTile(
+                    title: Text(optionsError!),
+                    trailing: IconButton(
+                        onPressed: _loadOptions,
+                        icon: const Icon(Icons.refresh))),
               DropdownButtonFormField<String>(
-                key: ValueKey('category-$category'),
+                key: ValueKey('category-$category-${categories.join('|')}'),
                 initialValue: category.isEmpty ? null : category,
                 decoration: const InputDecoration(labelText: 'Issue category'),
                 items: categories
@@ -4385,7 +4423,8 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
-                key: ValueKey('location-$location'),
+                key: ValueKey(
+                    'location-$location-${configuredLocations.join('|')}'),
                 isExpanded: true,
                 initialValue: location.isEmpty ? null : location,
                 decoration: const InputDecoration(
@@ -4437,7 +4476,13 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: saving || optionsLoading || optionsError != null || category.isEmpty || location.isEmpty ? null : _save,
+                  onPressed: saving ||
+                          optionsLoading ||
+                          optionsError != null ||
+                          category.isEmpty ||
+                          location.isEmpty
+                      ? null
+                      : _save,
                   child: saving
                       ? const SizedBox(
                           width: 20,
@@ -4783,7 +4828,8 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
   @override
   Widget build(BuildContext context) {
     final rawList = _announcements ?? [];
-    final targetAnnouncement = NotificationTarget.recordIdOf(context, 'announcement');
+    final targetAnnouncement =
+        NotificationTarget.recordIdOf(context, 'announcement');
     final filtered = rawList.where((item) {
       if (targetAnnouncement != null) return item.id == targetAnnouncement;
       if (_selectedCategory != 'all' &&
@@ -5299,8 +5345,11 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
               .toList();
           final visibleRequests = List<CurfewRequest>.from(
             NotificationTarget.recordIdOf(context, 'curfew') != null
-                ? requests.where((item) => item.id == NotificationTarget.recordIdOf(context, 'curfew'))
-                : requestScope == RecordListScope.active ? activeRequests : historyRequests,
+                ? requests.where((item) =>
+                    item.id == NotificationTarget.recordIdOf(context, 'curfew'))
+                : requestScope == RecordListScope.active
+                    ? activeRequests
+                    : historyRequests,
           )..sort((a, b) => switch (requestSort) {
                 RecordListSort.oldest =>
                   a.departureTime.compareTo(b.departureTime),
@@ -6752,194 +6801,195 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (NotificationTarget.recordIdOf(context, 'visitor') == null) ...[
-            CarmelitaCard(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Submit the request at least one calendar day before the visit. '
-                      'Visiting hours are 9:00 AM–9:00 PM, and visitors must leave on the same day.',
+              CarmelitaCard(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              'VISITOR DETAILS',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    letterSpacing: 1.3,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-            ),
-            const SizedBox(height: 10),
-            LabeledField(
-              label: 'Visitor name',
-              controller: name,
-              hint: 'Full name',
-            ),
-            const SizedBox(height: 14),
-            LabeledField(
-              label: 'Relationship',
-              controller: relation,
-              hint: 'Parent, guardian, sibling, etc.',
-            ),
-            const SizedBox(height: 14),
-            LabeledField(
-              label: 'Purpose',
-              controller: purpose,
-              hint: 'Reason for the visit',
-              maxLines: 3,
-            ),
-            const SizedBox(height: 14),
-            LabeledField(
-              label: 'Visitor contact number',
-              controller: contact,
-              hint: 'e.g. 0917 123 4567',
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 14),
-            CarmelitaCard(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Column(
-                children: [
-                  InfoRow(
-                    label: 'Expected arrival',
-                    value: '${shortDate(schedule)} • ${timeText(schedule)}',
-                    icon: Icons.event_outlined,
-                  ),
-                  const SizedBox(height: 8),
-                  InfoRow(
-                    label: 'Expected departure',
-                    value:
-                        '${shortDate(expectedDepartureAt)} • ${timeText(expectedDepartureAt)}',
-                    icon: Icons.schedule_outlined,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Advance registration • 9:00 AM–9:00 PM visiting hours • same-day departure only.',
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _pickArrival,
-                        icon: const Icon(Icons.event_outlined),
-                        label: const Text('Choose arrival'),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Submit the request at least one calendar day before the visit. '
+                        'Visiting hours are 9:00 AM–9:00 PM, and visitors must leave on the same day.',
                       ),
-                      OutlinedButton.icon(
-                        onPressed: _pickDeparture,
-                        icon: const Icon(Icons.schedule_outlined),
-                        label: const Text('Choose departure'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: saving
-                    ? null
-                    : () async {
-                        if (name.text.trim().isEmpty ||
-                            relation.text.trim().isEmpty ||
-                            purpose.text.trim().isEmpty ||
-                            contact.text.trim().length < 7) {
-                          showAppSnackBar(
-                            context,
-                            'Complete all visitor details with a valid contact number.',
-                          );
-                          return;
-                        }
-
-                        final policyError = VisitorPolicy.validateVisit(
-                          schedule: schedule,
-                          expectedDepartureAt: expectedDepartureAt,
-                          now: DateTime.now(),
-                        );
-                        if (policyError != null) {
-                          showAppSnackBar(context, policyError);
-                          return;
-                        }
-
-                        setState(() => saving = true);
-                        try {
-                          final editing = editingRequest;
-                          if (editing == null) {
-                            await TenantController.instance.submitVisitor(
-                              visitorName: name.text.trim(),
-                              relationship: relation.text.trim(),
-                              purpose: purpose.text.trim(),
-                              contactNumber: contact.text.trim(),
-                              schedule: schedule,
-                              expectedDepartureAt: expectedDepartureAt,
-                            );
-                          } else {
-                            await TenantController.instance.updateVisitor(
-                              request: editing,
-                              visitorName: name.text.trim(),
-                              relationship: relation.text.trim(),
-                              purpose: purpose.text.trim(),
-                              contactNumber: contact.text.trim(),
-                              schedule: schedule,
-                              expectedDepartureAt: expectedDepartureAt,
-                            );
-                          }
-
-                          if (context.mounted) {
-                            showAppSnackBar(
-                              context,
-                              editing == null
-                                  ? 'Visitor request submitted.'
-                                  : 'Visitor request updated.',
-                            );
-                            _resetForm();
-                          }
-                        } catch (error) {
-                          if (context.mounted) {
-                            showAppSnackBar(
-                              context,
-                              'Unable to submit visitor request: $error',
-                            );
-                          }
-                        } finally {
-                          if (mounted) setState(() => saving = false);
-                        }
-                      },
-                child: Text(
-                  saving
-                      ? 'Saving…'
-                      : editingRequest == null
-                          ? 'Submit visitor request'
-                          : 'Save changes',
+                    ),
+                  ],
                 ),
               ),
-            ),
-            if (editingRequest != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 18),
+              Text(
+                'VISITOR DETAILS',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      letterSpacing: 1.3,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              LabeledField(
+                label: 'Visitor name',
+                controller: name,
+                hint: 'Full name',
+              ),
+              const SizedBox(height: 14),
+              LabeledField(
+                label: 'Relationship',
+                controller: relation,
+                hint: 'Parent, guardian, sibling, etc.',
+              ),
+              const SizedBox(height: 14),
+              LabeledField(
+                label: 'Purpose',
+                controller: purpose,
+                hint: 'Reason for the visit',
+                maxLines: 3,
+              ),
+              const SizedBox(height: 14),
+              LabeledField(
+                label: 'Visitor contact number',
+                controller: contact,
+                hint: 'e.g. 0917 123 4567',
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 14),
+              CarmelitaCard(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Column(
+                  children: [
+                    InfoRow(
+                      label: 'Expected arrival',
+                      value: '${shortDate(schedule)} • ${timeText(schedule)}',
+                      icon: Icons.event_outlined,
+                    ),
+                    const SizedBox(height: 8),
+                    InfoRow(
+                      label: 'Expected departure',
+                      value:
+                          '${shortDate(expectedDepartureAt)} • ${timeText(expectedDepartureAt)}',
+                      icon: Icons.schedule_outlined,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Advance registration • 9:00 AM–9:00 PM visiting hours • same-day departure only.',
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _pickArrival,
+                          icon: const Icon(Icons.event_outlined),
+                          label: const Text('Choose arrival'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _pickDeparture,
+                          icon: const Icon(Icons.schedule_outlined),
+                          label: const Text('Choose departure'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
-                child: TextButton(
-                  onPressed: saving ? null : _resetForm,
-                  child: const Text('Discard changes'),
+                child: FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          if (name.text.trim().isEmpty ||
+                              relation.text.trim().isEmpty ||
+                              purpose.text.trim().isEmpty ||
+                              contact.text.trim().length < 7) {
+                            showAppSnackBar(
+                              context,
+                              'Complete all visitor details with a valid contact number.',
+                            );
+                            return;
+                          }
+
+                          final policyError = VisitorPolicy.validateVisit(
+                            schedule: schedule,
+                            expectedDepartureAt: expectedDepartureAt,
+                            now: DateTime.now(),
+                          );
+                          if (policyError != null) {
+                            showAppSnackBar(context, policyError);
+                            return;
+                          }
+
+                          setState(() => saving = true);
+                          try {
+                            final editing = editingRequest;
+                            if (editing == null) {
+                              await TenantController.instance.submitVisitor(
+                                visitorName: name.text.trim(),
+                                relationship: relation.text.trim(),
+                                purpose: purpose.text.trim(),
+                                contactNumber: contact.text.trim(),
+                                schedule: schedule,
+                                expectedDepartureAt: expectedDepartureAt,
+                              );
+                            } else {
+                              await TenantController.instance.updateVisitor(
+                                request: editing,
+                                visitorName: name.text.trim(),
+                                relationship: relation.text.trim(),
+                                purpose: purpose.text.trim(),
+                                contactNumber: contact.text.trim(),
+                                schedule: schedule,
+                                expectedDepartureAt: expectedDepartureAt,
+                              );
+                            }
+
+                            if (context.mounted) {
+                              showAppSnackBar(
+                                context,
+                                editing == null
+                                    ? 'Visitor request submitted.'
+                                    : 'Visitor request updated.',
+                              );
+                              _resetForm();
+                            }
+                          } catch (error) {
+                            if (context.mounted) {
+                              showAppSnackBar(
+                                context,
+                                'Unable to submit visitor request: $error',
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => saving = false);
+                          }
+                        },
+                  child: Text(
+                    saving
+                        ? 'Saving…'
+                        : editingRequest == null
+                            ? 'Submit visitor request'
+                            : 'Save changes',
+                  ),
                 ),
               ),
-            ],
-            const SizedBox(height: 24),
+              if (editingRequest != null) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: saving ? null : _resetForm,
+                    child: const Text('Discard changes'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
             ],
             AnimatedBuilder(
               animation: TenantController.instance,
@@ -6955,8 +7005,12 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                     .toList();
                 final visible = List<VisitorRequest>.from(
                   NotificationTarget.recordIdOf(context, 'visitor') != null
-                      ? controller.visitors.where((item) => item.id == NotificationTarget.recordIdOf(context, 'visitor'))
-                      : visitorScope == RecordListScope.active ? activeRequests : historyRequests,
+                      ? controller.visitors.where((item) =>
+                          item.id ==
+                          NotificationTarget.recordIdOf(context, 'visitor'))
+                      : visitorScope == RecordListScope.active
+                          ? activeRequests
+                          : historyRequests,
                 )..sort((a, b) => switch (visitorSort) {
                       RecordListSort.oldest => a.schedule.compareTo(b.schedule),
                       RecordListSort.status => a.status.compareTo(b.status),
@@ -7043,7 +7097,48 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                                       icon: const Icon(Icons.history_rounded),
                                       label: const Text('View history'),
                                     ),
-                              if (request.isPending) ...[
+                                    if (request.isDepartureUnconfirmed)
+                                      ListTile(
+                                        contentPadding: EdgeInsets.zero,
+                                        leading: Icon(
+                                          Icons.warning_amber_rounded,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .error,
+                                        ),
+                                        title: const Text(
+                                          'Departure unconfirmed',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w800),
+                                        ),
+                                        subtitle: const Text(
+                                          'The expected departure time has passed. Authorized staff still needs to confirm checkout.',
+                                        ),
+                                      ),
+                                    if (request.isApproved)
+                                      OutlinedButton.icon(
+                                        onPressed: () async {
+                                          final changed =
+                                              await editVisitorSchedule(
+                                            context,
+                                            request,
+                                          );
+                                          if (changed && context.mounted) {
+                                            await controller.loadVisitors(
+                                                force: true);
+                                            if (context.mounted) {
+                                              showAppSnackBar(
+                                                context,
+                                                'Visitor schedule updated and sent for approval.',
+                                              );
+                                            }
+                                          }
+                                        },
+                                        icon: const Icon(
+                                            Icons.edit_calendar_outlined),
+                                        label: const Text('Change schedule'),
+                                      ),
+                                    if (request.isPending) ...[
                                       const SizedBox(height: 8),
                                       Wrap(
                                         spacing: 8,
@@ -7099,16 +7194,36 @@ class ConfidentialConcernPage extends StatefulWidget {
 
 class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
   String category = 'Safety concern';
-  List<DormitoryOption> reportTypes=[];
+  List<DormitoryOption> reportTypes = [];
   DormitoryOption? selectedType;
   String? choicesError;
-  bool choicesLoading=true;
-  final specificConcern=TextEditingController();
+  bool choicesLoading = true;
+  late final TableRefreshSubscription _configurationSubscription;
+  final specificConcern = TextEditingController();
   Future<void> _loadReportTypes() async {
-    try { final result=await const DormitoryConfigurationService().options('report_type');
-      if(mounted)setState((){reportTypes=result; selectedType=result.firstOrNull; category=selectedType?.categoryCode ?? 'other';choicesLoading=false;choicesError=null;});
-    } catch(e){if(mounted)setState((){choicesLoading=false;choicesError='Could not load report types. Please retry.';});}
+    try {
+      final result =
+          await const DormitoryConfigurationService().options('report_type');
+      if (!mounted) return;
+      setState(() {
+        final selectedId = selectedType?.id;
+        reportTypes = result;
+        selectedType =
+            result.where((option) => option.id == selectedId).firstOrNull ??
+                result.firstOrNull;
+        category = selectedType?.categoryCode ?? 'other';
+        choicesLoading = false;
+        choicesError = null;
+      });
+    } catch (e) {
+      if (mounted)
+        setState(() {
+          choicesLoading = false;
+          choicesError = 'Could not load report types. Please retry.';
+        });
+    }
   }
+
   final details = TextEditingController();
   bool saving = false;
   RecordListScope concernScope = RecordListScope.active;
@@ -7117,12 +7232,19 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
   @override
   void initState() {
     super.initState();
+    _configurationSubscription = TableRefreshSubscription(
+      'tenant-concern-options',
+      const ['dormitory_options'],
+      _loadReportTypes,
+      catchUpInterval: const Duration(seconds: 15),
+    );
     _loadReportTypes();
     TenantController.instance.loadConcerns(force: true);
   }
 
   @override
   void dispose() {
+    _configurationSubscription.dispose();
     details.dispose();
     specificConcern.dispose();
     super.dispose();
@@ -7130,9 +7252,9 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: TenantController.instance,
-    builder: (context, _) => _buildContent(context),
-  );
+        animation: TenantController.instance,
+        builder: (context, _) => _buildContent(context),
+      );
 
   Widget _buildContent(BuildContext context) {
     final concerns = TenantController.instance.concerns;
@@ -7140,15 +7262,20 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
     final historyConcerns = concerns.where((item) => item.isResolved).toList();
     final visibleConcerns = List<ConcernReport>.from(
       NotificationTarget.recordIdOf(context, 'confidential_report') != null
-          ? concerns.where((item) => item.id == NotificationTarget.recordIdOf(context, 'confidential_report'))
-          : concernScope == RecordListScope.active ? activeConcerns : historyConcerns,
+          ? concerns.where((item) =>
+              item.id ==
+              NotificationTarget.recordIdOf(context, 'confidential_report'))
+          : concernScope == RecordListScope.active
+              ? activeConcerns
+              : historyConcerns,
     )..sort((a, b) => switch (concernSort) {
           RecordListSort.oldest => a.createdAt.compareTo(b.createdAt),
           RecordListSort.status => a.status.compareTo(b.status),
           RecordListSort.title => a.category.compareTo(b.category),
           _ => b.createdAt.compareTo(a.createdAt),
         });
-    final targetId = NotificationTarget.recordIdOf(context, 'confidential_report');
+    final targetId =
+        NotificationTarget.recordIdOf(context, 'confidential_report');
     if (targetId != null) {
       final controller = TenantController.instance;
       final report = visibleConcerns.firstOrNull;
@@ -7159,8 +7286,10 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
         child: report == null
             ? controller.concernsLoading
                 ? const Center(child: CircularProgressIndicator())
-                : Text(controller.concernsError ?? 'This report is no longer available.')
-            : CarmelitaCard(child: Column(
+                : Text(controller.concernsError ??
+                    'This report is no longer available.')
+            : CarmelitaCard(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   StatusPill(report.status),
@@ -7179,7 +7308,8 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                   Text(shortDate(report.createdAt)),
                   if (report.responseNotes.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    const Text('Staff response', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const Text('Staff response',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
                     SelectableText(report.responseNotes),
                   ],
                 ],
@@ -7241,19 +7371,39 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
               ),
             ),
             const SizedBox(height: 14),
-            if(choicesLoading)const LinearProgressIndicator(),
-            if(choicesError!=null)ListTile(title:Text(choicesError!),trailing:IconButton(onPressed:_loadReportTypes,icon:const Icon(Icons.refresh))),
+            if (choicesLoading) const LinearProgressIndicator(),
+            if (choicesError != null)
+              ListTile(
+                  title: Text(choicesError!),
+                  trailing: IconButton(
+                      onPressed: _loadReportTypes,
+                      icon: const Icon(Icons.refresh))),
             DropdownButtonFormField<String>(
-              key:ValueKey(selectedType?.id), initialValue:selectedType?.id,
-              decoration:const InputDecoration(labelText:'Report type'),
-              items:reportTypes.map((o)=>DropdownMenuItem(value:o.id,child:Text(o.label))).toList(),
-              onChanged:saving?null:(id)=>setState((){selectedType=reportTypes.where((o)=>o.id==id).firstOrNull;category=selectedType?.categoryCode ?? 'other';}),
+              key: ValueKey(selectedType?.id),
+              initialValue: selectedType?.id,
+              decoration: const InputDecoration(labelText: 'Report type'),
+              items: reportTypes
+                  .map((o) =>
+                      DropdownMenuItem(value: o.id, child: Text(o.label)))
+                  .toList(),
+              onChanged: saving
+                  ? null
+                  : (id) => setState(() {
+                        selectedType =
+                            reportTypes.where((o) => o.id == id).firstOrNull;
+                        category = selectedType?.categoryCode ?? 'other';
+                      }),
             ),
-            if(selectedType?.categoryCode=='other')...[
-              const SizedBox(height:14),
-              TextField(controller:specificConcern,maxLength:120,decoration:const InputDecoration(labelText:'Please specify the concern',hintText:'Enter the type of concern')),
+            if (selectedType?.categoryCode == 'other') ...[
+              const SizedBox(height: 14),
+              TextField(
+                  controller: specificConcern,
+                  maxLength: 120,
+                  decoration: const InputDecoration(
+                      labelText: 'Please specify the concern',
+                      hintText: 'Enter the type of concern')),
             ],
-            const SizedBox(height:14),
+            const SizedBox(height: 14),
             LabeledField(
               label: 'Details',
               controller: details,
@@ -7264,12 +7414,17 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: saving || choicesLoading || choicesError != null || selectedType == null
+                onPressed: saving ||
+                        choicesLoading ||
+                        choicesError != null ||
+                        selectedType == null
                     ? null
                     : () async {
                         final summary = details.text.trim();
-                        if (selectedType?.categoryCode == 'other' && specificConcern.text.trim().length < 2) {
-                          showAppSnackBar(context, 'Please specify the concern.');
+                        if (selectedType?.categoryCode == 'other' &&
+                            specificConcern.text.trim().length < 2) {
+                          showAppSnackBar(
+                              context, 'Please specify the concern.');
                           return;
                         }
                         if (summary.length < 10) {
@@ -7284,7 +7439,10 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                           await TenantController.instance.submitConcern(
                             category: category,
                             reportTypeId: selectedType!.id,
-                            specificConcern: selectedType?.categoryCode=='other' ? specificConcern.text.trim() : null,
+                            specificConcern:
+                                selectedType?.categoryCode == 'other'
+                                    ? specificConcern.text.trim()
+                                    : null,
                             summary: summary,
                           );
                           if (!context.mounted) return;
@@ -7341,15 +7499,19 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                             horizontal: 10,
                             vertical: 5,
                           ),
-                          child: Column(children:[TimelineTile(
-                            compact: true,
-                            icon: Icons.shield_outlined,
-                            color: const Color(0xFF7D70A0),
-                            title: report.category,
-                            subtitle:
-                                '${report.specificConcern.isEmpty ? report.summary : '${report.specificConcern}\n${report.summary}'}\n${shortDate(report.createdAt)}',
-                            trailing: StatusPill(report.status),
-                          ),ReportAddenda(key:ValueKey(report.id),reportId:report.id)]),
+                          child: Column(children: [
+                            TimelineTile(
+                              compact: true,
+                              icon: Icons.shield_outlined,
+                              color: const Color(0xFF7D70A0),
+                              title: report.category,
+                              subtitle:
+                                  '${report.specificConcern.isEmpty ? report.summary : '${report.specificConcern}\n${report.summary}'}\n${shortDate(report.createdAt)}',
+                              trailing: StatusPill(report.status),
+                            ),
+                            ReportAddenda(
+                                key: ValueKey(report.id), reportId: report.id)
+                          ]),
                         ),
                       ),
                     )

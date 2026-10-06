@@ -2,7 +2,6 @@ import 'dart:async';
 
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
-import 'app_notification_service.dart';
 
 class VisitorService {
   const VisitorService();
@@ -14,7 +13,7 @@ class VisitorService {
   static const _staffColumns =
       '$_columns, tenant:profiles!visitor_requests_tenant_id_fkey(full_name)';
   static const _eventColumns =
-      'id, request_id, event_type, actor_id, note, occurred_at, '
+      'id, request_id, event_type, actor_id, note, occurred_at, details, '
       'actor:profiles!visitor_events_actor_id_fkey(full_name)';
 
   Future<List<VisitorRequest>> listOwnRequests() async {
@@ -75,14 +74,6 @@ class VisitorService {
         .select(_columns)
         .single();
     final request = VisitorRequest.fromRow(row);
-    final tenantName =
-        client.auth.currentUser?.userMetadata?['full_name']?.toString().trim();
-    unawaited(AppNotificationService.instance.notifyVisitorPassRequested(
-      passId: request.id,
-      tenantName: tenantName?.isNotEmpty == true ? tenantName! : 'A tenant',
-      visitorName: request.visitorName,
-      visitDate: request.schedule.toString().split(' ').first,
-    ));
     return request;
   }
 
@@ -129,17 +120,49 @@ class VisitorService {
     });
     final request =
         VisitorRequest.fromRow(Map<String, dynamic>.from(value as Map));
-    if (request.tenantId.isNotEmpty && action != 'cancel') {
-      unawaited(
-        AppNotificationService.instance.notifyVisitorPassStatusChanged(
-          tenantId: request.tenantId,
-          passId: request.id,
-          visitorName: request.visitorName,
-          status: request.statusLabel,
-        ),
+    return request;
+  }
+
+  Future<VisitorRequest> reschedule({
+    required VisitorRequest request,
+    required DateTime arrival,
+    required DateTime departure,
+    required String note,
+    bool keepApproval = false,
+  }) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null) throw Exception('Database client not available');
+
+    final expectedUpdatedAt = request.updatedAt;
+    if (expectedUpdatedAt == null) {
+      throw Exception(
+          'Refresh this visitor request before changing its schedule.');
+    }
+
+    final value = await client.rpc(
+      'reschedule_visitor_request',
+      params: {
+        'p_request_id': request.id,
+        'p_expected_updated_at': expectedUpdatedAt.toUtc().toIso8601String(),
+        'p_schedule': arrival.toUtc().toIso8601String(),
+        'p_departure': departure.toUtc().toIso8601String(),
+        'p_note': note.trim(),
+        'p_keep_approval': keepApproval,
+      },
+    );
+
+    if (value is Map<String, dynamic>) {
+      return VisitorRequest.fromRow(value);
+    }
+    if (value is Map) {
+      return VisitorRequest.fromRow(Map<String, dynamic>.from(value));
+    }
+    if (value is List && value.isNotEmpty && value.first is Map) {
+      return VisitorRequest.fromRow(
+        Map<String, dynamic>.from(value.first as Map),
       );
     }
-    return request;
+    throw Exception('Visitor schedule update returned an invalid response.');
   }
 
   Future<List<VisitorEvent>> listEvents(String requestId) async {
