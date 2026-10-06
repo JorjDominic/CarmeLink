@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
+import 'dormitory_configuration_service.dart';
 import 'app_notification_service.dart';
 import 'secure_media_service.dart';
 
@@ -19,7 +20,7 @@ class MaintenanceService {
 
   static const String _reportColumns =
       'id, tenant_id, category, description, location, urgency, '
-      'status, photo_path, staff_notes, resolved_at, created_at, updated_at';
+      'status, photo_path, staff_notes, resolved_at, created_at, updated_at, category_option_id, location_option_id';
 
   String _requireTenantId() {
     final user = _client.auth.currentUser;
@@ -57,12 +58,27 @@ class MaintenanceService {
     String? photoMimeType,
   }) async {
     final tenantId = _requireTenantId();
+    final categoryOptionId =
+        await const DormitoryConfigurationService().activeOptionId(
+      'maintenance_category',
+      category,
+    );
+    if (categoryOptionId == null) {
+      throw ArgumentError('Choose an active maintenance category.');
+    }
+    final locationOptionId =
+        await const DormitoryConfigurationService().activeOptionId(
+      'common_area',
+      location,
+    );
 
     final row = await _client
         .from('maintenance_reports')
         .insert({
           'tenant_id': tenantId,
           'category': category.trim(),
+          'category_option_id': categoryOptionId,
+          'location_option_id': locationOptionId,
           'description': description.trim(),
           'location': location.trim(),
           'urgency': urgency.trim().toLowerCase(),
@@ -151,6 +167,21 @@ class MaintenanceService {
         .single();
 
     final current = _fromRow(currentRow);
+    final categoryOptionId = category == current.category
+        ? currentRow['category_option_id'] as String?
+        : await const DormitoryConfigurationService().activeOptionId(
+            'maintenance_category',
+            category,
+          );
+    if (category != current.category && categoryOptionId == null) {
+      throw ArgumentError('Choose an active maintenance category.');
+    }
+    final locationOptionId = location == current.location
+        ? currentRow['location_option_id'] as String?
+        : await const DormitoryConfigurationService().activeOptionId(
+            'common_area',
+            location,
+          );
 
     String? nextPhotoPath = current.photoPath;
     String? uploadedPath;
@@ -173,6 +204,8 @@ class MaintenanceService {
           .from('maintenance_reports')
           .update({
             'category': category.trim(),
+            'category_option_id': categoryOptionId,
+            'location_option_id': locationOptionId,
             'description': description.trim(),
             'location': location.trim(),
             'urgency': urgency.trim().toLowerCase(),

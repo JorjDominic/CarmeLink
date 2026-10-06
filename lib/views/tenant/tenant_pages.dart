@@ -1,3 +1,5 @@
+import '../shared/report_addenda.dart';
+import '../../services/dormitory_configuration_service.dart';
 import '../shared/notification_destination.dart';
 import '../shared/staff_message_contacts.dart';
 import 'dart:typed_data';
@@ -4050,15 +4052,28 @@ class SubmitMaintenancePage extends StatefulWidget {
 }
 
 class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
-  static const categories = [
-    'Plumbing',
-    'Electrical',
-    'Furniture',
-    'Air conditioning',
-    'Locks & Keys',
-    'Structural',
-    'Other',
-  ];
+  List<String> categories = [];
+  List<String> configuredLocations = [];
+  bool optionsLoading = true;
+  String? optionsError;
+  Future<void> _loadOptions() async {
+    setState(() { optionsLoading=true; optionsError=null; });
+    try {
+      const service=DormitoryConfigurationService();
+      final results=await Future.wait([service.options('maintenance_category'),service.options('common_area')]);
+      final rooms=await service.maintenanceRoomLocations();
+      if(!mounted)return;
+      setState((){
+        categories=results[0].map((o)=>o.label).toList();
+        configuredLocations=[...rooms,...results[1].map((o)=>o.label)];
+        if(editing && !categories.contains(widget.report!.category))categories.insert(0,widget.report!.category);
+        if(editing && !configuredLocations.contains(widget.report!.location))configuredLocations.insert(0,widget.report!.location);
+        if(!categories.contains(category))category=categories.firstOrNull ?? '';
+        if(!configuredLocations.contains(location))location=configuredLocations.firstOrNull ?? '';
+        optionsLoading=false;
+      });
+    } catch(e){if(mounted)setState((){optionsLoading=false;optionsError='Could not load report choices. Retry before submitting.';});}
+  }
 
   static const urgencies = ['Low', 'Medium', 'High'];
   static const int _maximumPhotoBytes = 5 * 1024 * 1024;
@@ -4083,42 +4098,18 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
       widget.report?.photoPath != null && !removeExistingPhoto;
   bool get hasPhoto => selectedPhotoBytes != null || hasExistingPhoto;
 
-  List<String> get _availableLocations {
-    final room = TenantController.instance.room;
-    final locs = <String>[];
-    if (room != null) {
-      locs.add('Room ${room.number}');
-      locs.add('Room ${room.number} • Bathroom');
-    } else {
-      locs.add('Room 204');
-      locs.add('Room 204 • Bathroom');
-    }
-    locs.addAll(const [
-      'Second-floor corridor',
-      'First-floor hallway',
-      'Kitchen / Dining area',
-      'Laundry area',
-      'Study lounge',
-      'Ground floor lobby',
-      'Other common area',
-    ]);
-    if (!locs.contains(location)) {
-      locs.insert(0, location);
-    }
-    return locs;
-  }
+  List<String> get _availableLocations => configuredLocations;
 
   @override
   void initState() {
     super.initState();
     final report = widget.report;
     final room = TenantController.instance.room;
-    final defaultLocation = room != null ? 'Room ${room.number}' : 'Room 204';
+    final defaultLocation = room != null ? 'Room ${room.number}' : ''; 
 
     description = TextEditingController(text: report?.description ?? '');
-    category = categories.contains(report?.category)
-        ? report!.category
-        : categories.first;
+    category = report?.category ?? '';
+    _loadOptions();
     urgency = urgencies.contains(report?.urgency) ? report!.urgency : 'Medium';
     location = report?.location ?? defaultLocation;
 
@@ -4367,8 +4358,11 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if(optionsLoading) const LinearProgressIndicator(),
+              if(optionsError!=null) ListTile(title:Text(optionsError!),trailing:IconButton(onPressed:_loadOptions,icon:const Icon(Icons.refresh))),
               DropdownButtonFormField<String>(
-                initialValue: category,
+                key: ValueKey('category-$category'),
+                initialValue: category.isEmpty ? null : category,
                 decoration: const InputDecoration(labelText: 'Issue category'),
                 items: categories
                     .map(
@@ -4393,7 +4387,7 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
               DropdownButtonFormField<String>(
                 key: ValueKey('location-$location'),
                 isExpanded: true,
-                initialValue: location,
+                initialValue: location.isEmpty ? null : location,
                 decoration: const InputDecoration(
                   labelText: 'Room / area',
                   helperText: 'Choose the closest room or common area.',
@@ -4443,7 +4437,7 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: saving ? null : _save,
+                  onPressed: saving || optionsLoading || optionsError != null || category.isEmpty || location.isEmpty ? null : _save,
                   child: saving
                       ? const SizedBox(
                           width: 20,
@@ -7049,7 +7043,7 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                                       icon: const Icon(Icons.history_rounded),
                                       label: const Text('View history'),
                                     ),
-                                    if (request.isPending) ...[
+                              if (request.isPending) ...[
                                       const SizedBox(height: 8),
                                       Wrap(
                                         spacing: 8,
@@ -7105,6 +7099,16 @@ class ConfidentialConcernPage extends StatefulWidget {
 
 class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
   String category = 'Safety concern';
+  List<DormitoryOption> reportTypes=[];
+  DormitoryOption? selectedType;
+  String? choicesError;
+  bool choicesLoading=true;
+  final specificConcern=TextEditingController();
+  Future<void> _loadReportTypes() async {
+    try { final result=await const DormitoryConfigurationService().options('report_type');
+      if(mounted)setState((){reportTypes=result; selectedType=result.firstOrNull; category=selectedType?.categoryCode ?? 'other';choicesLoading=false;choicesError=null;});
+    } catch(e){if(mounted)setState((){choicesLoading=false;choicesError='Could not load report types. Please retry.';});}
+  }
   final details = TextEditingController();
   bool saving = false;
   RecordListScope concernScope = RecordListScope.active;
@@ -7113,12 +7117,14 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
   @override
   void initState() {
     super.initState();
+    _loadReportTypes();
     TenantController.instance.loadConcerns(force: true);
   }
 
   @override
   void dispose() {
     details.dispose();
+    specificConcern.dispose();
     super.dispose();
   }
 
@@ -7159,7 +7165,16 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                 children: [
                   StatusPill(report.status),
                   const SizedBox(height: 12),
+                  if (report.specificConcern.isNotEmpty) ...[
+                    const Text(
+                      'Specific concern',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    SelectableText(report.specificConcern),
+                    const SizedBox(height: 10),
+                  ],
                   SelectableText(report.summary),
+                  ReportAddenda(key: ValueKey(report.id), reportId: report.id),
                   const SizedBox(height: 12),
                   Text(shortDate(report.createdAt)),
                   if (report.responseNotes.isNotEmpty) ...[
@@ -7226,28 +7241,19 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
               ),
             ),
             const SizedBox(height: 14),
+            if(choicesLoading)const LinearProgressIndicator(),
+            if(choicesError!=null)ListTile(title:Text(choicesError!),trailing:IconButton(onPressed:_loadReportTypes,icon:const Icon(Icons.refresh))),
             DropdownButtonFormField<String>(
-              isDense: true,
-              initialValue: category,
-              decoration: const InputDecoration(labelText: 'Category'),
-              items: const [
-                'Safety concern',
-                'Rule violation',
-                'Roommate concern',
-                'Other',
-              ]
-                  .map(
-                    (value) => DropdownMenuItem(
-                      value: value,
-                      child: Text(value),
-                    ),
-                  )
-                  .toList(),
-              onChanged: saving
-                  ? null
-                  : (value) => setState(() => category = value ?? category),
+              key:ValueKey(selectedType?.id), initialValue:selectedType?.id,
+              decoration:const InputDecoration(labelText:'Report type'),
+              items:reportTypes.map((o)=>DropdownMenuItem(value:o.id,child:Text(o.label))).toList(),
+              onChanged:saving?null:(id)=>setState((){selectedType=reportTypes.where((o)=>o.id==id).firstOrNull;category=selectedType?.categoryCode ?? 'other';}),
             ),
-            const SizedBox(height: 14),
+            if(selectedType?.categoryCode=='other')...[
+              const SizedBox(height:14),
+              TextField(controller:specificConcern,maxLength:120,decoration:const InputDecoration(labelText:'Please specify the concern',hintText:'Enter the type of concern')),
+            ],
+            const SizedBox(height:14),
             LabeledField(
               label: 'Details',
               controller: details,
@@ -7258,10 +7264,14 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: saving
+                onPressed: saving || choicesLoading || choicesError != null || selectedType == null
                     ? null
                     : () async {
                         final summary = details.text.trim();
+                        if (selectedType?.categoryCode == 'other' && specificConcern.text.trim().length < 2) {
+                          showAppSnackBar(context, 'Please specify the concern.');
+                          return;
+                        }
                         if (summary.length < 10) {
                           showAppSnackBar(
                             context,
@@ -7273,6 +7283,8 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                         try {
                           await TenantController.instance.submitConcern(
                             category: category,
+                            reportTypeId: selectedType!.id,
+                            specificConcern: selectedType?.categoryCode=='other' ? specificConcern.text.trim() : null,
                             summary: summary,
                           );
                           if (!context.mounted) return;
@@ -7329,15 +7341,15 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                             horizontal: 10,
                             vertical: 5,
                           ),
-                          child: TimelineTile(
+                          child: Column(children:[TimelineTile(
                             compact: true,
                             icon: Icons.shield_outlined,
                             color: const Color(0xFF7D70A0),
                             title: report.category,
                             subtitle:
-                                '${report.summary}\n${shortDate(report.createdAt)}',
+                                '${report.specificConcern.isEmpty ? report.summary : '${report.specificConcern}\n${report.summary}'}\n${shortDate(report.createdAt)}',
                             trailing: StatusPill(report.status),
-                          ),
+                          ),ReportAddenda(key:ValueKey(report.id),reportId:report.id)]),
                         ),
                       ),
                     )

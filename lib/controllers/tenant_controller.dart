@@ -614,10 +614,14 @@ class TenantController extends ChangeNotifier {
   Future<ConcernReport> submitConcern({
     required String category,
     required String summary,
+    String? reportTypeId,
+    String? specificConcern,
   }) async {
     final report = await _confidentialReportService.submit(
       category: category,
       summary: summary,
+      reportTypeId: reportTypeId,
+      specificConcern: specificConcern,
     );
     _concerns.insert(0, report);
     _concernsLoadedOnce = true;

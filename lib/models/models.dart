@@ -670,6 +670,7 @@ class ConcernReport {
     this.tenantId = '',
     this.tenantName = 'Confidential tenant',
     this.responseNotes = '',
+    this.specificConcern = '',
     this.reviewedAt,
   });
 
@@ -681,6 +682,7 @@ class ConcernReport {
   final String tenantId;
   final String tenantName;
   final String responseNotes;
+  final String specificConcern;
   final DateTime? reviewedAt;
 
   bool get isSubmitted => status.toLowerCase() == 'submitted';
@@ -688,12 +690,16 @@ class ConcernReport {
 
   factory ConcernReport.fromRow(Map<String, dynamic> row) {
     final rawCategory = row['category'] as String? ?? 'other';
-    final category = rawCategory
+    final fallbackCategory = rawCategory
         .split('_')
         .map((part) => part.isEmpty
             ? part
             : '${part[0].toUpperCase()}${part.substring(1)}')
         .join(' ');
+    final configuredLabel = (row['report_type_label'] as String?)?.trim();
+    final category = configuredLabel != null && configuredLabel.isNotEmpty
+        ? configuredLabel
+        : fallbackCategory;
     final rawStatus = row['status'] as String? ?? 'submitted';
     final status = rawStatus
         .split('_')
@@ -709,6 +715,7 @@ class ConcernReport {
       summary: row['summary'] as String? ?? '',
       status: status,
       responseNotes: row['response_notes'] as String? ?? '',
+      specificConcern: row['specific_concern'] as String? ?? '',
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
       reviewedAt: row['reviewed_at'] == null
           ? null
