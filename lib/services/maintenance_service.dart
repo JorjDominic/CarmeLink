@@ -20,7 +20,7 @@ class MaintenanceService {
 
   static const String _reportColumns =
       'id, tenant_id, category, description, location, room_id, urgency, '
-      'status, photo_path, staff_notes, resolved_at, created_at, updated_at, category_option_id, location_option_id';
+      'status, photo_path, staff_notes, resolved_at, created_at, updated_at, category_option_id, location_option_id, specific_category, specific_location';
 
   String _requireTenantId() {
     final user = _client.auth.currentUser;
@@ -53,6 +53,8 @@ class MaintenanceService {
     required String description,
     required String location,
     required String urgency,
+    String? specificCategory,
+    String? specificLocation,
     Uint8List? photoBytes,
     String? photoFileName,
     String? photoMimeType,
@@ -79,6 +81,8 @@ class MaintenanceService {
           'category': category.trim(),
           'category_option_id': categoryOptionId,
           'location_option_id': locationOptionId,
+          'specific_category': _nullableSpecific(specificCategory),
+          'specific_location': _nullableSpecific(specificLocation),
           'description': description.trim(),
           'location': location.trim(),
           'urgency': urgency.trim().toLowerCase(),
@@ -140,8 +144,8 @@ class MaintenanceService {
   void _notifySubmitted(MaintenanceReport report) {
     unawaited(AppNotificationService.instance.notifyMaintenanceSubmitted(
       reportId: report.id,
-      location: report.location,
-      category: report.category,
+      location: report.displayLocation,
+      category: report.displayCategory,
       description: report.description,
     ));
   }
@@ -152,6 +156,8 @@ class MaintenanceService {
     required String description,
     required String location,
     required String urgency,
+    String? specificCategory,
+    String? specificLocation,
     Uint8List? photoBytes,
     String? photoFileName,
     String? photoMimeType,
@@ -206,6 +212,8 @@ class MaintenanceService {
             'category': category.trim(),
             'category_option_id': categoryOptionId,
             'location_option_id': locationOptionId,
+            'specific_category': _nullableSpecific(specificCategory),
+            'specific_location': _nullableSpecific(specificLocation),
             'description': description.trim(),
             'location': location.trim(),
             'urgency': urgency.trim().toLowerCase(),
@@ -385,6 +393,8 @@ class MaintenanceService {
       description: row['description'] as String,
       location: row['location'] as String,
       roomId: row['room_id'] as String?,
+      specificCategory: row['specific_category'] as String? ?? '',
+      specificLocation: row['specific_location'] as String? ?? '',
       urgency: _label(row['urgency'] as String),
       status: _statusLabel(
         row['status'] as String,
@@ -398,6 +408,11 @@ class MaintenanceService {
           ? null
           : DateTime.tryParse(row['resolved_at'] as String)?.toLocal(),
     );
+  }
+
+  String? _nullableSpecific(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   String _label(String value) {

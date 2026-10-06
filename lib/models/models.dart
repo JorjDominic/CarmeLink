@@ -396,6 +396,8 @@ class MaintenanceReport {
     this.staffNotes = '',
     this.resolvedAt,
     this.roomId,
+    this.specificCategory = '',
+    this.specificLocation = '',
   });
 
   final String id;
@@ -403,6 +405,8 @@ class MaintenanceReport {
   final String description;
   final String location;
   final String? roomId;
+  final String specificCategory;
+  final String specificLocation;
   final String urgency;
   String status;
   final DateTime createdAt;
@@ -410,6 +414,14 @@ class MaintenanceReport {
   String notes;
   final String staffNotes;
   final DateTime? resolvedAt;
+
+  String get displayCategory => specificCategory.trim().isEmpty
+      ? category
+      : '$category — ${specificCategory.trim()}';
+
+  String get displayLocation => specificLocation.trim().isEmpty
+      ? location
+      : '$location — ${specificLocation.trim()}';
 
   bool get isPending => status.trim().toLowerCase() == 'pending';
   bool get isAssigned => status.trim().toLowerCase() == 'assigned';
@@ -436,6 +448,8 @@ class MaintenanceReport {
     String? notes,
     String? staffNotes,
     DateTime? resolvedAt,
+    String? specificCategory,
+    String? specificLocation,
   }) {
     return MaintenanceReport(
       id: id ?? this.id,
@@ -443,6 +457,8 @@ class MaintenanceReport {
       description: description ?? this.description,
       location: location ?? this.location,
       roomId: roomId,
+      specificCategory: specificCategory ?? this.specificCategory,
+      specificLocation: specificLocation ?? this.specificLocation,
       urgency: urgency ?? this.urgency,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,

@@ -17,6 +17,7 @@ import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/announcement_service.dart';
 import '../../services/geofence_service.dart';
+import '../../services/maintenance_service.dart';
 import '../../services/receipt_ocr_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/tripwire_geofence_service.dart';
@@ -3915,7 +3916,8 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
                             : report.urgency == 'Medium'
                                 ? const Color(0xFFB47A52)
                                 : const Color(0xFF627FA8),
-                        title: '${report.category} • ${report.location}',
+                        title:
+                            '${report.displayCategory} • ${report.displayLocation}',
                         subtitle:
                             '${report.description}\n${shortDate(report.createdAt)}'
                             '${report.photoPath != null ? ' • Photo attached' : ''}'
@@ -3983,6 +3985,8 @@ class SubmitMaintenancePage extends StatefulWidget {
 }
 
 class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
+  List<DormitoryOption> categoryOptions = [];
+  List<DormitoryOption> commonAreaOptions = [];
   List<String> categories = [];
   List<String> configuredLocations = [];
   late final TableRefreshSubscription _configurationSubscription;
@@ -4002,16 +4006,26 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
       final rooms = await service.maintenanceRoomLocations();
       if (!mounted) return;
       setState(() {
-        categories = results[0].map((o) => o.label).toList();
-        configuredLocations = [...rooms, ...results[1].map((o) => o.label)];
-        if (editing && !categories.contains(widget.report!.category))
-          categories.insert(0, widget.report!.category);
-        if (editing && !configuredLocations.contains(widget.report!.location))
-          configuredLocations.insert(0, widget.report!.location);
-        if (!categories.contains(category))
+        categoryOptions = List<DormitoryOption>.from(results[0]);
+        commonAreaOptions = List<DormitoryOption>.from(results[1]);
+        final categoryLabels = <String>[
+          ...categoryOptions.map((option) => option.label),
+          if (editing) widget.report!.category,
+        ];
+        final locationLabels = <String>[
+          ...rooms,
+          ...commonAreaOptions.map((option) => option.label),
+          if (editing) widget.report!.location,
+        ];
+        categories = DormitoryConfigurationService.sortLabels(categoryLabels);
+        configuredLocations =
+            DormitoryConfigurationService.sortLabels(locationLabels);
+        if (!categories.contains(category)) {
           category = categories.firstOrNull ?? '';
-        if (!configuredLocations.contains(location))
+        }
+        if (!configuredLocations.contains(location)) {
           location = configuredLocations.firstOrNull ?? '';
+        }
         optionsLoading = false;
       });
     } catch (e) {
@@ -4030,6 +4044,8 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
   final ImagePicker _imagePicker = ImagePicker();
 
   late final TextEditingController description;
+  late final TextEditingController specificCategory;
+  late final TextEditingController specificLocation;
   late String category;
   late String urgency;
   late String location;
@@ -4049,6 +4065,26 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
 
   List<String> get _availableLocations => configuredLocations;
 
+  DormitoryOption? get _selectedCategoryOption =>
+      categoryOptions.where((option) => option.label == category).firstOrNull;
+
+  DormitoryOption? get _selectedLocationOption =>
+      commonAreaOptions.where((option) => option.label == location).firstOrNull;
+
+  bool get _categoryNeedsSpecific =>
+      _selectedCategoryOption?.isCatchAll == true ||
+      DormitoryConfigurationService.isCatchAllLabel(category) ||
+      (editing &&
+          category == widget.report!.category &&
+          widget.report!.specificCategory.trim().isNotEmpty);
+
+  bool get _locationNeedsSpecific =>
+      _selectedLocationOption?.isCatchAll == true ||
+      DormitoryConfigurationService.isCatchAllLabel(location) ||
+      (editing &&
+          location == widget.report!.location &&
+          widget.report!.specificLocation.trim().isNotEmpty);
+
   @override
   void initState() {
     super.initState();
@@ -4057,6 +4093,10 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
     final defaultLocation = room != null ? 'Room ${room.number}' : '';
 
     description = TextEditingController(text: report?.description ?? '');
+    specificCategory =
+        TextEditingController(text: report?.specificCategory ?? '');
+    specificLocation =
+        TextEditingController(text: report?.specificLocation ?? '');
     category = report?.category ?? '';
     urgency = urgencies.contains(report?.urgency) ? report!.urgency : 'Medium';
     location = report?.location ?? defaultLocation;
@@ -4077,6 +4117,8 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
   void dispose() {
     _configurationSubscription.dispose();
     description.dispose();
+    specificCategory.dispose();
+    specificLocation.dispose();
     super.dispose();
   }
 
@@ -4188,32 +4230,51 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
       return;
     }
 
+    if (_categoryNeedsSpecific && specificCategory.text.trim().length < 2) {
+      showAppSnackBar(context, 'Please specify the issue category.');
+      return;
+    }
+    if (_locationNeedsSpecific && specificLocation.text.trim().length < 2) {
+      showAppSnackBar(context, 'Please specify the area or location.');
+      return;
+    }
+
     setState(() => saving = true);
 
     try {
+      const maintenanceService = MaintenanceService();
       if (editing) {
-        await TenantController.instance.updateMaintenance(
+        await maintenanceService.updateReport(
           id: widget.report!.id,
           category: category,
           description: cleanDescription,
           location: location,
           urgency: urgency,
+          specificCategory:
+              _categoryNeedsSpecific ? specificCategory.text.trim() : null,
+          specificLocation:
+              _locationNeedsSpecific ? specificLocation.text.trim() : null,
           photoBytes: selectedPhotoBytes,
           photoFileName: selectedPhotoName,
           photoMimeType: selectedPhotoMimeType,
           removePhoto: removeExistingPhoto && selectedPhotoBytes == null,
         );
       } else {
-        await TenantController.instance.submitMaintenance(
+        await maintenanceService.createReport(
           category: category,
           description: cleanDescription,
           location: location,
           urgency: urgency,
+          specificCategory:
+              _categoryNeedsSpecific ? specificCategory.text.trim() : null,
+          specificLocation:
+              _locationNeedsSpecific ? specificLocation.text.trim() : null,
           photoBytes: selectedPhotoBytes,
           photoFileName: selectedPhotoName,
           photoMimeType: selectedPhotoMimeType,
         );
       }
+      await TenantController.instance.loadMaintenance(force: true);
 
       if (!mounted) return;
       showAppSnackBar(
@@ -4335,8 +4396,25 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
                     .toList(),
                 onChanged: saving
                     ? null
-                    : (value) => setState(() => category = value ?? category),
+                    : (value) => setState(() {
+                          category = value ?? category;
+                          if (!_categoryNeedsSpecific) {
+                            specificCategory.clear();
+                          }
+                        }),
               ),
+              if (_categoryNeedsSpecific) ...[
+                const SizedBox(height: 14),
+                TextField(
+                  controller: specificCategory,
+                  maxLength: 120,
+                  enabled: !saving,
+                  decoration: const InputDecoration(
+                    labelText: 'Please specify the issue category',
+                    hintText: 'Enter the exact type of issue',
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
               LabeledField(
                 label: 'Description',
@@ -4368,8 +4446,25 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
                     .toList(),
                 onChanged: saving
                     ? null
-                    : (value) => setState(() => location = value ?? location),
+                    : (value) => setState(() {
+                          location = value ?? location;
+                          if (!_locationNeedsSpecific) {
+                            specificLocation.clear();
+                          }
+                        }),
               ),
+              if (_locationNeedsSpecific) ...[
+                const SizedBox(height: 14),
+                TextField(
+                  controller: specificLocation,
+                  maxLength: 120,
+                  enabled: !saving,
+                  decoration: const InputDecoration(
+                    labelText: 'Please specify the area / location',
+                    hintText: 'Enter the exact area or location',
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
                 initialValue: urgency,
@@ -7319,7 +7414,7 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                         category = selectedType?.categoryCode ?? 'other';
                       }),
             ),
-            if (selectedType?.categoryCode == 'other') ...[
+            if (selectedType?.isCatchAll == true) ...[
               const SizedBox(height: 14),
               TextField(
                   controller: specificConcern,
@@ -7346,7 +7441,7 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                     ? null
                     : () async {
                         final summary = details.text.trim();
-                        if (selectedType?.categoryCode == 'other' &&
+                        if (selectedType?.isCatchAll == true &&
                             specificConcern.text.trim().length < 2) {
                           showAppSnackBar(
                               context, 'Please specify the concern.');
@@ -7364,10 +7459,9 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                           await TenantController.instance.submitConcern(
                             category: category,
                             reportTypeId: selectedType!.id,
-                            specificConcern:
-                                selectedType?.categoryCode == 'other'
-                                    ? specificConcern.text.trim()
-                                    : null,
+                            specificConcern: selectedType?.isCatchAll == true
+                                ? specificConcern.text.trim()
+                                : null,
                             summary: summary,
                           );
                           if (!context.mounted) return;

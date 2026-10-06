@@ -36,6 +36,14 @@ class DormitoryOption {
   final int sortOrder;
   final String? categoryCode;
   final String instructions;
+
+  /// Catch-all choices stay last and can request a user-entered description.
+  /// Workflow mappings such as category_code='other' do not automatically make
+  /// a descriptive custom option a catch-all choice.
+  bool get isCatchAll => DormitoryConfigurationService.isCatchAllChoice(
+        code: code,
+        label: label,
+      );
 }
 
 class DormitoryConfigurationService {
@@ -49,6 +57,54 @@ class DormitoryConfigurationService {
     'payment_method': 'Payment methods',
   };
 
+  static bool isCatchAllChoice({required String code, required String label}) {
+    final normalizedCode =
+        code.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+    final normalizedLabel = label.trim().toLowerCase();
+    return normalizedCode == 'other' ||
+        normalizedCode == 'others' ||
+        normalizedCode.startsWith('other_') ||
+        normalizedCode.startsWith('others_') ||
+        normalizedLabel == 'other' ||
+        normalizedLabel == 'others' ||
+        normalizedLabel.startsWith('other ') ||
+        normalizedLabel.startsWith('others ');
+  }
+
+  static bool isCatchAllLabel(String label) {
+    final normalized = label.trim().toLowerCase();
+    return normalized == 'other' ||
+        normalized == 'others' ||
+        normalized.startsWith('other ') ||
+        normalized.startsWith('others ');
+  }
+
+  static int compareOptions(DormitoryOption a, DormitoryOption b) {
+    if (a.isCatchAll != b.isCatchAll) return a.isCatchAll ? 1 : -1;
+    final labelCompare = a.label.toLowerCase().compareTo(b.label.toLowerCase());
+    if (labelCompare != 0) return labelCompare;
+    return a.code.toLowerCase().compareTo(b.code.toLowerCase());
+  }
+
+  static List<String> sortLabels(Iterable<String> values) {
+    final result = values.toSet().toList();
+    result.sort((a, b) {
+      final aOther = isCatchAllLabel(a);
+      final bOther = isCatchAllLabel(b);
+      if (aOther != bOther) return aOther ? 1 : -1;
+      return a.toLowerCase().compareTo(b.toLowerCase());
+    });
+    return result;
+  }
+
+  static List<MapEntry<String, String>> sortedGroupEntries() {
+    final entries = groups.entries.toList();
+    entries.sort(
+      (a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()),
+    );
+    return entries;
+  }
+
   Future<List<DormitoryOption>> options(
     String groupKey, {
     bool activeOnly = true,
@@ -60,19 +116,20 @@ class DormitoryConfigurationService {
     if (activeOnly) {
       query = query.eq('is_active', true);
     }
-    final rows = await query.order('sort_order').order('label');
-    return rows
+    final rows = await query.order('label');
+    final options = rows
         .map<DormitoryOption>(
           (row) => DormitoryOption.fromRow(Map<String, dynamic>.from(row)),
         )
-        .toList(growable: false);
+        .toList();
+    options.sort(compareOptions);
+    return List<DormitoryOption>.unmodifiable(options);
   }
 
   Future<void> save({
     DormitoryOption? existing,
     required String groupKey,
     required String label,
-    required int sortOrder,
     String? categoryCode,
     String instructions = '',
   }) async {
@@ -80,19 +137,19 @@ class DormitoryConfigurationService {
     if (normalizedLabel.length < 2 || normalizedLabel.length > 80) {
       throw ArgumentError('Use 2 to 80 characters.');
     }
-    if (sortOrder < 0 || sortOrder > 9999) {
-      throw ArgumentError('Display order must be between 0 and 9999.');
-    }
     if (instructions.trim().length > 1000) {
       throw ArgumentError(
-          'Payment instructions must be at most 1000 characters.');
+        'Payment instructions must be at most 1000 characters.',
+      );
     }
 
     if (existing == null) {
       await SupabaseConfig.client.from('dormitory_options').insert({
         'group_key': groupKey,
         'label': normalizedLabel,
-        'sort_order': sortOrder,
+        // The database normalizes this after insert. Keep a valid placeholder
+        // because the legacy column remains non-null for compatibility.
+        'sort_order': 0,
         if (groupKey == 'payment_method') 'instructions': instructions.trim(),
         if (groupKey == 'report_type') 'category_code': categoryCode,
       });
@@ -101,7 +158,6 @@ class DormitoryConfigurationService {
 
     await SupabaseConfig.client.from('dormitory_options').update({
       'label': normalizedLabel,
-      'sort_order': sortOrder,
       if (groupKey == 'payment_method') 'instructions': instructions.trim(),
     }).eq('id', existing.id);
   }
@@ -118,9 +174,11 @@ class DormitoryConfigurationService {
   Future<List<String>> maintenanceRoomLocations() async {
     final result =
         await SupabaseConfig.client.rpc('list_maintenance_room_locations');
-    return (result as List)
-        .map((row) => (row as Map)['location_label'] as String)
-        .toList(growable: false);
+    return sortLabels(
+      (result as List).map(
+        (row) => (row as Map)['location_label'] as String,
+      ),
+    );
   }
 
   Future<String?> activeOptionId(String groupKey, String label) async {

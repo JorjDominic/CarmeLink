@@ -22,15 +22,26 @@ List<String> allowedMaintenanceStatuses(String status) => switch (status) {
       _ => [status],
     };
 
+String _displayOther(String base, String? specific) {
+  final value = specific?.trim() ?? '';
+  return value.isEmpty ? base : '$base — $value';
+}
+
 class StaffMaintenanceReport {
   StaffMaintenanceReport.fromRow(Map<String, dynamic> row)
       : id = row['id'] as String,
         tenantId = row['tenant_id'] as String? ?? '',
         tenantName = (row['tenant'] as Map?)?['full_name'] as String? ??
             'Tenant unavailable',
-        category = row['category'] as String,
+        category = _displayOther(
+          row['category'] as String,
+          row['specific_category'] as String?,
+        ),
         description = row['description'] as String,
-        location = row['location'] as String,
+        location = _displayOther(
+          row['location'] as String,
+          row['specific_location'] as String?,
+        ),
         roomId = row['room_id'] as String?,
         urgency = row['urgency'] as String,
         status = row['status'] as String,
@@ -135,7 +146,7 @@ class StaffMaintenanceService {
 
   static const _columns =
       'id, tenant_id, category, description, location, room_id, urgency, status, photo_path, '
-      'staff_notes, updated_at, created_at, resolved_at, '
+      'staff_notes, updated_at, created_at, resolved_at, specific_category, specific_location, '
       'tenant:profiles!maintenance_reports_tenant_id_fkey(full_name)';
 
   Future<List<StaffMaintenanceReport>> listReports() async {

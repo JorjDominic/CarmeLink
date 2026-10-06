@@ -99,16 +99,41 @@ class _ConfiguredChoiceFieldState extends State<ConfiguredChoiceField> {
   @override
   Widget build(BuildContext context) {
     final items = _options
-        .map((o) => DropdownMenuItem(value: _value(o), child: Text(o.label)))
+        .map(
+          (option) => DropdownMenuItem<String>(
+            value: _value(option),
+            child: Text(option.label),
+          ),
+        )
         .toList();
     if (widget.preservedValue != null &&
         widget.value == widget.preservedValue &&
         !items.any((item) => item.value == widget.preservedValue)) {
-      items.add(DropdownMenuItem(
+      items.add(
+        DropdownMenuItem<String>(
           value: widget.preservedValue,
           child: Text(
-              '${widget.preservedLabel ?? widget.preservedValue} (archived)')));
+            '${widget.preservedLabel ?? widget.preservedValue} (archived)',
+          ),
+        ),
+      );
     }
+    items.sort((a, b) {
+      String labelOf(DropdownMenuItem<String> item) {
+        final child = item.child;
+        final raw = child is Text
+            ? child.data ?? child.textSpan?.toPlainText() ?? ''
+            : '';
+        return raw.replaceFirst(RegExp(r' \(archived\)$'), '');
+      }
+
+      final aLabel = labelOf(a);
+      final bLabel = labelOf(b);
+      final aOther = DormitoryConfigurationService.isCatchAllLabel(aLabel);
+      final bOther = DormitoryConfigurationService.isCatchAllLabel(bLabel);
+      if (aOther != bOther) return aOther ? 1 : -1;
+      return aLabel.toLowerCase().compareTo(bLabel.toLowerCase());
+    });
     final selected =
         items.any((item) => item.value == widget.value) ? widget.value : null;
     void change(String? value) {

@@ -1987,10 +1987,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
                       prefixIcon: Icon(Icons.category_outlined),
                     ),
                     items: const [
-                      'Suggestion',
+                      'Accessibility',
                       'App issue',
                       'Compliment',
-                      'Accessibility',
+                      'Suggestion',
                       'Other',
                     ]
                         .map((item) => DropdownMenuItem(
