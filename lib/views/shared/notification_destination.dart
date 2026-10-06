@@ -8,6 +8,7 @@ import '../owner/owner_pages.dart';
 import '../owner/room_monitoring_page.dart';
 import '../owner/staff_maintenance_page.dart';
 import '../tenant/tenant_pages.dart';
+import 'cleaning_report_detail.dart';
 import 'conduct_case_pages.dart';
 import 'room_inspection_pages.dart';
 import 'staff_message_contacts.dart';
@@ -25,6 +26,12 @@ Widget notificationDestination(AppNotificationItem item, UserRole role) {
         ? const TenantMessagesPage()
         : const GuardianMessagesPage();
   }
+  if (route == 'cleaning_report' && id != null) {
+    if (staff || role == UserRole.tenant) {
+      return CleaningReportDetail(reportId: id);
+    }
+  }
+
   final Widget? page;
   if (staff) {
     page = switch (route) {

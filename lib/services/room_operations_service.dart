@@ -190,6 +190,21 @@ class RoomOperationsService {
     );
   }
 
+  Future<CleaningNoncomplianceReport> getCleaningReport(String reportId) async {
+    final id = reportId.trim();
+    if (id.isEmpty) {
+      throw ArgumentError('Cleaning report id is required.');
+    }
+
+    final row = await _client
+        .from('cleaning_noncompliance_reports')
+        .select(_reportColumns)
+        .eq('id', id)
+        .single();
+
+    return CleaningNoncomplianceReport.fromRow(row);
+  }
+
   Future<List<CleaningNoncomplianceReport>> listMyReports() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return const [];

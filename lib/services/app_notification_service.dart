@@ -65,7 +65,10 @@ class AppNotificationItem {
     if (direct != null && direct.isNotEmpty) return direct;
     final key = switch (destinationType) {
       'conduct_case' => 'case_id',
-      'confidential_report' || 'maintenance' => 'report_id',
+      'confidential_report' ||
+      'maintenance' ||
+      'cleaning_report' =>
+        'report_id',
       'message' || 'conversation' => 'conversation_id',
       'payment' => 'payment_id',
       'curfew' => 'request_id',
