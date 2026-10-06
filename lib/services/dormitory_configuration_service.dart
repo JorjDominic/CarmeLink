@@ -10,6 +10,7 @@ class DormitoryOption {
     required this.isSystem,
     required this.sortOrder,
     this.categoryCode,
+    this.instructions = '',
   });
 
   factory DormitoryOption.fromRow(Map<String, dynamic> row) {
@@ -22,6 +23,7 @@ class DormitoryOption {
       isSystem: row['is_system'] as bool? ?? false,
       sortOrder: row['sort_order'] as int? ?? 0,
       categoryCode: row['category_code'] as String?,
+      instructions: row['instructions'] as String? ?? '',
     );
   }
 
@@ -33,6 +35,7 @@ class DormitoryOption {
   final bool isSystem;
   final int sortOrder;
   final String? categoryCode;
+  final String instructions;
 }
 
 class DormitoryConfigurationService {
@@ -42,6 +45,8 @@ class DormitoryConfigurationService {
     'maintenance_category': 'Maintenance categories',
     'common_area': 'Common areas',
     'report_type': 'Concern report types',
+    'announcement_category': 'Announcement categories',
+    'payment_method': 'Payment methods',
   };
 
   Future<List<DormitoryOption>> options(
@@ -69,6 +74,7 @@ class DormitoryConfigurationService {
     required String label,
     required int sortOrder,
     String? categoryCode,
+    String instructions = '',
   }) async {
     final normalizedLabel = label.trim();
     if (normalizedLabel.length < 2 || normalizedLabel.length > 80) {
@@ -77,12 +83,17 @@ class DormitoryConfigurationService {
     if (sortOrder < 0 || sortOrder > 9999) {
       throw ArgumentError('Display order must be between 0 and 9999.');
     }
+    if (instructions.trim().length > 1000) {
+      throw ArgumentError(
+          'Payment instructions must be at most 1000 characters.');
+    }
 
     if (existing == null) {
       await SupabaseConfig.client.from('dormitory_options').insert({
         'group_key': groupKey,
         'label': normalizedLabel,
         'sort_order': sortOrder,
+        if (groupKey == 'payment_method') 'instructions': instructions.trim(),
         if (groupKey == 'report_type') 'category_code': categoryCode,
       });
       return;
@@ -91,6 +102,7 @@ class DormitoryConfigurationService {
     await SupabaseConfig.client.from('dormitory_options').update({
       'label': normalizedLabel,
       'sort_order': sortOrder,
+      if (groupKey == 'payment_method') 'instructions': instructions.trim(),
     }).eq('id', existing.id);
   }
 
@@ -104,7 +116,8 @@ class DormitoryConfigurationService {
   }
 
   Future<List<String>> maintenanceRoomLocations() async {
-    final result = await SupabaseConfig.client.rpc('list_maintenance_room_locations');
+    final result =
+        await SupabaseConfig.client.rpc('list_maintenance_room_locations');
     return (result as List)
         .map((row) => (row as Map)['location_label'] as String)
         .toList(growable: false);

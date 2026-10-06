@@ -1,3 +1,5 @@
+import '../../core/widgets/configured_choice_field.dart';
+import '../../core/widgets/searchable_dropdown.dart';
 import '../shared/report_addenda.dart';
 import 'dormitory_configuration_page.dart';
 import '../shared/notification_destination.dart';
@@ -1362,9 +1364,13 @@ class _TenantAssignmentManagerState extends State<_TenantAssignmentManager> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        builder: (context) => RoomBedSelectorSheet(
-          rooms: bedRooms,
-          tenantName: widget.tenant.name,
+        builder: (context) => Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+          child: RoomBedSelectorSheet(
+            rooms: bedRooms,
+            tenantName: widget.tenant.name,
+          ),
         ),
       );
       if (selected == null || !mounted) return;
@@ -1476,6 +1482,7 @@ class RoomBedSelectorSheet extends StatefulWidget {
 
 class _RoomBedSelectorSheetState extends State<RoomBedSelectorSheet> {
   String? _expandedRoom;
+  String _query = '';
 
   @override
   void initState() {
@@ -1490,6 +1497,15 @@ class _RoomBedSelectorSheetState extends State<RoomBedSelectorSheet> {
     final theme = Theme.of(context);
     final totalBeds =
         widget.rooms.fold<int>(0, (sum, r) => sum + r.beds.length);
+    final visibleRooms = widget.rooms
+        .where(
+          (room) =>
+              '${room.roomNumber} ${room.floor}'
+                  .toLowerCase()
+                  .contains(_query) ||
+              room.beds.any((bed) => bed.label.toLowerCase().contains(_query)),
+        )
+        .toList();
 
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -1549,13 +1565,20 @@ class _RoomBedSelectorSheetState extends State<RoomBedSelectorSheet> {
             const SizedBox(height: 12),
             const Divider(height: 1),
             const SizedBox(height: 10),
+            ChoiceSearchField(
+              hintText: 'Search room, floor, or bed label',
+              onChanged: (value) => setState(() => _query = value),
+            ),
+            const SizedBox(height: 10),
+            if (visibleRooms.isEmpty)
+              const Text('No matching rooms. Try another search.'),
             Flexible(
               child: ListView.separated(
                 shrinkWrap: true,
-                itemCount: widget.rooms.length,
+                itemCount: visibleRooms.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
-                  final room = widget.rooms[index];
+                  final room = visibleRooms[index];
                   final isExpanded = _expandedRoom == room.roomNumber;
 
                   return CarmelitaCard(
@@ -3332,8 +3355,7 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
+                SearchableDropdownFormField<String>(
                   initialValue: _selectedTenantId,
                   decoration: const InputDecoration(
                     labelText: 'Tenant / Resident',
@@ -3682,9 +3704,8 @@ class _AdditionalChargeDialogState extends State<_AdditionalChargeDialog> {
               const Text(
                   'This charge is entered manually. Conduct cases never create charges automatically.'),
               const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
+              SearchableDropdownFormField<String>(
                 initialValue: _tenantId,
-                isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Tenant'),
                 items: tenants
                     .map((t) => DropdownMenuItem(
@@ -3961,9 +3982,8 @@ class _RentOverrideDialogState extends State<_RentOverrideDialog> {
                   'Increase or decrease unpaid future rent. Contract terms and historical charges remain unchanged.',
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
+                SearchableDropdownFormField<String>(
                   initialValue: _tenantId.isEmpty ? null : _tenantId,
-                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Tenant / Resident',
                     prefixIcon: Icon(Icons.person_outline),
@@ -7055,7 +7075,7 @@ class _StaffManualLogDialogState extends State<_StaffManualLogDialog> {
                 style: TextStyle(fontSize: 13),
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<TenantDirectoryEntry>(
+              SearchableDropdownFormField<TenantDirectoryEntry>(
                 initialValue: _selectedTenant,
                 decoration: const InputDecoration(
                   labelText: 'Select Tenant',
@@ -7594,9 +7614,8 @@ class _LocationTestPanelState extends State<_LocationTestPanel> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          DropdownButtonFormField<TenantDirectoryEntry>(
+                          SearchableDropdownFormField<TenantDirectoryEntry>(
                             initialValue: _selectedTenant,
-                            isExpanded: true,
                             decoration: const InputDecoration(
                               labelText: 'Tenant',
                               border: OutlineInputBorder(),
@@ -7644,9 +7663,9 @@ class _LocationTestPanelState extends State<_LocationTestPanel> {
                     return Row(
                       children: [
                         Expanded(
-                          child: DropdownButtonFormField<TenantDirectoryEntry>(
+                          child:
+                              SearchableDropdownFormField<TenantDirectoryEntry>(
                             initialValue: _selectedTenant,
-                            isExpanded: true,
                             decoration: const InputDecoration(
                               labelText: 'Tenant',
                               border: OutlineInputBorder(),
@@ -9008,15 +9027,17 @@ class _AnnouncementsManagementPageState
   String _searchQuery = '';
   final _searchController = TextEditingController();
 
-  static const _categories = [
-    ('all', 'All', Icons.apps_outlined),
-    ('general', 'General', Icons.campaign_outlined),
-    ('maintenance', 'Maintenance', Icons.build_outlined),
-    ('utility', 'Utility', Icons.bolt_outlined),
-    ('billing', 'Billing', Icons.payments_outlined),
-    ('emergency', 'Emergency', Icons.warning_amber_rounded),
-    ('event', 'Event', Icons.event_outlined),
-  ];
+  List<(String, String, IconData)> get _categories {
+    final labels = <String, String>{};
+    for (final item in _announcements ?? <AnnouncementRecord>[]) {
+      labels.putIfAbsent(item.category, () => item.displayCategory);
+    }
+    return [
+      ('all', 'All', Icons.apps_outlined),
+      for (final entry in labels.entries)
+        (entry.key, entry.value, _categoryIcon(entry.key)),
+    ];
+  }
 
   static const _audiences = [
     ('all', 'All Audiences'),
@@ -9529,7 +9550,7 @@ class _AnnouncementsManagementPageState
                                       Icon(icon, size: 13, color: color),
                                       const SizedBox(width: 4),
                                       Text(
-                                        _categoryTitle(item.category),
+                                        item.displayCategory,
                                         style: TextStyle(
                                           fontSize: 11.5,
                                           fontWeight: FontWeight.w600,
@@ -9779,8 +9800,9 @@ class _AnnouncementComposerSheetState
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
 
-    if (title.isEmpty || body.isEmpty) {
-      setState(() => _errorMessage = 'Please enter both a title and content.');
+    if (title.isEmpty || body.isEmpty || _category.isEmpty) {
+      setState(() => _errorMessage =
+          'Please enter a title, content, and an active category.');
       return;
     }
 
@@ -9833,43 +9855,16 @@ class _AnnouncementComposerSheetState
     final isEditing = widget.announcement != null;
     final viewInsetsBottom = MediaQuery.viewInsetsOf(context).bottom;
 
-    final categoryDropdown = DropdownButtonFormField<String>(
-      initialValue: _category,
-      isExpanded: true,
-      decoration: const InputDecoration(labelText: 'Category'),
-      items: const [
-        DropdownMenuItem(
-          value: 'general',
-          child: Text('General', overflow: TextOverflow.ellipsis),
-        ),
-        DropdownMenuItem(
-          value: 'maintenance',
-          child: Text('Maintenance', overflow: TextOverflow.ellipsis),
-        ),
-        DropdownMenuItem(
-          value: 'utility',
-          child: Text('Utility', overflow: TextOverflow.ellipsis),
-        ),
-        DropdownMenuItem(
-          value: 'billing',
-          child: Text('Billing', overflow: TextOverflow.ellipsis),
-        ),
-        DropdownMenuItem(
-          value: 'emergency',
-          child: Text('Emergency', overflow: TextOverflow.ellipsis),
-        ),
-        DropdownMenuItem(
-          value: 'event',
-          child: Text('Event', overflow: TextOverflow.ellipsis),
-        ),
-      ],
-      onChanged: _saving
-          ? null
-          : (val) {
-              if (val != null) setState(() => _category = val);
-            },
+    final categoryDropdown = ConfiguredChoiceField(
+      group: 'announcement_category',
+      label: 'Category',
+      value: _category,
+      enabled: !_saving,
+      searchable: true,
+      preservedValue: widget.announcement?.category,
+      preservedLabel: widget.announcement?.displayCategory,
+      onChanged: (option) => setState(() => _category = option?.code ?? ''),
     );
-
     final audienceDropdown = DropdownButtonFormField<String>(
       initialValue: _audience,
       isExpanded: true,

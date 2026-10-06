@@ -1,3 +1,4 @@
+import '../../core/widgets/configured_choice_field.dart';
 import '../shared/report_addenda.dart';
 import '../../services/dormitory_configuration_service.dart';
 import '../shared/notification_destination.dart';
@@ -2365,6 +2366,7 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
   late final TextEditingController amountController;
   final referenceController = TextEditingController();
   String method = 'GCash';
+  DormitoryOption? _paymentOption;
   Payment? selectedPayment;
 
   Uint8List? receiptBytes;
@@ -2471,6 +2473,7 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
 
           if (result.paymentMethod != null) {
             method = result.paymentMethod!;
+            _paymentOption = null;
           }
         });
 
@@ -2536,6 +2539,10 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
   }
 
   Future<void> _submit() async {
+    if (_paymentOption == null) {
+      showAppSnackBar(context, 'Select an active payment method.');
+      return;
+    }
     final parsedAmount = double.tryParse(amountController.text.trim());
     if (parsedAmount == null || parsedAmount <= 0) {
       showAppSnackBar(context, 'Enter a valid payment amount.');
@@ -2655,23 +2662,22 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
               ),
               const SizedBox(height: 14),
             ],
-            DropdownButtonFormField<String>(
-              key: ValueKey(method),
-              isExpanded: true,
-              initialValue: method,
-              decoration: const InputDecoration(labelText: 'Payment method'),
-              items: const ['GCash', 'Maya', 'Bank transfer', 'Cash']
-                  .map(
-                    (value) => DropdownMenuItem(
-                      value: value,
-                      child: Text(value),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => method = value ?? method),
+            ConfiguredChoiceField(
+              group: 'payment_method',
+              label: 'Payment method',
+              value: method,
+              enabled: !submitting,
+              onChanged: (option) => setState(() {
+                _paymentOption = option;
+                method = option?.code ?? '';
+              }),
             ),
             const SizedBox(height: 10),
-            _PaymentMethodInstructionCard(method: method),
+            if (_paymentOption != null)
+              CarmelitaCard(
+                  child: Text(_paymentOption!.instructions.isEmpty
+                      ? 'Confirm payment instructions with dormitory staff.'
+                      : _paymentOption!.instructions)),
             const SizedBox(height: 14),
             TextField(
               controller: amountController,
@@ -2882,7 +2888,8 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
               width: double.infinity,
               height: 48,
               child: FilledButton(
-                onPressed: submitting ? null : _submit,
+                onPressed:
+                    submitting || _paymentOption == null ? null : _submit,
                 child: submitting
                     ? const SizedBox(
                         width: 20,
@@ -2897,90 +2904,6 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _PaymentMethodInstructionCard extends StatelessWidget {
-  const _PaymentMethodInstructionCard({required this.method});
-  final String method;
-
-  @override
-  Widget build(BuildContext context) {
-    final (icon, title, account, note) = switch (method.toLowerCase().trim()) {
-      'gcash' => (
-          Icons.account_balance_wallet_outlined,
-          'GCash Account',
-          '0917-123-4567 (Carmelita D.)',
-          'Ensure the 13-digit reference number is clearly visible on your screenshot.'
-        ),
-      'maya' => (
-          Icons.account_balance_wallet_outlined,
-          'Maya Account',
-          '0917-123-4567 (Carmelita D.)',
-          'Ensure the reference number and date are clearly readable.'
-        ),
-      'bank transfer' || 'bank' => (
-          Icons.account_balance_outlined,
-          'BDO Bank Deposit / Transfer',
-          '0012-3456-7890 (Carmelita Dormitory Management)',
-          'Attach a clear photo or screenshot of the deposit slip or mobile banking transfer.'
-        ),
-      _ => (
-          Icons.payments_outlined,
-          'Cash at Front Desk',
-          'Dormitory Administration Office',
-          'Hand payment directly to the caretaker and request an official receipt slip.'
-        ),
-    };
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF627FA8).withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: const Color(0xFF627FA8).withValues(alpha: 0.2),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: const Color(0xFF627FA8), size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  account,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                    color: Color(0xFF2C4A6F),
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  note,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontSize: 11,
-                        color: Colors.grey.shade700,
-                      ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -4652,15 +4575,17 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
   String _searchQuery = '';
   final _searchController = TextEditingController();
 
-  static const _categories = [
-    ('all', 'All', Icons.apps_outlined),
-    ('general', 'General', Icons.campaign_outlined),
-    ('maintenance', 'Maintenance', Icons.build_outlined),
-    ('utility', 'Utility', Icons.bolt_outlined),
-    ('billing', 'Billing', Icons.payments_outlined),
-    ('emergency', 'Emergency', Icons.warning_amber_rounded),
-    ('event', 'Event', Icons.event_outlined),
-  ];
+  List<(String, String, IconData)> get _categories {
+    final labels = <String, String>{};
+    for (final item in _announcements ?? <AnnouncementRecord>[]) {
+      labels.putIfAbsent(item.category, () => item.displayCategory);
+    }
+    return [
+      ('all', 'All', Icons.apps_outlined),
+      for (final entry in labels.entries)
+        (entry.key, entry.value, _categoryIcon(entry.key)),
+    ];
+  }
 
   @override
   void initState() {
@@ -5036,7 +4961,7 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
                                 Icon(icon, size: 13, color: color),
                                 const SizedBox(width: 4),
                                 Text(
-                                  _categoryTitle(item.category),
+                                  item.displayCategory,
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w600,

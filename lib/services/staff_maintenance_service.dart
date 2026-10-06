@@ -31,6 +31,7 @@ class StaffMaintenanceReport {
         category = row['category'] as String,
         description = row['description'] as String,
         location = row['location'] as String,
+        roomId = row['room_id'] as String?,
         urgency = row['urgency'] as String,
         status = row['status'] as String,
         photoPath = row['photo_path'] as String?,
@@ -50,6 +51,7 @@ class StaffMaintenanceReport {
     required this.category,
     required this.description,
     required this.location,
+    this.roomId,
     required this.urgency,
     required this.status,
     required this.notes,
@@ -65,6 +67,7 @@ class StaffMaintenanceReport {
   final String category;
   final String description;
   final String location;
+  final String? roomId;
   final String urgency;
   final String status;
   final String notes;
@@ -111,6 +114,7 @@ class StaffMaintenanceReport {
       category: category ?? this.category,
       description: description ?? this.description,
       location: location ?? this.location,
+      roomId: roomId,
       urgency: urgency ?? this.urgency,
       status: status ?? this.status,
       notes: notes ?? this.notes,
@@ -130,7 +134,7 @@ class StaffMaintenanceService {
   SupabaseClient get _client => _clientOverride ?? SupabaseConfig.client;
 
   static const _columns =
-      'id, tenant_id, category, description, location, urgency, status, photo_path, '
+      'id, tenant_id, category, description, location, room_id, urgency, status, photo_path, '
       'staff_notes, updated_at, created_at, resolved_at, '
       'tenant:profiles!maintenance_reports_tenant_id_fkey(full_name)';
 

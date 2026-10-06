@@ -64,27 +64,34 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
   void _reset() => _transform.value = Matrix4.identity();
 
   List<_PlanRoom> _roomsForCurrentFloor() {
-    final layout = _currentFloor.toLowerCase() == 'ground floor'
+    final floorRooms =
+        widget.rooms.where((room) => room.floor == _currentFloor).toList();
+    final originalFloors = floorRooms
+        .map((room) => (room.layoutFloor ?? room.floor).toLowerCase())
+        .toSet();
+    final layout = originalFloors.contains('ground floor')
         ? _groundLayout
-        : _currentFloor.toLowerCase() == 'second floor'
+        : originalFloors.contains('second floor')
             ? _secondLayout
             : <_PlanSlot>[];
     final mapped = layout
         .where((slot) =>
             slot.number == 'COMMON' ||
             slot.number == 'LAUNDRY' ||
-            widget.rooms.any(
-                (r) => r.number == slot.number && r.floor == _currentFloor))
+            widget.rooms.any((r) =>
+                (r.layoutNumber ?? r.number) == slot.number &&
+                r.floor == _currentFloor))
         .map((slot) {
       RoomRecord? liveRoom;
       for (final room in widget.rooms) {
-        if (room.number == slot.number && room.floor == _currentFloor) {
+        if ((room.layoutNumber ?? room.number) == slot.number &&
+            room.floor == _currentFloor) {
           liveRoom = room;
           break;
         }
       }
       return _PlanRoom(
-        slot.number,
+        liveRoom?.number ?? slot.number,
         liveRoom?.occupied ?? 0,
         liveRoom?.capacity ?? 0,
         slot.x,
@@ -98,7 +105,7 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
     final extra = widget.rooms
         .where((r) =>
             r.floor == _currentFloor &&
-            !mapped.any((p) => p.number == r.number))
+            !mapped.any((p) => p.roomRecord?.id == r.id))
         .toList()
       ..sort((a, b) => compareNaturalLabels(a.number, b.number));
     for (var i = 0; i < extra.length; i++) {
@@ -279,7 +286,7 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
                         mode: _mode,
                         maintenance: maintenance,
                         onRoomTap: (room) {
-                          setState(() => _selectedRoom = room.number);
+                          setState(() => _selectedRoom = room.identity);
                           _showRoomDetails(room, maintenance);
                         },
                       ),
@@ -306,8 +313,8 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
     // 1. Search current floor
     final currentRooms = _roomsForCurrentFloor();
     for (final room in currentRooms) {
-      if (room.number == clean) {
-        setState(() => _selectedRoom = room.number);
+      if (room.number.toUpperCase() == clean) {
+        setState(() => _selectedRoom = room.identity);
         _showRoomDetails(room, maintenance);
         return;
       }
@@ -318,7 +325,7 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
     if (found != null) {
       setState(() {
         _floor = _floors.indexOf(found.floor);
-        _selectedRoom = found.number;
+        _selectedRoom = found.id;
       });
       widget.onRoomTap(found);
       return;
@@ -328,10 +335,8 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
   }
 
   void _showRoomDetails(_PlanRoom room, List<MaintenanceReport> maintenance) {
-    final reports = maintenance
-        .where((report) =>
-            report.location.toLowerCase().contains(room.number.toLowerCase()))
-        .toList();
+    final reports =
+        maintenance.where((report) => room.matchesReport(report)).toList();
     final isDesktop = MediaQuery.sizeOf(context).width >= 700;
 
     if (isDesktop) {
@@ -530,11 +535,10 @@ class _FloorCanvas extends StatelessWidget {
                 height: room.height,
                 child: _RoomTile(
                   room: room,
-                  selected: selectedRoom == room.number,
+                  selected: selectedRoom == room.identity,
                   mode: mode,
-                  maintenanceCount: maintenance
-                      .where((report) => report.location.contains(room.number))
-                      .length,
+                  maintenanceCount:
+                      maintenance.where(room.matchesReport).length,
                   onTap: () => onRoomTap(room),
                 ),
               )),
@@ -659,9 +663,17 @@ class _PlanRoom {
   final String note;
   final RoomRecord? roomRecord;
 
+  String get identity => roomRecord?.id ?? number;
+  bool matchesReport(MaintenanceReport report) =>
+      roomRecord != null &&
+      (report.roomId != null
+          ? report.roomId == roomRecord!.id
+          : report.location.trim().toLowerCase() ==
+              'room ${number.toLowerCase()}');
+
   double get width => 270;
   double get height => 105;
-  bool get isAmenity => number == 'COMMON' || number == 'LAUNDRY';
+  bool get isAmenity => roomRecord == null;
   bool get isFull => !isAmenity && capacity > 0 && occupied >= capacity;
 }
 

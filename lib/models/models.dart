@@ -395,12 +395,14 @@ class MaintenanceReport {
     this.notes = '',
     this.staffNotes = '',
     this.resolvedAt,
+    this.roomId,
   });
 
   final String id;
   final String category;
   final String description;
   final String location;
+  final String? roomId;
   final String urgency;
   String status;
   final DateTime createdAt;
@@ -440,6 +442,7 @@ class MaintenanceReport {
       category: category ?? this.category,
       description: description ?? this.description,
       location: location ?? this.location,
+      roomId: roomId,
       urgency: urgency ?? this.urgency,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,

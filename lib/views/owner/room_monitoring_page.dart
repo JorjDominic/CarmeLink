@@ -14,6 +14,7 @@ import '../shared/staff_quick_panel.dart';
 import '../shared/room_cleaning_pages.dart';
 import '../shared/room_inspection_pages.dart';
 import 'floor_plan_page.dart';
+import 'floor_management_page.dart';
 import 'owner_pages.dart';
 
 enum RoomViewMode { list, floorPlan }
@@ -137,13 +138,9 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                         maxLength: 40,
                         decoration:
                             const InputDecoration(labelText: 'Room number')),
-                    TextField(
+                    FloorNameField(
                         controller: floor,
-                        maxLength: 60,
-                        decoration: const InputDecoration(
-                            labelText: 'Floor',
-                            helperText:
-                                'Use the existing floor label or enter a new floor')),
+                        floors: (rooms ?? []).map((room) => room.floor)),
                     TextField(
                         controller: notes,
                         decoration: const InputDecoration(labelText: 'Notes')),
@@ -404,6 +401,16 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
           : 'Interactive building layout, occupancy, and room status',
       onRefresh: () => _loadRooms(showSpinner: currentRooms == null),
       actions: [
+        if (SessionController.instance.currentUser?.role == UserRole.owner)
+          IconButton(
+            tooltip: 'Manage floors',
+            icon: const Icon(Icons.layers_outlined),
+            onPressed: () async {
+              await Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => const FloorManagementPage()));
+              if (mounted) await _loadRooms();
+            },
+          ),
         if (SessionController.instance.currentUser?.role == UserRole.owner)
           FilledButton.icon(
               onPressed: _addRoom,
@@ -1229,6 +1236,7 @@ class _RoomEditorState extends State<RoomEditor> {
   final form = GlobalKey<FormState>();
   late final TextEditingController description;
   late final TextEditingController floor;
+  late final TextEditingController number;
   bool saving = false;
 
   @override
@@ -1236,12 +1244,14 @@ class _RoomEditorState extends State<RoomEditor> {
     super.initState();
     description = TextEditingController(text: widget.room.description);
     floor = TextEditingController(text: widget.room.floor);
+    number = TextEditingController(text: widget.room.number);
   }
 
   @override
   void dispose() {
     description.dispose();
     floor.dispose();
+    number.dispose();
     super.dispose();
   }
 
@@ -1252,7 +1262,7 @@ class _RoomEditorState extends State<RoomEditor> {
       final r = widget.room;
       await widget.service.updateRoom(
         id: r.id,
-        number: r.number,
+        number: number.text,
         floor: floor.text,
         description: description.text,
       );
@@ -1267,34 +1277,42 @@ class _RoomEditorState extends State<RoomEditor> {
   @override
   Widget build(BuildContext context) => AlertDialog(
         title: Text('Edit Room ${widget.room.number}'),
-        content: Form(
-          key: form,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${widget.room.floor} • 4 bed spaces',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                  controller: floor,
-                  maxLength: 60,
-                  decoration: const InputDecoration(labelText: 'Floor'),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter a floor'
-                      : null),
-              TextFormField(
-                controller: description,
-                maxLength: 300,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Room notes / description',
-                  hintText: 'e.g. Quiet room, near hallway window',
+        content: SingleChildScrollView(
+          child: Form(
+            key: form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${widget.room.floor} • 4 bed spaces',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: number,
+                  maxLength: 40,
+                  decoration:
+                      const InputDecoration(labelText: 'Room number / name'),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter a room number or name'
+                      : null,
+                ),
+                FloorNameField(
+                    controller: floor,
+                    floors: (RoomService.cachedRooms ?? [])
+                        .map((room) => room.floor)),
+                TextFormField(
+                  controller: description,
+                  maxLength: 300,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Room notes / description',
+                    hintText: 'e.g. Quiet room, near hallway window',
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [

@@ -28,7 +28,8 @@ class RoomService {
     final results = await Future.wait([
       _client
           .from('rooms')
-          .select('id, room_number, floor, capacity, description, is_active')
+          .select(
+              'id, room_number, floor, capacity, description, is_active, layout_number, layout_floor')
           .order('room_number'),
       _client
           .from('bed_spaces')
@@ -100,6 +101,16 @@ class RoomService {
   Future<void> deleteRoom(String id) async {
     invalidateCache();
     await setRoomActive(id, false);
+  }
+
+  Future<int> renameFloor(String from, String to, int expectedCount) async {
+    final result = await _client.rpc('rename_room_floor', params: {
+      'p_from': from,
+      'p_to': to.trim(),
+      'p_expected_count': expectedCount,
+    });
+    invalidateCache();
+    return (result as num).toInt();
   }
 
   Future<void> setRoomActive(String id, bool active) async {
@@ -218,6 +229,8 @@ class RoomRecord {
     required this.description,
     required this.beds,
     this.isActive = true,
+    this.layoutNumber,
+    this.layoutFloor,
   });
   factory RoomRecord.fromRow(Map<String, dynamic> row, List<BedRecord> beds) =>
       RoomRecord(
@@ -228,8 +241,11 @@ class RoomRecord {
         description: row['description'] as String,
         isActive: row['is_active'] as bool? ?? true,
         beds: beds,
+        layoutNumber: row['layout_number'] as String?,
+        layoutFloor: row['layout_floor'] as String?,
       );
   final String id, number, floor, description;
+  final String? layoutNumber, layoutFloor;
   final int capacity;
   final List<BedRecord> beds;
   final bool isActive;

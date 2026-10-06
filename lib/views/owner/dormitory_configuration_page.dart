@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/searchable_dropdown.dart';
 
 import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/role_guard.dart';
@@ -18,6 +19,8 @@ class _DormitoryConfigurationPageState
   static const _service = DormitoryConfigurationService();
 
   String _groupKey = 'maintenance_category';
+  String _query = '';
+  String _visibility = 'active';
   List<DormitoryOption> _options = const [];
   bool _loading = true;
   String? _error;
@@ -52,6 +55,8 @@ class _DormitoryConfigurationPageState
 
   Future<void> _edit([DormitoryOption? option]) async {
     final label = TextEditingController(text: option?.label ?? '');
+    final instructions =
+        TextEditingController(text: option?.instructions ?? '');
     final order = TextEditingController(
       text: '${option?.sortOrder ?? (_options.length + 1)}',
     );
@@ -78,6 +83,18 @@ class _DormitoryConfigurationPageState
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(labelText: 'Display order'),
                 ),
+                if (_groupKey == 'payment_method')
+                  TextField(
+                    controller: instructions,
+                    maxLength: 1000,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'Payment instructions / account details',
+                      helperText:
+                          'Visible to tenants when they select this method.',
+                    ),
+                  ),
                 if (_groupKey == 'report_type') ...[
                   const SizedBox(height: 10),
                   if (option == null)
@@ -116,8 +133,7 @@ class _DormitoryConfigurationPageState
                       leading: const Icon(Icons.lock_outline),
                       title: const Text('Workflow category'),
                       subtitle: Text(
-                        (option.categoryCode ?? 'other')
-                            .replaceAll('_', ' '),
+                        (option.categoryCode ?? 'other').replaceAll('_', ' '),
                       ),
                     ),
                 ],
@@ -155,6 +171,7 @@ class _DormitoryConfigurationPageState
                           label: label.text,
                           sortOrder: position,
                           categoryCode: categoryCode,
+                          instructions: instructions.text,
                         );
                         if (dialogContext.mounted) {
                           Navigator.pop(dialogContext);
@@ -178,6 +195,7 @@ class _DormitoryConfigurationPageState
 
     await Future<void>.delayed(const Duration(milliseconds: 200));
     label.dispose();
+    instructions.dispose();
     order.dispose();
     if (mounted) await _load();
   }
@@ -187,7 +205,7 @@ class _DormitoryConfigurationPageState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(option.isActive ? 'Deactivate choice?' : 'Reactivate choice?'),
+        title: Text(option.isActive ? 'Archive choice?' : 'Restore choice?'),
         content: const Text(
           'Existing records keep their saved labels. Only new selections are affected.',
         ),
@@ -198,7 +216,7 @@ class _DormitoryConfigurationPageState
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Confirm'),
+            child: Text(option.isActive ? 'Archive' : 'Restore'),
           ),
         ],
       ),
@@ -217,6 +235,14 @@ class _DormitoryConfigurationPageState
 
   @override
   Widget build(BuildContext context) {
+    final visibleOptions = _options
+        .where(
+          (option) =>
+              option.label.toLowerCase().contains(_query) &&
+              (_visibility == 'all' ||
+                  option.isActive == (_visibility == 'active')),
+        )
+        .toList();
     return RoleGuard(
       allowedRoles: const {UserRole.owner},
       child: PageFrame(
@@ -236,7 +262,8 @@ class _DormitoryConfigurationPageState
           children: [
             DropdownButtonFormField<String>(
               initialValue: _groupKey,
-              decoration: const InputDecoration(labelText: 'Configuration group'),
+              decoration:
+                  const InputDecoration(labelText: 'Configuration group'),
               items: [
                 for (final entry
                     in DormitoryConfigurationService.groups.entries)
@@ -247,11 +274,30 @@ class _DormitoryConfigurationPageState
               ],
               onChanged: (value) {
                 if (value == null || value == _groupKey) return;
-                setState(() => _groupKey = value);
+                setState(() {
+                  _groupKey = value;
+                  _query = '';
+                });
                 _load();
               },
             ),
             const SizedBox(height: 12),
+            ChoiceSearchField(
+              key: ValueKey(_groupKey),
+              hintText: 'Search choices by name',
+              onChanged: (value) => setState(() => _query = value),
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'active', label: Text('Active')),
+                ButtonSegment(value: 'archived', label: Text('Archived')),
+                ButtonSegment(value: 'all', label: Text('All')),
+              ],
+              selected: {_visibility},
+              onSelectionChanged: (values) =>
+                  setState(() => _visibility = values.first),
+            ),
             if (_loading) const LinearProgressIndicator(),
             if (_error != null)
               ListTile(
@@ -268,7 +314,16 @@ class _DormitoryConfigurationPageState
                 title: 'No choices yet',
                 message: 'Add a choice to make it available in new reports.',
               ),
-            for (final option in _options)
+            if (!_loading &&
+                _error == null &&
+                _options.isNotEmpty &&
+                visibleOptions.isEmpty)
+              const EmptyState(
+                icon: Icons.search_off,
+                title: 'No matching choices',
+                message: 'Try another name or clear your search.',
+              ),
+            for (final option in visibleOptions)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(option.label),
@@ -277,7 +332,7 @@ class _DormitoryConfigurationPageState
                       ? 'Protected system choice'
                       : option.isActive
                           ? 'Active • order ${option.sortOrder}'
-                          : 'Inactive • order ${option.sortOrder}',
+                          : 'Archived • order ${option.sortOrder}',
                 ),
                 trailing: option.isSystem
                     ? const Icon(Icons.lock_outline)
@@ -289,9 +344,14 @@ class _DormitoryConfigurationPageState
                             icon: const Icon(Icons.edit_outlined),
                             tooltip: 'Edit',
                           ),
-                          Switch(
-                            value: option.isActive,
-                            onChanged: (_) => _toggle(option),
+                          IconButton(
+                            tooltip: option.isActive
+                                ? 'Archive choice'
+                                : 'Restore choice',
+                            icon: Icon(option.isActive
+                                ? Icons.archive_outlined
+                                : Icons.restore),
+                            onPressed: () => _toggle(option),
                           ),
                         ],
                       ),

@@ -19,7 +19,7 @@ class MaintenanceService {
   SupabaseClient get _client => SupabaseConfig.client;
 
   static const String _reportColumns =
-      'id, tenant_id, category, description, location, urgency, '
+      'id, tenant_id, category, description, location, room_id, urgency, '
       'status, photo_path, staff_notes, resolved_at, created_at, updated_at, category_option_id, location_option_id';
 
   String _requireTenantId() {
@@ -384,6 +384,7 @@ class MaintenanceService {
       category: row['category'] as String,
       description: row['description'] as String,
       location: row['location'] as String,
+      roomId: row['room_id'] as String?,
       urgency: _label(row['urgency'] as String),
       status: _statusLabel(
         row['status'] as String,

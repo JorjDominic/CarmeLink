@@ -149,6 +149,7 @@ class OwnerController extends ChangeNotifier {
                 category: s.category,
                 description: s.description,
                 location: s.location,
+                roomId: s.roomId,
                 urgency: s.urgency.isNotEmpty
                     ? '${s.urgency[0].toUpperCase()}${s.urgency.substring(1).toLowerCase()}'
                     : s.urgency,
