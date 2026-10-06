@@ -3342,28 +3342,25 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
                       borderRadius: BorderRadius.all(Radius.circular(12)),
                     ),
                   ),
-                  items: tenants.isNotEmpty
-                      ? tenants.map((t) {
-                          return DropdownMenuItem(
-                            value: t.id,
-                            child: Text(
-                              '${t.name} (${t.room})',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }).toList()
-                      : const [
-                          DropdownMenuItem(
-                            value: 't1',
-                            child: Text(
-                              'Anna Dela Cruz (Room 204)',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedTenantId = val);
-                  },
+                  items: tenants.map((t) {
+                    return DropdownMenuItem(
+                      value: t.id,
+                      child: Text(
+                        '${t.name} (${t.room.isEmpty ? 'Unassigned' : t.room})',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }).toList(),
+                  hint: Text(tenants.isEmpty
+                      ? 'No active tenants available'
+                      : 'Select tenant'),
+                  onChanged: tenants.isEmpty
+                      ? null
+                      : (val) {
+                          if (val != null) {
+                            setState(() => _selectedTenantId = val);
+                          }
+                        },
                 ),
                 const SizedBox(height: 14),
                 Container(
@@ -4083,7 +4080,7 @@ class _PaymentReviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tenantName = payment.tenantName ?? 'Tenant';
-    final roomName = payment.tenantRoom ?? 'Room 204 • Bed 2';
+    final roomName = payment.tenantRoom ?? 'Room / bed not available';
 
     return CarmelitaCard(
       child: Column(
@@ -10916,7 +10913,7 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
                 context: context,
                 title: 'Dormitory Occupancy & Tenant Roster',
                 description:
-                    'Full room-by-room census, 40-bed vacancy breakdown, and active resident directory.',
+                    'Live room-by-room census, current vacancy breakdown, and active resident directory.',
                 icon: Icons.meeting_room_outlined,
                 color: Colors.indigo,
                 fileName:

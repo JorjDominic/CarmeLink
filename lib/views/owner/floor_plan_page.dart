@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../controllers/owner_controller.dart';
+import '../../core/utils/natural_sort.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/room_service.dart';
@@ -39,7 +40,14 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
   String? _selectedRoom;
   PlanMode _mode = PlanMode.occupancy;
 
-  static const _floors = ['Ground floor', 'Second floor'];
+  List<String> get _floors => widget.rooms
+      .map((room) => room.floor.trim())
+      .where((floor) => floor.isNotEmpty)
+      .toSet()
+      .toList()
+    ..sort(compareFloorLabels);
+  String get _currentFloor =>
+      _floors.isEmpty ? '' : _floors[_floor.clamp(0, _floors.length - 1)];
 
   @override
   void dispose() {
@@ -56,11 +64,21 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
   void _reset() => _transform.value = Matrix4.identity();
 
   List<_PlanRoom> _roomsForCurrentFloor() {
-    final layout = _floor == 0 ? _groundLayout : _secondLayout;
-    return layout.map((slot) {
+    final layout = _currentFloor.toLowerCase() == 'ground floor'
+        ? _groundLayout
+        : _currentFloor.toLowerCase() == 'second floor'
+            ? _secondLayout
+            : <_PlanSlot>[];
+    final mapped = layout
+        .where((slot) =>
+            slot.number == 'COMMON' ||
+            slot.number == 'LAUNDRY' ||
+            widget.rooms.any(
+                (r) => r.number == slot.number && r.floor == _currentFloor))
+        .map((slot) {
       RoomRecord? liveRoom;
       for (final room in widget.rooms) {
-        if (room.number == slot.number) {
+        if (room.number == slot.number && room.floor == _currentFloor) {
           liveRoom = room;
           break;
         }
@@ -77,10 +95,24 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
         roomRecord: liveRoom,
       );
     }).toList();
+    final extra = widget.rooms
+        .where((r) =>
+            r.floor == _currentFloor &&
+            !mapped.any((p) => p.number == r.number))
+        .toList()
+      ..sort((a, b) => compareNaturalLabels(a.number, b.number));
+    for (var i = 0; i < extra.length; i++) {
+      final r = extra[i];
+      mapped.add(_PlanRoom(r.number, r.occupied, r.capacity, i.isEven ? 4 : 458,
+          (layout.isEmpty ? 4 : 350) + (i ~/ 2) * 114.0,
+          roomRecord: r, note: r.floor));
+    }
+    return mapped;
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.rooms.isEmpty) return const Text('No rooms to display.');
     final controller = OwnerController.instance;
 
     return AnimatedBuilder(
@@ -103,24 +135,26 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
             Row(
               children: [
                 Expanded(
-                  child: SegmentedButton<int>(
-                    segments: List.generate(
-                      _floors.length,
-                      (index) => ButtonSegment(
-                        value: index,
-                        label: Text(_floors[index]),
-                        icon: const Icon(Icons.layers_outlined),
-                      ),
-                    ),
-                    selected: {_floor},
-                    onSelectionChanged: (value) {
-                      setState(() {
-                        _floor = value.first;
-                        _selectedRoom = null;
-                        _reset();
-                      });
-                    },
-                  ),
+                  child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SegmentedButton<int>(
+                        segments: List.generate(
+                          _floors.length,
+                          (index) => ButtonSegment(
+                            value: index,
+                            label: Text(_floors[index]),
+                            icon: const Icon(Icons.layers_outlined),
+                          ),
+                        ),
+                        selected: {_floor.clamp(0, _floors.length - 1)},
+                        onSelectionChanged: (value) {
+                          setState(() {
+                            _floor = value.first;
+                            _selectedRoom = null;
+                            _reset();
+                          });
+                        },
+                      )),
                 ),
               ],
             ),
@@ -132,7 +166,7 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
                     decoration: const InputDecoration(
                       isDense: true,
                       prefixIcon: Icon(Icons.search_rounded),
-                      hintText: 'Find room (for example, 204)',
+                      hintText: 'Find room by number',
                     ),
                     textInputAction: TextInputAction.search,
                     onSubmitted: (value) => _findRoom(value, maintenance),
@@ -221,7 +255,10 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
                     ),
                   ),
                   Container(
-                    height: 440,
+                    height: rooms.fold<double>(
+                        440,
+                        (height, room) =>
+                            height > room.y + 155 ? height : room.y + 155),
                     clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
                       color:
@@ -276,22 +313,14 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
       }
     }
 
-    // 2. Search other floor and switch automatically
-    final otherFloor = _floor == 0 ? 1 : 0;
-    final otherLayout = otherFloor == 0 ? _groundLayout : _secondLayout;
-    final existsOnOther = otherLayout.any((slot) => slot.number == clean);
-    if (existsOnOther) {
+    final found =
+        widget.rooms.where((r) => r.number.toUpperCase() == clean).firstOrNull;
+    if (found != null) {
       setState(() {
-        _floor = otherFloor;
-        _selectedRoom = clean;
+        _floor = _floors.indexOf(found.floor);
+        _selectedRoom = found.number;
       });
-      final updatedRooms = _roomsForCurrentFloor();
-      for (final room in updatedRooms) {
-        if (room.number == clean) {
-          _showRoomDetails(room, maintenance);
-          return;
-        }
-      }
+      widget.onRoomTap(found);
       return;
     }
 

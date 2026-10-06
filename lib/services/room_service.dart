@@ -28,7 +28,7 @@ class RoomService {
     final results = await Future.wait([
       _client
           .from('rooms')
-          .select('id, room_number, floor, capacity, description')
+          .select('id, room_number, floor, capacity, description, is_active')
           .order('room_number'),
       _client
           .from('bed_spaces')
@@ -65,14 +65,20 @@ class RoomService {
     return list;
   }
 
-  Future<void> createRoom(
-      {required String number,
-      required String floor,
-      required String description}) async {
+  Future<void> createRoom({
+    required String number,
+    required String floor,
+    required String description,
+  }) async {
+    final roomNumber = number.trim();
+    final floorLabel = floor.trim();
+    if (roomNumber.isEmpty || floorLabel.isEmpty) {
+      throw ArgumentError('Room number and floor are required.');
+    }
     invalidateCache();
     await _client.rpc('create_room_with_four_beds', params: {
-      'p_room_number': number.trim(),
-      'p_floor': floor.trim(),
+      'p_room_number': roomNumber,
+      'p_floor': floorLabel,
       'p_description': description.trim(),
     });
   }
@@ -93,7 +99,12 @@ class RoomService {
 
   Future<void> deleteRoom(String id) async {
     invalidateCache();
-    await _client.from('rooms').delete().eq('id', id);
+    await setRoomActive(id, false);
+  }
+
+  Future<void> setRoomActive(String id, bool active) async {
+    await _client.from('rooms').update({'is_active': active}).eq('id', id);
+    invalidateCache();
   }
 
   Future<void> createBed(
@@ -199,27 +210,33 @@ class RoomService {
 }
 
 class RoomRecord {
-  const RoomRecord(
-      {required this.id,
-      required this.number,
-      required this.floor,
-      required this.capacity,
-      required this.description,
-      required this.beds});
+  const RoomRecord({
+    required this.id,
+    required this.number,
+    required this.floor,
+    required this.capacity,
+    required this.description,
+    required this.beds,
+    this.isActive = true,
+  });
   factory RoomRecord.fromRow(Map<String, dynamic> row, List<BedRecord> beds) =>
       RoomRecord(
-          id: row['id'] as String,
-          number: row['room_number'] as String,
-          floor: row['floor'] as String,
-          capacity: row['capacity'] as int,
-          description: row['description'] as String,
-          beds: beds);
+        id: row['id'] as String,
+        number: row['room_number'] as String,
+        floor: row['floor'] as String,
+        capacity: row['capacity'] as int,
+        description: row['description'] as String,
+        isActive: row['is_active'] as bool? ?? true,
+        beds: beds,
+      );
   final String id, number, floor, description;
   final int capacity;
   final List<BedRecord> beds;
+  final bool isActive;
   int get occupied => beds.where((bed) => bed.occupied).length;
-  int get physicallyAvailable =>
-      beds.where((bed) => !bed.occupied && bed.status == 'available').length;
+  int get physicallyAvailable => isActive
+      ? beds.where((bed) => !bed.occupied && bed.status == 'available').length
+      : 0;
 }
 
 class BedRecord {
@@ -266,13 +283,27 @@ class BedRecord {
 String roomServiceError(Object error) {
   final message =
       error is PostgrestException ? error.message : error.toString();
-  if (message.contains('duplicate key'))
-    return 'That room number or bed label already exists.';
-  if (message.contains('capacity'))
-    return 'Capacity cannot be lower than the number of existing beds.';
-  if (message.contains('foreign key'))
+  if (message.contains('Room number already exists') ||
+      message.contains('duplicate key')) {
+    return 'That room number already exists.';
+  }
+  if (message.contains('Only the owner can')) {
+    return 'Only the owner can change the dormitory room structure.';
+  }
+  if (message.contains('Move all residents before archiving')) {
+    return 'Move all residents before archiving this room.';
+  }
+  if (message.contains('Archived rooms cannot receive assignments')) {
+    return 'Reactivate this room before assigning a tenant.';
+  }
+  if (message.contains('capacity')) {
+    return 'Each dormitory room must keep exactly four bed spaces.';
+  }
+  if (message.contains('foreign key')) {
     return 'This record has assignment history and cannot be deleted.';
-  if (message.contains('occupied'))
+  }
+  if (message.contains('occupied')) {
     return 'An occupied bed cannot be changed or removed.';
+  }
   return 'Unable to save room data. Check the values and your connection.';
 }

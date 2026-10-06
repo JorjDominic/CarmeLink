@@ -123,7 +123,7 @@ class OwnerController extends ChangeNotifier {
     if (_roomRecords.isEmpty) {
       return const [];
     }
-    return _roomRecords.map((r) {
+    return _roomRecords.where((r) => r.isActive).map((r) {
       final status = r.occupied >= r.capacity
           ? 'Full'
           : (r.occupied > 0 ? 'Partially occupied' : 'Available');

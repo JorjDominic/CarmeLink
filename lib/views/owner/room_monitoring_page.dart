@@ -1,3 +1,5 @@
+import '../../controllers/session_controller.dart';
+import '../../models/models.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -24,11 +26,16 @@ List<RoomRecord> filterRoomDirectory(
 }) {
   final needle = query.trim().toLowerCase();
   return rooms.where((room) {
-    if (availability == 'available' && room.physicallyAvailable == 0) {
+    if (availability == 'available' &&
+        (!room.isActive || room.physicallyAvailable == 0)) {
       return false;
     }
     if (availability == 'full' &&
-        !(room.capacity > 0 && room.occupied >= room.capacity)) {
+        (!room.isActive ||
+            !(room.capacity > 0 && room.occupied >= room.capacity))) {
+      return false;
+    }
+    if (availability == 'archived' && room.isActive) {
       return false;
     }
     return needle.isEmpty ||
@@ -94,7 +101,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
       setState(() => loading = true);
     }
     try {
-      final latest = await service.listRooms();
+      final latest = await service.listRooms(forceRefresh: true);
       if (mounted && version == _requestVersion) {
         setState(() {
           rooms = latest;
@@ -109,6 +116,105 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
           errorMessage = roomServiceError(error);
         });
       }
+    }
+  }
+
+  Future<void> _addRoom() async {
+    final number = TextEditingController();
+    final floor = TextEditingController();
+    final notes = TextEditingController();
+    bool saving = false;
+    String? error;
+    await showDialog<void>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+            builder: (ctx, update) => AlertDialog(
+                  title: const Text('Add room'),
+                  content: SingleChildScrollView(
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    TextField(
+                        controller: number,
+                        maxLength: 40,
+                        decoration:
+                            const InputDecoration(labelText: 'Room number')),
+                    TextField(
+                        controller: floor,
+                        maxLength: 60,
+                        decoration: const InputDecoration(
+                            labelText: 'Floor',
+                            helperText:
+                                'Use the existing floor label or enter a new floor')),
+                    TextField(
+                        controller: notes,
+                        decoration: const InputDecoration(labelText: 'Notes')),
+                    const Text(
+                        'Four fixed bed spaces will be created automatically.'),
+                    if (error != null) Text(error!),
+                  ])),
+                  actions: [
+                    TextButton(
+                        onPressed: saving ? null : () => Navigator.pop(ctx),
+                        child: const Text('Cancel')),
+                    FilledButton(
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                if (number.text.trim().isEmpty ||
+                                    floor.text.trim().isEmpty) {
+                                  update(() =>
+                                      error = 'Enter a room number and floor.');
+                                  return;
+                                }
+                                update(() => saving = true);
+                                try {
+                                  await service.createRoom(
+                                      number: number.text,
+                                      floor: floor.text,
+                                      description: notes.text);
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                } catch (e) {
+                                  if (ctx.mounted)
+                                    update(() {
+                                      saving = false;
+                                      error = roomServiceError(e);
+                                    });
+                                }
+                              },
+                        child: Text(saving ? 'Creating…' : 'Create room'))
+                  ],
+                )));
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    number.dispose();
+    floor.dispose();
+    notes.dispose();
+    if (mounted) await _loadRooms();
+  }
+
+  Future<void> _toggleRoom(RoomRecord room) async {
+    final yes = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+                title: Text(room.isActive
+                    ? 'Archive Room ${room.number}?'
+                    : 'Reactivate Room ${room.number}?'),
+                content: Text(room.isActive
+                    ? 'This room will be unavailable for new assignments and excluded from active capacity. Historical records will remain available. Only empty rooms can be archived.'
+                    : 'This room will return to active capacity and become available for new assignments.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(
+                          room.isActive ? 'Archive room' : 'Reactivate room'))
+                ]));
+    if (yes != true) return;
+    try {
+      await service.setRoomActive(room.id, !room.isActive);
+      if (mounted) await _loadRooms();
+    } catch (e) {
+      if (mounted) showAppSnackBar(context, roomServiceError(e));
     }
   }
 
@@ -142,11 +248,13 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
         ),
       );
     } else {
+      final activeRooms = currentRooms.where((room) => room.isActive).toList();
+      final archivedRooms = currentRooms.length - activeRooms.length;
       final occupied =
-          currentRooms.fold<int>(0, (sum, room) => sum + room.occupied);
+          activeRooms.fold<int>(0, (sum, room) => sum + room.occupied);
       final bedCount =
-          currentRooms.fold<int>(0, (sum, room) => sum + room.beds.length);
-      final available = currentRooms.fold<int>(
+          activeRooms.fold<int>(0, (sum, room) => sum + room.beds.length);
+      final available = activeRooms.fold<int>(
           0, (sum, room) => sum + room.physicallyAvailable);
       final orderedRooms = List<RoomRecord>.from(currentRooms)
         ..sort((a, b) => compareNaturalLabels(a.number, b.number));
@@ -159,9 +267,11 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
         children: [
           AdaptiveGrid(children: [
             MetricCard(
-              label: 'Rooms',
-              value: '${currentRooms.length}',
-              detail: '$bedCount configured beds',
+              label: 'Active rooms',
+              value: '${activeRooms.length}',
+              detail: archivedRooms == 0
+                  ? '$bedCount active beds'
+                  : '$bedCount active beds • $archivedRooms archived',
               icon: Icons.meeting_room_outlined,
             ),
             MetricCard(
@@ -233,6 +343,8 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                           value: 'available', child: Text('Beds available')),
                       DropdownMenuItem(
                           value: 'full', child: Text('Fully occupied')),
+                      DropdownMenuItem(
+                          value: 'archived', child: Text('Archived rooms')),
                     ],
                     onChanged: (value) {
                       if (value != null) {
@@ -256,11 +368,28 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
             else
               AdaptiveGrid(
                 minTileWidth: 260,
-                children: visibleRooms.map(roomCard).toList(),
+                children: visibleRooms
+                    .map((room) => Column(children: [
+                          roomCard(room),
+                          if (SessionController.instance.currentUser?.role ==
+                              UserRole.owner)
+                            TextButton.icon(
+                                onPressed: () => _toggleRoom(room),
+                                icon: Icon(room.isActive
+                                    ? Icons.archive_outlined
+                                    : Icons.unarchive_outlined),
+                                label: Text(room.isActive
+                                    ? 'Archive room'
+                                    : 'Reactivate room')),
+                          if (!room.isActive)
+                            const Text(
+                                'Archived - unavailable for new assignments'),
+                        ]))
+                    .toList(),
               ),
           ] else
             RoomFloorPlanView(
-              rooms: orderedRooms,
+              rooms: orderedRooms.where((room) => room.isActive).toList(),
               onRoomTap: _openRoomDetail,
             ),
         ],
@@ -275,6 +404,11 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
           : 'Interactive building layout, occupancy, and room status',
       onRefresh: () => _loadRooms(showSpinner: currentRooms == null),
       actions: [
+        if (SessionController.instance.currentUser?.role == UserRole.owner)
+          FilledButton.icon(
+              onPressed: _addRoom,
+              icon: const Icon(Icons.add),
+              label: const Text('Add room')),
         IconButton(
           onPressed: () => _loadRooms(showSpinner: currentRooms == null),
           tooltip: 'Refresh',
@@ -815,11 +949,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           '${room.floor} • ${room.beds.length}/${room.capacity} bed spaces',
       useScriptTitle: false,
       actions: [
-        IconButton(
-          tooltip: 'Edit notes',
-          onPressed: editRoom,
-          icon: const Icon(Icons.edit_note_outlined),
-        ),
+        if (SessionController.instance.currentUser?.role == UserRole.owner)
+          IconButton(
+            tooltip: 'Edit room details',
+            onPressed: editRoom,
+            icon: const Icon(Icons.edit_note_outlined),
+          ),
       ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1093,17 +1228,20 @@ class RoomEditor extends StatefulWidget {
 class _RoomEditorState extends State<RoomEditor> {
   final form = GlobalKey<FormState>();
   late final TextEditingController description;
+  late final TextEditingController floor;
   bool saving = false;
 
   @override
   void initState() {
     super.initState();
     description = TextEditingController(text: widget.room.description);
+    floor = TextEditingController(text: widget.room.floor);
   }
 
   @override
   void dispose() {
     description.dispose();
+    floor.dispose();
     super.dispose();
   }
 
@@ -1115,7 +1253,7 @@ class _RoomEditorState extends State<RoomEditor> {
       await widget.service.updateRoom(
         id: r.id,
         number: r.number,
-        floor: r.floor,
+        floor: floor.text,
         description: description.text,
       );
       if (mounted) Navigator.pop(context, true);
@@ -1128,7 +1266,7 @@ class _RoomEditorState extends State<RoomEditor> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: Text('Edit Room ${widget.room.number} notes'),
+        title: Text('Edit Room ${widget.room.number}'),
         content: Form(
           key: form,
           child: Column(
@@ -1140,6 +1278,13 @@ class _RoomEditorState extends State<RoomEditor> {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 12),
+              TextFormField(
+                  controller: floor,
+                  maxLength: 60,
+                  decoration: const InputDecoration(labelText: 'Floor'),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter a floor'
+                      : null),
               TextFormField(
                 controller: description,
                 maxLength: 300,

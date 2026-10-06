@@ -14,15 +14,26 @@ import 'staff_maintenance_service.dart';
 class DormitoryReportService {
   const DormitoryReportService();
 
-  static const PdfColor primaryColor = PdfColor.fromInt(0xFF6B1D2F); // Carmelita Deep Wine
+  static const PdfColor primaryColor =
+      PdfColor.fromInt(0xFF6B1D2F); // Carmelita Deep Wine
   static const PdfColor secondaryColor = PdfColor.fromInt(0xFFC5A059); // Gold
   static const PdfColor darkTextColor = PdfColor.fromInt(0xFF2D3142);
   static const PdfColor lightBgColor = PdfColor.fromInt(0xFFF9F7F5);
   static const PdfColor tableBorderColor = PdfColor.fromInt(0xFFE2D9D2);
 
   static const _monthNames = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   String _formatCurrency(double amount) => 'PHP ${amount.toStringAsFixed(2)}';
@@ -74,7 +85,8 @@ class DormitoryReportService {
               pw.SizedBox(height: 2),
               pw.Text(
                 'Student & Professional Residential Management',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                style:
+                    const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
               ),
               pw.SizedBox(height: 6),
               pw.Text(
@@ -88,7 +100,8 @@ class DormitoryReportService {
               if (subtitle.isNotEmpty)
                 pw.Text(
                   subtitle,
-                  style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+                  style:
+                      const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
                 ),
             ],
           ),
@@ -106,7 +119,8 @@ class DormitoryReportService {
               pw.SizedBox(height: 2),
               pw.Text(
                 'Generated: ${_formatDateTime(DateTime.now())}',
-                style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+                style:
+                    const pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
               ),
               pw.Text(
                 'Confidential & Internal Use Only',
@@ -124,7 +138,8 @@ class DormitoryReportService {
       margin: const pw.EdgeInsets.only(top: 14),
       padding: const pw.EdgeInsets.only(top: 8),
       decoration: const pw.BoxDecoration(
-        border: pw.Border(top: pw.BorderSide(color: tableBorderColor, width: 0.8)),
+        border:
+            pw.Border(top: pw.BorderSide(color: tableBorderColor, width: 0.8)),
       ),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -142,7 +157,8 @@ class DormitoryReportService {
     );
   }
 
-  pw.Widget _buildSummaryCard(String title, String value, {PdfColor color = primaryColor}) {
+  pw.Widget _buildSummaryCard(String title, String value,
+      {PdfColor color = primaryColor}) {
     return pw.Container(
       padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: pw.BoxDecoration(
@@ -183,7 +199,8 @@ class DormitoryReportService {
               pw.Container(width: 140, height: 1, color: PdfColors.grey500),
               pw.SizedBox(height: 4),
               pw.Text('Prepared / Verified By: Dormitory Caretaker',
-                  style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey800)),
+                  style: const pw.TextStyle(
+                      fontSize: 7.5, color: PdfColors.grey800)),
             ],
           ),
           pw.Column(
@@ -192,7 +209,8 @@ class DormitoryReportService {
               pw.Container(width: 140, height: 1, color: PdfColors.grey500),
               pw.SizedBox(height: 4),
               pw.Text('Approved By: Carmelita Dormitory Management',
-                  style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey800)),
+                  style: const pw.TextStyle(
+                      fontSize: 7.5, color: PdfColors.grey800)),
             ],
           ),
         ],
@@ -222,11 +240,17 @@ class DormitoryReportService {
     }
 
     final rentPaid = payments
-        .where((p) => p.category.toLowerCase() == 'rent' && (p.status.toLowerCase() == 'verified' || p.status.toLowerCase() == 'paid'))
+        .where((p) =>
+            p.category.toLowerCase() == 'rent' &&
+            (p.status.toLowerCase() == 'verified' ||
+                p.status.toLowerCase() == 'paid'))
         .fold<double>(0, (sum, p) => sum + p.amount);
 
     final utilityPaid = payments
-        .where((p) => p.category.toLowerCase() != 'rent' && (p.status.toLowerCase() == 'verified' || p.status.toLowerCase() == 'paid'))
+        .where((p) =>
+            p.category.toLowerCase() != 'rent' &&
+            (p.status.toLowerCase() == 'verified' ||
+                p.status.toLowerCase() == 'paid'))
         .fold<double>(0, (sum, p) => sum + p.amount);
 
     pdf.addPage(
@@ -242,42 +266,86 @@ class DormitoryReportService {
           // KPI Metric Row
           pw.Row(
             children: [
-              pw.Expanded(child: _buildSummaryCard('Verified Collections', _formatCurrency(totalPaid), color: PdfColors.green800)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Verified Collections', _formatCurrency(totalPaid),
+                      color: PdfColors.green800)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Pending Verification', _formatCurrency(totalPending), color: PdfColors.amber800)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Pending Verification', _formatCurrency(totalPending),
+                      color: PdfColors.amber800)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Outstanding Dues', _formatCurrency(totalDue), color: PdfColors.red800)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Outstanding Dues', _formatCurrency(totalDue),
+                      color: PdfColors.red800)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Rent Collections', _formatCurrency(rentPaid), color: primaryColor)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Rent Collections', _formatCurrency(rentPaid),
+                      color: primaryColor)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Utility Collections', _formatCurrency(utilityPaid), color: secondaryColor)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Utility Collections', _formatCurrency(utilityPaid),
+                      color: secondaryColor)),
             ],
           ),
           pw.SizedBox(height: 16),
 
-          pw.Text('ITEMIZED PAYMENT LEDGER', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+          pw.Text('ITEMIZED PAYMENT LEDGER',
+              style: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                  color: primaryColor)),
           pw.SizedBox(height: 6),
           pw.TableHelper.fromTextArray(
-            headers: ['Invoice / Ref', 'Resident Name', 'Category', 'Due Date', 'Method', 'Amount', 'Status'],
+            headers: [
+              'Invoice / Ref',
+              'Resident Name',
+              'Category',
+              'Due Date',
+              'Method',
+              'Amount',
+              'Status'
+            ],
             data: payments.isEmpty
                 ? [
-                    ['No payment transactions recorded in the current ledger', '', '', '', '', '', '']
+                    [
+                      'No payment transactions recorded in the current ledger',
+                      '',
+                      '',
+                      '',
+                      '',
+                      '',
+                      ''
+                    ]
                   ]
-                : payments.map((p) => [
-                      p.reference ?? p.id.substring(0, p.id.length > 8 ? 8 : p.id.length),
-                      p.tenantName ?? 'Resident',
-                      p.category.toUpperCase(),
-                      _formatDate(p.dueDate),
-                      p.paymentMethod ?? 'Direct/Cash',
-                      _formatCurrency(p.amount),
-                      p.status,
-                    ]).toList(),
-            headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                : payments
+                    .map((p) => [
+                          p.reference ??
+                              p.id.substring(
+                                  0, p.id.length > 8 ? 8 : p.id.length),
+                          p.tenantName ?? 'Resident',
+                          p.category.toUpperCase(),
+                          _formatDate(p.dueDate),
+                          p.paymentMethod ?? 'Direct/Cash',
+                          _formatCurrency(p.amount),
+                          p.status,
+                        ])
+                    .toList(),
+            headerStyle: pw.TextStyle(
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white),
             headerDecoration: const pw.BoxDecoration(color: primaryColor),
             cellStyle: const pw.TextStyle(fontSize: 7),
-            cellPadding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+            cellPadding:
+                const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
             rowDecoration: const pw.BoxDecoration(
-              border: pw.Border(bottom: pw.BorderSide(color: tableBorderColor, width: 0.5)),
+              border: pw.Border(
+                  bottom: pw.BorderSide(color: tableBorderColor, width: 0.5)),
             ),
           ),
 
@@ -298,7 +366,9 @@ class DormitoryReportService {
 
     final totalCapacity = rooms.fold<int>(0, (sum, r) => sum + r.capacity);
     final totalOccupied = rooms.fold<int>(0, (sum, r) => sum + r.occupied);
-    final occupancyPct = totalCapacity > 0 ? (totalOccupied / totalCapacity * 100).toStringAsFixed(1) : '0';
+    final occupancyPct = totalCapacity > 0
+        ? (totalOccupied / totalCapacity * 100).toStringAsFixed(1)
+        : '0';
 
     pdf.addPage(
       pw.MultiPage(
@@ -306,59 +376,104 @@ class DormitoryReportService {
         margin: const pw.EdgeInsets.all(36),
         header: (context) => _buildReportHeader(
           'Dormitory Occupancy & Tenant Roster',
-          'Capacity: 40 Fixed Beds (10 Rooms) • Active Tenants: ${tenants.length}',
+          'Active rooms: ${rooms.length} • Bed capacity: $totalCapacity • Active tenants: ${tenants.length}',
         ),
         footer: (context) => _buildReportFooter(context),
         build: (context) => [
           // KPI Metric Row
           pw.Row(
             children: [
-              pw.Expanded(child: _buildSummaryCard('Total Rooms', '${rooms.length} Rooms', color: primaryColor)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Total Rooms', '${rooms.length} Rooms',
+                      color: primaryColor)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Bed Capacity', '$totalCapacity Beds', color: PdfColors.blue800)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Bed Capacity', '$totalCapacity Beds',
+                      color: PdfColors.blue800)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Occupied Beds', '$totalOccupied Beds', color: PdfColors.green800)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Occupied Beds', '$totalOccupied Beds',
+                      color: PdfColors.green800)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Occupancy Rate', '$occupancyPct%', color: secondaryColor)),
+              pw.Expanded(
+                  child: _buildSummaryCard('Occupancy Rate', '$occupancyPct%',
+                      color: secondaryColor)),
             ],
           ),
           pw.SizedBox(height: 16),
 
-          pw.Text('ROOM-BY-ROOM CENSUS', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+          pw.Text('ROOM-BY-ROOM CENSUS',
+              style: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                  color: primaryColor)),
           pw.SizedBox(height: 6),
           pw.TableHelper.fromTextArray(
-            headers: ['Room', 'Floor', 'Capacity', 'Occupied', 'Vacant', 'Status'],
-            data: rooms.map((r) => [
-              'Room ${r.roomNumber}',
-              r.floor.isNotEmpty ? r.floor : 'Floor 1',
-              '${r.capacity} beds',
-              '${r.occupied} occupied',
-              '${r.capacity - r.occupied} available',
-              r.status,
-            ]).toList(),
-            headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headers: [
+              'Room',
+              'Floor',
+              'Capacity',
+              'Occupied',
+              'Vacant',
+              'Status'
+            ],
+            data: rooms
+                .map((r) => [
+                      'Room ${r.roomNumber}',
+                      r.floor.isNotEmpty ? r.floor : 'Floor 1',
+                      '${r.capacity} beds',
+                      '${r.occupied} occupied',
+                      '${r.capacity - r.occupied} available',
+                      r.status,
+                    ])
+                .toList(),
+            headerStyle: pw.TextStyle(
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white),
             headerDecoration: const pw.BoxDecoration(color: primaryColor),
             cellStyle: const pw.TextStyle(fontSize: 7),
-            cellPadding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+            cellPadding:
+                const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
           ),
           pw.SizedBox(height: 16),
 
-          pw.Text('RESIDENT DIRECTORY', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+          pw.Text('RESIDENT DIRECTORY',
+              style: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                  color: primaryColor)),
           pw.SizedBox(height: 6),
           pw.TableHelper.fromTextArray(
-            headers: ['Resident Name', 'Room', 'Bed Space', 'Contact Number', 'Emergency Contact', 'Emergency Phone'],
-            data: tenants.map((t) => [
-              t.name,
-              t.room.isNotEmpty ? 'Room ${t.room}' : 'Unassigned',
-              t.bedSpace.isNotEmpty ? t.bedSpace : '-',
-              t.phone.isNotEmpty ? t.phone : 'Not provided',
-              t.guardianName.isNotEmpty ? t.guardianName : 'None',
-              t.guardianPhone.isNotEmpty ? t.guardianPhone : '-',
-            ]).toList(),
-            headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headers: [
+              'Resident Name',
+              'Room',
+              'Bed Space',
+              'Contact Number',
+              'Emergency Contact',
+              'Emergency Phone'
+            ],
+            data: tenants
+                .map((t) => [
+                      t.name,
+                      t.room.isNotEmpty ? 'Room ${t.room}' : 'Unassigned',
+                      t.bedSpace.isNotEmpty ? t.bedSpace : '-',
+                      t.phone.isNotEmpty ? t.phone : 'Not provided',
+                      t.guardianName.isNotEmpty ? t.guardianName : 'None',
+                      t.guardianPhone.isNotEmpty ? t.guardianPhone : '-',
+                    ])
+                .toList(),
+            headerStyle: pw.TextStyle(
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white),
             headerDecoration: const pw.BoxDecoration(color: primaryColor),
             cellStyle: const pw.TextStyle(fontSize: 7),
-            cellPadding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+            cellPadding:
+                const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
           ),
 
           _buildSignOff(),
@@ -377,7 +492,8 @@ class DormitoryReportService {
     final openCount = reports.where((r) => r.isOpen).length;
     final inProgressCount = reports.where((r) => r.isInProgress).length;
     final resolvedCount = reports.where((r) => r.isResolved).length;
-    final urgentCount = reports.where((r) => r.isOpen && r.isHighUrgency).length;
+    final urgentCount =
+        reports.where((r) => r.isOpen && r.isHighUrgency).length;
 
     pdf.addPage(
       pw.MultiPage(
@@ -509,7 +625,8 @@ class DormitoryReportService {
     final openCount = cases.where((c) => !conductCaseIsClosed(c.status)).length;
     final underReviewCount =
         cases.where((c) => c.status == 'under_review').length;
-    final closedCount = cases.where((c) => conductCaseIsClosed(c.status)).length;
+    final closedCount =
+        cases.where((c) => conductCaseIsClosed(c.status)).length;
     final evidenceCount = evidenceByCase.values.fold<int>(
       0,
       (sum, entries) => sum + entries.length,
@@ -519,7 +636,8 @@ class DormitoryReportService {
     final warningRows = <List<String>>[];
 
     for (final record in cases) {
-      for (final evidence in evidenceByCase[record.id] ?? const <ConductCaseEvidence>[]) {
+      for (final evidence
+          in evidenceByCase[record.id] ?? const <ConductCaseEvidence>[]) {
         evidenceRows.add([
           _formatDate(evidence.createdAt),
           record.tenantName ?? 'Tenant',
@@ -528,7 +646,8 @@ class DormitoryReportService {
           evidence.caption.isEmpty ? '-' : _truncate(evidence.caption, 60),
         ]);
       }
-      for (final warning in warningsByCase[record.id] ?? const <ConductCaseWarning>[]) {
+      for (final warning
+          in warningsByCase[record.id] ?? const <ConductCaseWarning>[]) {
         warningRows.add([
           _formatDate(warning.issuedAt),
           record.tenantName ?? 'Tenant',
@@ -730,7 +849,8 @@ class DormitoryReportService {
     final inCount = gateEvents.where((e) => e.direction == 'IN').length;
     final outCount = gateEvents.where((e) => e.direction == 'OUT').length;
     final flaggedCount = gateEvents.where((e) => e.status == 'Flagged').length;
-    final approvedPasses = curfewRequests.where((r) => r.status == 'approved').length;
+    final approvedPasses =
+        curfewRequests.where((r) => r.status == 'approved').length;
 
     pdf.addPage(
       pw.MultiPage(
@@ -745,51 +865,98 @@ class DormitoryReportService {
           // KPI Grid
           pw.Row(
             children: [
-              pw.Expanded(child: _buildSummaryCard('Total Entries (IN)', '$inCount Entries', color: PdfColors.green800)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Total Entries (IN)', '$inCount Entries',
+                      color: PdfColors.green800)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Total Exits (OUT)', '$outCount Exits', color: PdfColors.blue800)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Total Exits (OUT)', '$outCount Exits',
+                      color: PdfColors.blue800)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Flagged Violations', '$flaggedCount Flagged', color: PdfColors.red800)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Flagged Violations', '$flaggedCount Flagged',
+                      color: PdfColors.red800)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Approved Passes', '$approvedPasses Approved', color: secondaryColor)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Approved Passes', '$approvedPasses Approved',
+                      color: secondaryColor)),
             ],
           ),
           pw.SizedBox(height: 16),
 
-          pw.Text('GATE ACCESS AUDIT LOG', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+          pw.Text('GATE ACCESS AUDIT LOG',
+              style: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                  color: primaryColor)),
           pw.SizedBox(height: 6),
           pw.TableHelper.fromTextArray(
-            headers: ['Timestamp', 'Resident Name', 'Direction', 'Status', 'Verification Method'],
-            data: gateEvents.map((e) => [
-              '${_formatDate(e.time)} ${e.time.hour.toString().padLeft(2, '0')}:${e.time.minute.toString().padLeft(2, '0')}',
-              e.person,
-              e.direction ?? '-',
-              e.status,
-              e.verification,
-            ]).toList(),
-            headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headers: [
+              'Timestamp',
+              'Resident Name',
+              'Direction',
+              'Status',
+              'Verification Method'
+            ],
+            data: gateEvents
+                .map((e) => [
+                      '${_formatDate(e.time)} ${e.time.hour.toString().padLeft(2, '0')}:${e.time.minute.toString().padLeft(2, '0')}',
+                      e.person,
+                      e.direction ?? '-',
+                      e.status,
+                      e.verification,
+                    ])
+                .toList(),
+            headerStyle: pw.TextStyle(
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white),
             headerDecoration: const pw.BoxDecoration(color: primaryColor),
             cellStyle: const pw.TextStyle(fontSize: 7),
-            cellPadding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+            cellPadding:
+                const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
           ),
           pw.SizedBox(height: 16),
 
-          pw.Text('CURFEW EXEMPTION & OVERNIGHT PASSES', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+          pw.Text('CURFEW EXEMPTION & OVERNIGHT PASSES',
+              style: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                  color: primaryColor)),
           pw.SizedBox(height: 6),
           pw.TableHelper.fromTextArray(
-            headers: ['Request Type', 'Departure', 'Return Time', 'Destination', 'Reason', 'Status'],
-            data: curfewRequests.map((c) => [
-              c.requestType.replaceAll('_', ' ').toUpperCase(),
-              _formatDate(c.departureTime),
-              _formatDate(c.expectedReturnTime),
-              c.destination,
-              c.reason.length > 25 ? '${c.reason.substring(0, 22)}...' : c.reason,
-              c.status.toUpperCase(),
-            ]).toList(),
-            headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headers: [
+              'Request Type',
+              'Departure',
+              'Return Time',
+              'Destination',
+              'Reason',
+              'Status'
+            ],
+            data: curfewRequests
+                .map((c) => [
+                      c.requestType.replaceAll('_', ' ').toUpperCase(),
+                      _formatDate(c.departureTime),
+                      _formatDate(c.expectedReturnTime),
+                      c.destination,
+                      c.reason.length > 25
+                          ? '${c.reason.substring(0, 22)}...'
+                          : c.reason,
+                      c.status.toUpperCase(),
+                    ])
+                .toList(),
+            headerStyle: pw.TextStyle(
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white),
             headerDecoration: const pw.BoxDecoration(color: primaryColor),
             cellStyle: const pw.TextStyle(fontSize: 7),
-            cellPadding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+            cellPadding:
+                const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
           ),
 
           _buildSignOff(),
@@ -808,14 +975,20 @@ class DormitoryReportService {
     final rooms = controller.rooms;
     final totalCapacity = rooms.fold<int>(0, (sum, r) => sum + r.capacity);
     final totalOccupied = rooms.fold<int>(0, (sum, r) => sum + r.occupied);
-    final occupancyPct = totalCapacity > 0 ? (totalOccupied / totalCapacity * 100).toStringAsFixed(0) : '0';
+    final occupancyPct = totalCapacity > 0
+        ? (totalOccupied / totalCapacity * 100).toStringAsFixed(0)
+        : '0';
 
     final payments = controller.payments;
     final totalPaid = payments
-        .where((p) => p.status.toLowerCase() == 'verified' || p.status.toLowerCase() == 'paid')
+        .where((p) =>
+            p.status.toLowerCase() == 'verified' ||
+            p.status.toLowerCase() == 'paid')
         .fold<double>(0, (sum, p) => sum + p.amount);
     final totalDue = payments
-        .where((p) => p.status.toLowerCase() != 'verified' && p.status.toLowerCase() != 'paid')
+        .where((p) =>
+            p.status.toLowerCase() != 'verified' &&
+            p.status.toLowerCase() != 'paid')
         .fold<double>(0, (sum, p) => sum + p.amount);
 
     final maintenance = controller.staffMaintenanceReports;
@@ -834,24 +1007,40 @@ class DormitoryReportService {
         footer: (context) => _buildReportFooter(context),
         build: (context) => [
           pw.Text('EXECUTIVE SUMMARY & OPERATIONAL HEALTH',
-              style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+              style: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                  color: primaryColor)),
           pw.SizedBox(height: 8),
-
           pw.Row(
             children: [
-              pw.Expanded(child: _buildSummaryCard('Occupancy Rate', '$occupancyPct% ($totalOccupied/$totalCapacity Beds)', color: primaryColor)),
+              pw.Expanded(
+                  child: _buildSummaryCard('Occupancy Rate',
+                      '$occupancyPct% ($totalOccupied/$totalCapacity Beds)',
+                      color: primaryColor)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Revenue Collected', _formatCurrency(totalPaid), color: PdfColors.green800)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Revenue Collected', _formatCurrency(totalPaid),
+                      color: PdfColors.green800)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Outstanding Dues', _formatCurrency(totalDue), color: PdfColors.red800)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Outstanding Dues', _formatCurrency(totalDue),
+                      color: PdfColors.red800)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Open Repairs', '$openIssues Pending', color: PdfColors.amber800)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Open Repairs', '$openIssues Pending',
+                      color: PdfColors.amber800)),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Curfew Flags', '$flaggedCurfew After-Hours', color: secondaryColor)),
+              pw.Expanded(
+                  child: _buildSummaryCard(
+                      'Curfew Flags', '$flaggedCurfew After-Hours',
+                      color: secondaryColor)),
             ],
           ),
           pw.SizedBox(height: 18),
-
           pw.Container(
             padding: const pw.EdgeInsets.all(12),
             decoration: pw.BoxDecoration(
@@ -863,16 +1052,26 @@ class DormitoryReportService {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text('Management Highlights & Operational Notes',
-                    style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+                    style: pw.TextStyle(
+                        fontSize: 9,
+                        fontWeight: pw.FontWeight.bold,
+                        color: primaryColor)),
                 pw.SizedBox(height: 6),
-                pw.Bullet(text: 'Dormitory occupancy stands at $occupancyPct% across all 10 residential rooms.'),
-                pw.Bullet(text: 'Total verified collection in ledger currently equals ${_formatCurrency(totalPaid)}.'),
-                pw.Bullet(text: '$openIssues active maintenance work orders are currently tracked by custodial staff.'),
-                pw.Bullet(text: 'GPS geofencing tripwire recorded $flaggedCurfew after-hours curfew events requiring staff acknowledgment.'),
+                pw.Bullet(
+                    text:
+                        'Dormitory occupancy stands at $occupancyPct% across ${rooms.length} active residential rooms.'),
+                pw.Bullet(
+                    text:
+                        'Total verified collection in ledger currently equals ${_formatCurrency(totalPaid)}.'),
+                pw.Bullet(
+                    text:
+                        '$openIssues active maintenance work orders are currently tracked by custodial staff.'),
+                pw.Bullet(
+                    text:
+                        'GPS geofencing tripwire recorded $flaggedCurfew after-hours curfew events requiring staff acknowledgment.'),
               ],
             ),
           ),
-
           _buildSignOff(),
         ],
       ),
@@ -892,7 +1091,9 @@ class DormitoryReportService {
       MaterialPageRoute(
         builder: (_) => Scaffold(
           appBar: AppBar(
-            title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            title: Text(title,
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             backgroundColor: const Color(0xFF6B1D2F),
             foregroundColor: Colors.white,
           ),
