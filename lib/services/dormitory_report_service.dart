@@ -5,6 +5,9 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../controllers/owner_controller.dart';
+import '../core/utils/conduct_case_policy.dart';
+import 'conduct_case_service.dart';
+import 'staff_maintenance_service.dart';
 
 /// Professional PDF and Report generation service for Carmelita's Dormitory.
 /// Supports both mobile (Android/iOS) and web with print, export, and sharing.
@@ -36,6 +39,12 @@ class DormitoryReportService {
     final h = d.hour.toString().padLeft(2, '0');
     final min = d.minute.toString().padLeft(2, '0');
     return '${d.year}-$m-$day $h:$min';
+  }
+
+  String _truncate(String value, int maxLength) {
+    final clean = value.trim();
+    if (clean.length <= maxLength) return clean;
+    return '${clean.substring(0, maxLength - 3)}...';
   }
 
   pw.Widget _buildReportHeader(String reportTitle, String subtitle) {
@@ -363,8 +372,7 @@ class DormitoryReportService {
   // 3. MAINTENANCE & REPAIRS REPORT
   Future<Uint8List> generateMaintenanceReportPdf() async {
     final pdf = pw.Document();
-    final controller = OwnerController.instance;
-    final reports = controller.staffMaintenanceReports;
+    final reports = await const StaffMaintenanceService().listReports();
 
     final openCount = reports.where((r) => r.isOpen).length;
     final inProgressCount = reports.where((r) => r.isInProgress).length;
@@ -373,51 +381,109 @@ class DormitoryReportService {
 
     pdf.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(36),
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(32),
         header: (context) => _buildReportHeader(
           'Facility Maintenance & Work Orders Log',
-          'Facility Operations • Repairs, Inspections & Preventive Maintenance',
+          'Live database-backed work orders • ${reports.length} record(s)',
         ),
         footer: (context) => _buildReportFooter(context),
         build: (context) => [
-          // KPI Metric Row
           pw.Row(
             children: [
-              pw.Expanded(child: _buildSummaryCard('Open Requests', '$openCount Open', color: PdfColors.amber800)),
+              pw.Expanded(
+                child: _buildSummaryCard(
+                  'Open Requests',
+                  '$openCount Open',
+                  color: PdfColors.amber800,
+                ),
+              ),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('In Progress', '$inProgressCount In Progress', color: PdfColors.blue800)),
+              pw.Expanded(
+                child: _buildSummaryCard(
+                  'In Progress',
+                  '$inProgressCount In Progress',
+                  color: PdfColors.blue800,
+                ),
+              ),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('Resolved', '$resolvedCount Resolved', color: PdfColors.green800)),
+              pw.Expanded(
+                child: _buildSummaryCard(
+                  'Resolved',
+                  '$resolvedCount Resolved',
+                  color: PdfColors.green800,
+                ),
+              ),
               pw.SizedBox(width: 8),
-              pw.Expanded(child: _buildSummaryCard('High Priority', '$urgentCount Urgent', color: PdfColors.red800)),
+              pw.Expanded(
+                child: _buildSummaryCard(
+                  'High Priority',
+                  '$urgentCount Urgent',
+                  color: PdfColors.red800,
+                ),
+              ),
             ],
           ),
           pw.SizedBox(height: 16),
-
-          pw.Text('MAINTENANCE WORK ORDER LOG', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+          pw.Text(
+            'MAINTENANCE WORK ORDER LOG',
+            style: pw.TextStyle(
+              fontSize: 9,
+              fontWeight: pw.FontWeight.bold,
+              color: primaryColor,
+            ),
+          ),
           pw.SizedBox(height: 6),
           pw.TableHelper.fromTextArray(
-            headers: ['Report Date', 'Category', 'Location', 'Urgency', 'Status', 'Description', 'Staff Notes'],
+            headers: [
+              'Report Date',
+              'Tenant',
+              'Category',
+              'Location',
+              'Urgency',
+              'Status',
+              'Description',
+              'Staff Notes',
+            ],
             data: reports.isEmpty
                 ? [
-                    ['No maintenance issues recorded', '', '', '', '', '', '']
+                    [
+                      'No maintenance issues recorded',
+                      '',
+                      '',
+                      '',
+                      '',
+                      '',
+                      '',
+                      '',
+                    ]
                   ]
-                : reports.map((r) => [
-                      _formatDate(r.createdAt),
-                      r.category,
-                      r.location,
-                      r.urgency.toUpperCase(),
-                      r.status.toUpperCase(),
-                      r.description.length > 30 ? '${r.description.substring(0, 27)}...' : r.description,
-                      r.notes.isNotEmpty ? r.notes : '-',
-                    ]).toList(),
-            headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                : reports
+                    .map(
+                      (r) => [
+                        _formatDate(r.createdAt),
+                        r.tenantName,
+                        r.category,
+                        r.location,
+                        r.urgency.toUpperCase(),
+                        r.statusLabel,
+                        _truncate(r.description, 45),
+                        r.notes.isNotEmpty ? _truncate(r.notes, 45) : '-',
+                      ],
+                    )
+                    .toList(),
+            headerStyle: pw.TextStyle(
+              fontSize: 7.5,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
             headerDecoration: const pw.BoxDecoration(color: primaryColor),
-            cellStyle: const pw.TextStyle(fontSize: 7),
-            cellPadding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+            cellStyle: const pw.TextStyle(fontSize: 6.5),
+            cellPadding: const pw.EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: 4,
+            ),
           ),
-
           _buildSignOff(),
         ],
       ),
@@ -426,7 +492,235 @@ class DormitoryReportService {
     return pdf.save();
   }
 
-  // 4. SECURITY, GATE & CURFEW REPORT
+  // 4. CONDUCT & VIOLATION REPORT
+  Future<Uint8List> generateConductViolationReportPdf() async {
+    final pdf = pw.Document();
+    const service = ConductCaseService();
+    final cases = await service.listStaffCases();
+
+    final evidenceByCase = <String, List<ConductCaseEvidence>>{};
+    final warningsByCase = <String, List<ConductCaseWarning>>{};
+
+    for (final record in cases) {
+      evidenceByCase[record.id] = await service.listEvidence(record.id);
+      warningsByCase[record.id] = await service.listStaffWarnings(record.id);
+    }
+
+    final openCount = cases.where((c) => !conductCaseIsClosed(c.status)).length;
+    final underReviewCount =
+        cases.where((c) => c.status == 'under_review').length;
+    final closedCount = cases.where((c) => conductCaseIsClosed(c.status)).length;
+    final evidenceCount = evidenceByCase.values.fold<int>(
+      0,
+      (sum, entries) => sum + entries.length,
+    );
+
+    final evidenceRows = <List<String>>[];
+    final warningRows = <List<String>>[];
+
+    for (final record in cases) {
+      for (final evidence in evidenceByCase[record.id] ?? const <ConductCaseEvidence>[]) {
+        evidenceRows.add([
+          _formatDate(evidence.createdAt),
+          record.tenantName ?? 'Tenant',
+          _truncate(record.title, 36),
+          evidence.originalName,
+          evidence.caption.isEmpty ? '-' : _truncate(evidence.caption, 60),
+        ]);
+      }
+      for (final warning in warningsByCase[record.id] ?? const <ConductCaseWarning>[]) {
+        warningRows.add([
+          _formatDate(warning.issuedAt),
+          record.tenantName ?? 'Tenant',
+          _truncate(record.title, 36),
+          _truncate(warning.message, 80),
+        ]);
+      }
+    }
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => _buildReportHeader(
+          'Resident Conduct & Violation Cases',
+          'Live disciplinary records • Investigation status, evidence, warnings, and outcomes',
+        ),
+        footer: (context) => _buildReportFooter(context),
+        build: (context) => [
+          pw.Row(
+            children: [
+              pw.Expanded(
+                child: _buildSummaryCard(
+                  'Total Cases',
+                  '${cases.length} Cases',
+                  color: primaryColor,
+                ),
+              ),
+              pw.SizedBox(width: 8),
+              pw.Expanded(
+                child: _buildSummaryCard(
+                  'Open Cases',
+                  '$openCount Open',
+                  color: PdfColors.amber800,
+                ),
+              ),
+              pw.SizedBox(width: 8),
+              pw.Expanded(
+                child: _buildSummaryCard(
+                  'Under Review',
+                  '$underReviewCount Reviewing',
+                  color: PdfColors.blue800,
+                ),
+              ),
+              pw.SizedBox(width: 8),
+              pw.Expanded(
+                child: _buildSummaryCard(
+                  'Closed Cases',
+                  '$closedCount Closed',
+                  color: PdfColors.green800,
+                ),
+              ),
+              pw.SizedBox(width: 8),
+              pw.Expanded(
+                child: _buildSummaryCard(
+                  'Evidence Files',
+                  '$evidenceCount Files',
+                  color: secondaryColor,
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+          pw.Text(
+            'CONDUCT & VIOLATION CASE REGISTER',
+            style: pw.TextStyle(
+              fontSize: 9,
+              fontWeight: pw.FontWeight.bold,
+              color: primaryColor,
+            ),
+          ),
+          pw.SizedBox(height: 6),
+          pw.TableHelper.fromTextArray(
+            headers: [
+              'Incident',
+              'Tenant',
+              'Category',
+              'Investigation Status',
+              'Source',
+              'Case / Description',
+              'Evidence',
+              'Warnings',
+              'Outcome / Resolution',
+            ],
+            data: cases.isEmpty
+                ? [
+                    [
+                      'No conduct cases recorded',
+                      '',
+                      '',
+                      '',
+                      '',
+                      '',
+                      '',
+                      '',
+                      '',
+                    ]
+                  ]
+                : cases
+                    .map(
+                      (record) => [
+                        _formatDate(record.incidentAt),
+                        record.tenantName ?? 'Tenant',
+                        conductCategoryLabel(record.category),
+                        conductStatusLabel(record.status),
+                        conductSourceLabel(record.sourceModule ?? 'manual'),
+                        '${_truncate(record.title, 34)}\n${_truncate(record.description, 55)}',
+                        '${evidenceByCase[record.id]?.length ?? 0}',
+                        '${warningsByCase[record.id]?.length ?? 0}',
+                        record.terminationReviewReason.isNotEmpty
+                            ? _truncate(record.terminationReviewReason, 60)
+                            : record.resolutionNotes.isNotEmpty
+                                ? _truncate(record.resolutionNotes, 60)
+                                : '-',
+                      ],
+                    )
+                    .toList(),
+            headerStyle: pw.TextStyle(
+              fontSize: 7,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
+            headerDecoration: const pw.BoxDecoration(color: primaryColor),
+            cellStyle: const pw.TextStyle(fontSize: 6.2),
+            cellPadding: const pw.EdgeInsets.symmetric(
+              horizontal: 3,
+              vertical: 4,
+            ),
+          ),
+          if (evidenceRows.isNotEmpty) ...[
+            pw.SizedBox(height: 16),
+            pw.Text(
+              'EVIDENCE REGISTER',
+              style: pw.TextStyle(
+                fontSize: 9,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor,
+              ),
+            ),
+            pw.SizedBox(height: 6),
+            pw.TableHelper.fromTextArray(
+              headers: ['Added', 'Tenant', 'Case', 'Evidence File', 'Caption'],
+              data: evidenceRows,
+              headerStyle: pw.TextStyle(
+                fontSize: 7.5,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white,
+              ),
+              headerDecoration: const pw.BoxDecoration(color: primaryColor),
+              cellStyle: const pw.TextStyle(fontSize: 6.5),
+              cellPadding: const pw.EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 4,
+              ),
+            ),
+          ],
+          if (warningRows.isNotEmpty) ...[
+            pw.SizedBox(height: 16),
+            pw.Text(
+              'FORMAL WARNING REGISTER',
+              style: pw.TextStyle(
+                fontSize: 9,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor,
+              ),
+            ),
+            pw.SizedBox(height: 6),
+            pw.TableHelper.fromTextArray(
+              headers: ['Issued', 'Tenant', 'Case', 'Warning'],
+              data: warningRows,
+              headerStyle: pw.TextStyle(
+                fontSize: 7.5,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white,
+              ),
+              headerDecoration: const pw.BoxDecoration(color: primaryColor),
+              cellStyle: const pw.TextStyle(fontSize: 6.5),
+              cellPadding: const pw.EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 4,
+              ),
+            ),
+          ],
+          _buildSignOff(),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  // 5. SECURITY, GATE & CURFEW REPORT
   Future<Uint8List> generateCurfewGateReportPdf() async {
     final pdf = pw.Document();
     final controller = OwnerController.instance;
@@ -506,7 +800,7 @@ class DormitoryReportService {
     return pdf.save();
   }
 
-  // 5. CONSOLIDATED EXECUTIVE OVERVIEW
+  // 6. CONSOLIDATED EXECUTIVE OVERVIEW
   Future<Uint8List> generateExecutiveOverviewPdf() async {
     final pdf = pw.Document();
     final controller = OwnerController.instance;

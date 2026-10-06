@@ -1,3 +1,5 @@
+import '../shared/report_addenda.dart';
+import 'dormitory_configuration_page.dart';
 import '../shared/notification_destination.dart';
 import '../shared/staff_message_contacts.dart';
 import 'dart:async';
@@ -2158,8 +2160,8 @@ const _operationCategories = [
           'Review incidents, responses, warnings and appeals',
           Icons.gavel_outlined,
           StaffConductCasesPage()),
-      _OperationItem('Confidential reports', 'Review private reports',
-          Icons.shield_outlined, ConfidentialReportsPage()),
+      _OperationItem('Dormitory configuration', 'Manage report choices and common areas',
+          Icons.settings_outlined, DormitoryConfigurationPage(), ownerOnly:true),
       _OperationItem('Disciplinary records', 'Manage violations',
           Icons.rule_outlined, DisciplinaryRecordsPage(),
           ownerOnly: true),
@@ -8869,7 +8871,19 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w700)),
                             const SizedBox(height: 6),
+                            if (report.specificConcern.isNotEmpty) ...[
+                              const Text(
+                                'Specific concern',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              SelectableText(report.specificConcern),
+                              const SizedBox(height: 6),
+                            ],
                             SelectableText(report.summary),
+                            ReportAddenda(
+                              key: ValueKey(report.id),
+                              reportId: report.id,
+                            ),
                             const SizedBox(height: 8),
                             Text(
                               shortDate(report.createdAt),
@@ -10851,7 +10865,7 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
                 context: context,
                 title: 'Facility Maintenance & Work Orders Log',
                 description:
-                    'Operational summary of active repairs, urgency levels, technician notes, and resolutions.',
+                    'Live database-backed repair log with tenant, category, location, urgency, status, staff notes, and resolutions.',
                 icon: Icons.handyman_outlined,
                 color: Colors.orange,
                 fileName:
@@ -10861,7 +10875,22 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
               ),
               const SizedBox(height: 10),
 
-              // Report 4: Curfew & Security Log
+              // Report 4: Conduct & Violation Cases
+              _buildReportCard(
+                context: context,
+                title: 'Resident Conduct & Violation Cases',
+                description:
+                    'Live disciplinary case register with investigation status, evidence, warnings, and recorded outcomes.',
+                icon: Icons.gavel_outlined,
+                color: Colors.redAccent,
+                fileName:
+                    'carmelitas_conduct_violation_cases_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                documentBuilder: () =>
+                    _reportService.generateConductViolationReportPdf(),
+              ),
+              const SizedBox(height: 10),
+
+              // Report 5: Curfew & Security Log
               _buildReportCard(
                 context: context,
                 title: 'Security, Gate & Curfew Audit Log',
@@ -10876,7 +10905,7 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
               ),
               const SizedBox(height: 10),
 
-              // Report 5: Executive Consolidated Report
+              // Report 6: Executive Consolidated Report
               _buildReportCard(
                 context: context,
                 title: 'Consolidated Executive Overview',
