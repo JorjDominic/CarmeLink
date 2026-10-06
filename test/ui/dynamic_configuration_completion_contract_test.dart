@@ -44,7 +44,7 @@ void main() {
     ).readAsStringSync();
 
     expect(roomPage, contains("labelText: 'Room number / name'"));
-    expect(roomPage, contains("tooltip: 'Manage floors'"));
+    expect(roomPage, contains("label: const Text('Floor management')"));
     expect(floorPage, contains("hintText: 'Search floors'"));
     expect(floorPage, contains('Confirm merge'));
     expect(migration, contains('layout_number'));
