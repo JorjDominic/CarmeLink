@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 
 import '../../core/utils/conduct_case_policy.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../models/staff_tenant_option.dart';
 import '../../services/conduct_case_service.dart';
+import '../../services/staff_tenant_picker_service.dart';
 import '../../services/table_refresh_subscription.dart';
 
 import 'conduct_case_appeal_panel.dart';
+import 'conduct_case_create_dialog.dart';
 
 String _conductDateTime(DateTime value) {
   final local = value.toLocal();
@@ -49,9 +52,10 @@ class StaffConductCasesPage extends StatefulWidget {
 
 class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
   final service = const ConductCaseService();
+  final tenantPickerService = const StaffTenantPickerService();
   late final TableRefreshSubscription subscription;
   List<ConductCaseRecord> cases = const [];
-  List<ConductTenantOption> tenants = const [];
+  List<StaffTenantOption> tenants = const [];
   bool loading = true;
   String? errorMessage;
   RecordListScope scope = RecordListScope.active;
@@ -91,7 +95,7 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
     }
 
     try {
-      final latestTenants = await service.listTenantOptions();
+      final latestTenants = await tenantPickerService.listTenantOptions();
       final latestCases = await service.listStaffCases();
       if (!mounted) return;
       setState(() {
@@ -116,237 +120,21 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
   }
 
   Future<void> _create() async {
-    if (tenants.isEmpty) {
-      showAppSnackBar(context, 'No tenant accounts are available.');
+    final activeTenants =
+        tenants.where((tenant) => tenant.isActiveResident).toList();
+    if (activeTenants.isEmpty) {
+      showAppSnackBar(context, 'No active tenant accounts are available.');
       return;
     }
-
-    var tenantId = tenants.first.id;
-    var category = 'rule_violation';
-    var source = 'manual';
-    var incidentAt = DateTime.now();
-    final title = TextEditingController();
-    final description = TextEditingController();
-    final sourceRecord = TextEditingController();
-    var saving = false;
 
     final created = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Create conduct case'),
-          content: SizedBox(
-            width: 640,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CarmelitaCard(
-                    padding: const EdgeInsets.all(12),
-                    child: const Text(
-                      'Creating a case records an incident for review. It does not create a penalty, charge, or tenancy termination.',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    initialValue: tenantId,
-                    decoration: const InputDecoration(labelText: 'Tenant'),
-                    items: tenants
-                        .map(
-                          (tenant) => DropdownMenuItem(
-                            value: tenant.id,
-                            child: Text(tenant.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: saving
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              setDialogState(() => tenantId = value);
-                            }
-                          },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: category,
-                    decoration: const InputDecoration(labelText: 'Category'),
-                    items: conductCaseCategories
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(conductCategoryLabel(value)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: saving
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              setDialogState(() => category = value);
-                            }
-                          },
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: title,
-                    enabled: !saving,
-                    maxLength: 160,
-                    decoration: const InputDecoration(
-                      labelText: 'Case title',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: description,
-                    enabled: !saving,
-                    minLines: 3,
-                    maxLines: 6,
-                    maxLength: 4000,
-                    decoration: const InputDecoration(
-                      labelText: 'Incident description',
-                      hintText:
-                          'Record observed or reported facts without deciding guilt.',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.schedule_outlined),
-                    title: const Text('Incident date and time'),
-                    subtitle: Text(_conductDateTime(incidentAt)),
-                    trailing: const Icon(Icons.edit_calendar_outlined),
-                    onTap: saving
-                        ? null
-                        : () async {
-                            final date = await showDatePicker(
-                              context: dialogContext,
-                              initialDate: incidentAt,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime.now(),
-                            );
-                            if (date == null || !dialogContext.mounted) return;
-                            final time = await showTimePicker(
-                              context: dialogContext,
-                              initialTime: TimeOfDay.fromDateTime(incidentAt),
-                            );
-                            if (time == null) return;
-                            setDialogState(() {
-                              incidentAt = DateTime(
-                                date.year,
-                                date.month,
-                                date.day,
-                                time.hour,
-                                time.minute,
-                              );
-                            });
-                          },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: source,
-                    decoration:
-                        const InputDecoration(labelText: 'Record source'),
-                    items: conductCaseSources
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(conductSourceLabel(value)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: saving
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              setDialogState(() => source = value);
-                            }
-                          },
-                  ),
-                  if (source != 'manual') ...[
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: sourceRecord,
-                      enabled: !saving,
-                      maxLength: 200,
-                      decoration: const InputDecoration(
-                        labelText: 'Source record ID (optional)',
-                        helperText:
-                            'Internal staff reference only; never shown to the affected tenant.',
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed:
-                  saving ? null : () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      final titleError = validateConductCaseTitle(title.text);
-                      if (titleError != null) {
-                        showAppSnackBar(dialogContext, titleError);
-                        return;
-                      }
-                      final descriptionError =
-                          validateConductCaseDescription(description.text);
-                      if (descriptionError != null) {
-                        showAppSnackBar(dialogContext, descriptionError);
-                        return;
-                      }
-                      if (incidentAt.isAfter(
-                        DateTime.now().add(const Duration(minutes: 5)),
-                      )) {
-                        showAppSnackBar(
-                          dialogContext,
-                          'Incident time cannot be in the future.',
-                        );
-                        return;
-                      }
-
-                      setDialogState(() => saving = true);
-                      try {
-                        await service.createCase(
-                          tenantId: tenantId,
-                          category: category,
-                          title: title.text,
-                          description: description.text,
-                          incidentAt: incidentAt,
-                          sourceModule: source,
-                          sourceRecordId:
-                              source == 'manual' ? null : sourceRecord.text,
-                        );
-                        if (dialogContext.mounted) {
-                          Navigator.pop(dialogContext, true);
-                        }
-                      } catch (error) {
-                        if (dialogContext.mounted) {
-                          showAppSnackBar(
-                            dialogContext,
-                            conductCaseError(error),
-                          );
-                          setDialogState(() => saving = false);
-                        }
-                      }
-                    },
-              child: Text(saving ? 'Creating…' : 'Create draft'),
-            ),
-          ],
-        ),
+      builder: (_) => ConductCaseCreateDialog(
+        service: service,
+        tenants: activeTenants,
       ),
     );
-
-    title.dispose();
-    description.dispose();
-    sourceRecord.dispose();
 
     if (created == true && mounted) {
       await _load(showSpinner: false);
@@ -369,13 +157,16 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
   Widget build(BuildContext context) {
     final requestedId = widget.initialCaseId;
     if (requestedId != null && !loading && errorMessage == null) {
-      final selected = cases.where((record) => record.id == requestedId).firstOrNull;
+      final selected =
+          cases.where((record) => record.id == requestedId).firstOrNull;
       if (selected == null) {
-        return const PageFrame(title: 'Conduct case',
-          subtitle: 'This record is no longer available to your account.',
-          child: SizedBox.shrink());
+        return const PageFrame(
+            title: 'Conduct case',
+            subtitle: 'This record is no longer available to your account.',
+            child: SizedBox.shrink());
       }
-      return StaffConductCaseDetailPage(initialRecord: selected, repeatCount: _repeatCount(selected));
+      return StaffConductCaseDetailPage(
+          initialRecord: selected, repeatCount: _repeatCount(selected));
     }
 
     final active =
@@ -473,7 +264,7 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
                                   ),
                                   const SizedBox(height: 5),
                                   Text(
-                                    '${conductCategoryLabel(record.category)} • ${_conductDateTime(record.incidentAt)}',
+                                    '${conductCategoryDisplayLabel(record.category, record.categoryDetail)} • ${_conductDateTime(record.incidentAt)}',
                                     style:
                                         Theme.of(context).textTheme.bodySmall,
                                   ),
@@ -916,7 +707,8 @@ class _StaffConductCaseDetailPageState
                         children: [
                           Expanded(
                             child: Text(
-                              conductCategoryLabel(record.category),
+                              conductCategoryDisplayLabel(
+                                  record.category, record.categoryDetail),
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 18,
@@ -934,8 +726,9 @@ class _StaffConductCaseDetailPageState
                       ),
                       InfoRow(
                         label: 'Source',
-                        value: conductSourceLabel(
+                        value: conductSourceDisplayLabel(
                           record.sourceModule ?? 'manual',
+                          record.sourceDetail,
                         ),
                         icon: Icons.link_outlined,
                       ),
@@ -1239,11 +1032,13 @@ class _TenantConductCasesPageState extends State<TenantConductCasesPage> {
   Widget build(BuildContext context) {
     final requestedId = widget.initialCaseId;
     if (requestedId != null && !loading && errorMessage == null) {
-      final selected = cases.where((record) => record.id == requestedId).firstOrNull;
+      final selected =
+          cases.where((record) => record.id == requestedId).firstOrNull;
       if (selected == null) {
-        return const PageFrame(title: 'Conduct case',
-          subtitle: 'This record is no longer available to your account.',
-          child: SizedBox.shrink());
+        return const PageFrame(
+            title: 'Conduct case',
+            subtitle: 'This record is no longer available to your account.',
+            child: SizedBox.shrink());
       }
       return TenantConductCaseDetailPage(initialRecord: selected);
     }
@@ -1330,7 +1125,7 @@ class _TenantConductCasesPageState extends State<TenantConductCasesPage> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    '${conductCategoryLabel(record.category)} • ${_conductDateTime(record.incidentAt)}',
+                                    '${conductCategoryDisplayLabel(record.category, record.categoryDetail)} • ${_conductDateTime(record.incidentAt)}',
                                     style:
                                         Theme.of(context).textTheme.bodySmall,
                                   ),
@@ -1510,7 +1305,8 @@ class _TenantConductCaseDetailPageState
                         children: [
                           Expanded(
                             child: Text(
-                              conductCategoryLabel(record.category),
+                              conductCategoryDisplayLabel(
+                                  record.category, record.categoryDetail),
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 18,

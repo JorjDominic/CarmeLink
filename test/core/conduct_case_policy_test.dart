@@ -13,6 +13,47 @@ void main() {
       expect(conductSourceLabel('room_inspection'), 'Room inspection');
     });
 
+    test('descriptive choices are alphabetical with Other fixed last', () {
+      expect(conductCaseCategories.last, 'other');
+      final categories = conductCaseCategories
+          .where((value) => value != 'other')
+          .map(conductCategoryLabel)
+          .toList();
+      final sortedCategories = [...categories]
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      expect(categories, sortedCategories);
+
+      expect(conductCaseSources.first, 'manual');
+      expect(conductCaseSources.last, 'other');
+      final linkedSources = conductCaseSources
+          .where((value) => value != 'manual' && value != 'other')
+          .map(conductSourceLabel)
+          .toList();
+      final sortedSources = [...linkedSources]
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      expect(linkedSources, sortedSources);
+    });
+
+    test('Other requires a meaningful specific value', () {
+      expect(
+        validateConductOtherDetail('', fieldLabel: 'the case category'),
+        isNotNull,
+      );
+      expect(
+        validateConductOtherDetail('Noise concern',
+            fieldLabel: 'the case category'),
+        isNull,
+      );
+      expect(
+        conductCategoryDisplayLabel('other', 'Noise concern'),
+        'Other — Noise concern',
+      );
+      expect(
+        conductSourceDisplayLabel('other', 'Verbal staff report'),
+        'Other source — Verbal staff report',
+      );
+    });
+
     test('draft and closed cases cannot receive tenant responses', () {
       expect(tenantCanRespondToConductCase('draft'), isFalse);
       expect(tenantCanRespondToConductCase('resolved'), isFalse);

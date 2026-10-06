@@ -115,6 +115,19 @@ class CurfewService {
     }
   }
 
+  Future<CurfewRequest?> getStaffRequestById(String requestId) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null || requestId.trim().isEmpty) return null;
+
+    final row = await client
+        .from('curfew_requests')
+        .select(columnsWithTenant)
+        .eq('id', requestId.trim())
+        .maybeSingle();
+    if (row == null) return null;
+    return CurfewRequest.fromJson(row);
+  }
+
   /// Staff decision on a curfew request (approve or reject with optional notes).
   Future<CurfewRequest> decideStaffRequest({
     required String requestId,

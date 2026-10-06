@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import '../core/utils/conduct_case_policy.dart';
 import 'app_notification_service.dart';
 
 class ConductTenantOption {
@@ -14,6 +15,20 @@ class ConductTenantOption {
 
   final String id;
   final String name;
+}
+
+class ConductSourceOption {
+  const ConductSourceOption({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.occurredAt,
+  });
+
+  final String id;
+  final String title;
+  final String subtitle;
+  final DateTime occurredAt;
 }
 
 class ConductCaseRecord {
@@ -28,8 +43,10 @@ class ConductCaseRecord {
     required this.updatedAt,
     this.tenantId,
     this.tenantName,
+    this.categoryDetail,
     this.sourceModule,
     this.sourceRecordId,
+    this.sourceDetail,
     this.tenantNotifiedAt,
     this.resolutionNotes = '',
     this.terminationReviewReason = '',
@@ -44,12 +61,14 @@ class ConductCaseRecord {
       tenantId: row['tenant_id'] as String,
       tenantName: tenantName,
       category: row['category'] as String,
+      categoryDetail: row['category_detail'] as String?,
       title: row['title'] as String,
       description: row['description'] as String,
       incidentAt: DateTime.parse(row['incident_at'] as String).toLocal(),
       status: row['status'] as String,
       sourceModule: row['source_module'] as String? ?? 'manual',
       sourceRecordId: row['source_record_id'] as String?,
+      sourceDetail: row['source_detail'] as String?,
       tenantNotifiedAt: _nullableDate(row['tenant_notified_at']),
       resolutionNotes: row['resolution_notes'] as String? ?? '',
       terminationReviewReason:
@@ -63,6 +82,7 @@ class ConductCaseRecord {
     return ConductCaseRecord(
       id: row['id'] as String,
       category: row['category'] as String,
+      categoryDetail: row['category_detail'] as String?,
       title: row['title'] as String,
       description: row['description'] as String,
       incidentAt: DateTime.parse(row['incident_at'] as String).toLocal(),
@@ -85,12 +105,14 @@ class ConductCaseRecord {
   final String? tenantId;
   final String? tenantName;
   final String category;
+  final String? categoryDetail;
   final String title;
   final String description;
   final DateTime incidentAt;
   final String status;
   final String? sourceModule;
   final String? sourceRecordId;
+  final String? sourceDetail;
   final DateTime? tenantNotifiedAt;
   final String resolutionNotes;
   final String terminationReviewReason;
@@ -193,8 +215,8 @@ class ConductCaseService {
   SupabaseClient get _client => SupabaseConfig.client;
 
   static const String _staffCaseColumns =
-      'id, tenant_id, category, title, description, incident_at, status, '
-      'source_module, source_record_id, tenant_notified_at, resolution_notes, '
+      'id, tenant_id, category, category_detail, title, description, incident_at, status, '
+      'source_module, source_record_id, source_detail, tenant_notified_at, resolution_notes, '
       'termination_review_reason, created_at, updated_at';
 
   Future<List<ConductTenantOption>> listTenantOptions() async {
@@ -261,25 +283,183 @@ class ConductCaseService {
         .toList(growable: false);
   }
 
+  Future<List<ConductSourceOption>> listSourceOptions({
+    required String tenantId,
+    required String sourceModule,
+  }) async {
+    List<ConductSourceOption> finish(List<ConductSourceOption> values) {
+      values.sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+      return values.length <= 30 ? values : values.sublist(0, 30);
+    }
+
+    DateTime parseDate(dynamic value) =>
+        DateTime.tryParse(value?.toString() ?? '')?.toLocal() ?? DateTime.now();
+
+    String humanize(dynamic value) {
+      final raw = value?.toString().trim() ?? '';
+      if (raw.isEmpty) return 'Record';
+      final words = raw.replaceAll('_', ' ').split(RegExp(r'\s+'));
+      return words
+          .map((word) => word.isEmpty
+              ? word
+              : '${word[0].toUpperCase()}${word.substring(1)}')
+          .join(' ');
+    }
+
+    switch (sourceModule) {
+      case 'confidential_report':
+        final rows = await _client
+            .from('confidential_reports')
+            .select('id, category, summary, status, created_at')
+            .eq('tenant_id', tenantId)
+            .order('created_at', ascending: false)
+            .limit(30);
+        return finish(rows.map<ConductSourceOption>((row) {
+          final summary = row['summary']?.toString().trim() ?? '';
+          return ConductSourceOption(
+            id: row['id'] as String,
+            title: 'Confidential report • ${humanize(row['category'])}',
+            subtitle: summary.isEmpty ? humanize(row['status']) : summary,
+            occurredAt: parseDate(row['created_at']),
+          );
+        }).toList());
+      case 'maintenance':
+        final rows = await _client
+            .from('maintenance_reports')
+            .select('id, category, location, description, status, created_at')
+            .eq('tenant_id', tenantId)
+            .order('created_at', ascending: false)
+            .limit(30);
+        return finish(rows.map<ConductSourceOption>((row) {
+          final location = row['location']?.toString().trim() ?? '';
+          final description = row['description']?.toString().trim() ?? '';
+          return ConductSourceOption(
+            id: row['id'] as String,
+            title: '${humanize(row['category'])} • ${humanize(row['status'])}',
+            subtitle: [location, description]
+                .where((value) => value.isNotEmpty)
+                .join(' • '),
+            occurredAt: parseDate(row['created_at']),
+          );
+        }).toList());
+      case 'visitor':
+        final rows = await _client
+            .from('visitor_requests')
+            .select('id, visitor_name, purpose, status, schedule, created_at')
+            .eq('tenant_id', tenantId)
+            .order('schedule', ascending: false)
+            .limit(30);
+        return finish(rows.map<ConductSourceOption>((row) {
+          return ConductSourceOption(
+            id: row['id'] as String,
+            title:
+                '${row['visitor_name'] ?? 'Visitor'} • ${humanize(row['status'])}',
+            subtitle: row['purpose']?.toString().trim() ?? '',
+            occurredAt: parseDate(row['schedule'] ?? row['created_at']),
+          );
+        }).toList());
+      case 'curfew':
+        final rows = await _client
+            .from('curfew_requests')
+            .select(
+              'id, request_type, destination, reason, status, departure_time, created_at',
+            )
+            .eq('tenant_id', tenantId)
+            .order('departure_time', ascending: false)
+            .limit(30);
+        return finish(rows.map<ConductSourceOption>((row) {
+          final destination = row['destination']?.toString().trim() ?? '';
+          final reason = row['reason']?.toString().trim() ?? '';
+          return ConductSourceOption(
+            id: row['id'] as String,
+            title:
+                '${humanize(row['request_type'])} • ${humanize(row['status'])}',
+            subtitle: [destination, reason]
+                .where((value) => value.isNotEmpty)
+                .join(' • '),
+            occurredAt: parseDate(row['departure_time'] ?? row['created_at']),
+          );
+        }).toList());
+      case 'cleaning_report':
+        final assignment = await _client
+            .from('tenant_assignments')
+            .select('bed_space_id')
+            .eq('tenant_id', tenantId)
+            .eq('status', 'active')
+            .maybeSingle();
+        final bedSpaceId = assignment?['bed_space_id']?.toString();
+        if (bedSpaceId == null || bedSpaceId.isEmpty) return const [];
+        final rows = await _client
+            .from('cleaning_noncompliance_reports')
+            .select(
+              'id, reported_bed_label, description, status, created_at',
+            )
+            .eq('reported_bed_space_id', bedSpaceId)
+            .order('created_at', ascending: false)
+            .limit(30);
+        return finish(rows.map<ConductSourceOption>((row) {
+          return ConductSourceOption(
+            id: row['id'] as String,
+            title: 'Cleaning report • ${humanize(row['status'])}',
+            subtitle:
+                '${row['reported_bed_label'] ?? 'Bed'} • ${row['description'] ?? ''}',
+            occurredAt: parseDate(row['created_at']),
+          );
+        }).toList());
+      case 'room_inspection':
+        final assignment = await _client
+            .from('tenant_assignments')
+            .select('bed_spaces!inner(room_id)')
+            .eq('tenant_id', tenantId)
+            .eq('status', 'active')
+            .maybeSingle();
+        final bed = assignment?['bed_spaces'] as Map<String, dynamic>?;
+        final roomId = bed?['room_id']?.toString();
+        if (roomId == null || roomId.isEmpty) return const [];
+        final rows = await _client
+            .from('room_inspections')
+            .select('id, inspection_type, status, scheduled_at, summary')
+            .eq('room_id', roomId)
+            .order('scheduled_at', ascending: false)
+            .limit(30);
+        return finish(rows.map<ConductSourceOption>((row) {
+          final summary = row['summary']?.toString().trim() ?? '';
+          return ConductSourceOption(
+            id: row['id'] as String,
+            title:
+                '${humanize(row['inspection_type'])} inspection • ${humanize(row['status'])}',
+            subtitle: summary.isEmpty ? 'Room inspection record' : summary,
+            occurredAt: parseDate(row['scheduled_at']),
+          );
+        }).toList());
+      default:
+        return const [];
+    }
+  }
+
   Future<String> createCase({
     required String tenantId,
     required String category,
+    String? categoryDetail,
     required String title,
     required String description,
     required DateTime incidentAt,
     required String sourceModule,
     String? sourceRecordId,
+    String? sourceDetail,
   }) async {
     final result = await _client.rpc(
       'create_conduct_case',
       params: {
         'p_tenant_id': tenantId,
         'p_category': category,
+        'p_category_detail': categoryDetail?.trim(),
         'p_title': title.trim(),
         'p_description': description.trim(),
         'p_incident_at': incidentAt.toUtc().toIso8601String(),
         'p_source_module': sourceModule,
         'p_source_record_id': sourceRecordId?.trim(),
+        'p_source_detail': sourceDetail?.trim(),
       },
     );
     return result as String;
@@ -300,7 +480,10 @@ class ConductCaseService {
         tenantId: tenantId,
         caseId: record.id,
         title: record.title,
-        severity: record.category,
+        severity: conductCategoryDisplayLabel(
+          record.category,
+          record.categoryDetail,
+        ),
       ));
     }
   }
@@ -515,6 +698,15 @@ String conductCaseError(Object error) {
   }
   if (message.contains('not available to your account')) {
     return 'This conduct case is not available to your account.';
+  }
+  if (message.contains('Please specify the conduct case category')) {
+    return 'Please specify the conduct case category.';
+  }
+  if (message.contains('Please specify the conduct case source')) {
+    return 'Please specify the conduct case source.';
+  }
+  if (message.contains('does not belong to the selected tenant')) {
+    return 'That linked record does not belong to the selected tenant. Choose another record or remove the link.';
   }
   if (message.contains('Responses are closed')) {
     return 'Responses are closed for this conduct case.';

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../core/utils/employee_curfew_policy.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/staff_tenant_picker.dart';
+import '../../models/staff_tenant_option.dart';
 import '../../services/employee_curfew_profile_service.dart';
+import '../../services/staff_tenant_picker_service.dart';
 import '../../services/table_refresh_subscription.dart';
 
 String _profileDate(DateTime value) =>
@@ -24,8 +27,9 @@ class EmployeeCurfewProfilesPage extends StatefulWidget {
 class _EmployeeCurfewProfilesPageState
     extends State<EmployeeCurfewProfilesPage> {
   final service = const EmployeeCurfewProfileService();
+  final tenantPickerService = const StaffTenantPickerService();
   late final TableRefreshSubscription subscription;
-  List<EmployeeCurfewTenantOption> tenants = const [];
+  List<StaffTenantOption> tenants = const [];
   List<EmployeeCurfewProfileRecord> profiles = const [];
   bool loading = true;
   String? errorMessage;
@@ -61,7 +65,7 @@ class _EmployeeCurfewProfilesPageState
     }
 
     try {
-      final latestTenants = await service.listTenantOptions();
+      final latestTenants = await tenantPickerService.listTenantOptions();
       final latestProfiles = await service.listStaffProfiles();
       if (!mounted) return;
       setState(() {
@@ -82,12 +86,14 @@ class _EmployeeCurfewProfilesPageState
   Future<void> _edit({EmployeeCurfewProfileRecord? profile}) async {
     if (profile != null && profile.status != 'draft') return;
 
-    if (tenants.isEmpty) {
-      showAppSnackBar(context, 'No tenant accounts are available.');
+    final activeTenants =
+        tenants.where((tenant) => tenant.isActiveResident).toList();
+    if (profile == null && activeTenants.isEmpty) {
+      showAppSnackBar(context, 'No active tenant accounts are available.');
       return;
     }
 
-    var tenantId = profile?.tenantId ?? tenants.first.id;
+    String? tenantId = profile?.tenantId;
     var returnMinutes = profile?.allowedReturnMinutes ?? 23 * 60;
     var weekdays = (profile?.weekdays.toSet() ?? <int>{1, 2, 3, 4, 5}).toSet();
     var effectiveFrom = profile?.effectiveFrom ?? DateTime.now();
@@ -104,8 +110,8 @@ class _EmployeeCurfewProfilesPageState
         builder: (dialogContext, setDialogState) => AlertDialog(
           title: Text(
             profile == null
-                ? 'New employee curfew profile'
-                : 'Edit employee curfew profile',
+                ? 'New tenant work curfew profile'
+                : 'Edit tenant work curfew profile',
           ),
           content: SizedBox(
             width: 650,
@@ -117,28 +123,19 @@ class _EmployeeCurfewProfilesPageState
                   CarmelitaCard(
                     padding: const EdgeInsets.all(12),
                     child: const Text(
-                      'This profile records an approved employment-based curfew schedule. It does not change gate/geofence evaluation until the shared evaluator integration is reviewed.',
+                      'This profile records an approved work schedule for a tenant whose work hours may affect the regular curfew. It does not change gate/geofence evaluation until the shared evaluator integration is reviewed.',
                     ),
                   ),
                   const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    initialValue: tenantId,
-                    decoration: const InputDecoration(labelText: 'Tenant'),
-                    items: tenants
-                        .map(
-                          (tenant) => DropdownMenuItem(
-                            value: tenant.id,
-                            child: Text(tenant.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: profile != null || saving
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              setDialogState(() => tenantId = value);
-                            }
-                          },
+                  StaffTenantPickerField(
+                    options: tenants,
+                    value: tenantId,
+                    activeOnly: true,
+                    enabled: profile == null && !saving,
+                    labelText: 'Tenant with approved work schedule',
+                    onChanged: (value) {
+                      setDialogState(() => tenantId = value);
+                    },
                   ),
                   const SizedBox(height: 14),
                   ListTile(
@@ -292,6 +289,13 @@ class _EmployeeCurfewProfilesPageState
               onPressed: saving
                   ? null
                   : () async {
+                      if (tenantId == null || tenantId!.isEmpty) {
+                        showAppSnackBar(
+                          dialogContext,
+                          'Select a tenant before saving the work curfew profile.',
+                        );
+                        return;
+                      }
                       final weekdayError =
                           validateEmployeeCurfewWeekdays(weekdays);
                       if (weekdayError != null) {
@@ -320,7 +324,7 @@ class _EmployeeCurfewProfilesPageState
                         final selectedDays = weekdays.toList()..sort();
                         if (profile == null) {
                           await service.createProfile(
-                            tenantId: tenantId,
+                            tenantId: tenantId!,
                             allowedReturnMinutes: returnMinutes,
                             weekdays: selectedDays,
                             effectiveFrom: effectiveFrom,
@@ -374,7 +378,7 @@ class _EmployeeCurfewProfilesPageState
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Approve employee curfew profile'),
+          title: const Text('Approve tenant work curfew profile'),
           content: SizedBox(
             width: 560,
             child: Column(
@@ -447,7 +451,7 @@ class _EmployeeCurfewProfilesPageState
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Revoke employee curfew profile'),
+          title: const Text('Revoke tenant work curfew profile'),
           content: TextField(
             controller: reason,
             enabled: !saving,
@@ -582,7 +586,7 @@ class _EmployeeCurfewProfilesPageState
         profiles.where((profile) => profile.status == 'approved').length;
 
     return PageFrame(
-      title: 'Work curfew',
+      title: 'Tenant work curfew',
       subtitle: '$approved approved • ${profiles.length} total',
       useScriptTitle: false,
       onRefresh: () => _load(showSpinner: false),
@@ -607,7 +611,7 @@ class _EmployeeCurfewProfilesPageState
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Use this only for an approved employment-based schedule. Exact employee-curfew policy is not assumed here; staff records the approved time, days, dates, and basis. Gate/geofence evaluator changes require separate integration review.',
+                          'Use this only for a tenant with an approved work schedule that affects regular curfew. Staff records the approved return time, days, effective dates, and basis. Gate/geofence evaluator changes require separate integration review.',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),
@@ -622,9 +626,9 @@ class _EmployeeCurfewProfilesPageState
                 if (profiles.isEmpty)
                   const EmptyState(
                     icon: Icons.badge_outlined,
-                    title: 'No employee curfew profiles',
+                    title: 'No tenant work curfew profiles',
                     message:
-                        'Create a draft only after an employment-based curfew schedule has been approved operationally.',
+                        'Create a draft only after a tenant work schedule affecting curfew has been approved operationally.',
                   )
                 else
                   ...profiles.map(
@@ -789,7 +793,7 @@ class _TenantEmployeeCurfewProfileCardState
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             SizedBox(width: 12),
-            Text('Checking employee curfew profile…'),
+            Text('Checking tenant work curfew profile…'),
           ],
         ),
       );

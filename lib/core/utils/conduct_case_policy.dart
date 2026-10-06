@@ -1,22 +1,24 @@
 const List<String> conductCaseCategories = <String>[
-  'rule_violation',
-  'misconduct',
-  'unauthorized_visitor',
-  'roommate_conflict',
-  'safety',
-  'property_damage',
   'curfew',
+  'misconduct',
+  'property_damage',
+  'roommate_conflict',
+  'rule_violation',
+  'safety',
+  'unauthorized_visitor',
   'other',
 ];
 
+/// Manual stays first because it is the normal/default workflow. The linked
+/// record sources are alphabetical and the literal catch-all remains last.
 const List<String> conductCaseSources = <String>[
   'manual',
-  'confidential_report',
-  'room_inspection',
   'cleaning_report',
+  'confidential_report',
   'curfew',
-  'visitor',
   'maintenance',
+  'room_inspection',
+  'visitor',
   'other',
 ];
 
@@ -31,6 +33,12 @@ String conductCategoryLabel(String value) => switch (value) {
       _ => 'Other',
     };
 
+String conductCategoryDisplayLabel(String value, [String? detail]) {
+  final label = conductCategoryLabel(value);
+  final specific = detail?.trim() ?? '';
+  return value == 'other' && specific.isNotEmpty ? '$label — $specific' : label;
+}
+
 String conductSourceLabel(String value) => switch (value) {
       'confidential_report' => 'Confidential report',
       'room_inspection' => 'Room inspection',
@@ -41,6 +49,12 @@ String conductSourceLabel(String value) => switch (value) {
       'other' => 'Other source',
       _ => 'Manual case',
     };
+
+String conductSourceDisplayLabel(String value, [String? detail]) {
+  final label = conductSourceLabel(value);
+  final specific = detail?.trim() ?? '';
+  return value == 'other' && specific.isNotEmpty ? '$label — $specific' : label;
+}
 
 String conductStatusLabel(String value) => switch (value) {
       'awaiting_response' => 'Awaiting response',
@@ -73,6 +87,16 @@ String? validateConductCaseDescription(String value) {
   if (clean.length > 4000) {
     return 'Case description must be 4000 characters or fewer.';
   }
+  return null;
+}
+
+String? validateConductOtherDetail(
+  String value, {
+  required String fieldLabel,
+}) {
+  final clean = value.trim();
+  if (clean.length < 2) return 'Please specify $fieldLabel.';
+  if (clean.length > 120) return '$fieldLabel must be 120 characters or fewer.';
   return null;
 }
 
