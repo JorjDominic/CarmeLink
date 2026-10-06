@@ -309,7 +309,14 @@ class PaymentService {
       'p_reason': reason.trim(),
     });
     final row = Map<String, dynamic>.from(result as Map);
-    return (row['adjusted_charge_count'] as num?)?.toInt() ?? 0;
+    final adjustedCount = (row['adjusted_charge_count'] as num?)?.toInt() ?? 0;
+    unawaited(AppNotificationService.instance.notifyRentRateChanged(
+      tenantId: tenantId,
+      newMonthlyRent: newMonthlyRent,
+      effectiveDate: _dateOnly(effectiveDate),
+      adjustedChargeCount: adjustedCount,
+    ));
+    return adjustedCount;
   }
 
   /// Atomically issues every allocation produced from a utility cart.
@@ -322,20 +329,9 @@ class PaymentService {
     });
     final row = Map<String, dynamic>.from(result as Map);
 
-    for (final item in items) {
-      final tId = item['tenant_id']?.toString();
-      final title = item['title']?.toString() ?? 'Utility Charge';
-      final amt = (item['amount'] as num?)?.toDouble() ?? 0.0;
-      final dueDate = item['due_date']?.toString() ?? '';
-      if (tId != null && tId.isNotEmpty) {
-        unawaited(AppNotificationService.instance.notifyUtilityBillCreated(
-          tenantId: tId,
-          title: title,
-          amount: amt,
-          dueDate: dueDate,
-        ));
-      }
-    }
+    // Each persisted allocation creates its own notification in the database.
+    // Cart input has a total_amount (not an allocated amount) and room scopes
+    // have no tenant_id; notifying from input misses recipients and reports 0.
 
     return (row['charge_count'] as num?)?.toInt() ?? 0;
   }

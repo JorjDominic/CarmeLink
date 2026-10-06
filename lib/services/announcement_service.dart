@@ -17,6 +17,7 @@ class AnnouncementRecord {
     required this.fcmSent,
     required this.createdAt,
     required this.updatedAt,
+    this.categoryLabel,
   });
 
   factory AnnouncementRecord.fromRow(Map<String, dynamic> row) {
@@ -28,6 +29,7 @@ class AnnouncementRecord {
       title: row['title'] as String,
       body: row['body'] as String,
       category: row['category'] as String? ?? 'general',
+      categoryLabel: row['category_label'] as String?,
       audience: row['audience'] as String? ?? 'all',
       isPinned: row['is_pinned'] as bool? ?? false,
       fcmSent: row['fcm_sent'] as bool? ?? false,
@@ -42,6 +44,12 @@ class AnnouncementRecord {
   final String title;
   final String body;
   final String category;
+  final String? categoryLabel;
+  String get displayCategory =>
+      categoryLabel ??
+      (category.isEmpty
+          ? 'General'
+          : '${category[0].toUpperCase()}${category.substring(1)}');
   final String audience;
   final bool isPinned;
   final bool fcmSent;
@@ -82,7 +90,7 @@ class AnnouncementService {
     }
 
     var query = _client.from('announcements').select(
-        'id, author_id, title, body, category, audience, is_pinned, fcm_sent, created_at, updated_at, profiles!author_id(full_name)');
+        'id, author_id, title, body, category, category_label, audience, is_pinned, fcm_sent, created_at, updated_at, profiles!author_id(full_name)');
 
     if (audienceFilter != null && audienceFilter != 'all') {
       query = query.or('audience.eq.all,audience.eq.$audienceFilter');

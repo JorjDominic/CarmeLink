@@ -390,6 +390,11 @@ deno_version = 2
 [functions.process-location-monitoring-alerts]
 verify_jwt = false
 
+# These scheduled endpoints authenticate their private cron bearer in the handler.
+# A cron bearer is not a user JWT and must reach that authentication check.
+[functions.process-report-pushes]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

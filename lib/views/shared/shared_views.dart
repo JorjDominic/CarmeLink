@@ -121,8 +121,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       for (final item in _notifications) item.id: item,
       for (final item in latest) item.id: item,
     };
-    final merged = byId.values.toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final merged = byId.values.toList()..sort(compareNotificationsNewestFirst);
     setState(() {
       _notifications = List<AppNotificationItem>.unmodifiable(merged);
       _loading = false;
@@ -146,6 +145,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       final older = await _service.fetchMyNotificationsPage(
         limit: _pageSize,
         before: _notifications.last.createdAt,
+        beforeId: _notifications.last.id,
       );
       if (!mounted) return;
       final existingIds = _notifications.map((item) => item.id).toSet();

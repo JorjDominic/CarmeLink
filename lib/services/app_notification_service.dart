@@ -4,6 +4,33 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
 
+String announcementRecipientRole(String audience) =>
+    switch (audience.trim().toLowerCase()) {
+      'tenants' => 'tenant',
+      'guardians' => 'guardian',
+      'staff' => 'staff',
+      'all' => 'all',
+      _ => throw ArgumentError.value(
+          audience, 'audience', 'Unknown announcement audience'),
+    };
+
+int compareNotificationsNewestFirst(
+    AppNotificationItem a, AppNotificationItem b) {
+  final date = b.createdAt.compareTo(a.createdAt);
+  return date != 0 ? date : b.id.compareTo(a.id);
+}
+
+String notificationPageCursorFilter(DateTime before, String beforeId) {
+  if (!RegExp(
+          r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+      .hasMatch(beforeId)) {
+    throw ArgumentError.value(
+        beforeId, 'beforeId', 'Expected a notification UUID');
+  }
+  final timestamp = before.toUtc().toIso8601String();
+  return 'created_at.lt.$timestamp,and(created_at.eq.$timestamp,id.lt.$beforeId)';
+}
+
 class AppNotificationItem {
   const AppNotificationItem({
     required this.id,
@@ -75,6 +102,12 @@ class AppNotificationItem {
       'visitor' => 'pass_id',
       'announcement' => 'announcement_id',
       'inspection' => 'inspection_id',
+      'onboarding' => 'contract_id',
+      'move_out' => 'case_id',
+      'cleaning_schedule' => 'bed_space_id',
+      'employee_curfew' => 'profile_id',
+      'room_assignment' => 'room_id',
+      'guardian_link' => 'tenant_id',
       'gate' || 'gate_event' => 'event_id',
       _ => '',
     };
@@ -180,11 +213,7 @@ class AppNotificationService {
     required String audience,
     required String announcementId,
   }) async {
-    final targetRole = switch (audience.toLowerCase().trim()) {
-      'tenants' => 'tenant',
-      'guardians' => 'guardian',
-      _ => 'all',
-    };
+    final targetRole = announcementRecipientRole(audience);
 
     return sendNotification(
       title: '📢 $title',
@@ -289,6 +318,8 @@ class AppNotificationService {
       body: detail,
       notificationType: 'payment',
       recipientId: tenantId,
+      tenantId: tenantId,
+      notifyGuardians: true,
       routeType: 'payment',
       routeId: paymentId,
       data: {
@@ -311,6 +342,8 @@ class AppNotificationService {
       body: 'A charge of $formattedAmount is due on $dueDate.',
       notificationType: 'payment',
       recipientId: tenantId,
+      tenantId: tenantId,
+      notifyGuardians: true,
       routeType: 'payment',
       data: {
         'title': title,
@@ -339,11 +372,39 @@ class AppNotificationService {
       body: '$title was $action. Reason: $reason',
       notificationType: 'payment',
       recipientId: tenantId,
+      tenantId: tenantId,
+      notifyGuardians: true,
       routeType: 'payment',
       routeId: chargeId,
       data: {
         'payment_id': chargeId,
         'action_type': actionType,
+      },
+    );
+  }
+
+  Future<void> notifyRentRateChanged({
+    required String tenantId,
+    required double newMonthlyRent,
+    required String effectiveDate,
+    required int adjustedChargeCount,
+  }) async {
+    final formattedAmount = '₱${newMonthlyRent.toStringAsFixed(2)}';
+    await sendNotification(
+      title: 'Rent rate updated',
+      body:
+          'Your monthly rent is now $formattedAmount effective $effectiveDate. '
+          '$adjustedChargeCount future unpaid charge(s) were adjusted.',
+      notificationType: 'payment',
+      recipientId: tenantId,
+      tenantId: tenantId,
+      notifyGuardians: true,
+      routeType: 'payment',
+      data: {
+        'tenant_id': tenantId,
+        'new_monthly_rent': newMonthlyRent.toString(),
+        'effective_date': effectiveDate,
+        'adjusted_charge_count': adjustedChargeCount.toString(),
       },
     );
   }
@@ -672,6 +733,7 @@ class AppNotificationService {
   Future<List<AppNotificationItem>> fetchMyNotificationsPage({
     int limit = 15,
     DateTime? before,
+    String? beforeId,
   }) async {
     final client = _client;
     final user = client?.auth.currentUser;
@@ -686,11 +748,14 @@ class AppNotificationService {
         .eq('recipient_id', user.id);
 
     if (before != null) {
-      query = query.lt('created_at', before.toUtc().toIso8601String());
+      query = beforeId == null
+          ? query.lt('created_at', before.toUtc().toIso8601String())
+          : query.or(notificationPageCursorFilter(before, beforeId));
     }
 
     final rows = await query
         .order('created_at', ascending: false)
+        .order('id', ascending: false)
         .limit(limit.clamp(1, 60).toInt());
 
     return (rows as List)
