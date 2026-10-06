@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/services/app_notification_service.dart';
 import 'package:carmelitas_dormitory_system/views/shared/notification_destination.dart';
+import 'package:carmelitas_dormitory_system/views/shared/cleaning_report_detail.dart';
 import 'package:carmelitas_dormitory_system/views/shared/conduct_case_pages.dart';
 import 'package:carmelitas_dormitory_system/views/shared/staff_message_contacts.dart';
 import 'package:carmelitas_dormitory_system/views/shared/staff_curfew_requests_page.dart';
@@ -33,6 +34,7 @@ void main() {
       'visitor',
       'conduct_case',
       'confidential_report',
+      'cleaning_report',
       'curfew',
       'gate_event',
       'inspection',
@@ -66,6 +68,19 @@ void main() {
         child(notificationDestination(item('conduct_case'), UserRole.tenant))
             as TenantConductCasesPage;
     expect(tenant.initialCaseId, 'record-id');
+  });
+
+  test('cleaning reports open the exact report for staff and tenant', () {
+    for (final role in [UserRole.owner, UserRole.caretaker, UserRole.tenant]) {
+      final page =
+          child(notificationDestination(item('cleaning_report'), role));
+      expect(page, isA<CleaningReportDetail>());
+      expect((page as CleaningReportDetail).reportId, 'record-id');
+    }
+    expect(
+      notificationDestination(item('cleaning_report'), UserRole.guardian),
+      isA<NotificationDetailsPage>(),
+    );
   });
 
   test('confidential reports support both staff roles and select the report',
@@ -123,6 +138,10 @@ void main() {
         item('maintenance', id: null, data: {'report_id': 'report'})
             .destinationId,
         'report');
+    expect(
+        item('cleaning_report', id: null, data: {'report_id': 'cleaning'})
+            .destinationId,
+        'cleaning');
     expect(item(' ', id: null).destinationType, 'safety');
     expect(item('payment', id: ' ').destinationId, isNull);
   });
