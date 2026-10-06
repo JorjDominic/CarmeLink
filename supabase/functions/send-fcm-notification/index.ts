@@ -66,7 +66,7 @@ Deno.serve(async (request) => {
     const permitted = new Set<string>()
     for (const recipient of recipients ?? []) {
       if (isStaff) {
-        if (actor.role === 'owner' || ['tenant', 'guardian'].includes(recipient.role)) permitted.add(recipient.id)
+        if (['owner', 'caretaker', 'tenant', 'guardian'].includes(recipient.role)) permitted.add(recipient.id)
       } else if (['owner', 'caretaker'].includes(recipient.role)) {
         permitted.add(recipient.id)
       } else if (actor.role === 'tenant' && tenantId === actor.id && recipient.role === 'guardian') {

@@ -1,3 +1,4 @@
+import '../shared/notification_destination.dart';
 import '../shared/staff_message_contacts.dart';
 import 'dart:async';
 
@@ -2149,7 +2150,7 @@ const _operationCategories = [
     [
       _OperationItem(
           'Report management',
-          'Maintenance reports and owner-only confidential reports',
+          'Maintenance and confidential reports',
           Icons.assignment_outlined,
           ReportManagementPage()),
       _OperationItem(
@@ -2158,8 +2159,7 @@ const _operationCategories = [
           Icons.gavel_outlined,
           StaffConductCasesPage()),
       _OperationItem('Confidential reports', 'Review private reports',
-          Icons.shield_outlined, ConfidentialReportsPage(),
-          ownerOnly: true),
+          Icons.shield_outlined, ConfidentialReportsPage()),
       _OperationItem('Disciplinary records', 'Manage violations',
           Icons.rule_outlined, DisciplinaryRecordsPage(),
           ownerOnly: true),
@@ -2605,7 +2605,7 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        OwnerController.instance.loadPayments();
+        OwnerController.instance.loadPayments(force: true);
         OwnerController.instance.loadTenants();
       }
     });
@@ -2752,7 +2752,8 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
-          final allPayments = controller.payments;
+          final targetPayment = NotificationTarget.recordIdOf(context, 'payment');
+          final allPayments = controller.payments.where((p) => targetPayment == null || p.id == targetPayment).toList();
           final pendingCount = controller.pendingPaymentProofs;
           final overdueCount = controller.overduePaymentCount;
           final verifiedCount = allPayments.where((p) => p.isVerified).length;
@@ -2835,7 +2836,7 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
 
           searchFiltered.sort(_comparePaymentsForDisplay);
 
-          final shouldLimitAdvanceRent = _workspace == 'bills' &&
+          final shouldLimitAdvanceRent = targetPayment == null && _workspace == 'bills' &&
               _filter == 'all' &&
               _searchQuery.trim().isEmpty;
           final hiddenAdvanceRentCount = shouldLimitAdvanceRent
@@ -5106,10 +5107,10 @@ class ReportManagementPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isOwner =
-        SessionController.instance.currentUser?.role == UserRole.owner;
+    final role = SessionController.instance.currentUser?.role;
+    final isStaff = role == UserRole.owner || role == UserRole.caretaker;
 
-    if (!isOwner) {
+    if (!isStaff) {
       return const MaintenanceManagementPage();
     }
 
@@ -8364,7 +8365,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
   @override
   void initState() {
     super.initState();
-    controller.loadVisitors();
+    controller.loadVisitors(force: true);
     _subscription = TableRefreshSubscription(
       'staff-visitors',
       const ['visitor_requests', 'visitor_events'],
@@ -8516,7 +8517,9 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
                   item.isRejected || item.isCancelled || item.isCompleted)
               .toList();
           final visible = List<VisitorRequest>.from(
-            scope == RecordListScope.active ? activeVisitors : historyVisitors,
+            NotificationTarget.recordIdOf(context, 'visitor') != null
+                ? controller.visitors.where((item) => item.id == NotificationTarget.recordIdOf(context, 'visitor'))
+                : scope == RecordListScope.active ? activeVisitors : historyVisitors,
           )..sort((a, b) => switch (sort) {
                 RecordListSort.oldest => a.schedule.compareTo(b.schedule),
                 RecordListSort.status => a.status.compareTo(b.status),
@@ -8721,7 +8724,9 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
 }
 
 class ConfidentialReportsPage extends StatefulWidget {
-  const ConfidentialReportsPage({super.key});
+  const ConfidentialReportsPage({super.key, this.initialReportId});
+
+  final String? initialReportId;
 
   @override
   State<ConfidentialReportsPage> createState() =>
@@ -8734,7 +8739,7 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
   @override
   void initState() {
     super.initState();
-    controller.loadConcerns();
+    controller.loadConcerns(force: true);
   }
 
   Future<void> _review(ConcernReport report, String status) async {
@@ -8803,10 +8808,10 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
   @override
   Widget build(BuildContext context) {
     return RoleGuard(
-      allowedRoles: const {UserRole.owner},
+      allowedRoles: const {UserRole.owner, UserRole.caretaker},
       child: PageFrame(
         title: 'Concerns',
-        subtitle: 'Owner-authorized review with audit logging',
+        subtitle: 'Staff review with audit logging',
         onRefresh: () => controller.loadConcerns(force: true),
         child: AnimatedBuilder(
           animation: controller,
@@ -8830,13 +8835,15 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                 ]),
               );
             }
-            if (controller.concerns.isEmpty) {
+            final reports = controller.concerns.where((report) =>
+                widget.initialReportId == null || report.id == widget.initialReportId).toList();
+            if (reports.isEmpty) {
               return const Center(
                 child: Text('No confidential reports have been submitted.'),
               );
             }
             return Column(
-              children: controller.concerns
+              children: reports
                   .map(
                     (report) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -9220,7 +9227,9 @@ class _AnnouncementsManagementPageState
   @override
   Widget build(BuildContext context) {
     final rawList = _announcements ?? [];
+    final targetAnnouncement = NotificationTarget.recordIdOf(context, 'announcement');
     final filtered = rawList.where((item) {
+      if (targetAnnouncement != null) return item.id == targetAnnouncement;
       if (_selectedCategory != 'all' &&
           item.category.toLowerCase() != _selectedCategory) {
         return false;

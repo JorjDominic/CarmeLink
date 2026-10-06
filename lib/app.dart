@@ -12,15 +12,14 @@ import 'core/theme/app_theme.dart';
 import 'core/widgets/connectivity_banner.dart';
 import 'models/models.dart';
 import 'services/push_notification_service.dart';
+import 'services/app_notification_service.dart';
+import 'views/shared/notification_destination.dart';
 import 'views/auth/auth_views.dart';
 import 'views/auth/mobile_auth_entry.dart';
 import 'views/caretaker/caretaker_shell.dart';
 import 'views/guardian/guardian_shell.dart';
-import 'views/guardian/guardian_pages.dart';
 import 'views/owner/owner_shell.dart';
-import 'views/owner/owner_pages.dart';
 import 'views/tenant/tenant_shell.dart';
-import 'views/tenant/tenant_pages.dart';
 import 'views/tenant/onboarding_form_page.dart';
 import 'views/shared/shared_views.dart';
 
@@ -49,41 +48,82 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     super.initState();
 
     sessionController.addListener(_tryOpenPendingOnboarding);
+    sessionController.addListener(_tryOpenPendingNotification);
+    TenantAccessController.instance.addListener(_tryOpenPendingNotification);
 
     _listenForLinks();
     _notificationSubscription = PushNotificationService
         .instance.openedNotifications
         .listen(_openNotificationDestination);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PushNotificationService.instance.flushPendingOpen();
+    });
   }
 
+  Map<String, dynamic>? _pendingNotification;
+  bool _openingNotification = false;
+
   void _openNotificationDestination(Map<String, dynamic> data) {
-    final navigator = _navigatorKey.currentState;
-    final user = sessionController.currentUser;
-    if (navigator == null || user == null) return;
+    _pendingNotification = Map<String, dynamic>.from(data);
+    _tryOpenPendingNotification();
+  }
 
-    // Tenant notification routes lead into operational features. Keep them
-    // closed until the same centralized onboarding check unlocks the shell.
-    if (user.role == UserRole.tenant &&
-        !TenantAccessController.instance.canAccessCore) {
-      return;
-    }
-
-    if (data['route_type'] == 'conversation') {
-      final Widget destination = switch (user.role) {
-        UserRole.tenant => const TenantMessagesPage(),
-        UserRole.guardian => const GuardianMessagesPage(),
-        UserRole.owner || UserRole.caretaker => OwnerMessagingPage(
-            initialConversationId: data['route_id'] as String?,
-          ),
-      };
-      navigator.push(
-        MaterialPageRoute<void>(builder: (_) => destination),
-      );
-      return;
-    }
-    navigator.push(
-      MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
-    );
+  void _tryOpenPendingNotification() {
+    PushNotificationService.instance.flushPendingOpen();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _openingNotification) return;
+      final data = _pendingNotification;
+      final user = sessionController.currentUser;
+      final navigator = _navigatorKey.currentState;
+      if (data == null || user == null || navigator == null) return;
+      if (user.role == UserRole.tenant &&
+          !TenantAccessController.instance.canAccessCore) return;
+      _pendingNotification = null;
+      _openingNotification = true;
+      try {
+        var item = AppNotificationItem.fromPush(data, recipientId: user.id);
+        if (item.id.isNotEmpty) {
+          try {
+            final saved = await AppNotificationService.instance
+                .fetchNotification(item.id);
+            // Never open another account's notification or silently discard
+            // a tap on an expired notification.
+            if (saved == null) {
+              if (mounted && sessionController.currentUser?.id == user.id) {
+                unawaited(navigator.push(MaterialPageRoute<void>(
+                  builder: (_) => NotificationDetailsPage(
+                    notification: AppNotificationItem(
+                      id: '',
+                      recipientId: user.id,
+                      notificationType: 'system',
+                      title: 'Notification unavailable',
+                      body:
+                          'This notification has expired or is no longer available to this account.',
+                      createdAt: DateTime.now(),
+                    ),
+                  ),
+                )));
+              }
+              return;
+            }
+            item = saved;
+          } catch (_) {
+            // Record screens retain their normal access checks while offline.
+          }
+        }
+        if (!mounted || sessionController.currentUser?.id != user.id) return;
+        if (item.id.isNotEmpty) {
+          unawaited(AppNotificationService.instance.markAsRead(item.id));
+        }
+        unawaited(navigator.push(MaterialPageRoute<void>(
+          builder: (_) => notificationDestination(item, user.role),
+        )));
+      } finally {
+        _openingNotification = false;
+        if (_pendingNotification != null) _tryOpenPendingNotification();
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   Future<void> _listenForLinks() async {
@@ -157,6 +197,8 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   @override
   void dispose() {
     sessionController.removeListener(_tryOpenPendingOnboarding);
+    sessionController.removeListener(_tryOpenPendingNotification);
+    TenantAccessController.instance.removeListener(_tryOpenPendingNotification);
 
     _linkSubscription?.cancel();
     _notificationSubscription?.cancel();
@@ -186,6 +228,7 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
         sessionController,
       ]),
       builder: (context, _) {
+        if (_pendingNotification != null) _tryOpenPendingNotification();
         return MaterialApp(
           navigatorKey: _navigatorKey,
           title: 'CarmeLink',

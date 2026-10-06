@@ -1,4 +1,4 @@
-import '../shared/staff_message_contacts.dart';
+import '../shared/notification_destination.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -13,7 +13,6 @@ import '../../services/geofence_scheduler.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../controllers/session_controller.dart';
 import '../shared/shared_views.dart';
-import '../shared/conduct_case_pages.dart';
 import 'tenant_access_gate.dart';
 import 'tenant_pages.dart';
 
@@ -125,30 +124,8 @@ class _TenantShellState extends State<TenantShell> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  Widget? _notificationDestination(AppNotificationItem notification) {
-    final routeType = notification.routeType?.trim();
-    final route = (routeType == null || routeType.isEmpty
-            ? notification.notificationType.trim()
-            : routeType)
-        .toLowerCase();
-    return switch (route) {
-      'message' || 'conversation' => notification.routeId?.isNotEmpty == true
-          ? DirectStaffConversationPage(conversationId: notification.routeId)
-          : const TenantMessagesPage(),
-      'payment' => const PaymentsPage(),
-      'maintenance' => const MaintenanceReportsPage(),
-      'confidential_report' => const ConfidentialConcernPage(),
-      'conduct_case' => const TenantConductCasesPage(),
-      'visitor' => const VisitorRequestPage(),
-      'curfew' ||
-      'gate' ||
-      'gate_event' ||
-      'safety' =>
-        const TenantPresencePage(),
-      'announcement' => const TenantAnnouncementsPage(),
-      _ => null,
-    };
-  }
+  Widget _notificationDestination(AppNotificationItem notification) =>
+      notificationDestination(notification, UserRole.tenant);
 
   @override
   Widget build(BuildContext context) => RoleGuard(

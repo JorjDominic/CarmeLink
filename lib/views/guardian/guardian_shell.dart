@@ -1,4 +1,4 @@
-import '../shared/staff_message_contacts.dart';
+import '../shared/notification_destination.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -59,26 +59,8 @@ class _GuardianShellState extends State<GuardianShell>
     super.dispose();
   }
 
-  Widget? _notificationDestination(AppNotificationItem notification) {
-    final routeType = notification.routeType?.trim();
-    final route = (routeType == null || routeType.isEmpty
-            ? notification.notificationType.trim()
-            : routeType)
-        .toLowerCase();
-    return switch (route) {
-      'message' || 'conversation' => notification.routeId?.isNotEmpty == true
-          ? DirectStaffConversationPage(conversationId: notification.routeId)
-          : const GuardianMessagesPage(),
-      'payment' => const GuardianPaymentStatusPage(),
-      'curfew' ||
-      'gate' ||
-      'gate_event' ||
-      'safety' =>
-        const GuardianPresenceMonitoringPage(),
-      'announcement' => const GuardianAnnouncementsPage(),
-      _ => null,
-    };
-  }
+  Widget _notificationDestination(AppNotificationItem notification) =>
+      notificationDestination(notification, UserRole.guardian);
 
   @override
   Widget build(BuildContext context) => RoleGuard(

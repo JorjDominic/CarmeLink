@@ -1,3 +1,4 @@
+import '../shared/notification_destination.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -11,7 +12,6 @@ import '../../services/table_refresh_subscription.dart';
 import '../owner/owner_pages.dart';
 import '../owner/room_monitoring_page.dart';
 import '../shared/shared_views.dart';
-import '../shared/conduct_case_pages.dart';
 import '../shared/account_management_page.dart';
 
 /// Operational workspace that excludes owner-only financial and analytics UI.
@@ -39,6 +39,7 @@ class _CaretakerShellState extends State<CaretakerShell>
     OwnerController.instance.loadTenants();
     OwnerController.instance.loadGateEvents();
     OwnerController.instance.loadVisitors();
+    OwnerController.instance.loadConcerns();
     _liveDataSubscription = TableRefreshSubscription(
       'caretaker-shell-live-data',
       const [
@@ -55,6 +56,7 @@ class _CaretakerShellState extends State<CaretakerShell>
         'visitor_events',
         'curfew_requests',
         'gate_events',
+        'confidential_reports',
       ],
       () => unawaited(_refreshLiveData()),
     );
@@ -78,6 +80,7 @@ class _CaretakerShellState extends State<CaretakerShell>
         await controller.loadTenants(force: true);
         await controller.loadGateEvents(force: true);
         await controller.loadVisitors(force: true);
+        await controller.loadConcerns(force: true);
       } finally {
         _refreshInFlight = false;
       }
@@ -98,26 +101,8 @@ class _CaretakerShellState extends State<CaretakerShell>
     super.dispose();
   }
 
-  Widget? _notificationDestination(AppNotificationItem notification) {
-    final routeType = notification.routeType?.trim();
-    final route = (routeType == null || routeType.isEmpty
-            ? notification.notificationType.trim()
-            : routeType)
-        .toLowerCase();
-    return switch (route) {
-      'message' || 'conversation' => OwnerMessagingPage(
-          initialConversationId: notification.routeId,
-        ),
-      'payment' => const PaymentVerificationPage(),
-      'maintenance' => const MaintenanceManagementPage(),
-      'conduct_case' => const StaffConductCasesPage(),
-      'visitor' => const VisitorManagementPage(),
-      'curfew' || 'gate' || 'gate_event' => const GeofenceMonitoringPage(),
-      'announcement' => const AnnouncementsManagementPage(),
-      'inspection' => const RoomMonitoringPage(),
-      _ => null,
-    };
-  }
+  Widget _notificationDestination(AppNotificationItem notification) =>
+      notificationDestination(notification, UserRole.caretaker);
 
   @override
   Widget build(BuildContext context) => RoleGuard(

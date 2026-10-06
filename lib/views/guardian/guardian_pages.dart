@@ -1,3 +1,4 @@
+import '../shared/notification_destination.dart';
 import '../shared/staff_message_contacts.dart';
 import 'package:flutter/material.dart';
 import '../shared/security_deposit_card.dart';
@@ -919,7 +920,10 @@ class _GuardianPresenceMonitoringPageState
           final approvedCount = allRequests.where((r) => r.isApproved).length;
           final rejectedCount = allRequests.where((r) => r.isRejected).length;
 
-          final displayedRequests = switch (_filter) {
+          final targetRequest = NotificationTarget.recordIdOf(context, 'curfew');
+          final displayedRequests = targetRequest != null
+              ? allRequests.where((r) => r.id == targetRequest).toList()
+              : switch (_filter) {
             'pending' => allRequests
                 .where((r) =>
                     r.isPendingGuardian ||
@@ -2161,7 +2165,7 @@ class GuardianPaymentStatusPage extends StatelessWidget {
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
-          final payments = List<Payment>.from(controller.payments)
+          final payments = List<Payment>.from(controller.payments.where((p) => NotificationTarget.recordIdOf(context, 'payment') == null || p.id == NotificationTarget.recordIdOf(context, 'payment')))
             ..sort((a, b) {
               final aOpen = !a.isVerified && !a.isVoided;
               final bOpen = !b.isVerified && !b.isVoided;
@@ -2440,7 +2444,9 @@ class _GuardianAnnouncementsPageState extends State<GuardianAnnouncementsPage> {
   @override
   Widget build(BuildContext context) {
     final rawList = _announcements ?? [];
+    final targetAnnouncement = NotificationTarget.recordIdOf(context, 'announcement');
     final filtered = rawList.where((item) {
+      if (targetAnnouncement != null) return item.id == targetAnnouncement;
       if (_selectedCategory != 'all' &&
           item.category.toLowerCase() != _selectedCategory) {
         return false;

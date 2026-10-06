@@ -97,7 +97,17 @@ class PushNotificationService {
       );
 
       final initial = await FirebaseMessaging.instance.getInitialMessage();
-      if (initial != null) _pendingOpen = initial.data;
+      if (initial != null) _publishOpen(initial.data);
+      final localLaunch = await _local.getNotificationAppLaunchDetails();
+      final localPayload = localLaunch?.notificationResponse?.payload;
+      if (localLaunch?.didNotificationLaunchApp == true &&
+          localPayload != null &&
+          localPayload.isNotEmpty) {
+        try {
+          _publishOpen(
+              Map<String, dynamic>.from(jsonDecode(localPayload) as Map));
+        } catch (_) {}
+      }
       _available = true;
     } catch (error) {
       debugPrint('Push notification initialization unavailable: $error');
@@ -174,6 +184,7 @@ class PushNotificationService {
   }
 
   Future<void> revokeCurrentToken() async {
+    _pendingOpen = null;
     if (!_available) return;
     try {
       final token = await FirebaseMessaging.instance.getToken();
@@ -224,7 +235,8 @@ class PushNotificationService {
   }
 
   void _publishOpen(Map<String, dynamic> data) {
-    if (SupabaseConfig.clientSafe?.auth.currentUser == null) {
+    if (SupabaseConfig.clientSafe?.auth.currentUser == null ||
+        !_openedController.hasListener) {
       _pendingOpen = data;
       return;
     }

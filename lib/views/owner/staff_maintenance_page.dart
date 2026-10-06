@@ -444,7 +444,7 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                       onTap: () async {
                         await Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) => _StaffMaintenanceDetailsPage(
+                            builder: (_) => StaffMaintenanceDetailsPage(
                               id: report.id,
                               initialReport: report,
                             ),
@@ -662,22 +662,23 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
   }
 }
 
-class _StaffMaintenanceDetailsPage extends StatefulWidget {
-  const _StaffMaintenanceDetailsPage({
+class StaffMaintenanceDetailsPage extends StatefulWidget {
+  const StaffMaintenanceDetailsPage({
     required this.id,
     this.initialReport,
+    super.key,
   });
 
   final String id;
   final StaffMaintenanceReport? initialReport;
 
   @override
-  State<_StaffMaintenanceDetailsPage> createState() =>
-      _StaffMaintenanceDetailsPageState();
+  State<StaffMaintenanceDetailsPage> createState() =>
+      StaffMaintenanceDetailsPageState();
 }
 
-class _StaffMaintenanceDetailsPageState
-    extends State<_StaffMaintenanceDetailsPage> {
+class StaffMaintenanceDetailsPageState
+    extends State<StaffMaintenanceDetailsPage> {
   final _service = const StaffMaintenanceService();
   final _notes = TextEditingController();
 

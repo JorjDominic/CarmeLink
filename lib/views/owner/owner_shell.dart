@@ -1,3 +1,4 @@
+import '../shared/notification_destination.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -8,7 +9,6 @@ import '../../models/models.dart';
 import '../../services/app_notification_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../shared/shared_views.dart';
-import '../shared/conduct_case_pages.dart';
 import '../shared/account_management_page.dart';
 import 'guardian_link_management_page.dart';
 import 'contracts_page.dart';
@@ -103,27 +103,8 @@ class _OwnerShellState extends State<OwnerShell> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  Widget? _notificationDestination(AppNotificationItem notification) {
-    final routeType = notification.routeType?.trim();
-    final route = (routeType == null || routeType.isEmpty
-            ? notification.notificationType.trim()
-            : routeType)
-        .toLowerCase();
-    return switch (route) {
-      'message' || 'conversation' => OwnerMessagingPage(
-          initialConversationId: notification.routeId,
-        ),
-      'payment' => const PaymentVerificationPage(),
-      'maintenance' => const MaintenanceManagementPage(),
-      'confidential_report' => const ConfidentialReportsPage(),
-      'conduct_case' => const StaffConductCasesPage(),
-      'visitor' => const VisitorManagementPage(),
-      'curfew' || 'gate' || 'gate_event' => const GeofenceMonitoringPage(),
-      'announcement' => const AnnouncementsManagementPage(),
-      'inspection' => const RoomMonitoringPage(),
-      _ => null,
-    };
-  }
+  Widget _notificationDestination(AppNotificationItem notification) =>
+      notificationDestination(notification, UserRole.owner);
 
   @override
   Widget build(BuildContext context) => RoleGuard(

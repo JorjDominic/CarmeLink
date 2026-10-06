@@ -1,3 +1,4 @@
+import 'notification_destination.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -291,7 +292,9 @@ class _StaffRoomInspectionsPageState extends State<StaffRoomInspectionsPage> {
           (item) => item.status == 'scheduled' || item.status == 'in_progress',
         )
         .length;
-    final visible = _visibleInspections(inspections, scope, sort);
+    final targetInspection = NotificationTarget.recordIdOf(context, 'inspection');
+    final visible = targetInspection == null ? _visibleInspections(inspections, scope, sort)
+        : inspections.where((item) => item.id == targetInspection).toList();
 
     return PageFrame(
       heroTitle: 'Inspections',
@@ -1210,7 +1213,9 @@ class _TenantRoomInspectionsPageState extends State<TenantRoomInspectionsPage> {
         .where((item) =>
             item.status == 'scheduled' || item.status == 'in_progress')
         .length;
-    final visible = _visibleInspections(inspections, scope, sort);
+    final targetInspection = NotificationTarget.recordIdOf(context, 'inspection');
+    final visible = targetInspection == null ? _visibleInspections(inspections, scope, sort)
+        : inspections.where((item) => item.id == targetInspection).toList();
     return PageFrame(
       title: 'Inspections',
       subtitle: 'Inspection notices, findings, and follow-up',

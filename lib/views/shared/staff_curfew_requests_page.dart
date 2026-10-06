@@ -4,6 +4,7 @@ import '../../controllers/owner_controller.dart';
 import '../../models/models.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../core/widgets/common_widgets.dart';
+import 'notification_destination.dart';
 
 class StaffCurfewRequestsPage extends StatefulWidget {
   const StaffCurfewRequestsPage({super.key});
@@ -98,7 +99,9 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
             if (controller.curfewError != null) Text(controller.curfewError!),
             if (!controller.curfewLoading && controller.curfewRequests.isEmpty)
               const Text('No curfew requests recorded.'),
-            for (final request in controller.curfewRequests)
+            for (final request in controller.curfewRequests.where((request) =>
+                NotificationTarget.recordIdOf(context, 'curfew') == null ||
+                request.id == NotificationTarget.recordIdOf(context, 'curfew')))
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),

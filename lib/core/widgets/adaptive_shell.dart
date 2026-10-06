@@ -219,7 +219,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 
       _notificationSubscription = AppNotificationService.instance
           .streamMyNotifications(limit: 30)
-          .listen(_onNotificationSnapshot);
+          .listen(_onNotificationSnapshot, onError: (Object error) {
+        debugPrint('Notification realtime unavailable; polling remains active: $error');
+      });
 
       // app_notifications may not be enabled in the Realtime publication on
       // every deployed environment yet. Polling is a catch-up fallback only;
@@ -321,6 +323,10 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   Future<void> _openNotificationDestination(AppNotificationItem item) async {
     final destination = widget.notificationPageBuilder?.call(item);
     if (!mounted || destination == null) return;
+    if (!item.isRead) {
+      unawaited(AppNotificationService.instance.markAsRead(item.id)
+          .then((_) => _refreshUnreadNotificationCount()));
+    }
     if (CarmeLinkSurfaceScope.isWebPortal(context)) {
       final route = (item.routeType?.trim().isNotEmpty == true
               ? item.routeType!

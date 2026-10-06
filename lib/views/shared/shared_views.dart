@@ -22,6 +22,7 @@ import '../tenant/tenant_requirements_page.dart';
 import 'profile_edit_page.dart';
 import 'move_out_settlement_page.dart';
 import 'signature_pad_dialog.dart';
+import 'notification_destination.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({
@@ -323,7 +324,16 @@ class _NotificationsPageState extends State<NotificationsPage> {
           if (!item.isRead) {
             unawaited(_markRead(item));
           }
-          await widget.onOpenNotification?.call(item);
+          if (widget.onOpenNotification != null) {
+            await widget.onOpenNotification?.call(item);
+          } else {
+            final role = SessionController.instance.currentUser?.role;
+            if (role != null && context.mounted) {
+              await Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => notificationDestination(item, role),
+              ));
+            }
+          }
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

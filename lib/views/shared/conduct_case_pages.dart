@@ -39,7 +39,9 @@ List<ConductCaseRecord> _visibleCases(
 }
 
 class StaffConductCasesPage extends StatefulWidget {
-  const StaffConductCasesPage({super.key});
+  const StaffConductCasesPage({super.key, this.initialCaseId});
+
+  final String? initialCaseId;
 
   @override
   State<StaffConductCasesPage> createState() => _StaffConductCasesPageState();
@@ -365,6 +367,17 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final requestedId = widget.initialCaseId;
+    if (requestedId != null && !loading && errorMessage == null) {
+      final selected = cases.where((record) => record.id == requestedId).firstOrNull;
+      if (selected == null) {
+        return const PageFrame(title: 'Conduct case',
+          subtitle: 'This record is no longer available to your account.',
+          child: SizedBox.shrink());
+      }
+      return StaffConductCaseDetailPage(initialRecord: selected, repeatCount: _repeatCount(selected));
+    }
+
     final active =
         cases.where((record) => !conductCaseIsClosed(record.status)).length;
     final visible = _visibleCases(cases, scope, sort);
@@ -1148,7 +1161,9 @@ class _StaffConductCaseDetailPageState
 }
 
 class TenantConductCasesPage extends StatefulWidget {
-  const TenantConductCasesPage({super.key});
+  const TenantConductCasesPage({super.key, this.initialCaseId});
+
+  final String? initialCaseId;
 
   @override
   State<TenantConductCasesPage> createState() => _TenantConductCasesPageState();
@@ -1222,6 +1237,17 @@ class _TenantConductCasesPageState extends State<TenantConductCasesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final requestedId = widget.initialCaseId;
+    if (requestedId != null && !loading && errorMessage == null) {
+      final selected = cases.where((record) => record.id == requestedId).firstOrNull;
+      if (selected == null) {
+        return const PageFrame(title: 'Conduct case',
+          subtitle: 'This record is no longer available to your account.',
+          child: SizedBox.shrink());
+      }
+      return TenantConductCaseDetailPage(initialRecord: selected);
+    }
+
     final active =
         cases.where((record) => !conductCaseIsClosed(record.status)).length;
     final visible = _visibleCases(cases, scope, sort);

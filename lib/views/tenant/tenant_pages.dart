@@ -1,3 +1,4 @@
+import '../shared/notification_destination.dart';
 import '../shared/staff_message_contacts.dart';
 import 'dart:typed_data';
 
@@ -1708,7 +1709,16 @@ class TenantBillingDetailsPage extends StatelessWidget {
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
-          final payments = List<Payment>.from(controller.payments);
+          final targetPayment = NotificationTarget.recordIdOf(context, 'payment');
+          final payments = controller.payments.where((p) => targetPayment == null || p.id == targetPayment).toList();
+          if (targetPayment != null) {
+            if (controller.paymentsLoading && payments.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            return payments.isEmpty
+                ? Text(controller.paymentsError ?? 'This payment is no longer available.')
+                : _TenantPaymentCard(payment: payments.first);
+          }
           final openBills = payments
               .where((p) => !p.isVoided && p.outstandingAmount > 0)
               .toList()
@@ -3257,7 +3267,7 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
   @override
   void initState() {
     super.initState();
-    controller.loadMaintenance();
+    controller.loadMaintenance(force: true);
     subscription = TableRefreshSubscription(
       'tenant-maintenance',
       ['maintenance_reports'],
@@ -3747,7 +3757,10 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
           final resolvedCount = reports.where((r) => r.isResolved).length;
           final cancelledCount = reports.where((r) => r.isCancelled).length;
 
-          final filteredReports = switch (_selectedFilter) {
+          final targetReport = NotificationTarget.recordIdOf(context, 'maintenance');
+          final filteredReports = targetReport != null
+              ? reports.where((report) => report.id == targetReport).toList()
+              : switch (_selectedFilter) {
             'Active' =>
               reports.where((r) => !r.isResolved && !r.isCancelled).toList(),
             'Pending' => reports.where((r) => r.isPending).toList(),
@@ -4776,7 +4789,9 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
   @override
   Widget build(BuildContext context) {
     final rawList = _announcements ?? [];
+    final targetAnnouncement = NotificationTarget.recordIdOf(context, 'announcement');
     final filtered = rawList.where((item) {
+      if (targetAnnouncement != null) return item.id == targetAnnouncement;
       if (_selectedCategory != 'all' &&
           item.category.toLowerCase() != _selectedCategory) {
         return false;
@@ -5151,8 +5166,8 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        TenantController.instance.loadCurfewRequests();
-        TenantController.instance.loadGateEvents();
+        TenantController.instance.loadCurfewRequests(force: true);
+        TenantController.instance.loadGateEvents(force: true);
         _loadMonitoringStatus(sync: true);
         _checkBackgroundPermission();
       }
@@ -5289,9 +5304,9 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
               .where((item) => !item.isPending && !item.isApproved)
               .toList();
           final visibleRequests = List<CurfewRequest>.from(
-            requestScope == RecordListScope.active
-                ? activeRequests
-                : historyRequests,
+            NotificationTarget.recordIdOf(context, 'curfew') != null
+                ? requests.where((item) => item.id == NotificationTarget.recordIdOf(context, 'curfew'))
+                : requestScope == RecordListScope.active ? activeRequests : historyRequests,
           )..sort((a, b) => switch (requestSort) {
                 RecordListSort.oldest =>
                   a.departureTime.compareTo(b.departureTime),
@@ -6713,7 +6728,7 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
     schedule = VisitorPolicy.defaultArrival();
     expectedDepartureAt = VisitorPolicy.defaultDeparture(schedule);
 
-    TenantController.instance.loadVisitors();
+    TenantController.instance.loadVisitors(force: true);
     _subscription = TableRefreshSubscription(
       'tenant-visitors',
       const ['visitor_requests', 'visitor_events'],
@@ -6742,6 +6757,7 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (NotificationTarget.recordIdOf(context, 'visitor') == null) ...[
             CarmelitaCard(
               padding: const EdgeInsets.all(14),
               child: Row(
@@ -6930,6 +6946,7 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
               ),
             ],
             const SizedBox(height: 24),
+            ],
             AnimatedBuilder(
               animation: TenantController.instance,
               builder: (context, _) {
@@ -6943,9 +6960,9 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
                         item.isRejected || item.isCancelled || item.isCompleted)
                     .toList();
                 final visible = List<VisitorRequest>.from(
-                  visitorScope == RecordListScope.active
-                      ? activeRequests
-                      : historyRequests,
+                  NotificationTarget.recordIdOf(context, 'visitor') != null
+                      ? controller.visitors.where((item) => item.id == NotificationTarget.recordIdOf(context, 'visitor'))
+                      : visitorScope == RecordListScope.active ? activeRequests : historyRequests,
                 )..sort((a, b) => switch (visitorSort) {
                       RecordListSort.oldest => a.schedule.compareTo(b.schedule),
                       RecordListSort.status => a.status.compareTo(b.status),
@@ -7107,22 +7124,53 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: TenantController.instance,
-        builder: (context, _) => _buildContent(context),
-      );
+    animation: TenantController.instance,
+    builder: (context, _) => _buildContent(context),
+  );
 
   Widget _buildContent(BuildContext context) {
     final concerns = TenantController.instance.concerns;
     final activeConcerns = concerns.where((item) => !item.isResolved).toList();
     final historyConcerns = concerns.where((item) => item.isResolved).toList();
     final visibleConcerns = List<ConcernReport>.from(
-      concernScope == RecordListScope.active ? activeConcerns : historyConcerns,
+      NotificationTarget.recordIdOf(context, 'confidential_report') != null
+          ? concerns.where((item) => item.id == NotificationTarget.recordIdOf(context, 'confidential_report'))
+          : concernScope == RecordListScope.active ? activeConcerns : historyConcerns,
     )..sort((a, b) => switch (concernSort) {
           RecordListSort.oldest => a.createdAt.compareTo(b.createdAt),
           RecordListSort.status => a.status.compareTo(b.status),
           RecordListSort.title => a.category.compareTo(b.category),
           _ => b.createdAt.compareTo(a.createdAt),
         });
+    final targetId = NotificationTarget.recordIdOf(context, 'confidential_report');
+    if (targetId != null) {
+      final controller = TenantController.instance;
+      final report = visibleConcerns.firstOrNull;
+      return PageFrame(
+        title: 'Confidential report',
+        subtitle: report?.category ?? 'Report details',
+        onRefresh: () => controller.loadConcerns(force: true),
+        child: report == null
+            ? controller.concernsLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Text(controller.concernsError ?? 'This report is no longer available.')
+            : CarmelitaCard(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  StatusPill(report.status),
+                  const SizedBox(height: 12),
+                  SelectableText(report.summary),
+                  const SizedBox(height: 12),
+                  Text(shortDate(report.createdAt)),
+                  if (report.responseNotes.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Text('Staff response', style: TextStyle(fontWeight: FontWeight.w700)),
+                    SelectableText(report.responseNotes),
+                  ],
+                ],
+              )),
+      );
+    }
     return PageFrame(
       title: 'Concern',
       subtitle: 'Safety, rules, or roommate concerns',

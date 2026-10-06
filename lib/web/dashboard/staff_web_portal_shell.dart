@@ -1,3 +1,4 @@
+import '../../views/shared/notification_destination.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -140,13 +141,9 @@ abstract final class StaffWebDestinations {
         label: 'Report management',
         icon: Icons.assignment_outlined,
         selectedIcon: Icons.assignment,
-        page: owner
-            ? const ReportManagementPage()
-            : const MaintenanceManagementPage(),
+        page: const ReportManagementPage(),
         webGroup: 'Billing & Records',
-        webDescription: owner
-            ? 'Maintenance and confidential reports'
-            : 'Maintenance reports and repair progress',
+        webDescription: 'Maintenance and confidential reports',
       ),
       if (owner) ...[
         const AppDestination(
@@ -357,29 +354,8 @@ class _StaffWebPortalShellState extends State<StaffWebPortalShell>
     }
   }
 
-  Widget? _notificationDestination(AppNotificationItem notification) {
-    final routeType = notification.routeType?.trim().toLowerCase();
-    final route = routeType == null || routeType.isEmpty
-        ? notification.notificationType.trim().toLowerCase()
-        : routeType;
-    return switch (route) {
-      'payment' => const PaymentVerificationPage(),
-      'maintenance' => const MaintenanceManagementPage(),
-      'confidential_report' => widget.role == UserRole.owner
-          ? const ConfidentialReportsPage()
-          : null,
-      'visitor' => const VisitorManagementPage(),
-      'curfew' || 'gate' || 'gate_event' => const GeofenceMonitoringPage(),
-      'conduct_case' => const StaffConductCasesPage(),
-      'inspection' => const RoomMonitoringPage(),
-      'announcement' => const AnnouncementsManagementPage(),
-      'message' || 'conversation' => OwnerMessagingPage(
-          initialConversationId: notification.routeId,
-        ),
-      'onboarding' => const TenantDirectoryPage(),
-      _ => null,
-    };
-  }
+  Widget _notificationDestination(AppNotificationItem notification) =>
+      notificationDestination(notification, widget.role);
 
   @override
   void didUpdateWidget(covariant StaffWebPortalShell oldWidget) {

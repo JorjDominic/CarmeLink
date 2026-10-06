@@ -52,6 +52,48 @@ class AppNotificationItem {
   final DateTime? readAt;
 
   bool get isRead => readAt != null;
+
+  String get destinationType {
+    final route = routeType?.trim().toLowerCase();
+    return route == null || route.isEmpty
+        ? notificationType.trim().toLowerCase()
+        : route;
+  }
+
+  String? get destinationId {
+    final direct = routeId?.trim();
+    if (direct != null && direct.isNotEmpty) return direct;
+    final key = switch (destinationType) {
+      'conduct_case' => 'case_id',
+      'confidential_report' || 'maintenance' => 'report_id',
+      'message' || 'conversation' => 'conversation_id',
+      'payment' => 'payment_id',
+      'curfew' => 'request_id',
+      'visitor' => 'pass_id',
+      'announcement' => 'announcement_id',
+      'inspection' => 'inspection_id',
+      'gate' || 'gate_event' => 'event_id',
+      _ => '',
+    };
+    final value = data[key]?.toString().trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  factory AppNotificationItem.fromPush(Map<String, dynamic> payload,
+      {required String recipientId}) {
+    return AppNotificationItem(
+      id: payload['notification_id']?.toString() ?? '',
+      recipientId: recipientId,
+      notificationType: payload['notification_type']?.toString() ?? 'system',
+      title: payload['title']?.toString() ?? 'CarmeLink update',
+      body: payload['body']?.toString() ??
+          'Open Notifications to view this update.',
+      routeType: payload['route_type']?.toString(),
+      routeId: payload['route_id']?.toString(),
+      data: Map<String, dynamic>.from(payload),
+      createdAt: DateTime.now(),
+    );
+  }
 }
 
 class AppNotificationService {
@@ -80,8 +122,8 @@ class AppNotificationService {
 
     try {
       final payload = <String, dynamic>{
-        'title': title.trim(),
-        'body': body.trim(),
+        'title': String.fromCharCodes(title.trim().runes.take(120)),
+        'body': String.fromCharCodes(body.trim().runes.take(500)),
         'notification_type': notificationType.trim().toLowerCase(),
         if (recipientId != null && recipientId.isNotEmpty)
           'recipient_id': recipientId,
@@ -103,6 +145,15 @@ class AppNotificationService {
       );
 
       if (response.status >= 200 && response.status < 300) {
+        final result = response.data;
+        if (result is! Map ||
+            result['created'] is! num ||
+            result['recipients'] is! num ||
+            (result['created'] as num) <= 0 ||
+            (result['created'] as num) < (result['recipients'] as num)) {
+          debugPrint('Notification was not saved for every recipient: $result');
+          return false;
+        }
         debugPrint(
             'FCM Notification dispatched successfully: ${response.data}');
         return true;
@@ -729,5 +780,18 @@ class AppNotificationService {
       // Retention cleanup is best-effort and must never block app startup.
       debugPrint('Notification retention cleanup skipped: $e');
     }
+  }
+
+  Future<AppNotificationItem?> fetchNotification(String id) async {
+    final client = _client;
+    final user = client?.auth.currentUser;
+    if (client == null || user == null || id.isEmpty) return null;
+    final row = await client
+        .from('app_notifications')
+        .select()
+        .eq('id', id)
+        .eq('recipient_id', user.id)
+        .maybeSingle();
+    return row == null ? null : AppNotificationItem.fromRow(row);
   }
 }
