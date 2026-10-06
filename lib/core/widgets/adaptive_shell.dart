@@ -329,6 +329,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       final label = switch (route) {
         'payment' => 'Payment verification',
         'maintenance' => 'Report management',
+        'confidential_report' => 'Confidential reports',
         'visitor' => 'Visitors',
         'curfew' || 'gate' || 'gate_event' => 'Presence & Curfew',
         'conduct_case' || 'safety' => 'Conduct & Cases',

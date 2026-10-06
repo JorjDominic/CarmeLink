@@ -4,6 +4,29 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('staff notification deep-link contract', () {
+    test('report notifications have role-appropriate destinations', () {
+      final tenant =
+          File('lib/views/tenant/tenant_shell.dart').readAsStringSync();
+      final owner = File('lib/views/owner/owner_shell.dart').readAsStringSync();
+      final caretaker =
+          File('lib/views/caretaker/caretaker_shell.dart').readAsStringSync();
+      final web = File('lib/web/dashboard/staff_web_portal_shell.dart')
+          .readAsStringSync();
+      expect(tenant,
+          contains("'confidential_report' => const ConfidentialConcernPage()"));
+      expect(owner,
+          contains("'confidential_report' => const ConfidentialReportsPage()"));
+      expect(caretaker, isNot(contains("'confidential_report' =>")));
+      expect(web,
+          contains("'confidential_report' => widget.role == UserRole.owner"));
+      expect(
+          tenant, contains("'conduct_case' => const TenantConductCasesPage()"));
+      for (final source in [owner, caretaker, web]) {
+        expect(source,
+            contains("'conduct_case' => const StaffConductCasesPage()"));
+      }
+    });
+
     test(
         'notification rows invoke the shell navigation callback after read state',
         () {
@@ -35,8 +58,7 @@ void main() {
       expect(source.contains("group: 'Updates'"), isTrue);
       expect(source.contains('Navigator.of(context).push'), isTrue);
       expect(source.contains('onNotifications: _openNotifications'), isTrue);
-      expect(source.contains('onPressed: widget.onNotifications'), isTrue);
-      // Original (main): expect(source.contains('onTap: onOpenNotifications'), isTrue);
+      expect(source.contains('onTap: onOpenNotifications'), isTrue);
     });
 
     test(

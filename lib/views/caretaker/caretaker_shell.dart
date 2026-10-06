@@ -11,6 +11,7 @@ import '../../services/table_refresh_subscription.dart';
 import '../owner/owner_pages.dart';
 import '../owner/room_monitoring_page.dart';
 import '../shared/shared_views.dart';
+import '../shared/conduct_case_pages.dart';
 import '../shared/account_management_page.dart';
 
 /// Operational workspace that excludes owner-only financial and analytics UI.
@@ -109,6 +110,7 @@ class _CaretakerShellState extends State<CaretakerShell>
         ),
       'payment' => const PaymentVerificationPage(),
       'maintenance' => const MaintenanceManagementPage(),
+      'conduct_case' => const StaffConductCasesPage(),
       'visitor' => const VisitorManagementPage(),
       'curfew' || 'gate' || 'gate_event' => const GeofenceMonitoringPage(),
       'announcement' => const AnnouncementsManagementPage(),

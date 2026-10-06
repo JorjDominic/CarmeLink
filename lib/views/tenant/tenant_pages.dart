@@ -7096,7 +7096,7 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
   @override
   void initState() {
     super.initState();
-    TenantController.instance.loadConcerns();
+    TenantController.instance.loadConcerns(force: true);
   }
 
   @override
@@ -7106,7 +7106,12 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: TenantController.instance,
+        builder: (context, _) => _buildContent(context),
+      );
+
+  Widget _buildContent(BuildContext context) {
     final concerns = TenantController.instance.concerns;
     final activeConcerns = concerns.where((item) => !item.isResolved).toList();
     final historyConcerns = concerns.where((item) => item.isResolved).toList();

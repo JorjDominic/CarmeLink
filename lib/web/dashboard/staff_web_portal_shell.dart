@@ -365,6 +365,9 @@ class _StaffWebPortalShellState extends State<StaffWebPortalShell>
     return switch (route) {
       'payment' => const PaymentVerificationPage(),
       'maintenance' => const MaintenanceManagementPage(),
+      'confidential_report' => widget.role == UserRole.owner
+          ? const ConfidentialReportsPage()
+          : null,
       'visitor' => const VisitorManagementPage(),
       'curfew' || 'gate' || 'gate_event' => const GeofenceMonitoringPage(),
       'conduct_case' => const StaffConductCasesPage(),

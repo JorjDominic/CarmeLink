@@ -13,6 +13,7 @@ import '../../services/geofence_scheduler.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../controllers/session_controller.dart';
 import '../shared/shared_views.dart';
+import '../shared/conduct_case_pages.dart';
 import 'tenant_access_gate.dart';
 import 'tenant_pages.dart';
 
@@ -136,6 +137,8 @@ class _TenantShellState extends State<TenantShell> with WidgetsBindingObserver {
           : const TenantMessagesPage(),
       'payment' => const PaymentsPage(),
       'maintenance' => const MaintenanceReportsPage(),
+      'confidential_report' => const ConfidentialConcernPage(),
+      'conduct_case' => const TenantConductCasesPage(),
       'visitor' => const VisitorRequestPage(),
       'curfew' ||
       'gate' ||
