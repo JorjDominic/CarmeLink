@@ -4962,6 +4962,9 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
   final TextEditingController _notesController = TextEditingController();
   String _selectedReason = 'Screenshot is blurred or unreadable';
 
+  bool get _requiresSpecificReason =>
+      _selectedReason == 'Other reason (details below)';
+
   final List<String> _quickReasons = const [
     'Screenshot is blurred or unreadable',
     'Reference number not found in GCash/Bank records',
@@ -5074,10 +5077,14 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
             TextField(
               controller: _notesController,
               maxLines: 2,
-              decoration: const InputDecoration(
-                hintText: 'Additional remarks / instructions for tenant...',
-                labelText: 'Remarks (Optional)',
-                border: OutlineInputBorder(
+              decoration: InputDecoration(
+                hintText: _requiresSpecificReason
+                    ? 'Please specify the rejection reason'
+                    : 'Additional remarks / instructions for tenant...',
+                labelText: _requiresSpecificReason
+                    ? 'Please specify reason'
+                    : 'Remarks (Optional)',
+                border: const OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(12)),
                 ),
               ),
@@ -5096,6 +5103,13 @@ class _RejectReasonSheetState extends State<_RejectReasonSheet> {
                   ),
                   onPressed: () {
                     final extra = _notesController.text.trim();
+                    if (_requiresSpecificReason && extra.length < 2) {
+                      showAppSnackBar(
+                        context,
+                        'Please specify the rejection reason.',
+                      );
+                      return;
+                    }
                     final fullReason = extra.isNotEmpty
                         ? '$_selectedReason: $extra'
                         : _selectedReason;

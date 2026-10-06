@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/natural_sort.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/numbered_pagination.dart';
 import '../../services/room_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/tenant_service.dart';
@@ -65,6 +66,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
   String? errorMessage;
   String _roomQuery = '';
   String _availabilityFilter = 'all';
+  int _roomPage = 1;
   int _requestVersion = 0;
   Timer? _debounceTimer;
   late final TableRefreshSubscription subscription;
@@ -118,6 +120,15 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
         });
       }
     }
+  }
+
+  Future<void> _openFloorManagement() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const FloorManagementPage(),
+      ),
+    );
+    if (mounted) await _loadRooms();
   }
 
   Future<void> _addRoom() async {
@@ -218,6 +229,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
   @override
   Widget build(BuildContext context) {
     final currentRooms = rooms;
+    final compactActions = MediaQuery.sizeOf(context).width < 700;
 
     Widget body;
     if (loading && currentRooms == null) {
@@ -255,10 +267,22 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
           0, (sum, room) => sum + room.physicallyAvailable);
       final orderedRooms = List<RoomRecord>.from(currentRooms)
         ..sort((a, b) => compareNaturalLabels(a.number, b.number));
-      final visibleRooms = kIsWeb
-          ? filterRoomDirectory(orderedRooms,
-              query: _roomQuery, availability: _availabilityFilter)
-          : orderedRooms;
+      final visibleRooms = filterRoomDirectory(
+        orderedRooms,
+        query: _roomQuery,
+        availability: _availabilityFilter,
+      );
+      final roomPageSize = MediaQuery.sizeOf(context).width < 600 ? 6 : 8;
+      final roomPageCount = visibleRooms.isEmpty
+          ? 1
+          : (visibleRooms.length + roomPageSize - 1) ~/ roomPageSize;
+      final safeRoomPage =
+          _roomPage > roomPageCount ? roomPageCount : _roomPage;
+      final roomPageStart = (safeRoomPage - 1) * roomPageSize;
+      final pagedRooms = visibleRooms
+          .skip(roomPageStart)
+          .take(roomPageSize)
+          .toList(growable: false);
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -310,48 +334,77 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
             ],
           ),
           const SizedBox(height: 18),
-          if (kIsWeb && _viewMode == RoomViewMode.list) ...[
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                SizedBox(
-                  width: 300,
-                  child: TextField(
-                    key: const Key('web-room-search'),
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      hintText: 'Search room number or floor',
+          if (_viewMode == RoomViewMode.list) ...[
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final narrow = constraints.maxWidth < 620;
+                final search = TextField(
+                  key: const Key('web-room-search'),
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Search room number or floor',
+                  ),
+                  onChanged: (value) => setState(() {
+                    _roomQuery = value;
+                    _roomPage = 1;
+                  }),
+                );
+                final filter = DropdownButtonFormField<String>(
+                  key: const Key('web-room-availability-filter'),
+                  initialValue: _availabilityFilter,
+                  decoration: const InputDecoration(labelText: 'Availability'),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All rooms')),
+                    DropdownMenuItem(
+                      value: 'available',
+                      child: Text('Beds available'),
                     ),
-                    onChanged: (value) => setState(() => _roomQuery = value),
-                  ),
-                ),
-                SizedBox(
-                  width: 200,
-                  child: DropdownButtonFormField<String>(
-                    key: const Key('web-room-availability-filter'),
-                    initialValue: _availabilityFilter,
-                    decoration:
-                        const InputDecoration(labelText: 'Availability'),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('All rooms')),
-                      DropdownMenuItem(
-                          value: 'available', child: Text('Beds available')),
-                      DropdownMenuItem(
-                          value: 'full', child: Text('Fully occupied')),
-                      DropdownMenuItem(
-                          value: 'archived', child: Text('Archived rooms')),
+                    DropdownMenuItem(
+                      value: 'full',
+                      child: Text('Fully occupied'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'archived',
+                      child: Text('Archived rooms'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _availabilityFilter = value;
+                        _roomPage = 1;
+                      });
+                    }
+                  },
+                );
+
+                if (narrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      search,
+                      const SizedBox(height: 10),
+                      filter,
+                      const SizedBox(height: 8),
+                      Text(
+                        '${visibleRooms.length} of ${currentRooms.length} rooms',
+                      ),
                     ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _availabilityFilter = value);
-                      }
-                    },
-                  ),
-                ),
-                Text('${visibleRooms.length} of ${currentRooms.length} rooms'),
-              ],
+                  );
+                }
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    SizedBox(width: 300, child: search),
+                    SizedBox(width: 200, child: filter),
+                    Text(
+                      '${visibleRooms.length} of ${currentRooms.length} rooms',
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 14),
           ],
@@ -365,7 +418,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
             else
               AdaptiveGrid(
                 minTileWidth: 260,
-                children: visibleRooms
+                children: pagedRooms
                     .map((room) => Column(children: [
                           roomCard(room),
                           if (SessionController.instance.currentUser?.role ==
@@ -384,6 +437,13 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                         ]))
                     .toList(),
               ),
+            NumberedPaginationBar(
+              currentPage: safeRoomPage,
+              totalItems: visibleRooms.length,
+              pageSize: roomPageSize,
+              itemLabel: 'rooms',
+              onPageChanged: (page) => setState(() => _roomPage = page),
+            ),
           ] else
             RoomFloorPlanView(
               rooms: orderedRooms.where((room) => room.isActive).toList(),
@@ -393,6 +453,34 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
       );
     }
 
+    final owner =
+        SessionController.instance.currentUser?.role == UserRole.owner;
+    final pageBody = compactActions && owner
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _openFloorManagement,
+                    icon: const Icon(Icons.layers_outlined),
+                    label: const Text('Floor management'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: _addRoom,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add room'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              body,
+            ],
+          )
+        : body;
+
     return PageFrame(
       title: 'Rooms',
       maxWidth: 1400,
@@ -401,28 +489,27 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
           : 'Interactive building layout, occupancy, and room status',
       onRefresh: () => _loadRooms(showSpinner: currentRooms == null),
       actions: [
-        if (SessionController.instance.currentUser?.role == UserRole.owner)
-          IconButton(
-            tooltip: 'Manage floors',
+        if (!compactActions &&
+            SessionController.instance.currentUser?.role == UserRole.owner)
+          OutlinedButton.icon(
+            onPressed: _openFloorManagement,
             icon: const Icon(Icons.layers_outlined),
-            onPressed: () async {
-              await Navigator.of(context).push(MaterialPageRoute<void>(
-                  builder: (_) => const FloorManagementPage()));
-              if (mounted) await _loadRooms();
-            },
+            label: const Text('Floor management'),
           ),
-        if (SessionController.instance.currentUser?.role == UserRole.owner)
+        if (!compactActions &&
+            SessionController.instance.currentUser?.role == UserRole.owner)
           FilledButton.icon(
-              onPressed: _addRoom,
-              icon: const Icon(Icons.add),
-              label: const Text('Add room')),
+            onPressed: _addRoom,
+            icon: const Icon(Icons.add),
+            label: const Text('Add room'),
+          ),
         IconButton(
           onPressed: () => _loadRooms(showSpinner: currentRooms == null),
           tooltip: 'Refresh',
           icon: const Icon(Icons.refresh),
         ),
       ],
-      child: body,
+      child: pageBody,
     );
   }
 

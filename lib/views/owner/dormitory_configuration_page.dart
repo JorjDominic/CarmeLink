@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../core/widgets/searchable_dropdown.dart';
 
 import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/numbered_pagination.dart';
 import '../../core/widgets/role_guard.dart';
+import '../../core/widgets/searchable_dropdown.dart';
 import '../../models/models.dart';
 import '../../services/dormitory_configuration_service.dart';
 
@@ -17,10 +18,12 @@ class DormitoryConfigurationPage extends StatefulWidget {
 class _DormitoryConfigurationPageState
     extends State<DormitoryConfigurationPage> {
   static const _service = DormitoryConfigurationService();
+  static const _pageSize = 6;
 
   String _groupKey = 'maintenance_category';
   String _query = '';
   String _visibility = 'active';
+  int _page = 1;
   List<DormitoryOption> _options = const [];
   bool _loading = true;
   String? _error;
@@ -29,6 +32,10 @@ class _DormitoryConfigurationPageState
   void initState() {
     super.initState();
     _load();
+  }
+
+  void _resetPage() {
+    _page = 1;
   }
 
   Future<void> _load() async {
@@ -57,9 +64,6 @@ class _DormitoryConfigurationPageState
     final label = TextEditingController(text: option?.label ?? '');
     final instructions =
         TextEditingController(text: option?.instructions ?? '');
-    final order = TextEditingController(
-      text: '${option?.sortOrder ?? (_options.length + 1)}',
-    );
     var categoryCode = option?.categoryCode ?? 'rule_violation';
     var saving = false;
     String? message;
@@ -76,12 +80,11 @@ class _DormitoryConfigurationPageState
                 TextField(
                   controller: label,
                   maxLength: 80,
-                  decoration: const InputDecoration(labelText: 'Label'),
-                ),
-                TextField(
-                  controller: order,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Display order'),
+                  decoration: const InputDecoration(
+                    labelText: 'Label',
+                    helperText:
+                        'Choices are sorted alphabetically. Other stays last.',
+                  ),
                 ),
                 if (_groupKey == 'payment_method')
                   TextField(
@@ -107,16 +110,16 @@ class _DormitoryConfigurationPageState
                       ),
                       items: const [
                         DropdownMenuItem(
-                          value: 'safety_concern',
-                          child: Text('Safety concern'),
+                          value: 'roommate_concern',
+                          child: Text('Roommate concern'),
                         ),
                         DropdownMenuItem(
                           value: 'rule_violation',
                           child: Text('Rule violation'),
                         ),
                         DropdownMenuItem(
-                          value: 'roommate_concern',
-                          child: Text('Roommate concern'),
+                          value: 'safety_concern',
+                          child: Text('Safety concern'),
                         ),
                         DropdownMenuItem(
                           value: 'other',
@@ -139,7 +142,12 @@ class _DormitoryConfigurationPageState
                 ],
                 if (message != null) ...[
                   const SizedBox(height: 8),
-                  Text(message!, style: const TextStyle(color: Colors.red)),
+                  Text(
+                    message!,
+                    style: TextStyle(
+                      color: Theme.of(dialogContext).colorScheme.error,
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -153,13 +161,6 @@ class _DormitoryConfigurationPageState
               onPressed: saving
                   ? null
                   : () async {
-                      final position = int.tryParse(order.text.trim());
-                      if (position == null) {
-                        updateDialog(
-                          () => message = 'Enter a valid display order.',
-                        );
-                        return;
-                      }
                       updateDialog(() {
                         saving = true;
                         message = null;
@@ -169,7 +170,6 @@ class _DormitoryConfigurationPageState
                           existing: option,
                           groupKey: _groupKey,
                           label: label.text,
-                          sortOrder: position,
                           categoryCode: categoryCode,
                           instructions: instructions.text,
                         );
@@ -196,8 +196,10 @@ class _DormitoryConfigurationPageState
     await Future<void>.delayed(const Duration(milliseconds: 200));
     label.dispose();
     instructions.dispose();
-    order.dispose();
-    if (mounted) await _load();
+    if (mounted) {
+      setState(_resetPage);
+      await _load();
+    }
   }
 
   Future<void> _toggle(DormitoryOption option) async {
@@ -225,7 +227,10 @@ class _DormitoryConfigurationPageState
 
     try {
       await _service.setActive(option, !option.isActive);
-      if (mounted) await _load();
+      if (mounted) {
+        setState(_resetPage);
+        await _load();
+      }
     } catch (_) {
       if (mounted) {
         showAppSnackBar(context, 'Could not update this choice.');
@@ -235,20 +240,32 @@ class _DormitoryConfigurationPageState
 
   @override
   Widget build(BuildContext context) {
-    final visibleOptions = _options
-        .where(
-          (option) =>
-              option.label.toLowerCase().contains(_query) &&
-              (_visibility == 'all' ||
-                  option.isActive == (_visibility == 'active')),
-        )
-        .toList();
+    final needle = _query.trim().toLowerCase();
+    final visibleOptions = _options.where((option) {
+      final matchesSearch =
+          needle.isEmpty || option.label.toLowerCase().contains(needle);
+      final matchesVisibility =
+          _visibility == 'all' || option.isActive == (_visibility == 'active');
+      return matchesSearch && matchesVisibility;
+    }).toList()
+      ..sort(DormitoryConfigurationService.compareOptions);
+
+    final pageCount = visibleOptions.isEmpty
+        ? 1
+        : (visibleOptions.length + _pageSize - 1) ~/ _pageSize;
+    final safePage = _page > pageCount ? pageCount : _page;
+    final start = (safePage - 1) * _pageSize;
+    final pagedOptions =
+        visibleOptions.skip(start).take(_pageSize).toList(growable: false);
+
+    final groupEntries = DormitoryConfigurationService.sortedGroupEntries();
+
     return RoleGuard(
       allowedRoles: const {UserRole.owner},
       child: PageFrame(
         title: 'Dormitory configuration',
         subtitle:
-            'Manage choices used by new reports while preserving existing history',
+            'Manage choices used by new records while preserving existing history',
         onRefresh: _load,
         actions: [
           IconButton(
@@ -265,8 +282,7 @@ class _DormitoryConfigurationPageState
               decoration:
                   const InputDecoration(labelText: 'Configuration group'),
               items: [
-                for (final entry
-                    in DormitoryConfigurationService.groups.entries)
+                for (final entry in groupEntries)
                   DropdownMenuItem(
                     value: entry.key,
                     child: Text(entry.value),
@@ -277,6 +293,8 @@ class _DormitoryConfigurationPageState
                 setState(() {
                   _groupKey = value;
                   _query = '';
+                  _visibility = 'active';
+                  _resetPage();
                 });
                 _load();
               },
@@ -285,7 +303,10 @@ class _DormitoryConfigurationPageState
             ChoiceSearchField(
               key: ValueKey(_groupKey),
               hintText: 'Search choices by name',
-              onChanged: (value) => setState(() => _query = value),
+              onChanged: (value) => setState(() {
+                _query = value;
+                _resetPage();
+              }),
             ),
             const SizedBox(height: 12),
             SegmentedButton<String>(
@@ -295,8 +316,10 @@ class _DormitoryConfigurationPageState
                 ButtonSegment(value: 'all', label: Text('All')),
               ],
               selected: {_visibility},
-              onSelectionChanged: (values) =>
-                  setState(() => _visibility = values.first),
+              onSelectionChanged: (values) => setState(() {
+                _visibility = values.first;
+                _resetPage();
+              }),
             ),
             if (_loading) const LinearProgressIndicator(),
             if (_error != null)
@@ -312,7 +335,7 @@ class _DormitoryConfigurationPageState
               const EmptyState(
                 icon: Icons.tune_outlined,
                 title: 'No choices yet',
-                message: 'Add a choice to make it available in new reports.',
+                message: 'Add a choice to make it available in new records.',
               ),
             if (!_loading &&
                 _error == null &&
@@ -323,7 +346,7 @@ class _DormitoryConfigurationPageState
                 title: 'No matching choices',
                 message: 'Try another name or clear your search.',
               ),
-            for (final option in visibleOptions)
+            for (final option in pagedOptions)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(option.label),
@@ -331,8 +354,8 @@ class _DormitoryConfigurationPageState
                   option.isSystem
                       ? 'Protected system choice'
                       : option.isActive
-                          ? 'Active • order ${option.sortOrder}'
-                          : 'Archived • order ${option.sortOrder}',
+                          ? 'Active'
+                          : 'Archived',
                 ),
                 trailing: option.isSystem
                     ? const Icon(Icons.lock_outline)
@@ -348,14 +371,23 @@ class _DormitoryConfigurationPageState
                             tooltip: option.isActive
                                 ? 'Archive choice'
                                 : 'Restore choice',
-                            icon: Icon(option.isActive
-                                ? Icons.archive_outlined
-                                : Icons.restore),
+                            icon: Icon(
+                              option.isActive
+                                  ? Icons.archive_outlined
+                                  : Icons.restore,
+                            ),
                             onPressed: () => _toggle(option),
                           ),
                         ],
                       ),
               ),
+            NumberedPaginationBar(
+              currentPage: safePage,
+              totalItems: visibleOptions.length,
+              pageSize: _pageSize,
+              itemLabel: 'choices',
+              onPageChanged: (page) => setState(() => _page = page),
+            ),
           ],
         ),
       ),
