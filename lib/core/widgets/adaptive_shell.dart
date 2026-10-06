@@ -7,6 +7,7 @@ import '../../controllers/session_controller.dart';
 import '../../views/shared/shared_views.dart';
 import '../../services/app_notification_service.dart';
 import '../../services/web_workspace_persistence_service.dart';
+import '../../services/web_browser_history_service.dart';
 import 'common_widgets.dart';
 
 import '../runtime/app_surface.dart';
@@ -133,6 +134,22 @@ class AdaptiveRoleShell extends StatefulWidget {
   State<AdaptiveRoleShell> createState() => _AdaptiveRoleShellState();
 }
 
+class _WorkspaceBrowserEntry {
+  const _WorkspaceBrowserEntry({
+    required this.label,
+    required this.baseIndex,
+    this.group,
+    this.destinationIndex,
+    this.page,
+  });
+
+  final String label;
+  final String? group;
+  final int baseIndex;
+  final int? destinationIndex;
+  final Widget? page;
+}
+
 class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   int index = 0;
   StreamSubscription<List<AppNotificationItem>>? _notificationSubscription;
@@ -150,6 +167,11 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   // workspace pages switch. Empty by default = a tidy collapsed sidebar.
   final Set<String> _expandedWebGroups = <String>{};
   static const _workspacePersistence = WebWorkspacePersistenceService();
+  final _browserHistory = WebBrowserHistoryService.instance;
+  final Map<String, _WorkspaceBrowserEntry> _browserHistoryEntries = {};
+  StreamSubscription<WebBrowserHistoryLocation>? _browserHistorySubscription;
+  int _browserHistorySequence = 0;
+  bool _handlingBrowserHistory = false;
   bool _workspaceRestoreScheduled = false;
 
   GlobalKey<NavigatorState> _webWorkspaceNavigatorKey =
@@ -159,6 +181,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   void initState() {
     super.initState();
     MessagingController.instance.addListener(_onMessagingChanged);
+    _browserHistorySubscription = _browserHistory.changes.listen((location) {
+      unawaited(_restoreBrowserHistory(location));
+    });
     _scheduleWorkspaceRestore();
   }
 
@@ -199,6 +224,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       _workspaceLabelOverride = null;
       _workspaceGroupOverride = null;
       index = 0;
+      _browserHistoryEntries.clear();
       _webWorkspaceNavigatorKey = GlobalKey<NavigatorState>();
       _workspaceRestoreScheduled = false;
       _scheduleWorkspaceRestore();
@@ -220,7 +246,8 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       _notificationSubscription = AppNotificationService.instance
           .streamMyNotifications(limit: 30)
           .listen(_onNotificationSnapshot, onError: (Object error) {
-        debugPrint('Notification realtime unavailable; polling remains active: $error');
+        debugPrint(
+            'Notification realtime unavailable; polling remains active: $error');
       });
 
       // app_notifications may not be enabled in the Realtime publication on
@@ -324,7 +351,8 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     final destination = widget.notificationPageBuilder?.call(item);
     if (!mounted || destination == null) return;
     if (!item.isRead) {
-      unawaited(AppNotificationService.instance.markAsRead(item.id)
+      unawaited(AppNotificationService.instance
+          .markAsRead(item.id)
           .then((_) => _refreshUnreadNotificationCount()));
     }
     if (CarmeLinkSurfaceScope.isWebPortal(context)) {
@@ -419,6 +447,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   @override
   void dispose() {
     MessagingController.instance.removeListener(_onMessagingChanged);
+    unawaited(_browserHistorySubscription?.cancel());
     _notificationPollTimer?.cancel();
     unawaited(_notificationSubscription?.cancel());
     super.dispose();
@@ -450,6 +479,160 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       'maintenance' => 'report management',
       _ => normalized,
     };
+  }
+
+  String _nextBrowserHistoryId() =>
+      '${DateTime.now().microsecondsSinceEpoch}-${_browserHistorySequence++}';
+
+  bool get _canUseBrowserHistory =>
+      mounted &&
+      CarmeLinkSurfaceScope.isWebPortal(context) &&
+      _browserHistory.supported;
+
+  void _writeBrowserHistory(
+    _WorkspaceBrowserEntry entry, {
+    bool replace = false,
+  }) {
+    if (!_canUseBrowserHistory || _handlingBrowserHistory) return;
+    final entryId = _nextBrowserHistoryId();
+    _browserHistoryEntries[entryId] = entry;
+    if (replace) {
+      _browserHistory.replace(
+        entryId: entryId,
+        label: entry.label,
+        group: entry.group,
+      );
+    } else {
+      _browserHistory.push(
+        entryId: entryId,
+        label: entry.label,
+        group: entry.group,
+      );
+    }
+  }
+
+  void _recordDestinationBrowserHistory(
+    int destinationIndex, {
+    bool replace = false,
+  }) {
+    final destinations = _webWorkspaceDestinations();
+    if (destinationIndex < 0 || destinationIndex >= destinations.length) return;
+    final destination = destinations[destinationIndex];
+    _writeBrowserHistory(
+      _WorkspaceBrowserEntry(
+        label: destination.label,
+        group: destination.webGroup ?? 'Workspace',
+        baseIndex: destinationIndex,
+        destinationIndex: destinationIndex,
+      ),
+      replace: replace,
+    );
+  }
+
+  void _recordPageBrowserHistory(
+    Widget page, {
+    required String label,
+    required String? group,
+    bool replace = false,
+  }) {
+    _writeBrowserHistory(
+      _WorkspaceBrowserEntry(
+        label: label,
+        group: group,
+        baseIndex: index,
+        page: page,
+      ),
+      replace: replace,
+    );
+  }
+
+  Future<void> _restoreBrowserHistory(
+    WebBrowserHistoryLocation location,
+  ) async {
+    if (!mounted || !location.inStaffPortal) return;
+    final destinations = _webWorkspaceDestinations();
+    if (destinations.isEmpty) return;
+
+    final entry = location.entryId == null
+        ? null
+        : _browserHistoryEntries[location.entryId!];
+    _handlingBrowserHistory = true;
+    try {
+      if (entry?.destinationIndex != null) {
+        _select(entry!.destinationIndex!);
+        return;
+      }
+      if (entry?.page != null) {
+        _restoreBrowserPage(entry!);
+        return;
+      }
+
+      final visible = location.label?.trim();
+      if (visible == null || visible.isEmpty) {
+        _select(0);
+        return;
+      }
+      final wanted = _canonicalWebDestinationLabel(visible);
+      final destinationIndex = destinations.indexWhere(
+        (item) => _canonicalWebDestinationLabel(item.label) == wanted,
+      );
+      if (destinationIndex >= 0) {
+        _select(destinationIndex);
+      } else if (wanted == 'messages') {
+        _restoreBrowserPage(
+          _WorkspaceBrowserEntry(
+            label: 'Messages',
+            group: 'Communication',
+            baseIndex: index,
+            page: widget.messagePage,
+          ),
+        );
+      } else if (wanted == 'notifications') {
+        _restoreBrowserPage(
+          _WorkspaceBrowserEntry(
+            label: 'Notifications',
+            group: 'Communication',
+            baseIndex: index,
+            page: _notificationsPage(),
+          ),
+        );
+      }
+    } finally {
+      _handlingBrowserHistory = false;
+    }
+  }
+
+  void _restoreBrowserPage(_WorkspaceBrowserEntry entry) {
+    final destinations = _webWorkspaceDestinations();
+    final safeBaseIndex =
+        entry.baseIndex >= 0 && entry.baseIndex < destinations.length
+            ? entry.baseIndex
+            : 0;
+    setState(() {
+      index = safeBaseIndex;
+      _workspaceLabelOverride = entry.label;
+      _workspaceGroupOverride = entry.group;
+      _webWorkspaceNavigatorKey = GlobalKey<NavigatorState>();
+      final baseGroup = destinations[safeBaseIndex].webGroup;
+      if (baseGroup != null) {
+        _expandedWebGroups
+          ..clear()
+          ..add(baseGroup);
+      }
+    });
+    unawaited(_persistWorkspaceDestination(entry.label));
+
+    final page = entry.page;
+    if (page == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final navigator = _webWorkspaceNavigatorKey.currentState;
+      if (navigator == null) return;
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => page),
+        (route) => route.isFirst,
+      );
+    });
   }
 
   Future<void> _restoreWebWorkspaceState() async {
@@ -486,7 +669,10 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     });
 
     final visible = saved.visiblePageLabel?.trim();
-    if (visible == null || visible.isEmpty) return;
+    if (visible == null || visible.isEmpty) {
+      _recordDestinationBrowserHistory(index, replace: true);
+      return;
+    }
     final wanted = _canonicalWebDestinationLabel(visible);
     final destinationIndex = destinations.indexWhere(
       (item) => _canonicalWebDestinationLabel(item.label) == wanted,
@@ -494,12 +680,37 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (destinationIndex >= 0 && destinationIndex != index) {
-        _select(destinationIndex);
+      _handlingBrowserHistory = true;
+      try {
+        if (destinationIndex >= 0) {
+          if (destinationIndex != index) _select(destinationIndex);
+        } else if (wanted == 'messages') {
+          _openMessages();
+        } else if (wanted == 'notifications') {
+          _openNotifications();
+        }
+      } finally {
+        _handlingBrowserHistory = false;
+      }
+
+      if (destinationIndex >= 0) {
+        _recordDestinationBrowserHistory(destinationIndex, replace: true);
       } else if (wanted == 'messages') {
-        _openMessages();
+        _recordPageBrowserHistory(
+          widget.messagePage,
+          label: 'Messages',
+          group: 'Communication',
+          replace: true,
+        );
       } else if (wanted == 'notifications') {
-        _openNotifications();
+        _recordPageBrowserHistory(
+          _notificationsPage(),
+          label: 'Notifications',
+          group: 'Communication',
+          replace: true,
+        );
+      } else {
+        _recordDestinationBrowserHistory(index, replace: true);
       }
     });
   }
@@ -532,23 +743,29 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
   }
 
   void _select(int value) {
-    final destinations = CarmeLinkSurfaceScope.isWebPortal(context)
-        ? _webWorkspaceDestinations()
-        : widget.destinations;
+    final webPortal = CarmeLinkSurfaceScope.isWebPortal(context);
+    final destinations =
+        webPortal ? _webWorkspaceDestinations() : widget.destinations;
     if (value < 0 || value >= destinations.length) return;
 
     if (value == index) {
       final navigator = _webWorkspaceNavigatorKey.currentState;
-      if (navigator != null && navigator.canPop()) {
+      final hadNestedPage = navigator != null && navigator.canPop();
+      if (hadNestedPage) {
         navigator.popUntil((route) => route.isFirst);
       }
-      if (_workspaceLabelOverride != null || _workspaceGroupOverride != null) {
+      final hadOverride =
+          _workspaceLabelOverride != null || _workspaceGroupOverride != null;
+      if (hadOverride) {
         setState(() {
           _workspaceLabelOverride = null;
           _workspaceGroupOverride = null;
         });
       }
       unawaited(_persistWorkspaceDestination(destinations[value].label));
+      if (webPortal && (hadNestedPage || hadOverride)) {
+        _recordDestinationBrowserHistory(value);
+      }
       return;
     }
     final selectedGroup = destinations[value].webGroup;
@@ -557,7 +774,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       _workspaceLabelOverride = null;
       _workspaceGroupOverride = null;
       _webWorkspaceNavigatorKey = GlobalKey<NavigatorState>();
-      if (CarmeLinkSurfaceScope.isWebPortal(context) && selectedGroup != null) {
+      if (webPortal && selectedGroup != null) {
         _expandedWebGroups
           ..clear()
           ..add(selectedGroup);
@@ -572,6 +789,9 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
       );
     }
     unawaited(_persistWorkspaceDestination(destinations[value].label));
+    if (webPortal) {
+      _recordDestinationBrowserHistory(value);
+    }
   }
 
   void _selectByLabel(String label) {
@@ -605,9 +825,16 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
     final navigator = _webWorkspaceNavigatorKey.currentState;
     if (navigator != null) {
       navigator.push(MaterialPageRoute<void>(builder: (_) => page));
-      return;
+    } else {
+      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
     }
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+    if (label != null) {
+      _recordPageBrowserHistory(
+        page,
+        label: label,
+        group: group,
+      );
+    }
   }
 
   void _openWebCommunicationPage(
@@ -634,6 +861,11 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
           builder: (_) => page,
         ),
         (route) => route.isFirst,
+      );
+      _recordPageBrowserHistory(
+        page,
+        label: label,
+        group: 'Communication',
       );
     }
 

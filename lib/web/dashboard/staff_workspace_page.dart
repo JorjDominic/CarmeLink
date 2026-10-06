@@ -13,29 +13,6 @@ class StaffWorkspacePage extends StatelessWidget {
   final UserRole role;
   final VoidCallback onBack;
 
-  Future<bool> _confirmReturnToLanding(BuildContext context) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('Return to landing page?'),
-            content: const Text(
-              'You are about to leave the staff workspace. Your current account will remain signed in.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Stay'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('Return to landing page'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
-
   Future<bool> _confirmLogout(BuildContext context) async {
     return await showDialog<bool>(
           context: context,
@@ -76,21 +53,12 @@ class StaffWorkspacePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        if (await _confirmReturnToLanding(context) && context.mounted) {
-          onBack();
-        }
-      },
-      child: StaffWebPortalShell(
-        role: role,
-        workspaceBuilder: (scopedContext, workspace) => StaffWorkspaceChrome(
-          roleLabel: role == UserRole.owner ? 'Owner' : 'Caretaker',
-          onSignOut: () => _logout(scopedContext),
-          child: workspace,
-        ),
+    return StaffWebPortalShell(
+      role: role,
+      workspaceBuilder: (scopedContext, workspace) => StaffWorkspaceChrome(
+        roleLabel: role == UserRole.owner ? 'Owner' : 'Caretaker',
+        onSignOut: () => _logout(scopedContext),
+        child: workspace,
       ),
     );
   }
