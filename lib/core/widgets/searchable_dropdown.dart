@@ -93,29 +93,48 @@ class _SearchableDropdownFormFieldState<T> extends FormFieldState<T> {
       super.widget as SearchableDropdownFormField<T>;
 
   bool _open = false;
+  late final _liveItems = ValueNotifier(widget.items);
+
+  @override
+  void dispose() {
+    _liveItems.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant SearchableDropdownFormField<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _liveItems.value = widget.items;
+    });
     if (oldWidget.initialValue != widget.initialValue) {
       setValue(widget.initialValue);
     }
-    if (value != null && !widget.items.any((item) => item.value == value)) {
+    if (value != null &&
+        !widget.items.any((item) => item.value == value && item.enabled)) {
       setValue(null);
+      // Parent forms hold dependent IDs too. Notify outside their build.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && value == null) widget.onChanged?.call(null);
+      });
     }
   }
 
   Future<void> _select() async {
     if (_open || widget.onChanged == null) return;
     _open = true;
+    _liveItems.value = widget.items;
     try {
       final picked = await showDialog<T>(
         context: context,
-        builder: (_) => _SearchDialog<T>(
-          title: widget.decoration.labelText ?? 'Choose an option',
-          items: widget.items,
-          labelFor: widget.labelFor,
-          selected: value,
+        builder: (_) => ValueListenableBuilder<List<DropdownMenuItem<T>>>(
+          valueListenable: _liveItems,
+          builder: (_, items, child) => _SearchDialog<T>(
+            title: widget.decoration.labelText ?? 'Choose an option',
+            items: items,
+            labelFor: widget.labelFor,
+            selected: value,
+          ),
         ),
       );
       if (!mounted || picked == null || widget.onChanged == null) return;
