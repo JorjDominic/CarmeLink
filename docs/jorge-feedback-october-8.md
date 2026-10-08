@@ -14,10 +14,18 @@ Implemented in the Flutter app and two new Supabase migrations:
 
 ## Rollout
 
-Apply `202610080006_jorge_contracts_and_staff_receipts.sql` and
-`202610080007_nightly_curfew_status.sql` after the existing migrations. Rebuild and
-release the Flutter application. These changes have not been applied to the live
-Supabase project or published to production by this task.
+Applied `202610080006_jorge_contracts_and_staff_receipts.sql` and
+`202610080007_nightly_curfew_status.sql` to the linked live Supabase project on
+October 8, 2026. A subsequent CLI dry run confirmed the remote database is up to
+date. The updated app screen had been calling the old staff payment function,
+which rejected the new `f2f` method with "Choose an active payment method".
+The migrated function generates the reference and fixes the method server-side.
+The payment and curfew PostgreSQL checks passed before applying the migrations.
+No tenant payment was created during this fix; retry the existing receipt request
+in the app. The request UUID remains the idempotency key to prevent duplicates.
+
+The Flutter application was not rebuilt or published by this task. Release the
+updated app for clients that have not yet received the UI changes.
 
 Curfew push delivery relies on the existing notification queue, configured push
 Edge Functions/credentials, and recipient push tokens. The Cloudinary URL Edge
