@@ -40,6 +40,7 @@ List<RoomRecord> filterRoomDirectory(
     if (availability == 'archived' && room.isActive) {
       return false;
     }
+    if (availability == 'active' && !room.isActive) return false;
     return needle.isEmpty ||
         [room.number, room.floor, room.description]
             .any((value) => value.toLowerCase().contains(needle));
@@ -132,6 +133,19 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
   }
 
   Future<void> _addRoom() async {
+    List<String> floors;
+    try {
+      floors = await service.listFloors();
+    } catch (e) {
+      if (mounted) showAppSnackBar(context, roomServiceError(e));
+      return;
+    }
+    if (!mounted) return;
+    if (floors.isEmpty) {
+      showAppSnackBar(
+          context, 'Add a floor in Manage floors before adding a room.');
+      return;
+    }
     final usedNumbers =
         (rooms ?? <RoomRecord>[]).map((room) => room.number).toSet();
     var nextNumber = 1;
@@ -143,8 +157,9 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
     final notes = TextEditingController();
     bool saving = false;
     String? error;
-    await showDialog<void>(
+    final changed = await showDialog<bool>(
         context: context,
+        barrierDismissible: false,
         builder: (ctx) => StatefulBuilder(
             builder: (ctx, update) => AlertDialog(
                   title: const Text('Add room'),
@@ -156,8 +171,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                         decoration:
                             const InputDecoration(labelText: 'Room number')),
                     FloorNameField(
-                        controller: floor,
-                        floors: (rooms ?? []).map((room) => room.floor)),
+                        controller: floor, floors: floors, enabled: !saving),
                     TextField(
                         controller: notes,
                         decoration: const InputDecoration(labelText: 'Notes')),
@@ -185,7 +199,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                                       number: number.text,
                                       floor: floor.text,
                                       description: notes.text);
-                                  if (ctx.mounted) Navigator.pop(ctx);
+                                  if (ctx.mounted) Navigator.pop(ctx, true);
                                 } catch (e) {
                                   if (ctx.mounted)
                                     update(() {
@@ -201,7 +215,42 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
     number.dispose();
     floor.dispose();
     notes.dispose();
-    if (mounted) await _loadRooms();
+    if (changed == true && mounted) await _loadRooms();
+  }
+
+  Future<void> _editRoom(RoomRecord room) async {
+    final changed = await showDialog<bool>(
+        context: context,
+        builder: (_) => RoomEditor(service: service, room: room));
+    if (changed == true && mounted) await _loadRooms();
+  }
+
+  Future<void> _deleteRoom(RoomRecord room) async {
+    if (room.occupied > 0) {
+      showAppSnackBar(context, 'Move all residents before deleting this room.');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+                title: Text('Delete Room ${room.number}?'),
+                content: const Text(
+                    'Permanently delete this room and its four structural beds only if there are no linked or historical records. Otherwise deletion is blocked; archive the room instead.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Delete room'))
+                ]));
+    if (confirmed != true) return;
+    try {
+      await service.deleteRoom(room.id);
+      if (mounted) await _loadRooms();
+    } catch (e) {
+      if (mounted) showAppSnackBar(context, roomServiceError(e));
+    }
   }
 
   Future<void> _toggleRoom(RoomRecord room) async {
@@ -363,6 +412,8 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                   items: const [
                     DropdownMenuItem(value: 'all', child: Text('All rooms')),
                     DropdownMenuItem(
+                        value: 'active', child: Text('Active rooms')),
+                    DropdownMenuItem(
                       value: 'available',
                       child: Text('Beds available'),
                     ),
@@ -428,16 +479,6 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                 children: pagedRooms
                     .map((room) => Column(children: [
                           roomCard(room),
-                          if (SessionController.instance.currentUser?.role ==
-                              UserRole.owner)
-                            TextButton.icon(
-                                onPressed: () => _toggleRoom(room),
-                                icon: Icon(room.isActive
-                                    ? Icons.archive_outlined
-                                    : Icons.unarchive_outlined),
-                                label: Text(room.isActive
-                                    ? 'Archive room'
-                                    : 'Reactivate room')),
                           if (!room.isActive)
                             const Text(
                                 'Archived - unavailable for new assignments'),
@@ -473,7 +514,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                   OutlinedButton.icon(
                     onPressed: _openFloorManagement,
                     icon: const Icon(Icons.layers_outlined),
-                    label: const Text('Floor management'),
+                    label: const Text('Manage floors'),
                   ),
                   FilledButton.icon(
                     onPressed: _addRoom,
@@ -501,7 +542,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
           OutlinedButton.icon(
             onPressed: _openFloorManagement,
             icon: const Icon(Icons.layers_outlined),
-            label: const Text('Floor management'),
+            label: const Text('Manage floors'),
           ),
         if (!compactActions &&
             SessionController.instance.currentUser?.role == UserRole.owner)
@@ -558,14 +599,33 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurfaceVariant
-                    .withValues(alpha: .5),
-              ),
+              if (SessionController.instance.currentUser?.role ==
+                  UserRole.owner)
+                PopupMenuButton<String>(
+                    tooltip: 'Room actions',
+                    onSelected: (action) {
+                      if (action == 'edit') {
+                        _editRoom(room);
+                      } else if (action == 'delete') {
+                        _deleteRoom(room);
+                      } else {
+                        _toggleRoom(room);
+                      }
+                    },
+                    itemBuilder: (_) => [
+                          const PopupMenuItem(
+                              value: 'edit', child: Text('Edit room')),
+                          PopupMenuItem(
+                              value: 'archive',
+                              child: Text(room.isActive
+                                  ? 'Archive room'
+                                  : 'Reactivate room')),
+                          const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Delete room safely')),
+                        ])
+              else
+                const Icon(Icons.chevron_right_rounded, size: 20),
             ],
           ),
           const SizedBox(height: 10),
@@ -769,7 +829,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
 
   Future<void> _refreshRoom() async {
     try {
-      final latestRooms = await widget.service.listRooms();
+      final latestRooms = await widget.service.listRooms(forceRefresh: true);
       if (!mounted) return;
       final updated = latestRooms.cast<RoomRecord?>().firstWhere(
             (r) => r?.id == room.id,
@@ -1332,6 +1392,8 @@ class _RoomEditorState extends State<RoomEditor> {
   late final TextEditingController floor;
   late final TextEditingController number;
   bool saving = false;
+  List<String>? _floors;
+  String? _floorError;
 
   @override
   void initState() {
@@ -1339,6 +1401,20 @@ class _RoomEditorState extends State<RoomEditor> {
     description = TextEditingController(text: widget.room.description);
     floor = TextEditingController(text: widget.room.floor);
     number = TextEditingController(text: widget.room.number);
+    _loadFloors();
+  }
+
+  Future<void> _loadFloors() async {
+    try {
+      final floors = await widget.service.listFloors();
+      if (mounted)
+        setState(() {
+          _floors = floors;
+          _floorError = null;
+        });
+    } catch (e) {
+      if (mounted) setState(() => _floorError = roomServiceError(e));
+    }
   }
 
   @override
@@ -1394,8 +1470,12 @@ class _RoomEditorState extends State<RoomEditor> {
                 ),
                 FloorNameField(
                     controller: floor,
-                    floors: (RoomService.cachedRooms ?? [])
-                        .map((room) => room.floor)),
+                    floors: _floors ?? [],
+                    enabled: !saving && _floors != null),
+                if (_floors == null && _floorError == null)
+                  const LinearProgressIndicator(),
+                if (_floorError != null)
+                  TextButton(onPressed: _loadFloors, child: Text(_floorError!)),
                 TextFormField(
                   controller: description,
                   maxLength: 300,
@@ -1415,7 +1495,7 @@ class _RoomEditorState extends State<RoomEditor> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: saving ? null : save,
+            onPressed: saving || _floors == null ? null : save,
             child: Text(saving ? 'Saving…' : 'Save'),
           ),
         ],

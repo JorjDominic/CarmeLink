@@ -7,82 +7,48 @@ import '../../core/widgets/role_guard.dart';
 import '../../core/widgets/searchable_dropdown.dart';
 import '../../models/models.dart';
 import '../../services/room_service.dart';
+import '../../services/table_refresh_subscription.dart';
 
-class FloorNameField extends StatefulWidget {
+class FloorNameField extends StatelessWidget {
   const FloorNameField({
     super.key,
     required this.controller,
     required this.floors,
+    this.enabled = true,
+    this.onChanged,
   });
 
   final TextEditingController controller;
   final Iterable<String> floors;
+  final bool enabled;
+  final VoidCallback? onChanged;
 
   @override
-  State<FloorNameField> createState() => _FloorNameFieldState();
-}
-
-class _FloorNameFieldState extends State<FloorNameField> {
-  final _focus = FocusNode();
-
-  @override
-  void dispose() {
-    _focus.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    final options = floors.toSet().toList()..sort(compareFloorLabels);
+    return DropdownButtonFormField<String>(
+      initialValue: options.contains(controller.text) ? controller.text : null,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Floor',
+        helperText:
+            'Choose an existing floor. Add new floors in Manage floors.',
+      ),
+      items: [
+        for (final floor in options)
+          DropdownMenuItem(
+              value: floor,
+              child: Text(floor, overflow: TextOverflow.ellipsis)),
+      ],
+      onChanged: !enabled
+          ? null
+          : (value) {
+              controller.text = value ?? '';
+              onChanged?.call();
+            },
+      validator: (value) => value == null ? 'Choose a floor' : null,
+    );
   }
-
-  @override
-  Widget build(BuildContext context) => RawAutocomplete<String>(
-        textEditingController: widget.controller,
-        focusNode: _focus,
-        optionsBuilder: (text) {
-          final needle = text.text.trim().toLowerCase();
-          final options = widget.floors
-              .toSet()
-              .where((floor) => floor.toLowerCase().contains(needle))
-              .toList()
-            ..sort(compareFloorLabels);
-          return options;
-        },
-        fieldViewBuilder: (context, controller, focus, submit) => TextFormField(
-          controller: controller,
-          focusNode: focus,
-          maxLength: 60,
-          decoration: const InputDecoration(
-            labelText: 'Floor',
-            helperText: 'Choose an existing floor or enter a new name.',
-          ),
-          validator: (value) =>
-              value == null || value.trim().isEmpty ? 'Enter a floor' : null,
-          onFieldSubmitted: (_) => submit(),
-        ),
-        optionsViewBuilder: (context, select, options) => Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth:
-                    MediaQuery.sizeOf(context).width.clamp(0, 320).toDouble() -
-                        48,
-                maxHeight: 180,
-              ),
-              child: ListView(
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                children: options
-                    .map(
-                      (floor) => ListTile(
-                        title: Text(floor),
-                        onTap: () => select(floor),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ),
-          ),
-        ),
-      );
 }
 
 class FloorManagementPage extends StatefulWidget {
@@ -96,6 +62,9 @@ class _FloorManagementPageState extends State<FloorManagementPage> {
   static const _pageSize = 6;
 
   final _service = const RoomService();
+  List<String> _floors = [];
+  late final TableRefreshSubscription _subscription;
+  int _loadVersion = 0;
   List<RoomRecord> _rooms = [];
   String _query = '';
   int _page = 1;
@@ -106,41 +75,53 @@ class _FloorManagementPageState extends State<FloorManagementPage> {
   void initState() {
     super.initState();
     _load();
+    _subscription = TableRefreshSubscription(
+        'floor-management', const ['rooms', 'room_floors'], _load);
+  }
+
+  @override
+  void dispose() {
+    _subscription.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
+    final version = ++_loadVersion;
     try {
-      final rooms = await _service.listRooms(forceRefresh: true);
-      if (mounted) {
+      final results = await Future.wait<Object>([
+        _service.listRooms(forceRefresh: true),
+        _service.listFloors(),
+      ]);
+      if (mounted && version == _loadVersion) {
         setState(() {
-          _rooms = rooms;
+          _rooms = results[0] as List<RoomRecord>;
+          _floors = results[1] as List<String>;
           _loading = false;
           _error = null;
         });
       }
-    } catch (_) {
-      if (mounted) {
+    } catch (error) {
+      if (mounted && version == _loadVersion) {
         setState(() {
           _loading = false;
-          _error = 'Could not load floors. Retry.';
+          _error = roomServiceError(error);
         });
       }
     }
   }
 
-  Future<void> _rename(String floor) async {
+  Future<void> _rename(String floor, {bool merge = false}) async {
     final affected = _rooms.where((room) => room.floor == floor).toList();
     final controller = TextEditingController(text: floor);
     var saving = false;
     String? error;
 
-    await showDialog<void>(
+    final changed = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, update) {
           final target = controller.text.trim();
-          final merge =
-              target != floor && _rooms.any((room) => room.floor == target);
           return AlertDialog(
             title: Text(merge ? 'Merge floor' : 'Rename floor'),
             content: SizedBox(
@@ -150,15 +131,22 @@ class _FloorManagementPageState extends State<FloorManagementPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextField(
-                      controller: controller,
-                      maxLength: 60,
-                      enabled: !saving,
-                      decoration: const InputDecoration(
-                        labelText: 'New or existing floor name',
+                    if (merge)
+                      FloorNameField(
+                          controller: controller,
+                          floors: _floors.where((item) => item != floor),
+                          enabled: !saving,
+                          onChanged: () => update(() {}))
+                    else
+                      TextField(
+                        controller: controller,
+                        maxLength: 60,
+                        enabled: !saving,
+                        decoration: const InputDecoration(
+                          labelText: 'New floor name',
+                        ),
+                        onChanged: (_) => update(() {}),
                       ),
-                      onChanged: (_) => update(() {}),
-                    ),
                     Text(
                       '${affected.length} rooms will move from "$floor" to "$target", including archived rooms.',
                     ),
@@ -188,26 +176,40 @@ class _FloorManagementPageState extends State<FloorManagementPage> {
                 child: const Text('Cancel'),
               ),
               FilledButton(
-                onPressed: saving || target.isEmpty || target == floor
+                onPressed: saving
                     ? null
                     : () async {
+                        final target = controller.text.trim();
+                        if (target.isEmpty || target == floor) {
+                          update(
+                              () => error = 'Choose a different floor name.');
+                          return;
+                        }
+                        if (!merge &&
+                            _floors.any((item) =>
+                                item.toLowerCase() == target.toLowerCase() &&
+                                item != floor)) {
+                          update(() => error =
+                              'That floor name already exists. Use Merge floor instead.');
+                          return;
+                        }
                         update(() {
                           saving = true;
                           error = null;
                         });
                         try {
-                          await _service.renameFloor(
+                          await _service.manageFloor(
                             floor,
                             target,
                             affected.length,
+                            merge: merge,
                           );
-                          if (context.mounted) Navigator.pop(context);
-                        } catch (_) {
+                          if (context.mounted) Navigator.pop(context, true);
+                        } catch (e) {
                           if (context.mounted) {
                             update(() {
                               saving = false;
-                              error =
-                                  'Could not update this floor. Refresh if the room list changed.';
+                              error = roomServiceError(e);
                             });
                           }
                         }
@@ -228,18 +230,109 @@ class _FloorManagementPageState extends State<FloorManagementPage> {
 
     await Future<void>.delayed(const Duration(milliseconds: 200));
     controller.dispose();
-    if (mounted) {
+    if (changed == true && mounted) {
       setState(() => _page = 1);
       await _load();
+    }
+  }
+
+  Future<void> _addFloor() async {
+    final name = TextEditingController();
+    var saving = false;
+    String? error;
+    final changed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => StatefulBuilder(
+            builder: (ctx, update) => AlertDialog(
+                    title: const Text('Add floor'),
+                    scrollable: true,
+                    content: SizedBox(
+                        width: 440,
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
+                          TextField(
+                              controller: name,
+                              enabled: !saving,
+                              maxLength: 60,
+                              decoration: const InputDecoration(
+                                  labelText: 'Floor name')),
+                          if (error != null) Text(error!),
+                        ])),
+                    actions: [
+                      TextButton(
+                          onPressed:
+                              saving ? null : () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel')),
+                      FilledButton(
+                          onPressed: saving
+                              ? null
+                              : () async {
+                                  final value = name.text.trim();
+                                  if (value.isEmpty ||
+                                      _floors.any((floor) =>
+                                          floor.toLowerCase() ==
+                                          value.toLowerCase())) {
+                                    update(() =>
+                                        error = 'Enter a unique floor name.');
+                                    return;
+                                  }
+                                  update(() {
+                                    saving = true;
+                                    error = null;
+                                  });
+                                  try {
+                                    await _service.createFloor(value);
+                                    if (ctx.mounted) Navigator.pop(ctx, true);
+                                  } catch (e) {
+                                    if (ctx.mounted)
+                                      update(() {
+                                        saving = false;
+                                        error = roomServiceError(e);
+                                      });
+                                  }
+                                },
+                          child: Text(saving ? 'Saving…' : 'Add floor')),
+                    ])));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    name.dispose();
+    if (changed == true && mounted) await _load();
+  }
+
+  Future<void> _deleteFloor(String floor) async {
+    final count = _rooms.where((room) => room.floor == floor).length;
+    if (count > 0) {
+      showAppSnackBar(context,
+          'Move or delete all $count rooms first, including archived rooms.');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+                title: Text('Delete floor "$floor"?'),
+                content: const Text(
+                    'Only an empty floor can be deleted. No rooms or historical records will be removed.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Delete floor'))
+                ]));
+    if (confirmed != true) return;
+    try {
+      await _service.deleteFloor(floor);
+      if (mounted) await _load();
+    } catch (e) {
+      if (mounted) showAppSnackBar(context, roomServiceError(e));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final needle = _query.trim().toLowerCase();
-    final floors = _rooms
-        .map((room) => room.floor)
-        .toSet()
+    final floors = _floors
         .where(
             (floor) => needle.isEmpty || floor.toLowerCase().contains(needle))
         .toList()
@@ -256,11 +349,18 @@ class _FloorManagementPageState extends State<FloorManagementPage> {
       allowedRoles: const {UserRole.owner},
       child: PageFrame(
         title: 'Floor management',
-        subtitle: 'Rename a floor or merge its rooms into another floor',
+        subtitle: 'Manage floors without changing room or bed identities',
         onRefresh: _load,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                    onPressed: _loading || _error != null ? null : _addFloor,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add floor'))),
+            const SizedBox(height: 12),
             ChoiceSearchField(
               hintText: 'Search floors',
               onChanged: (value) => setState(() {
@@ -289,10 +389,21 @@ class _FloorManagementPageState extends State<FloorManagementPage> {
                 subtitle: Text(
                   '${_rooms.where((room) => room.floor == floor).length} rooms',
                 ),
-                trailing: IconButton(
-                  tooltip: 'Rename or merge floor',
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: () => _rename(floor),
+                trailing: PopupMenuButton<String>(
+                  tooltip: 'Floor actions',
+                  onSelected: (action) {
+                    if (action == 'delete') {
+                      _deleteFloor(floor);
+                    } else {
+                      _rename(floor, merge: action == 'merge');
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'rename', child: Text('Rename floor')),
+                    PopupMenuItem(value: 'merge', child: Text('Merge floor')),
+                    PopupMenuItem(
+                        value: 'delete', child: Text('Delete empty floor')),
+                  ],
                 ),
               ),
             NumberedPaginationBar(
