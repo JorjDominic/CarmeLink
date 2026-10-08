@@ -140,6 +140,37 @@ try {
     update public.move_out_settlements set refund_status='settled_zero' where case_id='${zeroCase}';`);
   assert.equal(await scalar(`select settled_at is not null from public.security_deposit_receipts where contract_id='${zeroContract}'`),true);
   console.log('PASS: move-out auto-fill, approved deductions, correction propagation, finalized refund sync, and settlement lock.');
+  // New contract-as-receipt policy: existing evidence must remain intact.
+  await db.exec(`alter table public.tenant_contracts add column created_at timestamptz default now();
+    insert into public.tenant_contracts(id,tenant_id,contract_number,starts_on,ends_on,monthly_rent,security_deposit,status,created_by,created_at)
+    values('${id(60)}','${tenant}','AUTO-OLD','2026-09-01','2027-09-01',3500,4500,'draft','${owner}','2026-09-01 08:00:00+08'),
+      ('${id(61)}','${tenant}','AUTO-CORRECTED',current_date,current_date,3500,4500,'draft','${owner}',now()),
+      ('${id(62)}','${tenant}','AUTO-PARTIAL',current_date,current_date,3500,4500,'draft','${owner}',now()),
+      ('${id(63)}','${tenant}','AUTO-OPEN',current_date,current_date,3500,5000,'draft','${owner}',now());
+    select public.record_security_deposit_receipt('${id(61)}',0,current_date,'','','Corrected to zero');
+    select public.record_security_deposit_receipt('${id(62)}',1500,current_date,'Cash','PARTIAL','Partial receipt');
+    insert into public.move_out_cases values('${id(64)}','${id(63)}','${tenant}','notice_submitted');
+    insert into public.move_out_settlements(case_id) values('${id(64)}');
+    insert into public.move_out_deductions values('${id(64)}',500,'approved');`);
+  const automatic = await readFile('supabase/migrations/202610080002_contract_deposit_auto_receipt.sql','utf8');
+  await db.exec(automatic);
+  assert.equal(Number(await scalar(`select received_amount from public.security_deposit_receipts where contract_id='${id(60)}'`)),4500);
+  assert.equal(await scalar(`select received_on::text from public.security_deposit_receipts where contract_id='${id(60)}'`),'2026-09-01');
+  assert.equal(Number(await scalar(`select received_amount from public.security_deposit_receipts where contract_id='${id(61)}'`)),0);
+  assert.equal(Number(await scalar(`select received_amount from public.security_deposit_receipts where contract_id='${id(62)}'`)),1500);
+  assert.equal(Number(await scalar(`select refunded_amount from public.security_deposit_receipts where contract_id='${contract}'`)),4500);
+  assert.equal(Number(await scalar(`select refundable_amount from public.move_out_settlements where case_id='${id(64)}'`)),4500);
+  const newContract=id(70), noDeposit=id(71);
+  await db.exec(`insert into public.tenant_contracts(id,tenant_id,contract_number,starts_on,ends_on,monthly_rent,security_deposit,status,created_by)
+    values('${newContract}','${tenant}','AUTO-NEW',current_date,current_date,3500,3500,'draft','${owner}'),
+      ('${noDeposit}','${tenant}','AUTO-ZERO',current_date,current_date,3500,0,'draft','${owner}');`);
+  assert.equal(Number(await scalar(`select received_amount from public.security_deposit_receipts where contract_id='${newContract}'`)),3500);
+  assert.equal(Number(await scalar(`select received_amount from public.security_deposit_receipts where contract_id='${noDeposit}'`)),0);
+  await db.exec(`update public.tenant_contracts set security_deposit=7000 where id='${newContract}';
+    select public.initialize_contract_deposit_receipt('${newContract}',true);`);
+  assert.equal(Number(await scalar(`select received_amount from public.security_deposit_receipts where contract_id='${newContract}'`)),3500);
+  assert.equal(await scalar(`select count(*)::int from public.security_deposit_receipt_events where contract_id='${newContract}'`),1);
+  console.log('PASS: contract deposits received automatically; historical backfill, partial/zero corrections, finalized refunds, open settlement sync, zero deposit, edits and duplicate protection.');
   console.log('All local security-deposit PostgreSQL smoke checks passed.');
 } finally {
   await db.close();

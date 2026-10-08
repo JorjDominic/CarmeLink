@@ -1528,8 +1528,11 @@ class _ContractEditorState extends State<_ContractEditor> {
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Security deposit',
+                helperText: widget.contract == null
+                    ? 'Saving records this amount as already received.'
+                    : 'Existing receipts are preserved. Correct receipt details from Billing.',
                 prefixText: '₱ ',
               ),
               validator: _moneyValidator,

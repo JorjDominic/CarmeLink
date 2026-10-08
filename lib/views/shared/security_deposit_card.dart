@@ -188,7 +188,7 @@ class _SecurityDepositCardState extends State<SecurityDepositCard> {
                         ? () => _edit(record)
                         : null,
                     icon: const Icon(Icons.receipt_long_outlined),
-                    label: const Text('Record or correct receipt')),
+                    label: const Text('Correct deposit receipt')),
             ],
           ));
         },
@@ -253,7 +253,7 @@ class _DepositReceiptDialogState extends State<_DepositReceiptDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: const Text('Confirm deposit received'),
+        title: const Text('Correct deposit receipt'),
         content: SizedBox(
             width: 420,
             child: SingleChildScrollView(
