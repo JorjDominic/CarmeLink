@@ -13,6 +13,14 @@ enum BillingStatusFilter {
 }
 
 abstract final class BillingManagementPolicy {
+  /// Keep proof reviews visible even when the bill is dated in the future.
+  static bool isFutureUnpaid(Payment payment) =>
+      !payment.isDeposit &&
+      !payment.isVoided &&
+      !payment.isPending &&
+      !payment.isDueNow &&
+      payment.outstandingAmount > 0;
+
   static const utilityCategories = <String>{
     'electricity',
     'water',

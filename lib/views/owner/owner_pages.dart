@@ -31,6 +31,8 @@ import '../../services/tenant_service.dart';
 import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../shared/account_management_page.dart';
+import '../../core/utils/billing_management_policy.dart';
+import 'billing_management_page.dart';
 import '../shared/staff_payment_received_dialog.dart';
 import '../shared/staff_quick_panel.dart';
 import '../shared/staff_curfew_requests_page.dart';
@@ -2153,6 +2155,8 @@ const _operationCategories = [
     Icons.account_balance_wallet_outlined,
     Color(0xFFAA8A45),
     [
+      _OperationItem('Billing', 'Bills, balances, and security deposits',
+          Icons.receipt_long_outlined, BillingManagementPage()),
       _OperationItem('Payments', 'Verify and track payments',
           Icons.payments_outlined, PaymentVerificationPage()),
       _OperationItem('Income & expenses', 'Monitor property finances',
@@ -2617,13 +2621,8 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
     return b.dueDate.compareTo(a.dueDate);
   }
 
-  bool _isAdvanceRentOutsidePreview(Payment payment) {
-    if (payment.isPending || !payment.isRent || payment.isDueNow) return false;
-
-    final now = DateTime.now();
-    final previewEnd = DateTime(now.year, now.month + 3, 1);
-    return !payment.dueDate.isBefore(previewEnd);
-  }
+  bool _isAdvanceRentOutsidePreview(Payment payment) =>
+      BillingManagementPolicy.isFutureUnpaid(payment);
 
   @override
   void initState() {
@@ -3102,8 +3101,8 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                     ),
                     label: Text(
                       _showAllAdvanceRent
-                          ? 'Show less advance rent'
-                          : 'See more advance rent ($hiddenAdvanceRentCount)',
+                          ? 'Hide upcoming bills'
+                          : 'Show upcoming bills ($hiddenAdvanceRentCount)',
                     ),
                   ),
                 ),

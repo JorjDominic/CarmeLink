@@ -25,6 +25,33 @@ Payment payment({
 }
 
 void main() {
+  test(
+      'future bills collapse while pending proofs and paid history stay visible',
+      () {
+    final future = DateTime.now().add(const Duration(days: 10));
+    final rent = payment(
+        id: 'future', category: 'rent', status: 'Upcoming', dueDate: future);
+    final water = payment(
+        id: 'water', category: 'water', status: 'Upcoming', dueDate: future);
+    final pending = payment(
+        id: 'proof',
+        category: 'rent',
+        status: 'Pending verification',
+        dueDate: future);
+    final paid = payment(
+        id: 'paid',
+        category: 'rent',
+        status: 'Verified',
+        remaining: 0,
+        dueDate: future);
+    final today = payment(
+        id: 'today', category: 'rent', status: 'Due', dueDate: DateTime.now());
+    expect(BillingManagementPolicy.isFutureUnpaid(rent), isTrue);
+    expect(BillingManagementPolicy.isFutureUnpaid(water), isTrue);
+    expect(BillingManagementPolicy.isFutureUnpaid(pending), isFalse);
+    expect(BillingManagementPolicy.isFutureUnpaid(paid), isFalse);
+    expect(BillingManagementPolicy.isFutureUnpaid(today), isFalse);
+  });
   test('classifies rent utilities and manually approved other charges', () {
     final rent = payment(id: 'r', category: 'rent', status: 'Due');
     final water = payment(id: 'w', category: 'water', status: 'Due');

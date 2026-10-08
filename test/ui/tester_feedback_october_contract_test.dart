@@ -19,14 +19,14 @@ void main() {
           isTrue,
         );
         expect(
-          source.contains('DateTime(now.year, now.month + 3, 1)'),
+          source.contains('BillingManagementPolicy.isFutureUnpaid(payment)'),
           isTrue,
         );
         expect(
           source.contains("Key('owner-advance-rent-toggle')"),
           isTrue,
         );
-        expect(source.contains('See more advance rent'), isTrue);
+        expect(source.contains('Show upcoming bills'), isTrue);
       },
     );
 

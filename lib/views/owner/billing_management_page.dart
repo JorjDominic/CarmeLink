@@ -11,6 +11,7 @@ import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import 'owner_pages.dart';
 import '../shared/staff_payment_received_dialog.dart';
+import '../shared/staff_security_deposits_section.dart';
 import 'utility_charge_cart_dialog.dart';
 
 class BillingManagementPage extends StatefulWidget {
@@ -26,6 +27,7 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
   BillingStatusFilter _status = BillingStatusFilter.all;
   int _visibleCount = 20;
   bool _refreshing = false;
+  bool _showUpcoming = false;
 
   bool get _isOwner =>
       SessionController.instance.currentUser?.role == UserRole.owner;
@@ -110,12 +112,21 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
           builder: (context, _) {
             final controller = OwnerController.instance;
             final payments = controller.payments;
-            final filtered = BillingManagementPolicy.filter(
+            final matching = BillingManagementPolicy.filter(
               payments,
               query: _query.text,
               bucket: _bucket,
               status: _status,
             );
+            final futureCount =
+                matching.where(BillingManagementPolicy.isFutureUnpaid).length;
+            final hideFuture =
+                _status == BillingStatusFilter.all && !_showUpcoming;
+            final filtered = hideFuture
+                ? matching
+                    .where((p) => !BillingManagementPolicy.isFutureUnpaid(p))
+                    .toList()
+                : matching;
             final visible = filtered.take(_visibleCount).toList();
             final outstanding =
                 BillingManagementPolicy.outstandingNow(payments);
@@ -158,6 +169,8 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
                     overdue: overdue,
                   ),
                   const SizedBox(height: 18),
+                  const StaffSecurityDepositsSection(),
+                  const SizedBox(height: 18),
                   _BillingActionsCard(
                     isOwner: _isOwner,
                     onUtilityCart: _openUtilityCart,
@@ -186,6 +199,20 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
                       });
                     },
                   ),
+                  if (_status == BillingStatusFilter.all && futureCount > 0)
+                    TextButton.icon(
+                      key: const Key('staff-billing-upcoming-toggle'),
+                      onPressed: () => setState(() {
+                        _showUpcoming = !_showUpcoming;
+                        _visibleCount = 20;
+                      }),
+                      icon: Icon(_showUpcoming
+                          ? Icons.expand_less
+                          : Icons.expand_more),
+                      label: Text(_showUpcoming
+                          ? 'Hide upcoming bills'
+                          : 'Show upcoming bills ($futureCount)'),
+                    ),
                   const SizedBox(height: 14),
                   if (controller.paymentsLoading &&
                       !controller.paymentsLoadedOnce)
@@ -200,6 +227,12 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
                     _BillingError(
                       message: controller.paymentsError!,
                       onRetry: _refresh,
+                    )
+                  else if (filtered.isEmpty && hideFuture && futureCount > 0)
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                          'No current bills match. Expand upcoming bills to view the future schedule.'),
                     )
                   else if (filtered.isEmpty)
                     const _BillingEmptyState()

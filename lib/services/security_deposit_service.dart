@@ -13,9 +13,11 @@ class SecurityDepositRecord {
     this.deductions = 0,
     this.settled = false,
     this.unassignedReceipts = const [],
+    this.tenantName = '',
   });
 
   final String contractId, contractNumber, method, reference;
+  final String tenantName;
   final double requiredAmount, receivedAmount, refundedAmount, deductions;
   final DateTime? receivedOn;
   final bool settled;
@@ -40,6 +42,49 @@ class SecurityDepositRecord {
 
 class SecurityDepositService {
   const SecurityDepositService();
+
+  /// Contract receipts for the staff overview, including settled history.
+  Future<List<SecurityDepositRecord>> listStaffRecords() async {
+    final client = SupabaseConfig.client;
+    final records = <SecurityDepositRecord>[];
+    for (var offset = 0;; offset += 200) {
+      final rows = await client
+          .from('tenant_contracts')
+          .select(
+            'id, contract_number, security_deposit, starts_on, '
+            'profiles!tenant_contracts_tenant_id_fkey(full_name), security_deposit_receipts(*)',
+          )
+          .order('starts_on', ascending: false)
+          .order('id')
+          .range(offset, offset + 199);
+      for (final row in rows) {
+        final raw = row['security_deposit_receipts'];
+        final receipt = raw is Map
+            ? raw
+            : raw is List && raw.isNotEmpty
+                ? raw.first as Map
+                : <String, dynamic>{};
+        final profile = row['profiles'];
+        records.add(SecurityDepositRecord(
+          contractId: row['id'] as String,
+          contractNumber: row['contract_number'] as String,
+          tenantName:
+              profile is Map ? profile['full_name'] as String? ?? '' : '',
+          requiredAmount: (row['security_deposit'] as num).toDouble(),
+          receivedAmount: (receipt['received_amount'] as num?)?.toDouble() ?? 0,
+          receivedOn:
+              DateTime.tryParse(receipt['received_on']?.toString() ?? ''),
+          method: receipt['method']?.toString() ?? '',
+          reference: receipt['reference']?.toString() ?? '',
+          refundedAmount: (receipt['refunded_amount'] as num?)?.toDouble() ?? 0,
+          deductions: (receipt['approved_deductions'] as num?)?.toDouble() ?? 0,
+          settled: receipt['settled_at'] != null,
+        ));
+      }
+      if (rows.length < 200) break;
+    }
+    return records;
+  }
 
   Future<SecurityDepositRecord?> load(
       {String? contractId, String? tenantId}) async {
