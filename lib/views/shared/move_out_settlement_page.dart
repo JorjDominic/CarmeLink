@@ -441,7 +441,7 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
     }
     showAppSnackBar(
       context,
-      'Open Operations → Rooms → Room inspections to manage the final inspection.',
+      'Open Management → Rooms → Room inspections to manage the final inspection.',
     );
   }
 

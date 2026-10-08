@@ -14,7 +14,6 @@ import '../../services/tenant_service.dart';
 import 'contract_onboarding_checklist_page.dart';
 import 'onboarding_invitation_page.dart';
 import 'tenant_onboarding_flow.dart';
-import 'rent_adjustment_dialog.dart';
 import '../shared/security_deposit_card.dart';
 
 Future<bool?> showContractEditor(
@@ -205,10 +204,6 @@ class _ContractsPageState extends State<ContractsPage> {
                         onEdit: () => _openEditor(items[index]),
                         onDelete: () => _delete(items[index]),
                         onDocuments: () => _openDocuments(items[index]),
-                        onAdjustRent: () => showRentAdjustmentDialog(
-                          context,
-                          items[index],
-                        ),
                       ),
                     );
                   }),
@@ -266,13 +261,11 @@ class _ContractCard extends StatelessWidget {
       {required this.contract,
       required this.onEdit,
       required this.onDelete,
-      required this.onDocuments,
-      required this.onAdjustRent});
+      required this.onDocuments});
   final TenantContract contract;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onDocuments;
-  final VoidCallback onAdjustRent;
 
   @override
   Widget build(BuildContext context) {
@@ -313,11 +306,6 @@ class _ContractCard extends StatelessWidget {
         ]),
         const Spacer(),
         Wrap(alignment: WrapAlignment.end, spacing: 2, children: [
-          if (contract.status == 'active')
-            IconButton(
-                tooltip: 'Adjust future rent',
-                onPressed: onAdjustRent,
-                icon: const Icon(Icons.price_change_outlined)),
           IconButton(
               tooltip: 'Security deposit receipt',
               onPressed: () => showDialog<void>(
@@ -1514,17 +1502,20 @@ class _ContractEditorState extends State<_ContractEditor> {
             stacked: compact,
             first: TextFormField(
               controller: _rent,
+              readOnly: widget.contract != null,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: 'Monthly rent',
+                helperText: 'New rent requires a new contract.',
                 prefixText: '₱ ',
               ),
               validator: _moneyValidator,
             ),
             second: TextFormField(
               controller: _deposit,
+              readOnly: widget.contract != null,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
@@ -1532,7 +1523,7 @@ class _ContractEditorState extends State<_ContractEditor> {
                 labelText: 'Security deposit',
                 helperText: widget.contract == null
                     ? 'Saving records this amount as already received.'
-                    : 'Existing receipts are preserved. Correct receipt details from Billing.',
+                    : 'New deposit terms require a new contract.',
                 prefixText: '₱ ',
               ),
               validator: _moneyValidator,

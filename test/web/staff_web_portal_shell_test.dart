@@ -9,8 +9,7 @@ void main() {
   test('owner uses grouped live management destinations', () {
     final main = StaffWebDestinations.primary(UserRole.owner);
     final extra = StaffWebDestinations.desktopTools(UserRole.owner);
-    expect(main.map((e) => e.label),
-        ['Dashboard', 'Residents', 'Operations', 'Profile']);
+    expect(main.map((e) => e.label), ['Dashboard', 'Residents', 'Profile']);
     expect(main.first.page, isA<StaffOverviewPage>());
     expect(extra, isNotEmpty);
     expect(
@@ -35,8 +34,7 @@ void main() {
   test('caretaker sees operational groups without owner-only destinations', () {
     final main = StaffWebDestinations.primary(UserRole.caretaker);
     final extra = StaffWebDestinations.desktopTools(UserRole.caretaker);
-    expect(main.map((e) => e.label),
-        ['Dashboard', 'Residents', 'Operations', 'Profile']);
+    expect(main.map((e) => e.label), ['Dashboard', 'Residents', 'Profile']);
     expect(extra, isNotEmpty);
     final labels = extra.map((e) => e.label).toList();
     expect(labels, isNot(contains('Maintenance')));
@@ -48,7 +46,7 @@ void main() {
     expect(labels, contains('Rooms & inspections'));
     expect(labels, isNot(contains('Room inspections')));
     final reports = extra.singleWhere((e) => e.label == 'Report management');
-    expect(reports.page, isA<MaintenanceManagementPage>());
+    expect(reports.page, isA<ReportManagementPage>());
     expect(labels, isNot(contains('Contracts')));
     expect(labels, isNot(contains('Guardian links')));
     expect(labels, isNot(contains('Income & expenses')));

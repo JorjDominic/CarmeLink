@@ -139,12 +139,6 @@ class _CaretakerShellState extends State<CaretakerShell>
               page: TenantDirectoryPage(),
             ),
             AppDestination(
-              label: 'Operations',
-              icon: Icons.tune_outlined,
-              selectedIcon: Icons.tune,
-              page: OperationsHubPage(),
-            ),
-            AppDestination(
               label: 'Profile',
               icon: Icons.person_outline,
               selectedIcon: Icons.person,

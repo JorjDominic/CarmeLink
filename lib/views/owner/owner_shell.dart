@@ -147,11 +147,6 @@ class _OwnerShellState extends State<OwnerShell> with WidgetsBindingObserver {
                 selectedIcon: Icons.groups,
                 page: TenantDirectoryPage()),
             AppDestination(
-                label: 'Operations',
-                icon: Icons.tune_outlined,
-                selectedIcon: Icons.tune,
-                page: OperationsHubPage()),
-            AppDestination(
                 label: 'Curfew',
                 icon: Icons.schedule_outlined,
                 selectedIcon: Icons.schedule,

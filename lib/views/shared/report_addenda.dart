@@ -66,9 +66,8 @@ class _ReportAddendaState extends State<ReportAddenda> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(dialogContext)
-                    .colorScheme
-                    .surfaceContainerHighest,
+                color:
+                    Theme.of(dialogContext).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(body),
@@ -166,8 +165,9 @@ class _ReportAddendaState extends State<ReportAddenda> {
   @override
   Widget build(BuildContext context) {
     return ExpansionTile(
+      initiallyExpanded: true,
       tilePadding: EdgeInsets.zero,
-      title: const Text('Corrections and additional details'),
+      title: const Text('Messages and additional details'),
       subtitle: const Text('The original report is preserved.'),
       children: [
         FutureBuilder<List<ConfidentialReportAddendum>>(
@@ -224,9 +224,8 @@ class _ReportAddendaState extends State<ReportAddenda> {
           minLines: 2,
           maxLines: 5,
           decoration: InputDecoration(
-            labelText: 'Correction or additional details',
-            helperText:
-                'This creates an audited addendum and does not overwrite the original report.',
+            labelText: 'Message, correction or additional details',
+            helperText: 'Add a follow-up message or correction to this report.',
             errorText: _error,
           ),
         ),

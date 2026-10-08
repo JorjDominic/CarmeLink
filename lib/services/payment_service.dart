@@ -204,9 +204,9 @@ class PaymentService {
           'p_request_id': requestId,
           'p_charge_id': paymentId,
           'p_amount': amount,
-          'p_method': method,
+          'p_method': 'f2f',
           'p_received_on': receivedOn.toIso8601String().substring(0, 10),
-          'p_reference_number': referenceNumber.trim(),
+          'p_reference_number': 'F2F-${requestId.toUpperCase()}',
           'p_receipt_path': path,
           'p_notes': notes.trim(),
         },
@@ -229,6 +229,22 @@ class PaymentService {
         reason: 'Payment received by staff.',
       ));
     return payment;
+  }
+
+  /// Read the confirmed transaction itself: a bill's partially-paid status can
+  /// coexist with a newer pending or rejected proof.
+  Future<Map<String, dynamic>?> latestConfirmedReceipt(String paymentId) async {
+    _requireAuthId();
+    return await _client
+        .from('payment_transactions')
+        .select(
+            'amount, reference_number, received_on, submitted_at, payment_method')
+        .eq('charge_id', paymentId)
+        .eq('status', 'verified')
+        .order('submitted_at', ascending: false)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
   }
 
   /// Confirms (verified) or Rejects a payment submission.

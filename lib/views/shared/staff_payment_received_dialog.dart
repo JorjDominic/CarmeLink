@@ -6,12 +6,11 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../controllers/owner_controller.dart';
 import '../../core/widgets/common_widgets.dart';
-import '../../core/widgets/configured_choice_field.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../core/widgets/searchable_dropdown.dart';
 import '../../models/models.dart';
-import '../../services/dormitory_configuration_service.dart';
 import '../../services/payment_service.dart';
+import '../../services/receipt_print_service.dart';
 
 Future<void> showStaffPaymentReceived(BuildContext context) async {
   await OwnerController.instance.loadPayments(force: true);
@@ -52,7 +51,7 @@ class _StaffPaymentReceivedDialogState
   final _picker = ImagePicker();
   late final String _requestId;
   Payment? _bill;
-  DormitoryOption? _method;
+  String _billGroup = 'overdue';
   DateTime _receivedOn = DateTime.now();
   Uint8List? _photo;
   String? _filename, _mimeType, _error;
@@ -68,6 +67,16 @@ class _StaffPaymentReceivedDialogState
           p.outstandingAmount > 0)
       .toList();
 
+  List<Payment> get _visibleBills => _eligible.where((p) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final due = DateTime(p.dueDate.year, p.dueDate.month, p.dueDate.day);
+        return _billGroup == 'overdue'
+            ? due.isBefore(today)
+            : !due.isBefore(today);
+      }).toList()
+        ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +87,8 @@ class _StaffPaymentReceivedDialogState
     final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
     _requestId = '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
         '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+    _reference.text = 'F2F-${_requestId.toUpperCase()}';
+    if (_visibleBills.isEmpty) _billGroup = 'upcoming';
   }
 
   @override
@@ -118,9 +129,8 @@ class _StaffPaymentReceivedDialogState
 
   Future<void> _save() async {
     if (_saving || !_form.currentState!.validate()) return;
-    if (_method == null || _photo == null) {
-      setState(
-          () => _error = 'Select a payment method and attach a receipt photo.');
+    if (_photo == null) {
+      setState(() => _error = 'Attach a receipt photo.');
       return;
     }
     setState(() {
@@ -129,11 +139,11 @@ class _StaffPaymentReceivedDialogState
       _error = null;
     });
     try {
-      await const PaymentService().recordReceivedPayment(
+      final payment = await const PaymentService().recordReceivedPayment(
         requestId: _requestId,
         paymentId: _bill!.id,
         amount: double.parse(_amount.text.trim()),
-        method: _method!.code,
+        method: 'f2f',
         receivedOn: _receivedOn,
         receiptBytes: _photo!,
         fileName: _filename!,
@@ -141,7 +151,35 @@ class _StaffPaymentReceivedDialogState
         referenceNumber: _reference.text,
         notes: _notes.text,
       );
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) {
+        await showDialog<void>(
+            context: context,
+            builder: (context) => AlertDialog(
+                  title: const Text('Payment receipt'),
+                  content: Text('Receipt ${_reference.text} saved.'),
+                  actions: [
+                    TextButton(
+                        onPressed: () async {
+                          try {
+                            await const ReceiptPrintService().printPayment(
+                                payment,
+                                amount: double.parse(_amount.text),
+                                reference: _reference.text,
+                                receivedOn: _receivedOn);
+                          } catch (error) {
+                            if (context.mounted)
+                              showAppSnackBar(
+                                  context, 'Could not print receipt: $error');
+                          }
+                        },
+                        child: const Text('Print receipt')),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Done')),
+                  ],
+                ));
+        if (mounted) Navigator.pop(this.context, true);
+      }
     } catch (error) {
       if (mounted)
         setState(() => _error =
@@ -171,11 +209,31 @@ class _StaffPaymentReceivedDialogState
                 if (_eligible.isEmpty)
                   const Text('No eligible unpaid bills. Review pending proofs '
                       'first. Security deposits are recorded separately.'),
+                DropdownButtonFormField<String>(
+                  initialValue: _billGroup,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Bill group'),
+                  items: const [
+                    DropdownMenuItem(value: 'overdue', child: Text('Overdue')),
+                    DropdownMenuItem(
+                        value: 'upcoming',
+                        child: Text('Upcoming / due today',
+                            maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  ],
+                  onChanged: !editable
+                      ? null
+                      : (value) => setState(() {
+                            _billGroup = value!;
+                            _bill = null;
+                            _amount.clear();
+                          }),
+                ),
+                const SizedBox(height: 12),
                 SearchableDropdownFormField<String>(
                   initialValue: _bill?.id,
                   decoration:
                       const InputDecoration(labelText: 'Tenant and bill'),
-                  items: _eligible
+                  items: _visibleBills
                       .map((p) => DropdownMenuItem(
                             value: p.id,
                             child: Text(
@@ -219,15 +277,7 @@ class _StaffPaymentReceivedDialogState
                   },
                 ),
                 const SizedBox(height: 12),
-                ConfiguredChoiceField(
-                  group: 'payment_method',
-                  label: 'Payment method',
-                  value: _method?.code,
-                  enabled: editable,
-                  onChanged: (option) {
-                    if (!_submitted) _method = option;
-                  },
-                ),
+                const Text('Payment method: Face-to-face receipt'),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Date received'),
@@ -248,9 +298,9 @@ class _StaffPaymentReceivedDialogState
                 ),
                 TextFormField(
                     controller: _reference,
-                    enabled: editable,
+                    readOnly: true,
                     decoration: const InputDecoration(
-                        labelText: 'Receipt / reference number (optional)')),
+                        labelText: 'Receipt / reference number (generated)')),
                 const SizedBox(height: 12),
                 TextFormField(
                     controller: _notes,

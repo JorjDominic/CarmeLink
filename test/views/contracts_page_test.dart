@@ -98,7 +98,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('active contract owns the future-rent adjustment workflow',
+  testWidgets(
+      'saved contract prices are read-only and future-rent adjustment is removed',
       (tester) async {
     tester.view.physicalSize = const Size(900, 1000);
     tester.view.devicePixelRatio = 1;
@@ -110,13 +111,14 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: ContractsPage()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Adjust future rent'));
+    expect(find.byTooltip('Adjust future rent'), findsNothing);
+    await tester.tap(find.byTooltip('Edit contract'));
     await tester.pumpAndSettle();
-
-    expect(find.text('Adjust future contract rent'), findsOneWidget);
-    expect(find.text('New monthly rent'), findsOneWidget);
-    expect(find.text('Effective date'), findsOneWidget);
-    expect(find.text('Amendment or approval reason'), findsOneWidget);
+    final priceFields = tester
+        .widgetList<TextField>(find.byType(TextField))
+        .where((field) => field.controller?.text == '4000.00');
+    expect(priceFields.length, 2);
+    expect(priceFields.every((field) => field.readOnly), isTrue);
   });
 
   testWidgets('onboarding editor locks the newly created tenant',

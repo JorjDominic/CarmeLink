@@ -132,7 +132,13 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
   }
 
   Future<void> _addRoom() async {
-    final number = TextEditingController();
+    final usedNumbers =
+        (rooms ?? <RoomRecord>[]).map((room) => room.number).toSet();
+    var nextNumber = 1;
+    while (usedNumbers.contains('$nextNumber')) {
+      nextNumber++;
+    }
+    final number = TextEditingController(text: '$nextNumber');
     final floor = TextEditingController();
     final notes = TextEditingController();
     bool saving = false;
@@ -351,6 +357,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                 );
                 final filter = DropdownButtonFormField<String>(
                   key: const Key('web-room-availability-filter'),
+                  isExpanded: true,
                   initialValue: _availabilityFilter,
                   decoration: const InputDecoration(labelText: 'Availability'),
                   items: const [

@@ -27,6 +27,7 @@ import '../../services/boundary_config_service.dart';
 import '../../services/geofence_service.dart';
 import '../../services/gate_service.dart';
 import '../../services/payment_service.dart';
+import '../../services/receipt_print_service.dart';
 import '../../services/tenant_service.dart';
 import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
@@ -150,7 +151,8 @@ class OwnerDashboardPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ElegantHeader(
-                eyebrow: isCaretaker ? 'Caretaker operations' : 'Operations',
+                eyebrow:
+                    isCaretaker ? 'Caretaker overview' : 'Dormitory overview',
                 title: 'Good afternoon.',
                 subtitle: controller.roomsLoadedOnce
                     ? '${controller.occupiedBeds} of ${controller.totalCapacity} beds are currently occupied.'
@@ -4415,6 +4417,42 @@ class _PaymentReviewCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+
+          if (payment.submittedAmount != null &&
+              payment.submittedAmount! > 0 &&
+              payment.reference?.isNotEmpty == true &&
+              payment.reviewedAt != null &&
+              !payment.isPending &&
+              !payment.isRejected)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                icon: const Icon(Icons.print_outlined),
+                label: const Text('Print receipt'),
+                onPressed: () async {
+                  try {
+                    final receipt = await const PaymentService()
+                        .latestConfirmedReceipt(payment.id);
+                    if (receipt == null ||
+                        (receipt['reference_number'] as String?)?.isNotEmpty !=
+                            true) {
+                      throw Exception(
+                          'No confirmed receipt with a reference is available.');
+                    }
+                    await const ReceiptPrintService().printPayment(payment,
+                        amount: (receipt['amount'] as num).toDouble(),
+                        reference: receipt['reference_number'] as String,
+                        receivedOn: DateTime.parse((receipt['received_on'] ??
+                                receipt['submitted_at']) as String)
+                            .toLocal());
+                  } catch (error) {
+                    if (context.mounted)
+                      showAppSnackBar(
+                          context, 'Could not print receipt: $error');
+                  }
+                },
+              ),
+            ),
 
           // RECEIPT PROOF IMAGE SECTION
           _ReceiptProofThumbnail(

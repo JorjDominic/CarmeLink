@@ -43,12 +43,6 @@ abstract final class StaffWebDestinations {
         page: TenantDirectoryPage(),
       ),
       const AppDestination(
-        label: 'Operations',
-        icon: Icons.tune_outlined,
-        selectedIcon: Icons.tune,
-        page: OperationsHubPage(),
-      ),
-      const AppDestination(
         label: 'Profile',
         icon: Icons.person_outline,
         selectedIcon: Icons.person,

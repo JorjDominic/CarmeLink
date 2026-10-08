@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
 import 'app_notification_service.dart';
+import 'secure_media_service.dart';
 
 const maintenanceStatusLabels = <String, String>{
   'pending': 'Pending',
@@ -206,6 +207,13 @@ class StaffMaintenanceService {
 
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;
+    }
+
+    if (SecureMediaService.isCloudinaryReference(path)) {
+      final url = await const SecureMediaService().createAuthorizedUrl(path);
+      if (url == null)
+        throw Exception('Unable to authorize maintenance photo.');
+      return url;
     }
 
     return _client.storage

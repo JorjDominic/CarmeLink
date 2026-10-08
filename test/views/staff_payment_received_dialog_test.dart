@@ -12,7 +12,7 @@ void main() {
         label: id,
         amount: 4000,
         remainingBalance: status == 'verified' ? 0 : 2500,
-        dueDate: DateTime(2026, 10, 1),
+        dueDate: DateTime.now().subtract(const Duration(days: 1)),
         status: status,
         category: category,
       );
@@ -38,8 +38,7 @@ void main() {
     expect(find.text('2500.00'), findsOneWidget);
     await tester.tap(find.text('Record payment'));
     await tester.pumpAndSettle();
-    expect(find.text('Select a payment method and attach a receipt photo.'),
-        findsOneWidget);
+    expect(find.text('Attach a receipt photo.'), findsOneWidget);
   });
   testWidgets('prevents overpayment and fractional cent amounts',
       (tester) async {
@@ -68,6 +67,39 @@ void main() {
     final button = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, 'Record payment'));
     expect(button.onPressed, isNull);
+  });
+  testWidgets(
+      'separates overdue and future bills and clears the selected amount',
+      (tester) async {
+    final future = bill('future', 'upcoming')
+        .copyWith(dueDate: DateTime.now().add(const Duration(days: 5)));
+    await open(tester, [bill('unpaid', 'due'), future]);
+    await chooseBill(tester);
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upcoming / due today').last);
+    await tester.pumpAndSettle();
+    expect(find.text('2500.00'), findsNothing);
+    await tester.tap(find.byType(SearchableDropdownFormField<String>));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('future'), findsOneWidget);
+    expect(find.textContaining('unpaid'), findsNothing);
+  });
+  testWidgets(
+      'uses a fixed face-to-face method and read-only generated reference',
+      (tester) async {
+    await open(tester, [bill('unpaid', 'due')]);
+    expect(find.text('Payment method: Face-to-face receipt'), findsOneWidget);
+    final reference = tester.widget<TextFormField>(find.byWidgetPredicate((w) =>
+        w is TextFormField && w.controller?.text.startsWith('F2F-') == true));
+    final referenceInput = tester.widget<TextField>(find.byWidgetPredicate(
+        (w) =>
+            w is TextField && identical(w.controller, reference.controller)));
+    expect(referenceInput.readOnly, isTrue);
+    expect(
+        reference.controller!.text,
+        matches(RegExp(
+            r'^F2F-[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$')));
   });
   testWidgets('fits a narrow screen with large text', (tester) async {
     tester.view.physicalSize = const Size(320, 700);

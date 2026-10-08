@@ -199,7 +199,7 @@ Future<void> _guardianStep(
         builder: (dialogContext) => AlertDialog(
           title: const Text('Guardian account required'),
           content: const Text(
-            'Create a guardian account first, then resume guardian linking from Operations.',
+            'Create a guardian account first, then resume guardian linking from the management areas.',
           ),
           actions: [
             FilledButton(

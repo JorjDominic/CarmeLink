@@ -263,12 +263,6 @@ class _StaffOverviewPageState extends State<StaffOverviewPage> {
                             label: const Text('Room monitoring'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => _open(const OperationsHubPage(),
-                                destinationLabel: 'Operations'),
-                            icon: const Icon(Icons.tune_outlined, size: 18),
-                            label: const Text('Operations'),
-                          ),
-                          OutlinedButton.icon(
                             onPressed: () => _open(
                               const BillingManagementPage(),
                               destinationLabel: 'Billing & charges',

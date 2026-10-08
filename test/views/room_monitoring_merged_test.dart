@@ -18,10 +18,14 @@ void main() {
         capacity: 4,
         description: 'Standard room',
         beds: [
-          BedRecord(id: 'b-1', label: 'Bed A', status: 'available', occupied: true),
-          BedRecord(id: 'b-2', label: 'Bed B', status: 'available', occupied: true),
-          BedRecord(id: 'b-3', label: 'Bed C', status: 'available', occupied: false),
-          BedRecord(id: 'b-4', label: 'Bed D', status: 'available', occupied: false),
+          BedRecord(
+              id: 'b-1', label: 'Bed A', status: 'available', occupied: true),
+          BedRecord(
+              id: 'b-2', label: 'Bed B', status: 'available', occupied: true),
+          BedRecord(
+              id: 'b-3', label: 'Bed C', status: 'available', occupied: false),
+          BedRecord(
+              id: 'b-4', label: 'Bed D', status: 'available', occupied: false),
         ],
       ),
       RoomRecord(
@@ -31,10 +35,14 @@ void main() {
         capacity: 4,
         description: 'Standard room',
         beds: [
-          BedRecord(id: 'b-5', label: 'Bed A', status: 'available', occupied: true),
-          BedRecord(id: 'b-6', label: 'Bed B', status: 'available', occupied: true),
-          BedRecord(id: 'b-7', label: 'Bed C', status: 'available', occupied: true),
-          BedRecord(id: 'b-8', label: 'Bed D', status: 'available', occupied: true),
+          BedRecord(
+              id: 'b-5', label: 'Bed A', status: 'available', occupied: true),
+          BedRecord(
+              id: 'b-6', label: 'Bed B', status: 'available', occupied: true),
+          BedRecord(
+              id: 'b-7', label: 'Bed C', status: 'available', occupied: true),
+          BedRecord(
+              id: 'b-8', label: 'Bed D', status: 'available', occupied: true),
         ],
       ),
     ];
@@ -48,7 +56,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify MetricCards
-    expect(find.text('Rooms'), findsNWidgets(2));
+    expect(find.text('Rooms'), findsOneWidget);
+    expect(find.text('Active rooms'), findsOneWidget);
     expect(find.text('Occupied beds'), findsOneWidget);
     expect(find.text('Available beds'), findsOneWidget);
 
@@ -79,7 +88,8 @@ void main() {
     expect(find.text('Room 101'), findsOneWidget);
   });
 
-  testWidgets('AdminFloorPlanPage backward compatibility routes to floor plan mode',
+  testWidgets(
+      'AdminFloorPlanPage backward compatibility routes to floor plan mode',
       (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
