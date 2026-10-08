@@ -61,4 +61,43 @@ void main() {
       expect(rect.right, lessThanOrEqualTo(320), reason: title);
     }
   });
+
+  testWidgets('operational page headers use the standard font by default',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: PageFrame(
+          title: 'Rooms',
+          child: SizedBox(),
+        ),
+      ),
+    );
+
+    final title = tester.widget<Text>(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text('Rooms'),
+      ),
+    );
+
+    expect(title.style?.fontFamily, isNot('GreatVibes'));
+  });
+
+  testWidgets('section headers use the standard font by default',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ElegantHeader(
+            eyebrow: 'Facilities',
+            title: 'Rooms & inspections',
+          ),
+        ),
+      ),
+    );
+
+    final title = tester.widget<Text>(find.text('Rooms & inspections'));
+
+    expect(title.style?.fontFamily, isNot('GreatVibes'));
+  });
 }

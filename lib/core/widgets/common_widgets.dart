@@ -947,7 +947,7 @@ class PageFrame extends StatelessWidget {
     this.actions,
     this.floatingActionButton,
     this.heroTitle,
-    this.useScriptTitle = true,
+    this.useScriptTitle = false,
     this.onRefresh,
     this.onBack,
     this.maxWidth,
@@ -1355,7 +1355,7 @@ class ElegantHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.trailing,
-    this.useScriptTitle = true,
+    this.useScriptTitle = false,
     super.key,
   });
 
