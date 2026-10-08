@@ -10,6 +10,7 @@ import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import 'owner_pages.dart';
+import '../shared/staff_payment_received_dialog.dart';
 import 'utility_charge_cart_dialog.dart';
 
 class BillingManagementPage extends StatefulWidget {
@@ -130,6 +131,11 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
                   'Rent, utilities, manually approved charges, balances, and payment review.',
               onRefresh: _refresh,
               actions: [
+                FilledButton.icon(
+                  onPressed: () => showStaffPaymentReceived(context),
+                  icon: const Icon(Icons.add_card_outlined),
+                  label: const Text('Record payment received'),
+                ),
                 IconButton(
                   tooltip: 'Refresh billing',
                   onPressed: _refreshing ? null : _refresh,

@@ -76,8 +76,14 @@ export async function canAttachRecord(
       ? 'billing_charges'
       : null
   if (!table) return false
-  // Uploads are tenant-originated evidence. Staff/guardian read permission must
-  // never imply permission to attach a new asset to somebody else's record.
+  // Staff may attach payment receipts; maintenance evidence remains tenant-only.
+  if (kind === 'payment') {
+    const profile = await caller.from('profiles').select('role').eq('id', userId).single()
+    if (!profile.error && ['owner', 'caretaker'].includes(profile.data?.role)) {
+      const bill = await caller.from(table).select('id,category').eq('id', recordId).single()
+      return !bill.error && !!bill.data && bill.data.category !== 'deposit'
+    }
+  }
   const result = await caller.from(table).select('id').eq('id', recordId)
     .eq('tenant_id', userId).limit(1)
   return !result.error && (result.data?.length ?? 0) > 0

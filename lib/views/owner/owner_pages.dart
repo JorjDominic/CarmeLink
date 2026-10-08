@@ -31,6 +31,7 @@ import '../../services/tenant_service.dart';
 import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../shared/account_management_page.dart';
+import '../shared/staff_payment_received_dialog.dart';
 import '../shared/staff_quick_panel.dart';
 import '../shared/staff_curfew_requests_page.dart';
 import '../shared/cleaning_schedule_management_page.dart';
@@ -2738,6 +2739,11 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
           : 'Review payment proofs submitted by tenants',
       onRefresh: () => OwnerController.instance.loadPayments(force: true),
       actions: [
+        IconButton(
+          tooltip: 'Record payment received',
+          icon: const Icon(Icons.add_card_outlined),
+          onPressed: () => showStaffPaymentReceived(context),
+        ),
         IconButton(
           tooltip: 'Send payment due alerts to staff',
           icon: const Icon(Icons.notifications_active_outlined),

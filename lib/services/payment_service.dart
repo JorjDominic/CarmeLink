@@ -173,6 +173,64 @@ class PaymentService {
     }).toList(growable: false);
   }
 
+  /// Records a staff-collected payment and its private receipt evidence.
+  Future<Payment> recordReceivedPayment({
+    required String requestId,
+    required String paymentId,
+    required double amount,
+    required String method,
+    required DateTime receivedOn,
+    required Uint8List receiptBytes,
+    required String fileName,
+    String? mimeType,
+    String referenceNumber = '',
+    String notes = '',
+  }) async {
+    _requireAuthId();
+    if (!amount.isFinite || amount <= 0) {
+      throw ArgumentError('Enter a positive payment amount.');
+    }
+    final path = await _uploadReceipt(
+      paymentId: paymentId,
+      bytes: receiptBytes,
+      fileName: fileName,
+      mimeType: mimeType,
+    );
+    late final Map<String, dynamic> result;
+    try {
+      result = Map<String, dynamic>.from(await _client.rpc(
+        'record_staff_payment',
+        params: {
+          'p_request_id': requestId,
+          'p_charge_id': paymentId,
+          'p_amount': amount,
+          'p_method': method,
+          'p_received_on': receivedOn.toIso8601String().substring(0, 10),
+          'p_reference_number': referenceNumber.trim(),
+          'p_receipt_path': path,
+          'p_notes': notes.trim(),
+        },
+      ) as Map);
+    } on PostgrestException {
+      await _safeRemoveReceipt(path);
+      rethrow;
+    }
+    // A transport failure may have committed: keep evidence until retry resolves.
+    if (result['receipt_path'] != path) await _safeRemoveReceipt(path);
+    final payment = Payment.fromJson(
+      Map<String, dynamic>.from(result['payment'] as Map),
+    );
+    if (result['is_new'] == true)
+      unawaited(AppNotificationService.instance.notifyPaymentReviewed(
+        tenantId: payment.tenantId,
+        paymentId: paymentId,
+        approved: true,
+        amount: amount,
+        reason: 'Payment received by staff.',
+      ));
+    return payment;
+  }
+
   /// Confirms (verified) or Rejects a payment submission.
   Future<Payment> verifyPayment({
     required String paymentId,
