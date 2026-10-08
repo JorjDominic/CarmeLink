@@ -1153,8 +1153,9 @@ class PageFrame extends StatelessWidget {
                   maxLines: 1,
                   softWrap: false,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontSize: compactHeader ? 20 : null,
-                        fontWeight: FontWeight.w700,
+                        fontFamily: 'GreatVibes',
+                        fontSize: compactHeader ? 25 : 30,
+                        fontWeight: FontWeight.w600,
                       ),
                 ),
               ),
@@ -1380,8 +1381,11 @@ class ElegantHeader extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                fontSize: titleSize,
-                fontWeight: FontWeight.w700,
+                fontFamily: 'GreatVibes',
+                fontSize: titleSize + 10,
+                fontWeight: FontWeight.w600,
+                height: 1.15,
+                letterSpacing: 0,
               ),
         ),
         if (subtitle != null) ...[

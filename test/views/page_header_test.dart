@@ -62,13 +62,13 @@ void main() {
     }
   });
 
-  testWidgets('operational page headers use the standard font by default',
+  testWidgets('operational page headers stay cursive with legacy opt-out',
       (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: PageFrame(
           title: 'Rooms',
-          useScriptTitle: true,
+          useScriptTitle: false,
           child: SizedBox(),
         ),
       ),
@@ -81,10 +81,10 @@ void main() {
       ),
     );
 
-    expect(title.style?.fontFamily, isNot('GreatVibes'));
+    expect(title.style?.fontFamily, 'GreatVibes');
   });
 
-  testWidgets('section headers use the standard font by default',
+  testWidgets('section headers stay cursive with legacy opt-out',
       (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
@@ -92,7 +92,7 @@ void main() {
           body: ElegantHeader(
             eyebrow: 'Facilities',
             title: 'Rooms & inspections',
-            useScriptTitle: true,
+            useScriptTitle: false,
           ),
         ),
       ),
@@ -100,6 +100,6 @@ void main() {
 
     final title = tester.widget<Text>(find.text('Rooms & inspections'));
 
-    expect(title.style?.fontFamily, isNot('GreatVibes'));
+    expect(title.style?.fontFamily, 'GreatVibes');
   });
 }
