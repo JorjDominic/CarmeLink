@@ -68,6 +68,7 @@ void main() {
       const MaterialApp(
         home: PageFrame(
           title: 'Rooms',
+          useScriptTitle: true,
           child: SizedBox(),
         ),
       ),
@@ -91,6 +92,7 @@ void main() {
           body: ElegantHeader(
             eyebrow: 'Facilities',
             title: 'Rooms & inspections',
+            useScriptTitle: true,
           ),
         ),
       ),
