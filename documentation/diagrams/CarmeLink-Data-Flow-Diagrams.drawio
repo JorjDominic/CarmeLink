@@ -1,0 +1,571 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" type="device" version="24.7.17">
+  <diagram id="CarmeLink-DFD-Level-0" name="Level 0 - Context Diagram">
+    <mxGraphModel dx="1600" dy="1050" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1050" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Level 0 - CarmeLink Context Diagram" style="text;html=0;whiteSpace=wrap;align=center;verticalAlign=middle;fontFamily=Arial;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="300" y="20" width="1000" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="system" value="0&#10;CarmeLink&#10;Dormitory Management System&#10;with Geofencing-Based&#10;Curfew Monitoring" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=18;fillColor=#ffffff;strokeColor=#222222;fontStyle=1;rounded=1;arcSize=18;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="600" y="355" width="400" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="tenant" value="Tenant" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=18;fillColor=#ffffff;strokeColor=#222222;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="55" y="210" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="guardian" value="Authorized Guardian" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=18;fillColor=#ffffff;strokeColor=#222222;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="55" y="710" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="owner" value="Owner" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=18;fillColor=#ffffff;strokeColor=#222222;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1305" y="210" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="caretaker" value="Authorized Caretaker" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=18;fillColor=#ffffff;strokeColor=#222222;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1305" y="710" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="tenant-in" value="Profile information, payment proofs,&#10;requests, reports, appeals, messages&#10;and detected entry / exit events" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#333333;fontFamily=Arial;fontSize=15;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.3;entryX=0.25;entryY=0.0;" edge="1" parent="1" source="tenant" target="system">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="240" />
+            </Array>
+            <mxPoint x="-65.0" y="-70.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tenant-out" value="Own room, contract and billing records,&#10;request results, notices, messages&#10;and presence / curfew updates" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#333333;fontFamily=Arial;fontSize=15;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.25;entryX=0.5;entryY=1.0;" edge="1" parent="1" source="system" target="tenant">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="175" y="425" />
+            </Array>
+            <mxPoint x="45.0" y="65.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="guardian-in" value="Account details, linked-record inquiries,&#10;overnight-leave acknowledgments,&#10;alert preferences and messages" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#333333;fontFamily=Arial;fontSize=15;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.35;entryX=0.25;entryY=1.0;" edge="1" parent="1" source="guardian" target="system">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="745" />
+            </Array>
+            <mxPoint x="-62.5" y="80.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="guardian-out" value="Selected linked-tenant records,&#10;presence / curfew notifications,&#10;acknowledgment requests and notices" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#333333;fontFamily=Arial;fontSize=15;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.7321428571428571;entryX=0.5;entryY=0.0;" edge="1" parent="1" source="system" target="guardian">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="175" y="560" />
+            </Array>
+            <mxPoint x="57.5" y="70.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="owner-in" value="Administrative requests, record updates,&#10;contract / guardian-link decisions,&#10;payment reviews and announcements" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#333333;fontFamily=Arial;fontSize=15;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.3;entryX=0.75;entryY=0.0;" edge="1" parent="1" source="owner" target="system">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="240" />
+            </Array>
+            <mxPoint x="65.0" y="-70.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="owner-out" value="Tenant and operational records,&#10;submitted requests, payment proofs,&#10;reports, analytics, messages and alerts" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#333333;fontFamily=Arial;fontSize=15;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.25;entryX=0.5;entryY=1.0;" edge="1" parent="1" source="system" target="owner">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1425" y="425" />
+            </Array>
+            <mxPoint x="-50.0" y="65.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="caretaker-in" value="Permitted record updates,&#10;payment verification, maintenance /&#10;visitor / curfew decisions and messages" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#333333;fontFamily=Arial;fontSize=15;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.35;entryX=0.75;entryY=1.0;" edge="1" parent="1" source="caretaker" target="system">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="745" />
+            </Array>
+            <mxPoint x="62.5" y="80.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="caretaker-out" value="Permitted tenant and payment records,&#10;maintenance / visitor / curfew requests,&#10;case records, messages and alerts" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#333333;fontFamily=Arial;fontSize=15;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.7321428571428571;entryX=0.5;entryY=0.0;" edge="1" parent="1" source="system" target="caretaker">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1425" y="560" />
+            </Array>
+            <mxPoint x="-57.5" y="70.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="note" value="Four external roles: Tenant, Authorized Guardian, Owner and Authorized Caretaker.&#10;Access follows role permissions; guardians access linked tenants only.&#10;Recorded geofence status describes the smartphone and does not independently confirm a violation." style="text;html=0;whiteSpace=wrap;align=center;verticalAlign=middle;fontFamily=Arial;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="160" y="940" width="1280" height="75" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="CarmeLink-DFD-Level-1" name="Level 1 - Compact Data Flow Diagram">
+    <mxGraphModel dx="1700" dy="1190" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1190" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Level 1 - CarmeLink Data Flow Diagram" style="text;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontFamily=Arial;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="200" y="12" width="1300" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="column-users" value="Users" style="text;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontFamily=Arial;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="30" y="55" width="180" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="column-processes" value="System Processes" style="text;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontFamily=Arial;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="420" y="55" width="290" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="column-data" value="Data Stores" style="text;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontFamily=Arial;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="935" y="55" width="270" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="column-staff" value="Management" style="text;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontFamily=Arial;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1430" y="55" width="220" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="p1" value="1. Manage Accounts and Tenancy&#10;Profiles, guardian links, contracts,&#10;rooms and bed assignments" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=1;arcSize=16;" vertex="1" parent="1">
+          <mxGeometry x="420" y="125" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="D1" value="D1 | User, Tenant, Guardian,&#10;Contract and Room Records" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;" vertex="1" parent="1">
+          <mxGeometry x="935" y="125" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="staff-1" value="Owner /&#10;Authorized Caretaker" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1430" y="125" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="store-1" value="Updated records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.2777777777777778;entryX=0.0;entryY=0.2777777777777778;" edge="1" parent="1" source="p1" target="D1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-0.5" y="-14.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="read-1" value="Existing records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.7444444444444445;entryX=1.0;entryY=0.7444444444444445;" edge="1" parent="1" source="D1" target="p1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-0.5" y="14.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Tenant-1" value="Tenant" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="105" width="180" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="input-1-Tenant" value="Account / profile data" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.26666666666666666;entryX=0.0;entryY=0.18888888888888888;" edge="1" parent="1" source="Tenant-1" target="p1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="255" y="117" />
+              <mxPoint x="255" y="142" />
+            </Array>
+            <mxPoint x="12.5" y="-34.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="output-1-Tenant" value="Access / own records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.36666666666666664;entryX=1.0;entryY=0.7555555555555555;" edge="1" parent="1" source="p1" target="Tenant-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="235" y="158" />
+              <mxPoint x="235" y="139" />
+            </Array>
+            <mxPoint x="9.5" y="-9.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Guardian-1" value="Authorized Guardian" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="165" width="180" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="input-1-Guardian" value="Account / record inquiry" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.26666666666666666;entryX=0.0;entryY=0.6111111111111112;" edge="1" parent="1" source="Guardian-1" target="p1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="255" y="177" />
+              <mxPoint x="255" y="180" />
+            </Array>
+            <mxPoint x="1.5" y="-5.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="output-1-Guardian" value="Access / linked records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.8333333333333334;entryX=1.0;entryY=0.7555555555555555;" edge="1" parent="1" source="p1" target="Guardian-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="235" y="200" />
+              <mxPoint x="235" y="199" />
+            </Array>
+            <mxPoint x="0.5" y="11.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="management-in-1" value="Account and tenancy updates" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.2222222222222222;entryX=0.5;entryY=0.0;" edge="1" parent="1" source="staff-1" target="p1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1300" y="145" />
+              <mxPoint x="1300" y="95" />
+              <mxPoint x="565" y="95" />
+            </Array>
+            <mxPoint x="37.5" y="0.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="management-out-1" value="Permitted resident records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1.0;entryX=0.0;entryY=0.7777777777777778;" edge="1" parent="1" source="p1" target="staff-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="565" y="235" />
+              <mxPoint x="1320" y="235" />
+              <mxPoint x="1320" y="195" />
+            </Array>
+            <mxPoint x="37.5" y="0.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2" value="2. Manage Billing and Payments&#10;Rent, utilities, charges, deposits&#10;and OCR-assisted receipt review" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=1;arcSize=16;" vertex="1" parent="1">
+          <mxGeometry x="420" y="285" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="D2" value="D2 | Billing, Payment, Deposit&#10;and Receipt Records" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;" vertex="1" parent="1">
+          <mxGeometry x="935" y="285" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="staff-2" value="Owner /&#10;Authorized Caretaker" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1430" y="285" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="store-2" value="Updated records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.2777777777777778;entryX=0.0;entryY=0.2777777777777778;" edge="1" parent="1" source="p2" target="D2">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-0.5" y="-14.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="read-2" value="Existing records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.7444444444444445;entryX=1.0;entryY=0.7444444444444445;" edge="1" parent="1" source="D2" target="p2">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-0.5" y="14.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Tenant-2" value="Tenant" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="265" width="180" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="input-2-Tenant" value="Payment proof / inquiry" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.26666666666666666;entryX=0.0;entryY=0.18888888888888888;" edge="1" parent="1" source="Tenant-2" target="p2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="255" y="277" />
+              <mxPoint x="255" y="302" />
+            </Array>
+            <mxPoint x="12.5" y="-34.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="output-2-Tenant" value="Balance / payment status" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.36666666666666664;entryX=1.0;entryY=0.7555555555555555;" edge="1" parent="1" source="p2" target="Tenant-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="235" y="318" />
+              <mxPoint x="235" y="299" />
+            </Array>
+            <mxPoint x="9.5" y="-9.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Guardian-2" value="Authorized Guardian" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="325" width="180" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="input-2-Guardian" value="Payment inquiry" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.26666666666666666;entryX=0.0;entryY=0.6111111111111112;" edge="1" parent="1" source="Guardian-2" target="p2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="255" y="337" />
+              <mxPoint x="255" y="340" />
+            </Array>
+            <mxPoint x="1.5" y="-5.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="output-2-Guardian" value="Selected payment records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.8333333333333334;entryX=1.0;entryY=0.7555555555555555;" edge="1" parent="1" source="p2" target="Guardian-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="235" y="360" />
+              <mxPoint x="235" y="359" />
+            </Array>
+            <mxPoint x="0.5" y="11.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="management-in-2" value="Charges and payment decisions" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.2222222222222222;entryX=0.5;entryY=0.0;" edge="1" parent="1" source="staff-2" target="p2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1300" y="305" />
+              <mxPoint x="1300" y="255" />
+              <mxPoint x="565" y="255" />
+            </Array>
+            <mxPoint x="37.5" y="0.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="management-out-2" value="Receipts and balances" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1.0;entryX=0.0;entryY=0.7777777777777778;" edge="1" parent="1" source="p2" target="staff-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="565" y="395" />
+              <mxPoint x="1320" y="395" />
+              <mxPoint x="1320" y="355" />
+            </Array>
+            <mxPoint x="37.5" y="0.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3" value="3. Manage Facilities and Cases&#10;Maintenance, cleaning, inspections,&#10;visitors, concerns and appeals" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=1;arcSize=16;" vertex="1" parent="1">
+          <mxGeometry x="420" y="445" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="D3" value="D3 | Maintenance, Inspection,&#10;Visitor and Case Records" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;" vertex="1" parent="1">
+          <mxGeometry x="935" y="445" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="staff-3" value="Owner /&#10;Authorized Caretaker" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1430" y="445" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="store-3" value="Updated records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.2777777777777778;entryX=0.0;entryY=0.2777777777777778;" edge="1" parent="1" source="p3" target="D3">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-0.5" y="-14.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="read-3" value="Existing records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.7444444444444445;entryX=1.0;entryY=0.7444444444444445;" edge="1" parent="1" source="D3" target="p3">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-0.5" y="14.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Tenant-3" value="Tenant" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="425" width="180" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="input-3-Tenant" value="Reports / visitor&#10;requests / appeals" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.26666666666666666;entryX=0.0;entryY=0.18888888888888888;" edge="1" parent="1" source="Tenant-3" target="p3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="255" y="437" />
+              <mxPoint x="255" y="462" />
+            </Array>
+            <mxPoint x="12.5" y="-34.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="output-3-Tenant" value="Status / decisions" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.36666666666666664;entryX=1.0;entryY=0.7555555555555555;" edge="1" parent="1" source="p3" target="Tenant-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="235" y="478" />
+              <mxPoint x="235" y="459" />
+            </Array>
+            <mxPoint x="9.5" y="-9.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="management-in-3" value="Reviews and operational updates" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.2222222222222222;entryX=0.5;entryY=0.0;" edge="1" parent="1" source="staff-3" target="p3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1300" y="465" />
+              <mxPoint x="1300" y="415" />
+              <mxPoint x="565" y="415" />
+            </Array>
+            <mxPoint x="37.5" y="0.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="management-out-3" value="Reports, requests and cases" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1.0;entryX=0.0;entryY=0.7777777777777778;" edge="1" parent="1" source="p3" target="staff-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="565" y="555" />
+              <mxPoint x="1320" y="555" />
+              <mxPoint x="1320" y="515" />
+            </Array>
+            <mxPoint x="37.5" y="0.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p4" value="4. Manage Communication&#10;Private messages, announcements&#10;and system notifications" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=1;arcSize=16;" vertex="1" parent="1">
+          <mxGeometry x="420" y="605" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="D4" value="D4 | Message, Announcement&#10;and Notification Records" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;" vertex="1" parent="1">
+          <mxGeometry x="935" y="605" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="staff-4" value="Owner /&#10;Authorized Caretaker" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1430" y="605" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="store-4" value="Updated records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.2777777777777778;entryX=0.0;entryY=0.2777777777777778;" edge="1" parent="1" source="p4" target="D4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-0.5" y="-14.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="read-4" value="Existing records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.7444444444444445;entryX=1.0;entryY=0.7444444444444445;" edge="1" parent="1" source="D4" target="p4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-0.5" y="14.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Tenant-4" value="Tenant" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="585" width="180" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="input-4-Tenant" value="Messages / notice inquiry" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.26666666666666666;entryX=0.0;entryY=0.18888888888888888;" edge="1" parent="1" source="Tenant-4" target="p4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="255" y="597" />
+              <mxPoint x="255" y="622" />
+            </Array>
+            <mxPoint x="12.5" y="-34.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="output-4-Tenant" value="Messages / notices" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.36666666666666664;entryX=1.0;entryY=0.7555555555555555;" edge="1" parent="1" source="p4" target="Tenant-4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="235" y="638" />
+              <mxPoint x="235" y="619" />
+            </Array>
+            <mxPoint x="9.5" y="-9.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Guardian-4" value="Authorized Guardian" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="645" width="180" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="input-4-Guardian" value="Messages / notice inquiry" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.26666666666666666;entryX=0.0;entryY=0.6111111111111112;" edge="1" parent="1" source="Guardian-4" target="p4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="255" y="657" />
+              <mxPoint x="255" y="660" />
+            </Array>
+            <mxPoint x="1.5" y="-5.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="output-4-Guardian" value="Messages / notices" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.8333333333333334;entryX=1.0;entryY=0.7555555555555555;" edge="1" parent="1" source="p4" target="Guardian-4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="235" y="680" />
+              <mxPoint x="235" y="679" />
+            </Array>
+            <mxPoint x="0.5" y="11.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="management-in-4" value="Messages and announcements" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.2222222222222222;entryX=0.5;entryY=0.0;" edge="1" parent="1" source="staff-4" target="p4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1300" y="625" />
+              <mxPoint x="1300" y="575" />
+              <mxPoint x="565" y="575" />
+            </Array>
+            <mxPoint x="37.5" y="0.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="management-out-4" value="Messages and notifications" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1.0;entryX=0.0;entryY=0.7777777777777778;" edge="1" parent="1" source="p4" target="staff-4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="565" y="715" />
+              <mxPoint x="1320" y="715" />
+              <mxPoint x="1320" y="675" />
+            </Array>
+            <mxPoint x="37.5" y="0.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p5" value="5. Process Geofencing and Curfew&#10;Entry / exit, presence, exceptions&#10;and curfew-related alerts" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=1;arcSize=16;" vertex="1" parent="1">
+          <mxGeometry x="420" y="765" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="D5" value="D5 | Presence, Gate Activity,&#10;Curfew and Exception Records" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;" vertex="1" parent="1">
+          <mxGeometry x="935" y="765" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="staff-5" value="Owner /&#10;Authorized Caretaker" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1430" y="765" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="store-5" value="Updated records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.2777777777777778;entryX=0.0;entryY=0.2777777777777778;" edge="1" parent="1" source="p5" target="D5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-0.5" y="-14.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="read-5" value="Existing records" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.7444444444444445;entryX=1.0;entryY=0.7444444444444445;" edge="1" parent="1" source="D5" target="p5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-0.5" y="14.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Tenant-5" value="Tenant" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="745" width="180" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="input-5-Tenant" value="Entry / exit events and&#10;requests" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.26666666666666666;entryX=0.0;entryY=0.18888888888888888;" edge="1" parent="1" source="Tenant-5" target="p5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="255" y="757" />
+              <mxPoint x="255" y="782" />
+            </Array>
+            <mxPoint x="12.5" y="-34.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="output-5-Tenant" value="Presence / request result" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.36666666666666664;entryX=1.0;entryY=0.7555555555555555;" edge="1" parent="1" source="p5" target="Tenant-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="235" y="798" />
+              <mxPoint x="235" y="779" />
+            </Array>
+            <mxPoint x="9.5" y="-9.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Guardian-5" value="Authorized Guardian" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="805" width="180" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="input-5-Guardian" value="Overnight acknowledgment&#10;/ preferences" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.26666666666666666;entryX=0.0;entryY=0.6111111111111112;" edge="1" parent="1" source="Guardian-5" target="p5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="255" y="817" />
+              <mxPoint x="255" y="820" />
+            </Array>
+            <mxPoint x="1.5" y="-5.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="output-5-Guardian" value="Linked status / alerts" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.8333333333333334;entryX=1.0;entryY=0.7555555555555555;" edge="1" parent="1" source="p5" target="Guardian-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="235" y="840" />
+              <mxPoint x="235" y="839" />
+            </Array>
+            <mxPoint x="0.5" y="11.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="management-in-5" value="Staff acknowledgments / exceptions" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.2222222222222222;entryX=0.5;entryY=0.0;" edge="1" parent="1" source="staff-5" target="p5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1300" y="785" />
+              <mxPoint x="1300" y="735" />
+              <mxPoint x="565" y="735" />
+            </Array>
+            <mxPoint x="37.5" y="0.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="management-out-5" value="Curfew records and alerts" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1.0;entryX=0.0;entryY=0.7777777777777778;" edge="1" parent="1" source="p5" target="staff-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="565" y="875" />
+              <mxPoint x="1320" y="875" />
+              <mxPoint x="1320" y="835" />
+            </Array>
+            <mxPoint x="37.5" y="0.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p6" value="6. Generate Reports and Analytics&#10;PDF reports and administrative&#10;summaries from recorded data" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=1;arcSize=16;" vertex="1" parent="1">
+          <mxGeometry x="420" y="925" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="owner-report" value="Owner" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#ffffff;strokeColor=#222222;rounded=0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1430" y="925" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="report-request" value="Report request / criteria" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.0;exitY=0.2222222222222222;entryX=0.5;entryY=0.0;" edge="1" parent="1" source="owner-report" target="p6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1300" y="945" />
+              <mxPoint x="1300" y="895" />
+              <mxPoint x="565" y="895" />
+            </Array>
+            <mxPoint x="37.5" y="0.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="report-output" value="PDF reports / analytics" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1.0;entryX=0.0;entryY=0.7777777777777778;" edge="1" parent="1" source="p6" target="owner-report">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="565" y="1035" />
+              <mxPoint x="1320" y="1035" />
+              <mxPoint x="1320" y="995" />
+            </Array>
+            <mxPoint x="37.5" y="0.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="report-data-D1" value="D1 data" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.7777777777777778;entryX=1.0;entryY=0.2222222222222222;" edge="1" parent="1" source="D1" target="p6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1240" y="195" />
+              <mxPoint x="1240" y="945" />
+            </Array>
+            <mxPoint x="28.0" y="-622.5" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="report-data-D2" value="D2 data" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.7777777777777778;entryX=1.0;entryY=0.4444444444444444;" edge="1" parent="1" source="D2" target="p6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1258" y="355" />
+              <mxPoint x="1258" y="965" />
+            </Array>
+            <mxPoint x="28.0" y="-552.5" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="report-data-D3" value="D3 data" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.7777777777777778;entryX=1.0;entryY=0.6666666666666666;" edge="1" parent="1" source="D3" target="p6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1276" y="515" />
+              <mxPoint x="1276" y="985" />
+            </Array>
+            <mxPoint x="40.5" y="-470.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="report-data-D5" value="D5 data" style="edgeStyle=none;html=0;endArrow=classic;endFill=1;strokeColor=#444444;strokeWidth=1;fontFamily=Arial;fontSize=12;labelBackgroundColor=#ffffff;exitX=1.0;exitY=0.7777777777777778;entryX=1.0;entryY=0.8888888888888888;" edge="1" parent="1" source="D5" target="p6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1294" y="835" />
+              <mxPoint x="1294" y="1005" />
+            </Array>
+            <mxPoint x="190.5" y="-170.0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="report-scope" value="PDFs cover tenants and occupancy,&#10;billing, maintenance, gate activity,&#10;curfew requests and operations." style="text;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontFamily=Arial;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="80" y="910" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="notes" value="Repeated user symbols represent the same roles. All access remains subject to permissions.&#10;Guardians access linked tenants only and acknowledge overnight leave only. Geofencing events come from the tenant's smartphone.&#10;Contracts, guardian links, confidential-report review, deposit finalization and analytics remain owner-controlled.&#10;Uploaded receipts, images and documents are linked to their records. Flagged curfew events require staff review." style="text;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontFamily=Arial;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="80" y="1070" width="1540" height="90" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

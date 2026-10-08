@@ -259,44 +259,18 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
 
 
   Future<void> _offerContractDraft(CreatedAccount account) async {
-    final createNow = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        icon: const Icon(Icons.person_add_alt_1_outlined),
-        title: const Text('Tenant account created'),
-        content: Text(
-          '${account.fullName} can now be added to a draft contract. '
-          'You can also complete this step later from Contracts.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Do this later'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Create contract now'),
-          ),
-        ],
-      ),
-    );
-    if (!mounted) return;
-    if (createNow != true) {
-      showAppSnackBar(context, 'Tenant account created successfully.');
-      return;
-    }
-
-    // Phase 2 – Draft the contract (tenant locked to the just-created account).
+    // Continue directly with the new tenant already selected.
     final contractCreated = await showContractEditor(
       context,
       initialTenantId: account.id,
       initialTenantName: account.fullName,
       lockTenant: true,
+      guidedOnboarding: true,
     );
     if (!mounted) return;
     if (contractCreated != true) {
-      showAppSnackBar(context, 'Tenant account created. Contract skipped.');
+      showAppSnackBar(context,
+          'Tenant account created. Contract pending details; resume from Contracts.');
       return;
     }
 
@@ -339,7 +313,6 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
       );
     }
   }
-
 
   String _roleLabel(String role) => switch (role) {
         'owner' => 'Owner',

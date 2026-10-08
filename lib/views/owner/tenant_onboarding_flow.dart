@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/widgets/common_widgets.dart';
 import '../../services/guardian_link_service.dart';
+import '../../models/models.dart';
+import '../../services/contract_document_service.dart';
+import '../../services/contract_onboarding_service.dart';
 import '../../services/tenant_service.dart';
 
 Future<void> continueTenantOnboarding(
@@ -10,6 +13,7 @@ Future<void> continueTenantOnboarding(
   required String tenantName,
   bool fromSavedContract = true,
   bool showConfirmation = true,
+  TenantContract? contract,
 }) async {
   final proceed = !showConfirmation ||
       await showDialog<bool>(
@@ -70,6 +74,42 @@ Future<void> continueTenantOnboarding(
   if (!context.mounted) return;
 
   await _assignBedStep(context, tenantId: tenantId, tenantName: tenantName);
+  if (!context.mounted) return;
+  try {
+    final current = contract ??
+        await const ContractOnboardingService().getContractForTenant(tenantId);
+    if (current != null) {
+      final document = await const ContractDocumentService()
+          .ensureGeneratedContract(current);
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          document == null
+              ? 'Contract pending room assignment. Resume from Contracts.'
+              : 'Contract PDF ready for review and signing.',
+        );
+      }
+    }
+  } catch (error) {
+    if (context.mounted) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Contract saved; PDF pending'),
+          content: Text(
+            'The account and draft are saved. Retry Generate printable PDF '
+            'from Contracts > Documents.\n\n$error',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Continue onboarding'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
   if (!context.mounted) return;
   await _guardianStep(context, tenantId: tenantId, tenantName: tenantName);
 }

@@ -432,6 +432,7 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
           initialTenantId: created.id,
           initialTenantName: created.fullName,
           lockTenant: true,
+          guidedOnboarding: true,
         );
         if (!mounted) return;
         if (contractCreated != true) {
@@ -454,13 +455,6 @@ class _TenantDirectoryPageState extends State<TenantDirectoryPage> {
           'Step 3 of 5 complete: profile onboarding reviewed.',
         );
 
-        await continueTenantOnboarding(
-          context,
-          tenantId: created.id,
-          tenantName: created.fullName,
-          showConfirmation: false,
-        );
-        if (!mounted) return;
         await _fetchTenants(showSpinner: false);
         showAppSnackBar(
           context,

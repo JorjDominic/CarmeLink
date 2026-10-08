@@ -1,0 +1,811 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" version="24.7.17" type="device">
+  <diagram id="carmelink-1" name="01 System Overview">
+    <mxGraphModel dx="1200" dy="1882" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1882" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="system" value="CarmeLink - System Overview" style="rounded=0;whiteSpace=wrap;html=0;fillColor=none;strokeColor=#000000;verticalAlign=top;align=center;fontSize=20;fontStyle=1;spacingTop=14;" vertex="1" parent="1">
+          <mxGeometry x="260" y="35" width="680" height="1772" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Owner" value="Owner" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="70" y="150" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Caretaker" value="Caretaker" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1512" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Tenant" value="Tenant" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="150" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Guardian" value="Guardian" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="1512" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-1" value="Log in / Log out" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="95" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-1-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-1-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-1-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-1-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-2" value="View role dashboard and notifications" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="177" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-2-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-2-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-2-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-2-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-3" value="Manage permitted user accounts" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="259" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-3-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-3-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-4" value="Manage tenant records and room assignments" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="341" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-4-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-4-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-5" value="Manage contracts and guardian links" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="423" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-5-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-6" value="View own or linked tenant records" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="505" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-6-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-6-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-7" value="Manage billing and verify payment proofs" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="587" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-7-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-7-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-8" value="View billing and payment records" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="669" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-8-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-8-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-9" value="Upload payment proof" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="751" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-9-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-10" value="Manage maintenance, cleaning and inspections" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="833" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-10-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-10-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-11" value="Submit and track maintenance reports" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="915" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-11-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-12" value="Manage visitor requests and visit records" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="997" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-12-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-12-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-13" value="Submit visitor and curfew requests" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1079" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-13-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-14" value="Review curfew requests and presence records" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1161" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-14-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-14-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-15" value="View linked tenant presence and acknowledge overnight requests" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1243" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-15-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-16" value="Submit confidential concerns, case responses and appeals" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1325" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-16-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-17" value="Review conduct cases and tenant appeals" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1407" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-17-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-17-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-18" value="Review confidential reports" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1489" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-18-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-19" value="Publish dormitory announcements" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1571" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-19-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-19-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-20" value="Read announcements and send private messages" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1653" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-20-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-20-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-20-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-20-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-21" value="Generate administrative reports and analytics" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1735" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-21-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="Solid lines show role participation; access remains subject to permissions. Functions apply to own or linked records where indicated." style="text;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=13;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="150" y="1816" width="900" height="54" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="carmelink-2" name="02 Records and Facilities">
+    <mxGraphModel dx="1200" dy="1554" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1554" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="system" value="CarmeLink - Records and Facilities" style="rounded=0;whiteSpace=wrap;html=0;fillColor=none;strokeColor=#000000;verticalAlign=top;align=center;fontSize=20;fontStyle=1;spacingTop=14;" vertex="1" parent="1">
+          <mxGeometry x="260" y="35" width="680" height="1444" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Owner" value="Owner" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="70" y="150" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Caretaker" value="Caretaker" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1184" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Tenant" value="Tenant" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="150" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Guardian" value="Guardian" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="1184" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-1" value="Manage permitted user accounts" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="95" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-1-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-1-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-2" value="Review tenant and guardian details" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="177" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-2-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-2-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-3" value="Manage guardian-to-tenant links" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="259" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-3-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-4" value="Create and manage tenant contracts" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="341" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-4-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-5" value="Assign rooms and bed spaces" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="423" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-5-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-5-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-6" value="View occupancy and interactive floor plan" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="505" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-6-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-6-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-7" value="Update own profile and emergency contacts" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="587" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-7-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-8" value="Submit required documents and signatures" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="669" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-8-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-9" value="View own room and contract records" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="751" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-9-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-10" value="View linked tenant details and documents" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="833" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-10-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-11" value="Manage cleaning schedules and duty records" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="915" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-11-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-11-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-12" value="View assigned cleaning duties" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="997" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-12-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-13" value="Record room inspections and findings" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1079" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-13-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-13-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-14" value="View inspection notices and published findings" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1161" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-14-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-15" value="Submit move-out notice" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1243" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-15-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-16" value="Review move-out requests" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1325" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-16-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-16-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-17" value="Finalize move-out settlement" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1407" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-17-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="Solid lines show role participation; access remains subject to permissions. Functions apply to own or linked records where indicated." style="text;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=13;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="150" y="1488" width="900" height="54" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="carmelink-3" name="03 Billing and Payments">
+    <mxGraphModel dx="1200" dy="1480" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1480" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="system" value="CarmeLink - Billing and Payments" style="rounded=0;whiteSpace=wrap;html=0;fillColor=none;strokeColor=#000000;verticalAlign=top;align=center;fontSize=20;fontStyle=1;spacingTop=14;" vertex="1" parent="1">
+          <mxGeometry x="260" y="35" width="680" height="1370" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Owner" value="Owner" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="70" y="150" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Caretaker" value="Caretaker" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1110" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Tenant" value="Tenant" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="150" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Guardian" value="Guardian" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="1110" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-1" value="Record rent, utility and other approved charges" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="95" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-1-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-1-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-2" value="Record property damage charges and financial penalties" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="177" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-2-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-2-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-3" value="Review uploaded payment receipts" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="259" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-3-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-3-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-4" value="Confirm or reject payment proofs" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="341" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-4-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-4-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-5" value="View own billing balance and due dates" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="423" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-5-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-6" value="View selected linked tenant payment records" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="505" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-6-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-7" value="Upload payment receipt" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="587" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-7-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-8" value="View own payment history and verification status" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="669" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-8-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-9" value="View own security deposit record" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="751" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-9-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-10" value="Record or correct security deposit received" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="833" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-10-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-11" value="Record deposit deductions and refund at settlement" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="915" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-11-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-12" value="Review income and expense summary" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="997" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-12-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-13" value="Generate billing and payment PDF reports" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1079" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-13-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ocr" value="Scan receipt with OCR&#10;(supported mobile images)" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=14;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="790" y="587" width="140" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="extend-ocr" value="«extend»" style="edgeStyle=none;dashed=1;endArrow=open;endFill=0;html=0;strokeColor=#000000;fontSize=12;" edge="1" parent="1" source="ocr" target="uc-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="Solid lines show role participation; access remains subject to permissions. Functions apply to own or linked records where indicated. Payments and refunds occur outside the app; staff verify OCR results." style="text;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=13;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="150" y="1414" width="900" height="54" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="carmelink-4" name="04 Reports Cases and Communication">
+    <mxGraphModel dx="1200" dy="1480" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1480" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="system" value="CarmeLink - Reports Cases and Communication" style="rounded=0;whiteSpace=wrap;html=0;fillColor=none;strokeColor=#000000;verticalAlign=top;align=center;fontSize=20;fontStyle=1;spacingTop=14;" vertex="1" parent="1">
+          <mxGeometry x="260" y="35" width="680" height="1370" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Owner" value="Owner" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="70" y="150" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Caretaker" value="Caretaker" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1110" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Tenant" value="Tenant" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="150" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Guardian" value="Guardian" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="1110" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-1" value="Submit maintenance report with photos" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="95" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-1-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-2" value="Track maintenance report status" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="177" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-2-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-3" value="Review maintenance reports and update status" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="259" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-3-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-3-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-4" value="Submit confidential concern" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="341" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-4-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-5" value="Review confidential reports" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="423" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-5-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-6" value="Create and manage conduct cases" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="505" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-6-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-6-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-7" value="View own case and disciplinary notices" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="587" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-7-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-8" value="Submit case response and appeal" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="669" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-8-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-9" value="Review tenant responses and decide appeals" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="751" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-9-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-9-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-10" value="Manage disciplinary records" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="833" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-10-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-11" value="Publish and manage announcements" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="915" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-11-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-11-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-12" value="Read announcements" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="997" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-12-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-12-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-12-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-12-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-13" value="Send and receive private messages" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1079" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-13-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-13-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-13-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-13-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-14" value="View system notifications" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1161" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-14-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-14-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-14-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-14-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-15" value="View dormitory contact information" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1243" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-15-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-15-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-15-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-15-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-16" value="Generate PDF reports and administrative analytics" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1325" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-16-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="Solid lines show role participation; access remains subject to permissions. Functions apply to own or linked records where indicated. Case responses and appeals are stored in cases, separately from private messaging." style="text;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=13;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="150" y="1414" width="900" height="54" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="carmelink-5" name="05 Visitors and Curfew">
+    <mxGraphModel dx="1200" dy="1554" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1554" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="system" value="CarmeLink - Visitors and Curfew" style="rounded=0;whiteSpace=wrap;html=0;fillColor=none;strokeColor=#000000;verticalAlign=top;align=center;fontSize=20;fontStyle=1;spacingTop=14;" vertex="1" parent="1">
+          <mxGeometry x="260" y="35" width="680" height="1444" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Owner" value="Owner" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="70" y="150" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Caretaker" value="Caretaker" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1184" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Tenant" value="Tenant" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="150" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-Guardian" value="Guardian" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="1184" width="60" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-1" value="Submit visitor request" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="95" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-1-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-2" value="Approve or reject visitor request" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="177" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-2-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-2-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-3" value="Record visitor arrival and departure" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="259" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-3-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-3-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-4" value="View own visitor request status" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="341" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-4-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-5" value="Enable smartphone location permissions" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="423" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-5-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-6" value="Record detected dormitory entry and exit" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="505" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-6-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-7" value="View own recorded presence and crossing history" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="587" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-7-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-8" value="Review tenant presence and gate activity" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="669" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-8-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-8-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-9" value="Submit late-return or overnight-leave request" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="751" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-9-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-10" value="Acknowledge late-return request" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="833" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-10-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-10-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-11" value="Acknowledge linked tenant overnight-leave request" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="915" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-11-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-12" value="Acknowledge overnight leave when no guardian is linked" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="997" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-12-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-12-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-13" value="Manage approved employment-related curfew arrangements" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1079" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-13-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-13-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-14" value="Review flagged curfew events" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1161" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-14-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-14-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-15" value="View linked tenant presence and curfew requests" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1243" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-15-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-16" value="Set linked tenant presence-alert preferences" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1325" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-16-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc-17" value="Receive applicable curfew and presence notifications" style="ellipse;whiteSpace=wrap;html=0;fillColor=#ffffff;strokeColor=#000000;fontSize=16;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1407" width="330" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="link-17-Owner" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Owner" target="uc-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-17-Caretaker" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Caretaker" target="uc-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-17-Tenant" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Tenant" target="uc-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="link-17-Guardian" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=none;startArrow=none;strokeColor=#555555;strokeWidth=1;" edge="1" parent="1" source="actor-Guardian" target="uc-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="Solid lines show role participation; access remains subject to permissions. Functions apply to own or linked records where indicated. Presence reflects the smartphone. Flagged events require staff review; no automatic financial penalty." style="text;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=13;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="150" y="1488" width="900" height="54" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

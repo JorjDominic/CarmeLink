@@ -36,6 +36,25 @@ class ContractDocumentService {
     return rows.map(ContractDocument.fromRow).toList();
   }
 
+  /// Resumes generation without replacing an existing printable contract.
+  /// A missing room leaves the saved draft pending until assignment completes.
+  Future<ContractDocument?> ensureGeneratedContract(
+      TenantContract contract) async {
+    final existing = await listDocuments(contract.id);
+    final generated = existing.where((item) => item.isGenerated).firstOrNull;
+    if (generated != null) return generated;
+    if (await _assignedRoomNumber(contract.tenantId) == null) return null;
+    try {
+      return (await generateContract(contract)).document;
+    } catch (_) {
+      // Another staff session may have registered the PDF in the meantime.
+      final documents = await listDocuments(contract.id);
+      final winner = documents.where((item) => item.isGenerated).firstOrNull;
+      if (winner != null) return winner;
+      rethrow;
+    }
+  }
+
   Future<GeneratedContractFile> generateContract(
       TenantContract contract) async {
     final existing = await listDocuments(contract.id);

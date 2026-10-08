@@ -23,6 +23,7 @@ Future<bool?> showContractEditor(
   String? initialTenantId,
   String? initialTenantName,
   bool lockTenant = false,
+  bool guidedOnboarding = false,
 }) async {
   final saved = await showDialog<TenantContract>(
     context: context,
@@ -34,6 +35,15 @@ Future<bool?> showContractEditor(
     ),
   );
   if (saved == null) return null;
+  if (guidedOnboarding && context.mounted) {
+    await continueTenantOnboarding(
+      context,
+      tenantId: saved.tenantId,
+      tenantName: saved.tenantName,
+      showConfirmation: false,
+      contract: saved,
+    );
+  }
   return true;
 }
 
@@ -508,8 +518,10 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
       context,
       tenantId: widget.contract.tenantId,
       tenantName: widget.contract.tenantName,
+      contract: widget.contract,
     );
     _reloadOnboardingNeeds();
+    _reload();
   }
 
   Future<void> _showActivateSheet({
