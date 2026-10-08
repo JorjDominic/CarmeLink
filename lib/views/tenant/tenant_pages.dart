@@ -1,4 +1,8 @@
 import '../../core/widgets/configured_choice_field.dart';
+import '../../core/config/supabase_config.dart';
+import '../../services/payment_collection_settings_service.dart';
+import '../shared/paymongo_payment_page.dart';
+import '../shared/paymongo_sessions_section.dart';
 import '../shared/report_addenda.dart';
 import '../../services/dormitory_configuration_service.dart';
 import '../shared/notification_destination.dart';
@@ -1360,6 +1364,15 @@ class _PaymentsPageState extends State<PaymentsPage> {
   late final TableRefreshSubscription _subscription;
   String _selectedFilter = 'current';
   RecordListSort _paymentSort = RecordListSort.oldest;
+  PaymentCollectionSettings? _paymentSettings;
+
+  Future<void> _refreshMode() async {
+    if (!SupabaseConfig.isInitialized) return;
+    try {
+      final settings = await const PaymentCollectionSettingsService().load();
+      if (mounted) setState(() => _paymentSettings = settings);
+    } catch (_) {/* Payment entry re-checks settings and displays any error. */}
+  }
 
   int _paymentPriority(Payment payment) {
     if (payment.isOverdue) return 0;
@@ -1387,14 +1400,16 @@ class _PaymentsPageState extends State<PaymentsPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         TenantController.instance.loadPayments();
+        _refreshMode();
       }
     });
     _subscription = TableRefreshSubscription(
       'tenant-payments',
-      ['payments'],
+      ['payments', 'payment_collection_settings'],
       () {
         if (mounted) {
           TenantController.instance.loadPayments(force: true);
+          _refreshMode();
         }
       },
     );
@@ -1413,6 +1428,12 @@ class _PaymentsPageState extends State<PaymentsPage> {
       title: 'Payments',
       subtitle: 'Balances, due dates, and history',
       actions: [
+        IconButton(
+          tooltip: 'Try payment demo',
+          icon: const Icon(Icons.science_outlined),
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => const PaymongoPaymentPage(demo: true))),
+        ),
         IconButton(
           tooltip: 'Refresh payments',
           icon: c.paymentsLoading
@@ -1677,13 +1698,17 @@ class _PaymentsPageState extends State<PaymentsPage> {
                   showEndState: true,
                   endLabel: 'End of payment records',
                   children: displayedPayments
-                      .map((p) => _TenantPaymentCard(payment: p))
+                      .map((p) => _TenantPaymentCard(
+                          payment: p,
+                          automatic: _paymentSettings?.mode ==
+                              PaymentCollectionMode.paymongo))
                       .toList(),
                 ),
               if (futurePayments.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _FutureRentSchedule(payments: futurePayments),
               ],
+              const PaymongoSessionsSection(),
             ],
           );
         },
@@ -1928,8 +1953,9 @@ class _FutureRentSchedule extends StatelessWidget {
 }
 
 class _TenantPaymentCard extends StatelessWidget {
-  const _TenantPaymentCard({required this.payment});
+  const _TenantPaymentCard({required this.payment, this.automatic = false});
   final Payment payment;
+  final bool automatic;
 
   IconData _categoryIcon(String category) =>
       switch (category.toLowerCase().trim()) {
@@ -2300,8 +2326,13 @@ class _TenantPaymentCard extends StatelessWidget {
                               UploadPaymentProofPage(targetPayment: payment),
                         ),
                       ),
-                      icon: const Icon(Icons.upload_file_outlined, size: 16),
-                      label: const Text('Submit proof'),
+                      icon: Icon(
+                          automatic
+                              ? Icons.qr_code_2
+                              : Icons.upload_file_outlined,
+                          size: 16),
+                      label:
+                          Text(automatic ? 'Pay with QR Ph' : 'Submit proof'),
                     );
 
                     final receiptBtn = OutlinedButton.icon(
@@ -2353,8 +2384,15 @@ class _TenantPaymentCard extends StatelessWidget {
 }
 
 class UploadPaymentProofPage extends StatefulWidget {
-  const UploadPaymentProofPage({this.targetPayment, super.key});
+  const UploadPaymentProofPage(
+      {this.targetPayment,
+      super.key,
+      this.paymentOptionsLoader,
+      this.collectionSettingsService});
   final Payment? targetPayment;
+  final Future<List<DormitoryOption>> Function(String group)?
+      paymentOptionsLoader;
+  final PaymentCollectionSettingsService? collectionSettingsService;
 
   @override
   State<UploadPaymentProofPage> createState() => _UploadPaymentProofPageState();
@@ -2363,6 +2401,30 @@ class UploadPaymentProofPage extends StatefulWidget {
 class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
   final ImagePicker _imagePicker = ImagePicker();
   final ReceiptOcrService _ocrService = const ReceiptOcrService();
+  PaymentCollectionSettings? _collectionSettings;
+  TableRefreshSubscription? _collectionSubscription;
+  bool _checkingMode = false;
+  String? _modeError;
+
+  Future<void> _loadCollectionMode() async {
+    if (_checkingMode) return;
+    setState(() {
+      _checkingMode = true;
+      _modeError = null;
+    });
+    try {
+      final settings = await (widget.collectionSettingsService ??
+              const PaymentCollectionSettingsService())
+          .load();
+      if (mounted) setState(() => _collectionSettings = settings);
+    } catch (_) {
+      if (mounted)
+        setState(() =>
+            _modeError = 'Could not load payment options. Please try again.');
+    } finally {
+      if (mounted) setState(() => _checkingMode = false);
+    }
+  }
 
   late final TextEditingController amountController;
   final referenceController = TextEditingController();
@@ -2383,13 +2445,24 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
     selectedPayment = widget.targetPayment;
     amountController = TextEditingController(
       text: widget.targetPayment != null
-          ? widget.targetPayment!.amount.toStringAsFixed(2)
+          ? widget.targetPayment!.outstandingAmount.toStringAsFixed(2)
           : '',
     );
+    if (SupabaseConfig.isInitialized ||
+        widget.collectionSettingsService != null) {
+      _loadCollectionMode();
+    }
+    if (SupabaseConfig.isInitialized) {
+      _collectionSubscription = TableRefreshSubscription(
+          'tenant-payment-entry', ['payment_collection_settings'], () {
+        if (mounted) _loadCollectionMode();
+      });
+    }
   }
 
   @override
   void dispose() {
+    _collectionSubscription?.dispose();
     amountController.dispose();
     referenceController.dispose();
     super.dispose();
@@ -2587,6 +2660,25 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingMode && _collectionSettings == null) {
+      return const PageFrame(
+          title: 'Payment options',
+          child: Center(child: CircularProgressIndicator()));
+    }
+    if (_modeError != null) {
+      return PageFrame(
+          title: 'Payment options',
+          child: Column(children: [
+            Text(_modeError!),
+            TextButton(
+                onPressed: _loadCollectionMode, child: const Text('Try again')),
+          ]));
+    }
+    if (_collectionSettings?.mode == PaymentCollectionMode.paymongo) {
+      return PaymongoPaymentPage(
+          payment: widget.targetPayment,
+          environment: _collectionSettings!.environment);
+    }
     final unpaidBills = TenantController.instance.payments
         .where((p) => p.canSubmitProof && !(p.isRent && !p.isDueNow))
         .toList();
@@ -2657,7 +2749,7 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
                       orElse: () => unpaidBills.first,
                     );
                     amountController.text =
-                        selectedPayment!.amount.toStringAsFixed(2);
+                        selectedPayment!.outstandingAmount.toStringAsFixed(2);
                   });
                 },
               ),
@@ -2665,6 +2757,7 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
             ],
             ConfiguredChoiceField(
               group: 'payment_method',
+              loadOptions: widget.paymentOptionsLoader,
               label: 'Payment method',
               value: method,
               enabled: !submitting,

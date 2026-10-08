@@ -13,6 +13,8 @@ import 'owner_pages.dart';
 import '../shared/staff_payment_received_dialog.dart';
 import '../shared/staff_security_deposits_section.dart';
 import 'utility_charge_cart_dialog.dart';
+import 'payment_collection_settings_card.dart';
+import '../shared/paymongo_sessions_section.dart';
 
 class BillingManagementPage extends StatefulWidget {
   const BillingManagementPage({super.key});
@@ -171,6 +173,11 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
                   const SizedBox(height: 18),
                   const StaffSecurityDepositsSection(),
                   const SizedBox(height: 18),
+                  const PaymongoSessionsSection(staff: true),
+                  if (_isOwner) ...[
+                    const PaymentCollectionSettingsCard(),
+                    const SizedBox(height: 18),
+                  ],
                   _BillingActionsCard(
                     isOwner: _isOwner,
                     onUtilityCart: _openUtilityCart,

@@ -395,6 +395,17 @@ verify_jwt = false
 [functions.process-report-pushes]
 verify_jwt = false
 
+# The user endpoint verifies its bearer with auth.getUser(); the webhook
+# verifies PayMongo's signature and re-reads provider status with a secret key.
+[functions.paymongo-payments]
+verify_jwt = false
+
+[functions.paymongo-webhook]
+verify_jwt = false
+
+[functions.reconcile-paymongo-payments]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

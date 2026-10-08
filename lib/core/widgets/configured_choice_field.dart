@@ -17,12 +17,14 @@ class ConfiguredChoiceField extends StatefulWidget {
     this.useLabelAsValue = false,
     this.preservedValue,
     this.preservedLabel,
+    this.loadOptions,
   });
 
   final String group, label;
   final String? value, preservedValue, preservedLabel;
   final bool enabled, searchable, useLabelAsValue;
   final ValueChanged<DormitoryOption?> onChanged;
+  final Future<List<DormitoryOption>> Function(String group)? loadOptions;
 
   @override
   State<ConfiguredChoiceField> createState() => _ConfiguredChoiceFieldState();
@@ -52,8 +54,8 @@ class _ConfiguredChoiceFieldState extends State<ConfiguredChoiceField> {
   Future<void> _load() async {
     final request = ++_request;
     try {
-      final options =
-          await const DormitoryConfigurationService().options(widget.group);
+      final options = await (widget.loadOptions ??
+          const DormitoryConfigurationService().options)(widget.group);
       if (!mounted || request != _request) return;
       setState(() {
         _options = options;

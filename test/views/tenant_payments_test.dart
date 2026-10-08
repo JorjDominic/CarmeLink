@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:carmelitas_dormitory_system/controllers/tenant_controller.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/views/tenant/tenant_pages.dart';
+import 'package:carmelitas_dormitory_system/services/dormitory_configuration_service.dart';
 
 void main() {
   setUp(() {
@@ -292,10 +293,31 @@ void main() {
   });
 
   group('UploadPaymentProofPage Widget Test', () {
+    Future<List<DormitoryOption>> options(String group) async => const [
+          DormitoryOption(
+              id: 'gcash',
+              groupKey: 'payment_method',
+              code: 'GCash',
+              label: 'GCash',
+              isActive: true,
+              isSystem: false,
+              sortOrder: 0,
+              instructions: 'Test GCash payment instructions'),
+          DormitoryOption(
+              id: 'bank',
+              groupKey: 'payment_method',
+              code: 'Bank transfer',
+              label: 'Bank transfer',
+              isActive: true,
+              isSystem: false,
+              sortOrder: 1,
+              instructions: 'Test bank payment instructions'),
+        ];
     testWidgets('renders preselected bill and dynamic payment instruction card',
         (tester) async {
       await tester.pumpWidget(
-        buildTestable(UploadPaymentProofPage(targetPayment: testPayments[0])),
+        buildTestable(UploadPaymentProofPage(
+            targetPayment: testPayments[0], paymentOptionsLoader: options)),
       );
       await tester.pump();
 
@@ -304,8 +326,7 @@ void main() {
       expect(find.text('Payment method'), findsOneWidget);
 
       // Default method is GCash, instruction card should render GCash details
-      expect(find.text('GCash Account'), findsOneWidget);
-      expect(find.text('0917-123-4567 (Carmelita D.)'), findsOneWidget);
+      expect(find.text('Test GCash payment instructions'), findsOneWidget);
 
       // Amount field prefilled with 3500.00
       expect(find.text('3500.00'), findsOneWidget);
@@ -314,11 +335,12 @@ void main() {
     testWidgets('switching payment method updates instruction card',
         (tester) async {
       await tester.pumpWidget(
-        buildTestable(UploadPaymentProofPage(targetPayment: testPayments[0])),
+        buildTestable(UploadPaymentProofPage(
+            targetPayment: testPayments[0], paymentOptionsLoader: options)),
       );
       await tester.pump();
 
-      expect(find.text('GCash Account'), findsOneWidget);
+      expect(find.text('Test GCash payment instructions'), findsOneWidget);
 
       // Open dropdown and select Bank transfer
       await tester.tap(find.text('GCash'));
@@ -327,9 +349,7 @@ void main() {
       await tester.tap(find.text('Bank transfer').last);
       await tester.pumpAndSettle();
 
-      expect(find.text('BDO Bank Deposit / Transfer'), findsOneWidget);
-      expect(find.text('0012-3456-7890 (Carmelita Dormitory Management)'),
-          findsOneWidget);
+      expect(find.text('Test bank payment instructions'), findsOneWidget);
     });
   });
 }
