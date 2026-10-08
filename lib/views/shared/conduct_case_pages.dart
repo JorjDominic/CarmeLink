@@ -10,6 +10,7 @@ import '../../services/table_refresh_subscription.dart';
 
 import 'conduct_case_appeal_panel.dart';
 import 'conduct_case_create_dialog.dart';
+import 'review_notes_dialog.dart';
 
 String _conductDateTime(DateTime value) {
   final local = value.toLocal();
@@ -373,20 +374,14 @@ class _StaffConductCaseDetailPageState
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Issue warning'),
-          content: TextField(
-            controller: controller,
-            enabled: !saving,
-            minLines: 3,
-            maxLines: 6,
-            maxLength: 3000,
-            decoration: const InputDecoration(
-              labelText: 'Warning',
-              hintText:
-                  'Document the warning clearly. This does not create a financial penalty.',
-            ),
-          ),
+        builder: (dialogContext, setDialogState) => ReviewNotesDialog(
+          title: 'Issue warning',
+          controller: controller,
+          saving: saving,
+          maxLength: 3000,
+          label: 'Warning',
+          hint:
+              'Document the warning clearly. This does not create a financial penalty.',
           actions: [
             TextButton(
               onPressed:
@@ -443,26 +438,16 @@ class _StaffConductCaseDetailPageState
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: Text(
-            status == 'resolved'
-                ? 'Resolve case'
-                : status == 'dismissed'
-                    ? 'Dismiss case'
-                    : 'Move to review',
-          ),
-          content: TextField(
-            controller: controller,
-            enabled: !saving,
-            minLines: 3,
-            maxLines: 6,
-            maxLength: 4000,
-            decoration: InputDecoration(
-              labelText: status == 'under_review'
-                  ? 'Review notes (optional)'
-                  : 'Notes',
-            ),
-          ),
+        builder: (dialogContext, setDialogState) => ReviewNotesDialog(
+          title: status == 'resolved'
+              ? 'Resolve case'
+              : status == 'dismissed'
+                  ? 'Dismiss case'
+                  : 'Move to review',
+          controller: controller,
+          saving: saving,
+          maxLength: 4000,
+          label: status == 'under_review' ? 'Review notes (optional)' : 'Notes',
           actions: [
             TextButton(
               onPressed:
