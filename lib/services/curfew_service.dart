@@ -10,7 +10,7 @@ class CurfewService {
   static const String _columns =
       'id, tenant_id, destination, reason, departure_time, expected_return_time, '
       'status, request_type, guardian_id, guardian_decision, guardian_remarks, guardian_decided_at, '
-      'staff_id, staff_decision, staff_notes, staff_decided_at, created_at, updated_at';
+      'staff_id, staff_decision, staff_notes, staff_decided_at, actual_return_time, created_at, updated_at';
 
   static const String columnsWithTenant =
       '$_columns, tenant:profiles!curfew_requests_tenant_id_fkey(full_name)';
@@ -155,6 +155,43 @@ class CurfewService {
     final request = CurfewRequest.fromJson(row);
     unawaited(_notifyDecision(request));
     return request;
+  }
+
+  /// Staff confirms an observed return; changing an expected time alone never
+  /// counts as an actual arrival. Database triggers enforce staff-only access.
+  Future<CurfewRequest> recordVerifiedReturn({
+    required String requestId,
+    required DateTime actualReturnTime,
+  }) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null) throw Exception('Database client not available');
+    final row = await client
+        .from('curfew_requests')
+        .update(
+            {'actual_return_time': actualReturnTime.toUtc().toIso8601String()})
+        .eq('id', requestId)
+        .select(columnsWithTenant)
+        .single();
+    return CurfewRequest.fromJson(row);
+  }
+
+  /// Only approved late returns can be rescheduled by staff. The database
+  /// rejects changes to guardian-approved overnight leave requests.
+  Future<CurfewRequest> updateLateReturnExpectedTime({
+    required String requestId,
+    required DateTime expectedReturnTime,
+  }) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null) throw Exception('Database client not available');
+    final row = await client
+        .from('curfew_requests')
+        .update({
+          'expected_return_time': expectedReturnTime.toUtc().toIso8601String()
+        })
+        .eq('id', requestId)
+        .select(columnsWithTenant)
+        .single();
+    return CurfewRequest.fromJson(row);
   }
 
   /// Lists curfew requests for the guardian's linked resident(s).
