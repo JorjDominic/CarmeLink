@@ -539,10 +539,13 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
       actions: [
         if (!compactActions &&
             SessionController.instance.currentUser?.role == UserRole.owner)
-          OutlinedButton.icon(
-            onPressed: _openFloorManagement,
-            icon: const Icon(Icons.layers_outlined),
-            label: const Text('Manage floors'),
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: OutlinedButton.icon(
+              onPressed: _openFloorManagement,
+              icon: const Icon(Icons.layers_outlined),
+              label: const Text('Manage floors'),
+            ),
           ),
         if (!compactActions &&
             SessionController.instance.currentUser?.role == UserRole.owner)
