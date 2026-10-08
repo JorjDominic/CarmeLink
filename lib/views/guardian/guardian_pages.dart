@@ -876,7 +876,9 @@ class _GuardianPresenceMonitoringPageState
     final controller = GuardianController.instance;
 
     return PageFrame(
-      title: 'Curfew',
+      title: NotificationTarget.recordIdOf(context, 'curfew') != null
+          ? 'Curfew Requests'
+          : 'Curfew',
       subtitle: 'Linked resident exceptions & boundary tracking',
       maxWidth: 720,
       actions: [
@@ -920,19 +922,20 @@ class _GuardianPresenceMonitoringPageState
           final approvedCount = allRequests.where((r) => r.isApproved).length;
           final rejectedCount = allRequests.where((r) => r.isRejected).length;
 
-          final targetRequest = NotificationTarget.recordIdOf(context, 'curfew');
+          final targetRequest =
+              NotificationTarget.recordIdOf(context, 'curfew');
           final displayedRequests = targetRequest != null
               ? allRequests.where((r) => r.id == targetRequest).toList()
               : switch (_filter) {
-            'pending' => allRequests
-                .where((r) =>
-                    r.isPendingGuardian ||
-                    (r.isPending && r.status == 'pending_staff'))
-                .toList(),
-            'approved' => allRequests.where((r) => r.isApproved).toList(),
-            'rejected' => allRequests.where((r) => r.isRejected).toList(),
-            _ => allRequests,
-          };
+                  'pending' => allRequests
+                      .where((r) =>
+                          r.isPendingGuardian ||
+                          (r.isPending && r.status == 'pending_staff'))
+                      .toList(),
+                  'approved' => allRequests.where((r) => r.isApproved).toList(),
+                  'rejected' => allRequests.where((r) => r.isRejected).toList(),
+                  _ => allRequests,
+                };
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1044,12 +1047,16 @@ class _GuardianPresenceMonitoringPageState
                     icon: _filter == 'pending'
                         ? Icons.task_alt_outlined
                         : Icons.schedule_outlined,
-                    title: _filter == 'pending'
-                        ? 'No pending curfew approvals'
-                        : 'No requests in this tab',
-                    message: _filter == 'pending'
-                        ? 'All resident curfew and leave requests have been reviewed.'
-                        : 'Curfew exception requests submitted by your linked resident will appear here.',
+                    title: targetRequest != null
+                        ? 'Request unavailable'
+                        : _filter == 'pending'
+                            ? 'No pending curfew approvals'
+                            : 'No requests in this tab',
+                    message: targetRequest != null
+                        ? 'This request no longer exists or is not available to your linked account.'
+                        : _filter == 'pending'
+                            ? 'All resident curfew and leave requests have been reviewed.'
+                            : 'Curfew exception requests submitted by your linked resident will appear here.',
                   )
                 else
                   ...displayedRequests.map(

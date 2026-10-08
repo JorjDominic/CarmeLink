@@ -5428,8 +5428,12 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
     final controller = TenantController.instance;
 
     return PageFrame(
-      title: 'Curfew',
-      subtitle: 'Your gate status, monitoring, and exceptions',
+      title: NotificationTarget.recordIdOf(context, 'curfew') != null
+          ? 'Curfew Requests'
+          : 'Curfew',
+      subtitle: NotificationTarget.recordIdOf(context, 'curfew') != null
+          ? 'Curfew request and scheduled times'
+          : 'Your gate status, monitoring, and exceptions',
       maxWidth: 720,
       actions: [
         IconButton(
@@ -5472,6 +5476,14 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
               });
           final visibleEvents =
               showAllPresenceRecords ? events : events.take(5).toList();
+          if (NotificationTarget.recordIdOf(context, 'curfew') != null) {
+            return TenantCurfewNotificationRequests(
+              requests: visibleRequests,
+              loading: loading,
+              error: error,
+              onCancel: _confirmCancel,
+            );
+          }
           final monitoringActive = _monitoringStatus['registered'] == true;
           final gateConfigured = _monitoringStatus['gateEnabled'] == true;
           final automaticReady = monitoringActive;
@@ -6083,6 +6095,40 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
       ),
     );
   }
+}
+
+/// Uses the same request cards and cancellation rules as the regular list.
+class TenantCurfewNotificationRequests extends StatelessWidget {
+  const TenantCurfewNotificationRequests({
+    required this.requests,
+    required this.onCancel,
+    this.loading = false,
+    this.error,
+    super.key,
+  });
+  final List<CurfewRequest> requests;
+  final ValueChanged<CurfewRequest> onCancel;
+  final bool loading;
+  final String? error;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (loading) const LinearProgressIndicator(),
+          if (error != null) Text(error!),
+          if (!loading && requests.isEmpty)
+            const EmptyState(
+              icon: Icons.event_busy_outlined,
+              title: 'Request unavailable',
+              message:
+                  'This request no longer exists or is not available to your account.',
+            ),
+          for (final request in requests)
+            _CurfewRequestCard(
+                request: request, onCancel: () => onCancel(request)),
+        ],
+      );
 }
 
 class _CurfewRequestCard extends StatelessWidget {

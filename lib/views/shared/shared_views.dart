@@ -29,11 +29,13 @@ class NotificationsPage extends StatefulWidget {
     super.key,
     this.onOpenNotification,
     this.onNotificationsChanged,
+    this.service,
   });
 
   final Future<void> Function(AppNotificationItem notification)?
       onOpenNotification;
   final ValueChanged<List<AppNotificationItem>>? onNotificationsChanged;
+  final AppNotificationService? service;
 
   @override
   State<NotificationsPage> createState() => _NotificationsPageState();
@@ -42,7 +44,8 @@ class NotificationsPage extends StatefulWidget {
 class _NotificationsPageState extends State<NotificationsPage> {
   static const int _pageSize = 15;
 
-  final _service = AppNotificationService.instance;
+  AppNotificationService get _service =>
+      widget.service ?? AppNotificationService.instance;
   StreamSubscription<List<AppNotificationItem>>? _subscription;
   Timer? _pollTimer;
   List<AppNotificationItem> _notifications = const [];
@@ -51,6 +54,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
   bool _loadingMore = false;
   bool _markingAllRead = false;
   bool _hasMore = false;
+  int? _serverUnreadCount;
+  int _unreadCountRevision = 0;
   String? _errorText;
 
   @override
@@ -172,11 +177,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
     widget.onNotificationsChanged?.call(
       List<AppNotificationItem>.unmodifiable(_notifications),
     );
+    unawaited(_refreshUnreadCount());
+  }
+
+  Future<void> _refreshUnreadCount() async {
+    final revision = ++_unreadCountRevision;
+    final count = await _service.fetchMyUnreadCount();
+    if (!mounted || revision != _unreadCountRevision || count == null) return;
+    setState(() => _serverUnreadCount = count);
   }
 
   AppNotificationItem _withReadAt(
     AppNotificationItem item,
-    DateTime readAt,
+    DateTime? readAt,
   ) =>
       AppNotificationItem(
         id: item.id,
@@ -204,14 +217,30 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     final saved = await _service.tryMarkAsRead(item.id);
     if (!saved && mounted) {
-      setState(() => _notifications = before);
+      setState(() => _notifications = _restoreFailedRead(before, now));
       _notifySnapshot();
       showAppSnackBar(context, 'Could not mark this notification as read.');
+    } else if (mounted) {
+      // Refresh the shell badge after the write, not only during optimism.
+      _notifySnapshot();
     }
   }
 
+  List<AppNotificationItem> _restoreFailedRead(
+      List<AppNotificationItem> before, DateTime optimisticReadAt) {
+    final original = {for (final entry in before) entry.id: entry};
+    return _notifications.map((entry) {
+      final previous = original[entry.id];
+      // Preserve fresh realtime rows and independently confirmed read state.
+      if (previous == null || entry.readAt != optimisticReadAt) return entry;
+      return _withReadAt(entry, previous.readAt);
+    }).toList(growable: false);
+  }
+
   Future<void> _markAllRead() async {
-    if (_markingAllRead || !_notifications.any((item) => !item.isRead)) return;
+    if (_markingAllRead ||
+        ((_serverUnreadCount ?? 0) == 0 &&
+            !_notifications.any((item) => !item.isRead))) return;
     final before = _notifications;
     final now = DateTime.now();
     setState(() {
@@ -226,11 +255,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
     if (!mounted) return;
     setState(() {
       _markingAllRead = false;
-      if (!saved) _notifications = before;
+      if (!saved) _notifications = _restoreFailedRead(before, now);
     });
     _notifySnapshot();
     if (!saved) {
       showAppSnackBar(context, 'Could not mark all notifications as read.');
+    } else {
+      unawaited(_refreshLatest());
     }
   }
 
@@ -427,8 +458,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final hasUnread = _notifications.any((item) => !item.isRead);
-    final unreadCount = _notifications.where((item) => !item.isRead).length;
+    final unreadCount = _serverUnreadCount ??
+        _notifications.where((item) => !item.isRead).length;
+    final hasUnread = unreadCount > 0;
 
     return PageFrame(
       title: 'Notifications',

@@ -356,10 +356,7 @@ class _AdaptiveRoleShellState extends State<AdaptiveRoleShell> {
           .then((_) => _refreshUnreadNotificationCount()));
     }
     if (CarmeLinkSurfaceScope.isWebPortal(context)) {
-      final route = (item.routeType?.trim().isNotEmpty == true
-              ? item.routeType!
-              : item.notificationType)
-          .toLowerCase();
+      final route = item.destinationType;
       final label = switch (route) {
         'payment' => 'Payment verification',
         'maintenance' => 'Report management',
