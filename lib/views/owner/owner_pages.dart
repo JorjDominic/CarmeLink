@@ -1,6 +1,8 @@
 import '../../core/widgets/configured_choice_field.dart';
 import '../../core/widgets/searchable_dropdown.dart';
 import '../shared/report_addenda.dart';
+import '../shared/review_notes_dialog.dart';
+import '../../core/utils/confidential_review_action.dart';
 import 'dormitory_configuration_page.dart';
 import '../shared/notification_destination.dart';
 import '../shared/staff_message_contacts.dart';
@@ -8867,28 +8869,20 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
   }
 
   Future<void> _review(ConcernReport report, String status) async {
+    final action = ConfidentialReviewAction.forStatus(status);
     final notes = TextEditingController(text: report.responseNotes);
     var saving = false;
-    await showDialog<void>(
+    final saved = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(status == 'resolved'
-              ? 'Resolve confidential report'
-              : status == 'dismissed'
-                  ? 'Dismiss confidential report'
-                  : 'Begin confidential review'),
-          content: TextField(
-            controller: notes,
-            minLines: 3,
-            maxLines: 6,
-            maxLength: 1000,
-            decoration: const InputDecoration(
-              labelText: 'Private review notes',
-              hintText: 'Record the action taken or reason for this decision.',
-              alignLabelWithHint: true,
-            ),
-          ),
+        builder: (context, setDialogState) => ReviewNotesDialog(
+          title: action.title,
+          controller: notes,
+          saving: saving,
+          maxLength: 1000,
+          label: 'Private review notes',
+          hint: 'Record the action taken or reason for this decision.',
           actions: [
             TextButton(
               onPressed: saving ? null : () => Navigator.pop(dialogContext),
@@ -8912,7 +8906,8 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                           status: status,
                           notes: notes.text,
                         );
-                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+                        if (dialogContext.mounted)
+                          Navigator.pop(dialogContext, true);
                       } catch (error) {
                         if (context.mounted) {
                           showAppSnackBar(context, 'Review failed: $error');
@@ -8920,13 +8915,16 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                         }
                       }
                     },
-              child: Text(saving ? 'Saving…' : 'Confirm'),
+              child: Text(saving ? 'Saving…' : action.confirmLabel),
             ),
           ],
         ),
       ),
     );
     notes.dispose();
+    if (saved == true && mounted) {
+      showAppSnackBar(context, action.successMessage);
+    }
   }
 
   @override
@@ -9008,6 +9006,7 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                             ReportAddenda(
                               key: ValueKey(report.id),
                               reportId: report.id,
+                              isResolved: report.isResolved,
                             ),
                             const SizedBox(height: 8),
                             Text(

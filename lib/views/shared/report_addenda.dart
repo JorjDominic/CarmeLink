@@ -4,16 +4,22 @@ import '../../core/widgets/common_widgets.dart';
 import '../../services/confidential_report_service.dart';
 
 class ReportAddenda extends StatefulWidget {
-  const ReportAddenda({required this.reportId, super.key});
+  const ReportAddenda(
+      {required this.reportId,
+      this.isResolved = false,
+      this.service = const ConfidentialReportService(),
+      super.key});
 
   final String reportId;
+  final bool isResolved;
+  final ConfidentialReportService service;
 
   @override
   State<ReportAddenda> createState() => _ReportAddendaState();
 }
 
 class _ReportAddendaState extends State<ReportAddenda> {
-  static const _service = ConfidentialReportService();
+  ConfidentialReportService get _service => widget.service;
 
   final _text = TextEditingController();
   late Future<List<ConfidentialReportAddendum>> _entries;
@@ -53,6 +59,7 @@ class _ReportAddendaState extends State<ReportAddenda> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Confirm report addendum'),
+        scrollable: true,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,6 +113,7 @@ class _ReportAddendaState extends State<ReportAddenda> {
 
   Future<void> _save() async {
     if (_saving) return;
+    if (widget.isResolved) return;
 
     final body = _text.text.trim();
     if (body.length < 5) {
@@ -114,7 +122,7 @@ class _ReportAddendaState extends State<ReportAddenda> {
     }
 
     final confirmed = await _confirmAddendum(body);
-    if (!confirmed || !mounted) return;
+    if (!confirmed || !mounted || widget.isResolved) return;
 
     final requestId = _requestIdFor(body);
 
@@ -211,7 +219,7 @@ class _ReportAddendaState extends State<ReportAddenda> {
         ),
         TextField(
           controller: _text,
-          enabled: !_saving,
+          enabled: !_saving && !widget.isResolved,
           onChanged: (value) {
             if (value.trim() != _pendingRequestBody) {
               _resetPendingRequest();
@@ -225,14 +233,16 @@ class _ReportAddendaState extends State<ReportAddenda> {
           maxLines: 5,
           decoration: InputDecoration(
             labelText: 'Message, correction or additional details',
-            helperText: 'Add a follow-up message or correction to this report.',
+            helperText: widget.isResolved
+                ? 'Resolved reports are read-only. Existing history is preserved.'
+                : 'Add a follow-up message or correction to this report.',
             errorText: _error,
           ),
         ),
         Align(
           alignment: Alignment.centerRight,
           child: FilledButton.icon(
-            onPressed: _saving ? null : _save,
+            onPressed: _saving ? null : (widget.isResolved ? null : _save),
             icon: _saving
                 ? const SizedBox.square(
                     dimension: 16,

@@ -7462,7 +7462,10 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                     const SizedBox(height: 10),
                   ],
                   SelectableText(report.summary),
-                  ReportAddenda(key: ValueKey(report.id), reportId: report.id),
+                  ReportAddenda(
+                      key: ValueKey(report.id),
+                      reportId: report.id,
+                      isResolved: report.isResolved),
                   const SizedBox(height: 12),
                   Text(shortDate(report.createdAt)),
                   if (report.responseNotes.isNotEmpty) ...[
@@ -7668,7 +7671,9 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                               trailing: StatusPill(report.status),
                             ),
                             ReportAddenda(
-                                key: ValueKey(report.id), reportId: report.id)
+                                key: ValueKey(report.id),
+                                reportId: report.id,
+                                isResolved: report.isResolved)
                           ]),
                         ),
                       ),

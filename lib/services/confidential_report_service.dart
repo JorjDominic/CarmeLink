@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
+import '../core/utils/confidential_review_action.dart';
 
 class ConfidentialReportAddendum {
   const ConfidentialReportAddendum({
@@ -22,7 +23,8 @@ class ConfidentialReportAddendum {
       reportId: row['report_id'] as String,
       authorId: row['author_id'] as String,
       authorName: row['author_name'] as String? ?? 'User',
-      authorRole: (row['author_role'] as String? ?? 'user').replaceAll('_', ' '),
+      authorRole:
+          (row['author_role'] as String? ?? 'user').replaceAll('_', ' '),
       body: row['body'] as String,
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
     );
@@ -104,9 +106,19 @@ class ConfidentialReportService {
     required String reportId,
     required String status,
     required String notes,
+    ConcernReport? originalReport,
   }) async {
     _requireUserId();
-    await _client.rpc(
+    ConfidentialReviewAction.forStatus(status);
+    if (notes.trim().length < 5 || notes.trim().length > 1000) {
+      throw ArgumentError('Use 5 to 1000 characters of review notes.');
+    }
+    // Preserve configured category snapshots/specific concerns, which the
+    // legacy review RPC does not include in its response. Read before writing
+    // so a subsequent fetch failure cannot masquerade as a failed save.
+    final original = originalReport ??
+        (await listForOwner()).firstWhere((report) => report.id == reportId);
+    final result = await _client.rpc(
       'owner_review_confidential_report',
       params: {
         'p_report_id': reportId,
@@ -114,8 +126,12 @@ class ConfidentialReportService {
         'p_notes': notes.trim(),
       },
     );
-    final reports = await listForOwner();
-    return reports.firstWhere((report) => report.id == reportId);
+    // The review RPC returns the persisted row. A second list fetch can fail
+    // after a successful save or show a later, unrelated state change.
+    return reviewedConfidentialReport({
+      'report_type_label': original.category,
+      'specific_concern': original.specificConcern,
+    }, Map<String, dynamic>.from(result as Map));
   }
 
   Future<List<ConfidentialReportAddendum>> listAddenda(String reportId) async {
@@ -154,6 +170,18 @@ class ConfidentialReportService {
       throw ArgumentError('Invalid correction request identifier.');
     }
 
+    // Staff deliberately read confidential records through audited RPCs, not
+    // tenant-only table policies. Choose the existing reader by server role.
+    final role = await _client.rpc('current_user_role');
+    final reports = role == 'owner' || role == 'caretaker'
+        ? await listForOwner()
+        : await listOwnReports();
+    final report = reports.firstWhere((item) => item.id == reportId,
+        orElse: () => throw StateError('Report unavailable or access denied.'));
+    if (report.isResolved) {
+      throw StateError('Resolved reports cannot receive additions.');
+    }
+
     try {
       await _client.rpc(
         'append_confidential_report_addendum',
@@ -173,6 +201,8 @@ class ConfidentialReportService {
             .select('id')
             .eq('author_id', uid)
             .eq('client_request_id', normalizedRequestId)
+            .eq('report_id', reportId)
+            .eq('body', normalized)
             .maybeSingle();
         if (existing != null) return;
       } catch (_) {
@@ -182,3 +212,7 @@ class ConfidentialReportService {
     }
   }
 }
+
+ConcernReport reviewedConfidentialReport(
+        Map<String, dynamic> original, Map<String, dynamic> persisted) =>
+    ConcernReport.fromRow({...original, ...persisted});
