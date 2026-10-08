@@ -10,6 +10,7 @@ import 'package:carmelitas_dormitory_system/views/shared/staff_curfew_requests_p
 import 'package:carmelitas_dormitory_system/views/owner/owner_pages.dart';
 import 'package:carmelitas_dormitory_system/views/owner/staff_maintenance_page.dart';
 import 'package:carmelitas_dormitory_system/views/guardian/guardian_pages.dart';
+import 'package:carmelitas_dormitory_system/views/tenant/tenant_pages.dart';
 
 AppNotificationItem item(String route,
         {String? id = 'record-id', Map<String, dynamic> data = const {}}) =>
@@ -27,6 +28,67 @@ AppNotificationItem item(String route,
 Widget child(Widget page) => page is NotificationTarget ? page.child : page;
 
 void main() {
+  test('legacy curfew taps retain request identity for all authorized roles',
+      () {
+    for (final alias in [
+      'curfew_pass',
+      'curfew_request',
+      'late_return',
+      'overnight_leave'
+    ]) {
+      final push = AppNotificationItem.fromPush({
+        'notification_type': alias,
+        'data': '{"request_id":"request-123"}',
+      }, recipientId: 'recipient');
+      expect(push.destinationType, 'curfew');
+      expect(push.destinationId, 'request-123');
+      for (final role in UserRole.values) {
+        final target =
+            notificationDestination(push, role) as NotificationTarget;
+        expect(target.route, 'curfew');
+        expect(target.recordId, 'request-123');
+        if (role == UserRole.tenant)
+          expect(target.child, isA<TenantPresencePage>());
+        if (role == UserRole.guardian) {
+          expect(
+              (target.child as GuardianPresenceMonitoringPage).initialSegment,
+              0);
+        }
+        if (role == UserRole.owner || role == UserRole.caretaker) {
+          expect((target.child as StaffCurfewRequestsPage).initialRequestId,
+              'request-123');
+        }
+      }
+    }
+  });
+
+  test('inspection taps select the exact protected staff report', () {
+    for (final role in [UserRole.owner, UserRole.caretaker]) {
+      final page = child(notificationDestination(item('room_inspection'), role))
+          as NotificationInspectionPage;
+      expect(page.inspectionId, 'record-id');
+    }
+    expect(notificationDestination(item('inspection'), UserRole.guardian),
+        isA<NotificationDetailsPage>());
+  });
+
+  test('malformed nested push data cannot break a tap', () {
+    final push = AppNotificationItem.fromPush(
+        {'notification_type': 'curfew_pass', 'data': '{broken'},
+        recipientId: 'recipient');
+    expect(push.destinationType, 'curfew');
+    expect(push.destinationId, isNull);
+  });
+
+  testWidgets('unavailable inspection shows an actionable protected fallback',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+        home: NotificationInspectionPage(inspectionId: 'deleted')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('unavailable or you do not have access'),
+        findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   test('all operational notifications have the same staff destination', () {
     for (final route in [
       'payment',
