@@ -4,6 +4,23 @@ import 'package:carmelitas_dormitory_system/controllers/tenant_controller.dart';
 
 void main() {
   group('Payment Model', () {
+    test('deposit credits remain visible when a bill is copied or serialized',
+        () {
+      final payment = Payment.fromJson({
+        'id': 'damage-1',
+        'title': 'Broken door',
+        'category': 'damage',
+        'amount': 800,
+        'remaining_balance': 800,
+        'deposit_applied_amount': 3000,
+        'due_date': '2026-10-09',
+        'status': 'due',
+      });
+      expect(payment.depositAppliedAmount, 3000);
+      expect(payment.outstandingAmount, 800);
+      expect(payment.copyWith(status: 'Verified').depositAppliedAmount, 3000);
+      expect(payment.toJson()['deposit_applied_amount'], 3000);
+    });
     final dueDate = DateTime(2026, 9, 20);
     final paidDate = DateTime(2026, 9, 18, 14, 30);
     final reviewedDate = DateTime(2026, 9, 19, 10, 0);
@@ -322,7 +339,9 @@ void main() {
       expect(controller.paymentsError, isNotNull);
     });
 
-    test('security deposit is excluded from duePayments, nextDuePayment, and overduePayments', () {
+    test(
+        'security deposit is excluded from duePayments, nextDuePayment, and overduePayments',
+        () {
       final depositPayment = Payment(
         id: 'p-deposit',
         label: 'Security Deposit',
@@ -349,7 +368,8 @@ void main() {
       controller.setPaymentsForTesting([depositPayment, rentPayment]);
 
       expect(controller.duePayments.map((p) => p.id), contains('p-rent'));
-      expect(controller.duePayments.map((p) => p.id), isNot(contains('p-deposit')));
+      expect(controller.duePayments.map((p) => p.id),
+          isNot(contains('p-deposit')));
       expect(controller.nextDuePayment?.id, 'p-rent');
       expect(controller.overduePayments, isEmpty);
       expect(controller.securityDepositBalance, 3000.0);

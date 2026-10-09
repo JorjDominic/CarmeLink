@@ -628,6 +628,12 @@ class _BillingChargeCard extends StatelessWidget {
             const SizedBox(height: 9),
             Text(payment.notes!.trim(), style: theme.textTheme.bodySmall),
           ],
+          if (payment.depositAppliedAmount > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+                'Covered by security deposit: ₱${payment.depositAppliedAmount.toStringAsFixed(2)}',
+                style: theme.textTheme.bodySmall),
+          ],
           if (onReviewPayment != null || canManage) ...[
             const SizedBox(height: 12),
             Wrap(

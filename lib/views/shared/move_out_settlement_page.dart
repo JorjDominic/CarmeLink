@@ -404,7 +404,10 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
       _reload();
       await widget.onChanged();
     } catch (error) {
-      if (mounted) showAppSnackBar(context, moveOutSettlementError(error));
+      if (mounted) {
+        _reload();
+        showAppSnackBar(context, moveOutSettlementError(error));
+      }
     }
   }
 
@@ -479,9 +482,17 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
   }
 
   Future<void> _addDeduction() async {
+    List<Payment> charges;
+    try {
+      charges = await widget.service.listDeductibleCharges(widget.record.id);
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, moveOutSettlementError(error));
+      return;
+    }
+    if (!mounted) return;
     final draft = await showDialog<_DeductionDraft>(
       context: context,
-      builder: (_) => const _DeductionDialog(),
+      builder: (_) => MoveOutChargeDeductionDialog(charges: charges),
     );
     if (draft == null) return;
     await _run(() => widget.service.addDeduction(
@@ -490,6 +501,7 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
           label: draft.label,
           amount: draft.amount,
           evidenceNote: draft.evidenceNote,
+          chargeId: draft.chargeId,
         ));
   }
 
@@ -520,6 +532,8 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
       if (draft == null) return;
       await _run(() => widget.service.recordRefundWithProof(
             caseId: widget.record.id,
+            expectedRefund: settlement.refundableAmount,
+            expectedDeductions: settlement.approvedDeductions,
             refundMethod: draft.method,
             refundReference: draft.reference,
             bytes: draft.bytes,
@@ -532,13 +546,15 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
     if (settlement.shortfallAmount > 0) {
       final note = await _textDialog(
         context,
-        title: 'Record shortfall handoff',
+        title: 'Apply deposit and bill the remaining balance',
         label:
-            'Explain the ₱${settlement.shortfallAmount.toStringAsFixed(2)} shortfall. This does not create a billing charge.',
+            'Explain the ₱${settlement.shortfallAmount.toStringAsFixed(2)} shortfall. The uncovered amount will remain payable on the linked bills.',
       );
       if (note == null) return;
       await _run(() => widget.service.recordSettlementOutcome(
             caseId: widget.record.id,
+            expectedRefund: settlement.refundableAmount,
+            expectedDeductions: settlement.approvedDeductions,
             shortfallNote: note,
           ));
       return;
@@ -546,6 +562,8 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
 
     await _run(() => widget.service.recordSettlementOutcome(
           caseId: widget.record.id,
+          expectedRefund: settlement.refundableAmount,
+          expectedDeductions: settlement.approvedDeductions,
         ));
   }
 
@@ -762,7 +780,7 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
             _CheckRow('Deposit settlement outcome', settlementReady),
             const Divider(height: 22),
             Text(
-              'Ready for closure is a handoff marker only. This workspace does not terminate the contract, end the tenant assignment, release the bed, or automatically create a shortfall charge.',
+              'Ready for closure is a handoff marker. Any damage balance remaining after the deposit is applied must be paid before closure. Contract termination, assignment ending, and bed release are separate actions.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -876,7 +894,7 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
           SectionTitle(
             'Deposit settlement',
             subtitle:
-                'Confirmed receipts carry over automatically. Deposit remains separate from bills.',
+                'Approved deductions credit the linked bills when settlement is finalized. Only the uncovered balance stays payable.',
             trailing: widget.isOwner && !settlementFinal
                 ? TextButton.icon(
                     onPressed: () => _setDeposit(s),
@@ -914,7 +932,7 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
                       ?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
-              if (widget.isOwner && !settlementFinal)
+              if (widget.isStaff && !settlementFinal)
                 TextButton.icon(
                   key: const Key('phase8-add-deduction'),
                   onPressed: _addDeduction,
@@ -932,7 +950,10 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
                 contentPadding: EdgeInsets.zero,
                 title: Text(item.label),
                 subtitle: Text(
-                    '${_categoryLabel(item.category)} · ${item.evidenceNote}'),
+                    '${_categoryLabel(item.category)} · ${item.evidenceNote}'
+                    '${item.billingChargeId == null ? "" : "\nLinked bill: ${item.billingTitle ?? item.label}"}'
+                    '${item.depositAppliedAmount > 0 ? "\nCovered by deposit: ${_money(item.depositAppliedAmount)}" : ""}'
+                    '${item.billingChargeId != null ? "\nBill balance: ${_money(item.outstandingAmount ?? 0)}" : ""}'),
                 leading: Text(
                   _money(item.amount),
                   style: const TextStyle(fontWeight: FontWeight.w800),
@@ -979,7 +1000,7 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
                 label: Text(s.refundableAmount > 0
                     ? 'Record refund + proof'
                     : s.shortfallAmount > 0
-                        ? 'Record shortfall handoff'
+                        ? 'Apply deposit + bill remaining balance'
                         : 'Finalize zero settlement'),
               ),
             ),
@@ -1284,14 +1305,16 @@ class _ClearanceDialogState extends State<_ClearanceDialog> {
       );
 }
 
-class _DeductionDialog extends StatefulWidget {
-  const _DeductionDialog();
+class MoveOutChargeDeductionDialog extends StatefulWidget {
+  const MoveOutChargeDeductionDialog({super.key, this.charges = const []});
+  final List<Payment> charges;
   @override
-  State<_DeductionDialog> createState() => _DeductionDialogState();
+  State<MoveOutChargeDeductionDialog> createState() => _DeductionDialogState();
 }
 
-class _DeductionDialogState extends State<_DeductionDialog> {
+class _DeductionDialogState extends State<MoveOutChargeDeductionDialog> {
   String _category = 'damage';
+  String? _chargeId;
   final _label = TextEditingController();
   final _amount = TextEditingController();
   final _evidence = TextEditingController();
@@ -1308,8 +1331,42 @@ class _DeductionDialogState extends State<_DeductionDialog> {
         title: const Text('Propose deposit deduction'),
         content: SizedBox(
             width: 440,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
+            child: SingleChildScrollView(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
               DropdownButtonFormField<String>(
+                initialValue: _chargeId ?? '',
+                isExpanded: true,
+                decoration:
+                    const InputDecoration(labelText: 'Link an existing bill'),
+                items: [
+                  const DropdownMenuItem(
+                      value: '', child: Text('New item (no existing bill)')),
+                  for (final charge in widget.charges)
+                    DropdownMenuItem(
+                        value: charge.id,
+                        child: Text(
+                            '${charge.label} · ${_money(charge.outstandingAmount)}',
+                            overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: (value) => setState(() {
+                  _chargeId = value == '' ? null : value;
+                  final charge = widget.charges
+                      .where((item) => item.id == _chargeId)
+                      .firstOrNull;
+                  if (charge != null) {
+                    _category = charge.category;
+                    _label.text = charge.label;
+                    _amount.text = charge.outstandingAmount.toStringAsFixed(2);
+                    _evidence.text = charge.notes ?? '';
+                  }
+                }),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                  'The owner must approve this proposal. Link existing bills to avoid charging for the same damage twice.'),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                  key: ValueKey(_category),
                   initialValue: _category,
                   decoration: const InputDecoration(labelText: 'Category'),
                   items: const [
@@ -1322,17 +1379,21 @@ class _DeductionDialogState extends State<_DeductionDialog> {
                       .map((v) => DropdownMenuItem(
                           value: v, child: Text(_categoryLabel(v))))
                       .toList(),
-                  onChanged: (v) {
-                    if (v != null) setState(() => _category = v);
-                  }),
+                  onChanged: _chargeId != null
+                      ? null
+                      : (v) {
+                          if (v != null) setState(() => _category = v);
+                        }),
               const SizedBox(height: 12),
               TextField(
                   controller: _label,
+                  readOnly: _chargeId != null,
                   decoration:
                       const InputDecoration(labelText: 'Deduction label')),
               const SizedBox(height: 12),
               TextField(
                   controller: _amount,
+                  readOnly: _chargeId != null,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
@@ -1343,8 +1404,10 @@ class _DeductionDialogState extends State<_DeductionDialog> {
                   minLines: 2,
                   maxLines: 4,
                   decoration: const InputDecoration(
-                      labelText: 'Evidence / basis note')),
-            ])),
+                      labelText: 'Evidence / basis note',
+                      helperText:
+                          'Reference inspection photos or repair receipts.')),
+            ]))),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
@@ -1353,7 +1416,9 @@ class _DeductionDialogState extends State<_DeductionDialog> {
               onPressed: () {
                 final amount = double.tryParse(_amount.text.trim()) ?? 0;
                 if (_label.text.trim().length < 2 ||
+                    !amount.isFinite ||
                     amount <= 0 ||
+                    (amount * 100 - (amount * 100).round()).abs() > .0001 ||
                     _evidence.text.trim().length < 3) {
                   showAppSnackBar(context,
                       'Complete the label, amount, and evidence note.');
@@ -1362,7 +1427,7 @@ class _DeductionDialogState extends State<_DeductionDialog> {
                 Navigator.pop(
                     context,
                     _DeductionDraft(_category, _label.text.trim(), amount,
-                        _evidence.text.trim()));
+                        _evidence.text.trim(), _chargeId));
               },
               child: const Text('Propose'))
         ],
@@ -1544,7 +1609,7 @@ class _Phase8BoundaryNotice extends StatelessWidget {
         const SizedBox(width: 10),
         const Expanded(
             child: Text(
-                'This workspace records the move-out notice, final inspection, clearance, deposit deductions/refund, and closure readiness. Contract termination, assignment ending, bed release, and shortfall billing remain separate authorized actions and are not performed automatically here.'))
+                'Owner-approved deductions are linked to bills when settlement is recorded. The deposit covers those bills first; any uncovered amount remains payable. Contract termination, assignment ending, and bed release remain separate authorized actions.'))
       ]));
 }
 
@@ -1562,11 +1627,13 @@ class _ClearanceDraft {
 
 class _DeductionDraft {
   const _DeductionDraft(
-      this.category, this.label, this.amount, this.evidenceNote);
+      this.category, this.label, this.amount, this.evidenceNote,
+      [this.chargeId]);
   final String category;
   final String label;
   final double amount;
   final String evidenceNote;
+  final String? chargeId;
 }
 
 class _RefundDraft {

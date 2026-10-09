@@ -2265,6 +2265,15 @@ class _TenantPaymentCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
+              if (payment.depositAppliedAmount > 0) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Covered by security deposit: ${money(payment.depositAppliedAmount)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
               if (payment.reviewNotes != null &&
                   payment.reviewNotes!.isNotEmpty) ...[
                 const SizedBox(height: 8),

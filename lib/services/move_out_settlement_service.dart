@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import '../models/models.dart';
 
 class MoveOutCaseRecord {
   const MoveOutCaseRecord({
@@ -87,6 +88,10 @@ class MoveOutDeductionRecord {
     required this.amount,
     required this.status,
     required this.evidenceNote,
+    this.billingChargeId,
+    this.billingTitle,
+    this.outstandingAmount,
+    this.depositAppliedAmount = 0,
   });
 
   factory MoveOutDeductionRecord.fromRow(Map<String, dynamic> row) =>
@@ -97,6 +102,11 @@ class MoveOutDeductionRecord {
         amount: (row['amount'] as num).toDouble(),
         status: row['status'] as String,
         evidenceNote: row['evidence_note'] as String? ?? '',
+        billingChargeId: row['billing_charge_id'] as String?,
+        billingTitle: row['billing_title'] as String?,
+        outstandingAmount: (row['outstanding_amount'] as num?)?.toDouble(),
+        depositAppliedAmount:
+            (row['deposit_applied_amount'] as num?)?.toDouble() ?? 0,
       );
 
   final String id;
@@ -105,6 +115,9 @@ class MoveOutDeductionRecord {
   final double amount;
   final String status;
   final String evidenceNote;
+  final String? billingChargeId, billingTitle;
+  final double? outstandingAmount;
+  final double depositAppliedAmount;
 }
 
 class MoveOutClearanceRecord {
@@ -275,29 +288,12 @@ class MoveOutSettlementService {
     final fresh = MoveOutCaseRecord.fromRow(freshRow);
     final results = await Future.wait<dynamic>([
       _client
-          .from('move_out_deductions')
-          .select('id, category, label, amount, status, evidence_note')
-          .eq('case_id', record.id)
-          .order('created_at'),
+          .rpc('get_move_out_charge_preview', params: {'p_case_id': record.id}),
       _client
           .from('move_out_clearance_items')
           .select('item_key, label, status, notes')
           .eq('case_id', record.id)
           .order('sort_order'),
-      _client
-          .from('move_out_settlements')
-          .select(
-            'deposit_received_amount, approved_deductions, refundable_amount, '
-            'shortfall_amount, refund_status, refund_due_on, refund_method, '
-            'refund_reference, refund_proof_path, refunded_at, shortfall_note, '
-            'tenant_response, tenant_acknowledged_at',
-          )
-          .eq('case_id', record.id)
-          .single(),
-      _client
-          .from('billing_charge_summaries')
-          .select('category, remaining_balance, status')
-          .eq('tenant_id', fresh.tenantId),
       if (fresh.finalInspectionId != null)
         _client
             .from('room_inspections')
@@ -308,33 +304,21 @@ class MoveOutSettlementService {
         Future<Map<String, dynamic>?>.value(null),
     ]);
 
-    final charges = List<Map<String, dynamic>>.from(results[3] as List);
-    var outstanding = 0.0;
-    for (final row in charges) {
-      final category = row['category']?.toString().toLowerCase() ?? '';
-      final status = row['status']?.toString().toLowerCase() ?? '';
-      if (category == 'deposit' ||
-          status == 'verified' ||
-          status == 'voided' ||
-          status == 'upcoming') {
-        continue;
-      }
-      outstanding += (row['remaining_balance'] as num?)?.toDouble() ?? 0;
-    }
-
-    final inspection = results[4] as Map<String, dynamic>?;
+    final preview = Map<String, dynamic>.from(results[0] as Map);
+    final inspection = results[2] as Map<String, dynamic>?;
     return MoveOutCaseDetails(
       caseRecord: fresh,
-      deductions: List<Map<String, dynamic>>.from(results[0] as List)
+      deductions: List<Map<String, dynamic>>.from(preview['deductions'] as List)
           .map(MoveOutDeductionRecord.fromRow)
           .toList(growable: false),
       clearance: List<Map<String, dynamic>>.from(results[1] as List)
           .map(MoveOutClearanceRecord.fromRow)
           .toList(growable: false),
       settlement: MoveOutSettlementRecord.fromRow(
-        Map<String, dynamic>.from(results[2] as Map),
+        Map<String, dynamic>.from(preview['settlement'] as Map),
       ),
-      outstandingNonDepositBalance: outstanding,
+      outstandingNonDepositBalance:
+          (preview['ordinary_balance'] as num).toDouble(),
       finalInspectionStatus: inspection?['status'] as String?,
       finalInspectionScheduledAt: inspection?['scheduled_at'] == null
           ? null
@@ -386,14 +370,24 @@ class MoveOutSettlementService {
     required String label,
     required double amount,
     required String evidenceNote,
+    String? chargeId,
   }) async {
-    await _client.rpc('add_move_out_deduction', params: {
+    await _client.rpc('propose_move_out_charge_deduction', params: {
       'p_case_id': caseId,
       'p_category': category,
       'p_label': label.trim(),
       'p_amount': amount,
       'p_evidence_note': evidenceNote.trim(),
+      'p_charge_id': chargeId,
     });
+  }
+
+  Future<List<Payment>> listDeductibleCharges(String caseId) async {
+    final rows = await _client
+        .rpc('list_move_out_deductible_charges', params: {'p_case_id': caseId});
+    return List<Map<String, dynamic>>.from(rows as List)
+        .map(Payment.fromJson)
+        .toList(growable: false);
   }
 
   Future<void> reviewDeduction({
@@ -436,13 +430,17 @@ class MoveOutSettlementService {
 
   Future<void> recordSettlementOutcome({
     required String caseId,
+    required double expectedRefund,
+    required double expectedDeductions,
     String? refundMethod,
     String? refundReference,
     String? refundProofPath,
     String? shortfallNote,
   }) async {
-    await _client.rpc('record_move_out_settlement_outcome', params: {
+    await _client.rpc('record_move_out_settlement_with_charges', params: {
       'p_case_id': caseId,
+      'p_expected_refund': expectedRefund,
+      'p_expected_deductions': expectedDeductions,
       'p_refund_method': refundMethod?.trim(),
       'p_refund_reference': refundReference?.trim(),
       'p_refund_proof_path': refundProofPath,
@@ -452,6 +450,8 @@ class MoveOutSettlementService {
 
   Future<void> recordRefundWithProof({
     required String caseId,
+    required double expectedRefund,
+    required double expectedDeductions,
     required String refundMethod,
     required String refundReference,
     required Uint8List bytes,
@@ -467,6 +467,8 @@ class MoveOutSettlementService {
     try {
       await recordSettlementOutcome(
         caseId: caseId,
+        expectedRefund: expectedRefund,
+        expectedDeductions: expectedDeductions,
         refundMethod: refundMethod,
         refundReference: refundReference,
         refundProofPath: path,

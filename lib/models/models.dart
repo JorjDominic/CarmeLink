@@ -121,6 +121,7 @@ class Payment {
     this.createdBy,
     this.contractAmount,
     this.rentAdjustment = 0,
+    this.depositAppliedAmount = 0,
     this.source = 'manual',
     DateTime? createdAt,
   }) : createdAt = createdAt ?? dueDate;
@@ -151,6 +152,7 @@ class Payment {
   final String? createdBy;
   final double? contractAmount;
   final double rentAdjustment;
+  final double depositAppliedAmount;
   final String source;
 
   bool get isRent => category.toLowerCase().trim() == 'rent';
@@ -248,6 +250,7 @@ class Payment {
       createdBy: createdBy ?? this.createdBy,
       contractAmount: contractAmount ?? this.contractAmount,
       rentAdjustment: rentAdjustment ?? this.rentAdjustment,
+      depositAppliedAmount: depositAppliedAmount,
       source: source ?? this.source,
     );
   }
@@ -340,6 +343,8 @@ class Payment {
       createdBy: json['created_by'] as String?,
       contractAmount: (json['contract_amount'] as num?)?.toDouble(),
       rentAdjustment: (json['rent_adjustment'] as num?)?.toDouble() ?? 0,
+      depositAppliedAmount:
+          (json['deposit_applied_amount'] as num?)?.toDouble() ?? 0,
       source: json['source'] as String? ?? 'manual',
     );
   }
@@ -370,6 +375,7 @@ class Payment {
         if (createdBy != null) 'created_by': createdBy,
         if (contractAmount != null) 'contract_amount': contractAmount,
         'rent_adjustment': rentAdjustment,
+        'deposit_applied_amount': depositAppliedAmount,
         'source': source,
       };
 
