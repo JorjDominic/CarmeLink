@@ -25,6 +25,7 @@ class MoveOutCaseRecord {
     this.reason = '',
     this.finalInspectionId,
     this.staffNotes = '',
+    this.caseType = 'voluntary',
   });
 
   factory MoveOutCaseRecord.fromRow(Map<String, dynamic> row) {
@@ -56,6 +57,7 @@ class MoveOutCaseRecord {
           (row['contract_deposit_amount'] as num?)?.toDouble() ?? 0,
       refundDueOn: DateTime.parse(row['refund_due_on'] as String).toLocal(),
       staffNotes: row['staff_notes'] as String? ?? '',
+      caseType: row['case_type'] as String? ?? 'voluntary',
       updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
     );
   }
@@ -77,6 +79,7 @@ class MoveOutCaseRecord {
   final double contractDepositAmount;
   final DateTime refundDueOn;
   final String staffNotes;
+  final String caseType;
   final DateTime updatedAt;
 }
 
@@ -231,7 +234,14 @@ class MoveOutSettlementService {
       'contract_number_snapshot, contract_ends_on_snapshot, room_id, '
       'room_number_snapshot, bed_label_snapshot, notice_submitted_on, '
       'planned_move_out_on, reason, status, final_inspection_id, '
-      'contract_deposit_amount, refund_due_on, staff_notes, updated_at';
+      'contract_deposit_amount, refund_due_on, staff_notes, updated_at, case_type';
+
+  Future<MoveOutCaseRecord> caseById(String id) async =>
+      MoveOutCaseRecord.fromRow(await _client
+          .from('move_out_cases')
+          .select(_caseColumns)
+          .eq('id', id)
+          .single());
 
   Future<List<MoveOutCaseRecord>> listCases() async {
     final rows = await _client

@@ -1,3 +1,4 @@
+import 'package:carmelitas_dormitory_system/views/shared/eviction_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
@@ -179,6 +180,13 @@ void main() {
               'record-id');
         }
       }
+    }
+  });
+
+  test('eviction notices open for every role', () {
+    for (final role in UserRole.values) {
+      expect(child(notificationDestination(item('eviction'), role)),
+          isA<EvictionPage>());
     }
   });
 

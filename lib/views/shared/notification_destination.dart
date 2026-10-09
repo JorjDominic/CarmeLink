@@ -21,6 +21,7 @@ import 'employee_curfew_profile_pages.dart';
 import 'cleaning_schedule_management_page.dart';
 import 'move_out_settlement_page.dart';
 import 'room_transfer_page.dart';
+import 'eviction_page.dart';
 import 'shared_views.dart';
 import '../owner/guardian_link_management_page.dart';
 
@@ -30,6 +31,7 @@ Widget notificationDestination(AppNotificationItem item, UserRole role) {
   final id = item.destinationId;
   final staff = role == UserRole.owner || role == UserRole.caretaker;
   if (route == 'room_transfer') return const RoomTransferPage();
+  if (route == 'eviction') return const EvictionPage();
   if (route == 'message' || route == 'conversation') {
     if (staff) return OwnerMessagingPage(initialConversationId: id);
     if (id != null) return DirectStaffConversationPage(conversationId: id);

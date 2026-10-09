@@ -22,6 +22,7 @@ import '../tenant/tenant_requirements_page.dart';
 import 'profile_edit_page.dart';
 import 'move_out_settlement_page.dart';
 import 'room_transfer_page.dart';
+import 'eviction_page.dart';
 import 'signature_pad_dialog.dart';
 import 'notification_destination.dart';
 
@@ -715,6 +716,15 @@ class ProfilePage extends StatelessWidget {
             : user.role == UserRole.guardian
                 ? _GuardianProfileContent(user: user)
                 : _OwnerProfileContent(user: user),
+        ListTile(
+          leading: const Icon(Icons.gavel_outlined),
+          title: const Text('Eviction & departure notices'),
+          subtitle: const Text(
+              'Owner decisions, notices, responses and closure history'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const EvictionPage())),
+        ),
       ]),
     );
   }

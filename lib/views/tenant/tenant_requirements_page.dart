@@ -9,6 +9,7 @@ import '../../models/models.dart';
 import '../../services/contract_onboarding_service.dart';
 import '../../services/contract_document_service.dart';
 import '../shared/signature_pad_dialog.dart';
+import '../shared/eviction_page.dart';
 
 /// Tenant-facing page for viewing and submitting required onboarding documents
 /// and in-app electronic signatures.
@@ -166,6 +167,12 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
       appBar: AppBar(
         title: const Text('Documents'),
         actions: [
+          IconButton(
+              tooltip: 'Departure notices & history',
+              icon: const Icon(Icons.gavel_outlined),
+              onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                      builder: (_) => const EvictionPage()))),
           IconButton(
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh),

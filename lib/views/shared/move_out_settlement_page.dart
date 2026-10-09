@@ -17,7 +17,8 @@ import '../../services/table_refresh_subscription.dart';
 import 'security_deposit_card.dart';
 
 class MoveOutSettlementPage extends StatefulWidget {
-  const MoveOutSettlementPage({super.key});
+  const MoveOutSettlementPage({super.key, this.initialCaseId});
+  final String? initialCaseId;
 
   @override
   State<MoveOutSettlementPage> createState() => _MoveOutSettlementPageState();
@@ -74,7 +75,7 @@ class _MoveOutSettlementPageState extends State<MoveOutSettlementPage> {
   Future<void> _initialize() async {
     if (_isStaff) {
       final prefs = await SharedPreferences.getInstance();
-      _selectedCaseId = prefs.getString(_selectionKey);
+      _selectedCaseId = widget.initialCaseId ?? prefs.getString(_selectionKey);
     }
     await _load();
   }
@@ -95,7 +96,9 @@ class _MoveOutSettlementPageState extends State<MoveOutSettlementPage> {
     if (!silent && mounted) setState(() => _loading = true);
     try {
       if (_isTenant) {
-        _tenantCase = await _service.currentCase();
+        _tenantCase = widget.initialCaseId == null
+            ? await _service.currentCase()
+            : await _service.caseById(widget.initialCaseId!);
       } else if (_isStaff) {
         if (!OwnerController.instance.tenantsLoadedOnce) {
           await OwnerController.instance.loadTenants();
@@ -379,6 +382,7 @@ class _MoveOutCaseDetail extends StatefulWidget {
 }
 
 class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
+  bool get _editable => !['closed', 'cancelled'].contains(widget.record.status);
   late Future<MoveOutCaseDetails> _future =
       widget.service.getDetails(widget.record);
 
@@ -655,7 +659,8 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
               const SizedBox(height: 18),
               _settlementCard(details),
               if (widget.isOwner &&
-                  details.caseRecord.status != 'ready_for_closure') ...[
+                  !['ready_for_closure', 'closed', 'cancelled']
+                      .contains(details.caseRecord.status)) ...[
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
@@ -692,8 +697,9 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
                 ),
               ],
               if (!widget.isStaff &&
+                  details.caseRecord.caseType == 'voluntary' &&
                   details.caseRecord.finalInspectionId == null &&
-                  details.caseRecord.status != 'cancelled') ...[
+                  _editable) ...[
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -735,7 +741,10 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
               children: [
                 _Fact(
                     'Notice', shortDate(details.caseRecord.noticeSubmittedOn)),
-                _Fact('Planned move-out',
+                _Fact(
+                    details.caseRecord.caseType == 'eviction'
+                        ? 'Owner departure deadline'
+                        : 'Planned move-out',
                     shortDate(details.caseRecord.plannedMoveOutOn)),
                 _Fact('Room', _roomLabel(details.caseRecord)),
                 _Fact('Contract',
@@ -807,7 +816,7 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('No move-out inspection has been scheduled yet.'),
-                  if (widget.isStaff) ...[
+                  if (widget.isStaff && _editable) ...[
                     const SizedBox(height: 12),
                     FilledButton.icon(
                       key: const Key('phase8-schedule-final-inspection'),
@@ -855,7 +864,9 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
                 title: Text(item.label),
                 subtitle: item.notes.isEmpty ? null : Text(item.notes),
                 trailing: StatusPill(_statusLabel(item.status)),
-                onTap: widget.isStaff ? () => _editClearance(item) : null,
+                onTap: widget.isStaff && _editable
+                    ? () => _editClearance(item)
+                    : null,
               ),
               if (item != details.clearance.last) const Divider(height: 1),
             ],

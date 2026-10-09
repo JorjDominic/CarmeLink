@@ -1,0 +1,15 @@
+select
+  (select count(*) from public.eviction_cases)::int as eviction_cases,
+  (select count(*) from public.eviction_events)::int as eviction_events,
+  (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname in ('eviction_cases','eviction_events') and c.relrowsecurity)::int as rls_tables,
+  (select count(*) from pg_policies where schemaname='public' and tablename in ('eviction_cases','eviction_events'))::int as read_policies,
+  not has_table_privilege('authenticated','public.eviction_cases','INSERT,UPDATE,DELETE') as direct_writes_blocked,
+  not has_table_privilege('authenticated','public.eviction_events','INSERT,UPDATE,DELETE') as event_writes_blocked,
+  has_function_privilege('authenticated','public.close_eviction_case(uuid,text)','EXECUTE') as authenticated_rpc,
+  not has_function_privilege('anon','public.close_eviction_case(uuid,text)','EXECUTE') as anonymous_blocked,
+  not has_function_privilege('authenticated','public.check_eviction_settlement_ready(uuid)','EXECUTE') as internal_helper_private,
+  (select not public from storage.buckets where id='eviction-notices') as private_notice_bucket,
+  (select count(*) from pg_policies where schemaname='storage' and policyname like 'eviction_notice_%')::int as storage_policies,
+  (select count(*) from pg_publication_tables where pubname='supabase_realtime' and tablename in ('eviction_cases','eviction_events'))::int as realtime_tables,
+  (select count(*) from public.move_out_cases where case_type='voluntary')::int as preserved_voluntary_cases,
+  (select count(*) from pg_trigger where not tgisinternal and tgname in ('guard_eviction_contract','guard_eviction_assignment','guard_eviction_move_out','guard_eviction_room_transfer'))::int as workflow_guards;

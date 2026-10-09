@@ -11,6 +11,9 @@ import '../../services/table_refresh_subscription.dart';
 import 'conduct_case_appeal_panel.dart';
 import 'conduct_case_create_dialog.dart';
 import 'review_notes_dialog.dart';
+import '../../controllers/session_controller.dart';
+import '../../models/models.dart';
+import 'eviction_page.dart';
 
 String _conductDateTime(DateTime value) {
   final local = value.toLocal();
@@ -773,6 +776,17 @@ class _StaffConductCaseDetailPageState
                         icon: const Icon(Icons.rule_folder_outlined),
                         label: const Text('Recommend termination review'),
                       ),
+                    if (record.status == 'termination_review_recommended' &&
+                        SessionController.instance.currentUser?.role ==
+                            UserRole.owner)
+                      FilledButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                  builder: (_) => EvictionPage(
+                                      initialTenantId: record.tenantId,
+                                      initialConductCaseId: record.id))),
+                          icon: const Icon(Icons.gavel_outlined),
+                          label: const Text('Open owner eviction workflow')),
                     if (canAct)
                       FilledButton.icon(
                         onPressed: () => _setReviewStatus('resolved'),
