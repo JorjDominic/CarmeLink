@@ -9,6 +9,7 @@ Future<Uint8List?> showSignaturePadDialog(
   BuildContext context, {
   required String signerName,
   required String contractNumber,
+  String? agreementText,
 }) =>
     showDialog<Uint8List>(
       context: context,
@@ -16,6 +17,7 @@ Future<Uint8List?> showSignaturePadDialog(
       builder: (_) => SignaturePadDialog(
         signerName: signerName,
         contractNumber: contractNumber,
+        agreementText: agreementText,
       ),
     );
 
@@ -24,10 +26,12 @@ class SignaturePadDialog extends StatefulWidget {
     super.key,
     required this.signerName,
     required this.contractNumber,
+    this.agreementText,
   });
 
   final String signerName;
   final String contractNumber;
+  final String? agreementText;
 
   @override
   State<SignaturePadDialog> createState() => _SignaturePadDialogState();
@@ -330,7 +334,8 @@ class _SignaturePadDialogState extends State<SignaturePadDialog> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          'I confirm this is my official signature and I agree to the Carmelita\'s Dormitory lease terms and dormitory regulations.',
+                          widget.agreementText ??
+                              'I confirm this is my official signature and I agree to the Carmelita\'s Dormitory lease terms and dormitory regulations.',
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
                                     fontSize: 11,

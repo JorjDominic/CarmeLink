@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/services/app_notification_service.dart';
 import 'package:carmelitas_dormitory_system/views/shared/notification_destination.dart';
+import 'package:carmelitas_dormitory_system/views/shared/room_transfer_page.dart';
 import 'package:carmelitas_dormitory_system/views/shared/cleaning_report_detail.dart';
 import 'package:carmelitas_dormitory_system/views/shared/conduct_case_pages.dart';
 import 'package:carmelitas_dormitory_system/views/shared/staff_message_contacts.dart';
@@ -28,6 +29,12 @@ AppNotificationItem item(String route,
 Widget child(Widget page) => page is NotificationTarget ? page.child : page;
 
 void main() {
+  test('room amendment notices open the transfer workspace for each role', () {
+    for (final role in UserRole.values) {
+      expect(child(notificationDestination(item('room_transfer'), role)),
+          isA<RoomTransferPage>());
+    }
+  });
   test('legacy curfew taps retain request identity for all authorized roles',
       () {
     for (final alias in [

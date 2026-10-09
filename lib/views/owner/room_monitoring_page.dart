@@ -11,6 +11,8 @@ import '../../core/widgets/numbered_pagination.dart';
 import '../../services/room_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../services/tenant_service.dart';
+import '../../services/contract_service.dart';
+import '../shared/room_transfer_page.dart';
 import '../shared/staff_quick_panel.dart';
 import '../shared/room_cleaning_pages.dart';
 import '../shared/room_inspection_pages.dart';
@@ -874,6 +876,15 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     final tenantName = bed.tenantName ?? 'Tenant';
 
     try {
+      final contracts = await const ContractService().listContracts();
+      if (!mounted) return;
+      if (contracts.any((contract) =>
+          contract.tenantId == bed.tenantId && contract.isActive)) {
+        await Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => RoomTransferPage(tenantId: bed.tenantId)));
+        if (mounted) await _refreshRoom();
+        return;
+      }
       final availableRooms =
           await const TenantService().loadAvailableBedsGroupedByRoom();
       if (!mounted) return;
@@ -1046,8 +1057,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                 'Move to another bed',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
-              subtitle:
-                  const Text('Reassign this tenant to any open bed space'),
+              subtitle: const Text(
+                  'Active contracts require a signed room amendment before moving'),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

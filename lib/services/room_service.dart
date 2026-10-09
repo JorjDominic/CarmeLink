@@ -336,6 +336,8 @@ class BedRecord {
 String roomServiceError(Object error) {
   final message =
       error is PostgrestException ? error.message : error.toString();
+  if (message.contains('room amendment') || message.contains('pending room'))
+    return message;
   if (message.contains('room_floors') &&
       (message.contains('Could not find the table') ||
           message.contains('does not exist'))) {

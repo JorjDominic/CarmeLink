@@ -1457,6 +1457,8 @@ class _TenantAssignmentManagerState extends State<_TenantAssignmentManager> {
 
 String tenantAssignmentError(Object error) {
   final message = error.toString();
+  if (message.contains('room amendment'))
+    return 'An active contract requires a signed room amendment. Open the tenant’s occupied bed in Room management to review or propose a transfer.';
   if (message.contains('no longer available') ||
       message.contains('tenant_assignments_one_active_per_bed')) {
     return 'That bed was just assigned to someone else. Choose another bed.';

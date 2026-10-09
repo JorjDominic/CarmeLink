@@ -21,6 +21,7 @@ import '../tenant/onboarding_form_page.dart';
 import '../tenant/tenant_requirements_page.dart';
 import 'profile_edit_page.dart';
 import 'move_out_settlement_page.dart';
+import 'room_transfer_page.dart';
 import 'signature_pad_dialog.dart';
 import 'notification_destination.dart';
 
@@ -699,11 +700,22 @@ class ProfilePage extends StatelessWidget {
       title: 'Profile',
       subtitle: 'Personal and contact information',
       maxWidth: 720,
-      child: user.role == UserRole.tenant
-          ? _TenantProfileContent(user: user)
-          : user.role == UserRole.guardian
-              ? _GuardianProfileContent(user: user)
-              : _OwnerProfileContent(user: user),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        ListTile(
+          leading: const Icon(Icons.swap_horiz),
+          title: const Text('Room transfers & amendments'),
+          subtitle:
+              const Text('Review notices, signatures, and transfer history'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => const RoomTransferPage())),
+        ),
+        user.role == UserRole.tenant
+            ? _TenantProfileContent(user: user)
+            : user.role == UserRole.guardian
+                ? _GuardianProfileContent(user: user)
+                : _OwnerProfileContent(user: user),
+      ]),
     );
   }
 }
