@@ -947,7 +947,7 @@ class PageFrame extends StatelessWidget {
     this.actions,
     this.floatingActionButton,
     this.heroTitle,
-    this.useScriptTitle = true,
+    this.useScriptTitle = false,
     this.onRefresh,
     this.onBack,
     this.maxWidth,
@@ -1153,12 +1153,9 @@ class PageFrame extends StatelessWidget {
                   maxLines: 1,
                   softWrap: false,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontFamily: useScriptTitle ? 'GreatVibes' : null,
-                        fontSize: compactHeader
-                            ? (useScriptTitle ? 25 : 20)
-                            : (useScriptTitle ? 30 : null),
-                        fontWeight:
-                            useScriptTitle ? FontWeight.w600 : FontWeight.w700,
+                        fontFamily: 'GreatVibes',
+                        fontSize: compactHeader ? 25 : 30,
+                        fontWeight: FontWeight.w600,
                       ),
                 ),
               ),
@@ -1355,7 +1352,7 @@ class ElegantHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.trailing,
-    this.useScriptTitle = true,
+    this.useScriptTitle = false,
     super.key,
   });
 
@@ -1384,11 +1381,11 @@ class ElegantHeader extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                fontFamily: useScriptTitle ? 'GreatVibes' : null,
-                fontSize: useScriptTitle ? titleSize + 10 : titleSize,
-                fontWeight: useScriptTitle ? FontWeight.w600 : FontWeight.w700,
-                height: useScriptTitle ? 1.15 : null,
-                letterSpacing: useScriptTitle ? 0 : null,
+                fontFamily: 'GreatVibes',
+                fontSize: titleSize + 10,
+                fontWeight: FontWeight.w600,
+                height: 1.15,
+                letterSpacing: 0,
               ),
         ),
         if (subtitle != null) ...[

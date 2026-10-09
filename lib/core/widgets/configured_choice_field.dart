@@ -80,6 +80,11 @@ class _ConfiguredChoiceFieldState extends State<ConfiguredChoiceField> {
   @override
   void didUpdateWidget(covariant ConfiguredChoiceField oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.group != widget.group) {
+      _loading = true;
+      _options = [];
+      _load();
+    }
     if (oldWidget.value != widget.value) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||

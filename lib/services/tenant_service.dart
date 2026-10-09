@@ -1,4 +1,5 @@
 import '../core/config/supabase_config.dart';
+import 'room_service.dart';
 import '../models/models.dart';
 
 class TenantService {
@@ -116,7 +117,8 @@ class TenantService {
       client
           .from('bed_spaces')
           .select('id, label, rooms!inner(room_number, floor)')
-          .eq('status', 'available'),
+          .eq('status', 'available')
+          .eq('rooms.is_active', true),
       client
           .from('tenant_assignments')
           .select('bed_space_id')
@@ -165,15 +167,17 @@ class TenantService {
   }
 
   Future<void> assignBed(String tenantId, String bedId) async {
-    invalidateCache();
     await SupabaseConfig.client.rpc('assign_tenant_bed',
         params: {'p_tenant_id': tenantId, 'p_bed_space_id': bedId});
+    invalidateCache();
+    RoomService.invalidateCache();
   }
 
   Future<void> endAssignment(String tenantId) async {
-    invalidateCache();
     await SupabaseConfig.client
         .rpc('end_tenant_assignment', params: {'p_tenant_id': tenantId});
+    invalidateCache();
+    RoomService.invalidateCache();
   }
 
   Future<void> updateResidencyStatus(String tenantId, String status) async {

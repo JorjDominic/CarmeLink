@@ -61,4 +61,45 @@ void main() {
       expect(rect.right, lessThanOrEqualTo(320), reason: title);
     }
   });
+
+  testWidgets('operational page headers stay cursive with legacy opt-out',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: PageFrame(
+          title: 'Rooms',
+          useScriptTitle: false,
+          child: SizedBox(),
+        ),
+      ),
+    );
+
+    final title = tester.widget<Text>(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text('Rooms'),
+      ),
+    );
+
+    expect(title.style?.fontFamily, 'GreatVibes');
+  });
+
+  testWidgets('section headers stay cursive with legacy opt-out',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ElegantHeader(
+            eyebrow: 'Facilities',
+            title: 'Rooms & inspections',
+            useScriptTitle: false,
+          ),
+        ),
+      ),
+    );
+
+    final title = tester.widget<Text>(find.text('Rooms & inspections'));
+
+    expect(title.style?.fontFamily, 'GreatVibes');
+  });
 }

@@ -11,7 +11,9 @@ void main() {
     expect(source, contains('Confirm report addendum'));
     expect(source, contains('Confirm and add'));
     expect(source, contains('if (_saving) return;'));
-    expect(source, contains('onPressed: _saving ? null : _save'));
+    expect(source, contains('onPressed: _saving ? null :'));
+    expect(source, contains('widget.isResolved ? null : _save'));
+    expect(source, contains('if (widget.isResolved) return;'));
     expect(source, contains('createCorrectionRequestId'));
     expect(source, contains('Correction added to the report.'));
   });
@@ -27,7 +29,8 @@ void main() {
     expect(source, contains('r.statusLabel'));
   });
 
-  test('conduct PDF includes live cases, investigation status and evidence', () {
+  test('conduct PDF includes live cases, investigation status and evidence',
+      () {
     final source = File(
       'lib/services/dormitory_report_service.dart',
     ).readAsStringSync();

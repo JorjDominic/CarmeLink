@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -82,9 +83,19 @@ class AppNotificationItem {
 
   String get destinationType {
     final route = routeType?.trim().toLowerCase();
-    return route == null || route.isEmpty
+    final resolved = route == null || route.isEmpty
         ? notificationType.trim().toLowerCase()
         : route;
+    return switch (resolved) {
+      'curfew_pass' ||
+      'curfew_request' ||
+      'late_return' ||
+      'overnight_leave' =>
+        'curfew',
+      'maintenance_report' => 'maintenance',
+      'room_inspection' => 'inspection',
+      _ => resolved,
+    };
   }
 
   String? get destinationId {
@@ -117,6 +128,20 @@ class AppNotificationItem {
 
   factory AppNotificationItem.fromPush(Map<String, dynamic> payload,
       {required String recipientId}) {
+    // FCM transports data as strings; older senders nest record identifiers.
+    final rawData = payload['data'];
+    Map<String, dynamic> nested = const {};
+    if (rawData is Map) {
+      nested = Map<String, dynamic>.from(rawData);
+    } else if (rawData is String) {
+      try {
+        final decoded = jsonDecode(rawData);
+        if (decoded is Map) nested = Map<String, dynamic>.from(decoded);
+      } catch (_) {
+        // A malformed legacy payload still opens readable notification details.
+      }
+    }
+    final merged = {...nested, ...payload};
     return AppNotificationItem(
       id: payload['notification_id']?.toString() ?? '',
       recipientId: recipientId,
@@ -124,19 +149,23 @@ class AppNotificationItem {
       title: payload['title']?.toString() ?? 'CarmeLink update',
       body: payload['body']?.toString() ??
           'Open Notifications to view this update.',
-      routeType: payload['route_type']?.toString(),
-      routeId: payload['route_id']?.toString(),
-      data: Map<String, dynamic>.from(payload),
+      routeType: merged['route_type']?.toString(),
+      routeId: merged['route_id']?.toString(),
+      data: merged,
       createdAt: DateTime.now(),
     );
   }
 }
 
 class AppNotificationService {
-  AppNotificationService._();
+  AppNotificationService._() : _clientOverride = null;
+  AppNotificationService.withClient(SupabaseClient client)
+      : _clientOverride = client;
   static final AppNotificationService instance = AppNotificationService._();
 
-  SupabaseClient? get _client => SupabaseConfig.clientSafe;
+  final SupabaseClient? _clientOverride;
+  SupabaseClient? get _client => _clientOverride ?? SupabaseConfig.clientSafe;
+  final _pendingReadWrites = <String, Future<bool>>{};
 
   /// Low-level dispatcher that invokes the Supabase `send-fcm-notification` Edge Function
   Future<bool> sendNotification({
@@ -792,7 +821,17 @@ class AppNotificationService {
         );
   }
 
-  Future<bool> tryMarkAsRead(String notificationId) async {
+  Future<bool> tryMarkAsRead(String notificationId) {
+    final key = '${_client?.auth.currentUser?.id}:$notificationId';
+    return _pendingReadWrites.putIfAbsent(
+      key,
+      () => _persistRead(notificationId).whenComplete(() {
+        _pendingReadWrites.remove(key);
+      }),
+    );
+  }
+
+  Future<bool> _persistRead(String notificationId) async {
     final client = _client;
     if (client == null) return false;
     try {

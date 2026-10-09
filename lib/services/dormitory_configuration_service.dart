@@ -156,10 +156,15 @@ class DormitoryConfigurationService {
       return;
     }
 
-    await SupabaseConfig.client.from('dormitory_options').update({
-      'label': normalizedLabel,
-      if (groupKey == 'payment_method') 'instructions': instructions.trim(),
-    }).eq('id', existing.id);
+    await SupabaseConfig.client
+        .from('dormitory_options')
+        .update({
+          'label': normalizedLabel,
+          if (groupKey == 'payment_method') 'instructions': instructions.trim(),
+        })
+        .eq('id', existing.id)
+        .select('id')
+        .single();
   }
 
   Future<void> setActive(DormitoryOption option, bool active) async {
@@ -168,7 +173,10 @@ class DormitoryConfigurationService {
     }
     await SupabaseConfig.client
         .from('dormitory_options')
-        .update({'is_active': active}).eq('id', option.id);
+        .update({'is_active': active})
+        .eq('id', option.id)
+        .select('id')
+        .single();
   }
 
   Future<List<String>> maintenanceRoomLocations() async {

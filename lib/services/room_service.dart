@@ -73,15 +73,13 @@ class RoomService {
   }) async {
     final roomNumber = number.trim();
     final floorLabel = floor.trim();
-    if (roomNumber.isEmpty || floorLabel.isEmpty) {
-      throw ArgumentError('Room number and floor are required.');
-    }
-    invalidateCache();
+    validateRoomIdentity(roomNumber, floorLabel);
     await _client.rpc('create_room_with_four_beds', params: {
       'p_room_number': roomNumber,
       'p_floor': floorLabel,
       'p_description': description.trim(),
     });
+    invalidateCache();
   }
 
   Future<void> updateRoom(
@@ -89,18 +87,52 @@ class RoomService {
       required String number,
       required String floor,
       required String description}) async {
+    validateRoomIdentity(number, floor);
+    await _client
+        .from('rooms')
+        .update({
+          'room_number': number.trim(),
+          'floor': floor.trim(),
+          'capacity': 4,
+          'description': description.trim()
+        })
+        .eq('id', id)
+        .select('id')
+        .single();
     invalidateCache();
-    await _client.from('rooms').update({
-      'room_number': number.trim(),
-      'floor': floor.trim(),
-      'capacity': 4,
-      'description': description.trim()
-    }).eq('id', id);
   }
 
   Future<void> deleteRoom(String id) async {
+    await _client.rpc('safe_delete_room', params: {'p_room_id': id});
     invalidateCache();
-    await setRoomActive(id, false);
+  }
+
+  Future<List<String>> listFloors() async {
+    final rows = await _client.from('room_floors').select('name').order('name');
+    return rows.map((row) => row['name'] as String).toList();
+  }
+
+  Future<void> createFloor(String name) async {
+    validateFloorName(name);
+    await _client.rpc('create_room_floor', params: {'p_name': name.trim()});
+  }
+
+  Future<void> deleteFloor(String name) async {
+    await _client.rpc('safe_delete_room_floor', params: {'p_name': name});
+    invalidateCache();
+  }
+
+  Future<int> manageFloor(String from, String to, int expectedCount,
+      {bool merge = false}) async {
+    validateFloorName(to);
+    final result = await _client.rpc('manage_room_floor', params: {
+      'p_from': from,
+      'p_to': to.trim(),
+      'p_expected_count': expectedCount,
+      'p_merge': merge,
+    });
+    invalidateCache();
+    return (result as num).toInt();
   }
 
   Future<int> renameFloor(String from, String to, int expectedCount) async {
@@ -114,7 +146,12 @@ class RoomService {
   }
 
   Future<void> setRoomActive(String id, bool active) async {
-    await _client.from('rooms').update({'is_active': active}).eq('id', id);
+    await _client
+        .from('rooms')
+        .update({'is_active': active})
+        .eq('id', id)
+        .select('id')
+        .single();
     invalidateCache();
   }
 
@@ -299,6 +336,36 @@ class BedRecord {
 String roomServiceError(Object error) {
   final message =
       error is PostgrestException ? error.message : error.toString();
+  if (message.contains('room_floors') &&
+      (message.contains('Could not find the table') ||
+          message.contains('does not exist'))) {
+    return 'The floor registry is unavailable in the database API. Verify the Phase 3 migration and schema cache, then retry.';
+  }
+  if (message.contains('permission denied') ||
+      message.contains('row-level security')) {
+    return 'Room/floor access was denied. Verify the signed-in role and existing database grants/RLS; do not bypass them.';
+  }
+  if (error is PostgrestException && error.code == 'PGRST202') {
+    return 'A room/floor database function is unavailable. Verify the Phase 3 RPCs and schema cache, then retry.';
+  }
+  if (message.contains('room_floors_normalized_name') ||
+      message.contains('room_floors_pkey') ||
+      message.contains('Floor name already exists')) {
+    return 'That floor name already exists. Choose another name or use Merge floor.';
+  }
+  if (message.contains('rooms_floor_registry_fkey')) {
+    return 'Choose an existing floor. Add it in Manage floors first.';
+  }
+  if (message.contains('dependent records')) {
+    return 'This room has linked or historical records. Archive it instead of deleting it.';
+  }
+  if (message.contains('Move or delete all rooms')) {
+    return 'Move or delete all rooms first, including archived rooms. No rooms will be deleted automatically.';
+  }
+  if (message.contains('Floor rooms changed') ||
+      message.contains('unavailable. Refresh')) {
+    return 'The room or floor changed. Refresh and review again.';
+  }
   if (message.contains('Room number already exists') ||
       message.contains('duplicate key')) {
     return 'That room number already exists.';
@@ -322,4 +389,17 @@ String roomServiceError(Object error) {
     return 'An occupied bed cannot be changed or removed.';
   }
   return 'Unable to save room data. Check the values and your connection.';
+}
+
+void validateFloorName(String name) {
+  if (name.trim().isEmpty || name.trim().length > 60) {
+    throw ArgumentError('Use 1 to 60 characters for the floor name.');
+  }
+}
+
+void validateRoomIdentity(String number, String floor) {
+  if (number.trim().isEmpty || number.trim().length > 40) {
+    throw ArgumentError('Use 1 to 40 characters for the room number / name.');
+  }
+  validateFloorName(floor);
 }

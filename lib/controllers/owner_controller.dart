@@ -599,6 +599,7 @@ class OwnerController extends ChangeNotifier {
       reportId: report.id,
       status: status,
       notes: notes,
+      originalReport: report,
     );
     final index = _concerns.indexWhere((item) => item.id == report.id);
     if (index >= 0) _concerns[index] = updated;

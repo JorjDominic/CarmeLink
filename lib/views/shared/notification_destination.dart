@@ -3,16 +3,25 @@ import 'package:flutter/material.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/app_notification_service.dart';
+import '../../services/room_inspection_service.dart';
+import '../../core/config/supabase_config.dart';
 import '../guardian/guardian_pages.dart';
+import '../guardian/guardian_documents_page.dart';
 import '../owner/owner_pages.dart';
 import '../owner/room_monitoring_page.dart';
 import '../owner/staff_maintenance_page.dart';
 import '../tenant/tenant_pages.dart';
+import '../tenant/tenant_requirements_page.dart';
 import 'conduct_case_pages.dart';
 import 'cleaning_report_detail.dart';
 import 'room_inspection_pages.dart';
 import 'staff_message_contacts.dart';
 import 'staff_curfew_requests_page.dart';
+import 'employee_curfew_profile_pages.dart';
+import 'cleaning_schedule_management_page.dart';
+import 'move_out_settlement_page.dart';
+import 'shared_views.dart';
+import '../owner/guardian_link_management_page.dart';
 
 /// Shared by the inbox, foreground alerts, and mobile push taps.
 Widget notificationDestination(AppNotificationItem item, UserRole role) {
@@ -48,7 +57,16 @@ Widget notificationDestination(AppNotificationItem item, UserRole role) {
       'guardian_presence_alert' ||
       'location_status_request' =>
         const GeofenceMonitoringPage(),
-      'inspection' => const RoomMonitoringPage(),
+      'inspection' => id == null
+          ? const RoomMonitoringPage()
+          : NotificationInspectionPage(inspectionId: id),
+      'employee_curfew' => const EmployeeCurfewProfilesPage(),
+      'cleaning_schedule' => const CleaningScheduleManagementPage(),
+      'room_assignment' => const RoomMonitoringPage(),
+      'move_out' => const MoveOutSettlementPage(),
+      'guardian_link' => role == UserRole.owner
+          ? const GuardianLinkManagementPage()
+          : const TenantDirectoryPage(),
       'announcement' => const AnnouncementsManagementPage(),
       'onboarding' => const TenantDirectoryPage(),
       _ => null,
@@ -69,6 +87,12 @@ Widget notificationDestination(AppNotificationItem item, UserRole role) {
       'location_settings' =>
         const TenantPresencePage(),
       'inspection' => const TenantRoomInspectionsPage(),
+      'employee_curfew' => const TenantPresencePage(),
+      'cleaning_schedule' => const MyRoomPage(),
+      'room_assignment' => const MyRoomPage(),
+      'guardian_link' => const ProfilePage(),
+      'move_out' => const MoveOutSettlementPage(),
+      'onboarding' => const TenantRequirementsPage(),
       'announcement' => const TenantAnnouncementsPage(),
       _ => null,
     };
@@ -84,12 +108,66 @@ Widget notificationDestination(AppNotificationItem item, UserRole role) {
       'location_status_request' =>
         const GuardianPresenceMonitoringPage(initialSegment: 1),
       'announcement' => const GuardianAnnouncementsPage(),
+      'guardian_link' || 'room_assignment' => const GuardianTenantInfoPage(),
+      'onboarding' => const GuardianDocumentsPage(),
       _ => null,
     };
   }
   return page == null
       ? NotificationDetailsPage(notification: item)
       : NotificationTarget(route: route, recordId: id, child: page);
+}
+
+/// Fetches through the caller's RLS-protected session, never an admin client.
+class NotificationInspectionPage extends StatefulWidget {
+  const NotificationInspectionPage({required this.inspectionId, super.key});
+  final String inspectionId;
+
+  @override
+  State<NotificationInspectionPage> createState() =>
+      _NotificationInspectionPageState();
+}
+
+class _NotificationInspectionPageState
+    extends State<NotificationInspectionPage> {
+  late final _inspection = _load();
+
+  Future<(RoomInspectionRecord, String)?> _load() async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null) throw StateError('Please sign in again.');
+    final row = await client
+        .from('room_inspections')
+        .select('*, room:rooms(room_number)')
+        .eq('id', widget.inspectionId)
+        .maybeSingle();
+    if (row == null) return null;
+    return (
+      RoomInspectionRecord.fromRow(row),
+      (row['room'] as Map?)?['room_number']?.toString() ?? 'Unavailable'
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      FutureBuilder<(RoomInspectionRecord, String)?>(
+        future: _inspection,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const PageFrame(
+                title: 'Inspection',
+                child: Center(child: CircularProgressIndicator()));
+          }
+          final record = snapshot.data;
+          if (snapshot.hasError || record == null) {
+            return const PageFrame(
+                title: 'Inspection unavailable',
+                child: Text(
+                    'This inspection is unavailable or you do not have access. Please return to Notifications and retry.'));
+          }
+          return StaffInspectionDetailPage(
+              inspection: record.$1, roomNumber: record.$2);
+        },
+      );
 }
 
 /// Keeps a notification's record selected even when it is already archived.

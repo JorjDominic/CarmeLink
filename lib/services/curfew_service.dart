@@ -10,7 +10,7 @@ class CurfewService {
   static const String _columns =
       'id, tenant_id, destination, reason, departure_time, expected_return_time, '
       'status, request_type, guardian_id, guardian_decision, guardian_remarks, guardian_decided_at, '
-      'staff_id, staff_decision, staff_notes, staff_decided_at, created_at, updated_at';
+      'staff_id, staff_decision, staff_notes, staff_decided_at, actual_return_time, created_at, updated_at';
 
   static const String columnsWithTenant =
       '$_columns, tenant:profiles!curfew_requests_tenant_id_fkey(full_name)';
@@ -23,19 +23,15 @@ class CurfewService {
     final tenantId = client.auth.currentUser?.id;
     if (tenantId == null) return const [];
 
-    try {
-      final rows = await client
-          .from('curfew_requests')
-          .select(_columns)
-          .eq('tenant_id', tenantId)
-          .order('departure_time', ascending: false);
+    final rows = await client
+        .from('curfew_requests')
+        .select(_columns)
+        .eq('tenant_id', tenantId)
+        .order('departure_time', ascending: false);
 
-      return rows
-          .map<CurfewRequest>((row) => CurfewRequest.fromJson(row))
-          .toList(growable: false);
-    } catch (_) {
-      return const [];
-    }
+    return rows
+        .map<CurfewRequest>((row) => CurfewRequest.fromJson(row))
+        .toList(growable: false);
   }
 
   /// Submits a new curfew exception request as a tenant.
@@ -101,18 +97,14 @@ class CurfewService {
     final client = SupabaseConfig.clientSafe;
     if (client == null) return const [];
 
-    try {
-      final rows = await client
-          .from('curfew_requests')
-          .select(columnsWithTenant)
-          .order('departure_time', ascending: false);
+    final rows = await client
+        .from('curfew_requests')
+        .select(columnsWithTenant)
+        .order('departure_time', ascending: false);
 
-      return rows
-          .map<CurfewRequest>((row) => CurfewRequest.fromJson(row))
-          .toList(growable: false);
-    } catch (_) {
-      return const [];
-    }
+    return rows
+        .map<CurfewRequest>((row) => CurfewRequest.fromJson(row))
+        .toList(growable: false);
   }
 
   Future<CurfewRequest?> getStaffRequestById(String requestId) async {
@@ -157,26 +149,59 @@ class CurfewService {
     return request;
   }
 
+  /// Staff confirms an observed return; changing an expected time alone never
+  /// counts as an actual arrival. Database triggers enforce staff-only access.
+  Future<CurfewRequest> recordVerifiedReturn({
+    required String requestId,
+    required DateTime actualReturnTime,
+  }) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null) throw Exception('Database client not available');
+    final row = await client
+        .from('curfew_requests')
+        .update(
+            {'actual_return_time': actualReturnTime.toUtc().toIso8601String()})
+        .eq('id', requestId)
+        .select(columnsWithTenant)
+        .single();
+    return CurfewRequest.fromJson(row);
+  }
+
+  /// Only approved late returns can be rescheduled by staff. The database
+  /// rejects changes to guardian-approved overnight leave requests.
+  Future<CurfewRequest> updateLateReturnExpectedTime({
+    required String requestId,
+    required DateTime expectedReturnTime,
+  }) async {
+    final client = SupabaseConfig.clientSafe;
+    if (client == null) throw Exception('Database client not available');
+    final row = await client
+        .from('curfew_requests')
+        .update({
+          'expected_return_time': expectedReturnTime.toUtc().toIso8601String()
+        })
+        .eq('id', requestId)
+        .select(columnsWithTenant)
+        .single();
+    return CurfewRequest.fromJson(row);
+  }
+
   /// Lists curfew requests for the guardian's linked resident(s).
   Future<List<CurfewRequest>> listGuardianRequests({String? tenantId}) async {
     final client = SupabaseConfig.clientSafe;
     if (client == null) return const [];
 
-    try {
-      var query = client.from('curfew_requests').select(columnsWithTenant);
+    var query = client.from('curfew_requests').select(columnsWithTenant);
 
-      if (tenantId != null && tenantId.trim().isNotEmpty) {
-        query = query.eq('tenant_id', tenantId.trim());
-      }
-
-      final rows = await query.order('departure_time', ascending: false);
-
-      return rows
-          .map<CurfewRequest>((row) => CurfewRequest.fromJson(row))
-          .toList(growable: false);
-    } catch (_) {
-      return const [];
+    if (tenantId != null && tenantId.trim().isNotEmpty) {
+      query = query.eq('tenant_id', tenantId.trim());
     }
+
+    final rows = await query.order('departure_time', ascending: false);
+
+    return rows
+        .map<CurfewRequest>((row) => CurfewRequest.fromJson(row))
+        .toList(growable: false);
   }
 
   /// Guardian decision on an overnight leave request (endorse/approve or decline/reject with remarks).

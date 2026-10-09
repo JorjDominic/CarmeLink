@@ -1494,7 +1494,11 @@ class CurfewRequest {
   bool get isApproved => status == 'approved';
   bool get isRejected => status == 'rejected';
   bool get isCancelled => status == 'cancelled';
-  bool get isCompleted => status == 'completed';
+  bool get isCompleted => status == 'completed' || actualReturnTime != null;
+  bool get isOverdue =>
+      status == 'approved' &&
+      actualReturnTime == null &&
+      DateTime.now().isAfter(expectedReturnTime);
 
   bool get canCancel =>
       status == 'pending_guardian' || status == 'pending_staff';
@@ -1502,6 +1506,7 @@ class CurfewRequest {
   bool get canReviewStaff => status == 'pending_staff';
 
   String get statusLabel {
+    if (actualReturnTime != null) return 'Returned';
     switch (status) {
       case 'pending_guardian':
         return 'Awaiting Guardian';

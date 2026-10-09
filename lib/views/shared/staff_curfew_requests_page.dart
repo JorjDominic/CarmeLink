@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../controllers/owner_controller.dart';
@@ -20,6 +22,8 @@ class StaffCurfewRequestsPage extends StatefulWidget {
 class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
   final _processing = <String>{};
   final _service = const CurfewService();
+  String _requestTypeFilter = 'all';
+  Timer? _clockTimer;
   late final TableRefreshSubscription _subscription;
 
   CurfewRequest? _targetRequest;
@@ -37,6 +41,9 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
     if (explicit != null && explicit.isNotEmpty) _targetId = explicit;
     _targetLoading = _hasTarget;
     _refresh();
+    _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
     _subscription = TableRefreshSubscription(
       'staff-curfew-acknowledgments',
       const ['curfew_requests', 'guardian_tenant_links'],
@@ -63,6 +70,7 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
 
   @override
   void dispose() {
+    _clockTimer?.cancel();
     _subscription.dispose();
     super.dispose();
   }
@@ -149,6 +157,147 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
     }
   }
 
+  Future<DateTime?> _pickDateTime({
+    required DateTime initial,
+    required DateTime earliest,
+    required DateTime latest,
+  }) async {
+    final firstDay = DateTime(earliest.year, earliest.month, earliest.day);
+    final lastDay = DateTime(latest.year, latest.month, latest.day);
+    final initialDay = DateTime(initial.year, initial.month, initial.day);
+    final safeDay = initialDay.isBefore(firstDay)
+        ? firstDay
+        : initialDay.isAfter(lastDay)
+            ? lastDay
+            : initialDay;
+    final date = await showDatePicker(
+      context: context,
+      initialDate: safeDay,
+      firstDate: firstDay,
+      lastDate: lastDay,
+    );
+    if (date == null || !mounted) return null;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null || !mounted) return null;
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  Future<void> _recordReturn(CurfewRequest request) async {
+    if (_processing.contains(request.id)) return;
+    final now = DateTime.now();
+    if (request.departureTime.isAfter(now)) {
+      showAppSnackBar(context, 'Departure has not started yet.');
+      return;
+    }
+    final time = await _pickDateTime(
+      initial: request.actualReturnTime ?? now,
+      earliest: request.departureTime,
+      latest: now,
+    );
+    if (time == null || !mounted) return;
+    if (time.isBefore(request.departureTime) || time.isAfter(DateTime.now())) {
+      showAppSnackBar(context,
+          'Return time must be after departure and not in the future.');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(request.actualReturnTime == null
+            ? 'Confirm actual return?'
+            : 'Correct recorded return?'),
+        content: Text(
+          'Have you verified ${request.tenantName ?? 'the tenant'} returned '
+          'at ${_dateTime(time)}? This is a staff-confirmed record, '
+          'not an automatic geofence confirmation.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save return'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _processing.add(request.id));
+    try {
+      final updated = await _service.recordVerifiedReturn(
+        requestId: request.id,
+        actualReturnTime: time,
+      );
+      if (!mounted) return;
+      if (_targetRequest?.id == updated.id) {
+        setState(() => _targetRequest = updated);
+      }
+      await _refresh(showSpinner: false);
+      if (mounted) showAppSnackBar(context, 'Verified return recorded.');
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Could not save return: $error');
+    } finally {
+      if (mounted) setState(() => _processing.remove(request.id));
+    }
+  }
+
+  Future<void> _editExpectedReturn(CurfewRequest request) async {
+    if (_processing.contains(request.id)) return;
+    final time = await _pickDateTime(
+      initial: request.expectedReturnTime,
+      earliest: request.departureTime,
+      latest: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (time == null || !mounted) return;
+    if (!time.isAfter(request.departureTime)) {
+      showAppSnackBar(context, 'Expected return must be after departure.');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Update expected return?'),
+        content: Text('Change the late-return deadline to ${_dateTime(time)}? '
+            'The tenant and linked guardian will be notified. '
+            'This does not record an actual return.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save schedule'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _processing.add(request.id));
+    try {
+      final updated = await _service.updateLateReturnExpectedTime(
+        requestId: request.id,
+        expectedReturnTime: time,
+      );
+      if (!mounted) return;
+      if (_targetRequest?.id == updated.id) {
+        setState(() => _targetRequest = updated);
+      }
+      await _refresh(showSpinner: false);
+      if (mounted) showAppSnackBar(context, 'Expected return updated.');
+    } catch (error) {
+      if (mounted)
+        showAppSnackBar(context, 'Could not update schedule: $error');
+    } finally {
+      if (mounted) setState(() => _processing.remove(request.id));
+    }
+  }
+
   String _dateTime(DateTime value) {
     final local = value.toLocal();
     final hour = local.hour == 0
@@ -176,7 +325,7 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
                       ),
                 ),
               ),
-              StatusPill(request.statusLabel),
+              StatusPill(request.isOverdue ? 'Overdue' : request.statusLabel),
             ],
           ),
           const SizedBox(height: 10),
@@ -189,8 +338,22 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
             Text(
               'Guardian decision: ${request.guardianDecision == 'approved' ? 'Approved' : 'Declined'}',
             ),
-            if ((request.guardianRemarks ?? '').trim().isNotEmpty)
-              Text('Guardian remarks: ${request.guardianRemarks}'),
+          ],
+          if ((request.guardianRemarks ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Guardian notes: ${request.guardianRemarks}'),
+          ],
+          if (request.staffDecision != null)
+            Text(
+                'Staff decision: ${request.staffDecision == 'approved' ? 'Approved' : 'Declined'}'),
+          if ((request.staffNotes ?? '').trim().isNotEmpty)
+            Text('Staff notes: ${request.staffNotes}'),
+          if (request.actualReturnTime != null)
+            Text('Verified return: ${_dateTime(request.actualReturnTime!)}'),
+          if (request.isOverdue) ...[
+            const SizedBox(height: 8),
+            const Text(
+                'Expected return has passed; no return has been recorded yet.'),
           ],
           if (request.canReviewStaff) ...[
             if (request.isOvernightLeave) ...[
@@ -216,11 +379,39 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
                 ),
               ],
             ),
-          ] else ...[
+          ] else if (!request.isApproved && !request.isCompleted) ...[
             const SizedBox(height: 10),
             Text(
               'This request no longer needs a staff decision. The record remains available for review.',
               style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+          if (request.status == 'approved') ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _processing.contains(request.id) ||
+                          (request.actualReturnTime == null &&
+                              request.departureTime.isAfter(DateTime.now()))
+                      ? null
+                      : () => _recordReturn(request),
+                  icon: const Icon(Icons.assignment_turned_in_outlined),
+                  label: Text(request.actualReturnTime == null
+                      ? 'Record return'
+                      : 'Edit recorded return'),
+                ),
+                if (request.isLateReturn && request.actualReturnTime == null)
+                  OutlinedButton.icon(
+                    onPressed: _processing.contains(request.id)
+                        ? null
+                        : () => _editExpectedReturn(request),
+                    icon: const Icon(Icons.edit_calendar_outlined),
+                    label: const Text('Edit expected return'),
+                  ),
+              ],
             ),
           ],
         ],
@@ -292,13 +483,35 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
         ],
         child: _hasTarget && !_showAll
             ? _targetBody()
-            : ListView(
-                padding: const EdgeInsets.all(16),
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
                     'Staff acknowledges late returns. A linked guardian acknowledges overnight leave; staff acts as the fallback when no guardian is linked.',
                   ),
                   const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final filter in const [
+                        'all',
+                        'late_return',
+                        'overnight_leave'
+                      ])
+                        ChoiceChip(
+                          label: Text(switch (filter) {
+                            'late_return' => 'Late Return',
+                            'overnight_leave' => 'Overnight Leave',
+                            _ => 'All Requests',
+                          }),
+                          selected: _requestTypeFilter == filter,
+                          onSelected: (_) =>
+                              setState(() => _requestTypeFilter = filter),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   if (controller.curfewLoading) const LinearProgressIndicator(),
                   if (controller.curfewError != null) ...[
                     const SizedBox(height: 8),
@@ -312,7 +525,21 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
                       message:
                           'Late-return and overnight-leave requests will appear here.',
                     ),
-                  for (final request in controller.curfewRequests) ...[
+                  if (!controller.curfewLoading &&
+                      controller.curfewRequests.isNotEmpty &&
+                      !controller.curfewRequests.any((request) =>
+                          _requestTypeFilter == 'all' ||
+                          request.requestType == _requestTypeFilter))
+                    const EmptyState(
+                      icon: Icons.filter_alt_off_outlined,
+                      title: 'No matching requests',
+                      message: 'Try another request type filter.',
+                    ),
+                  for (final request in controller.curfewRequests.where(
+                    (request) =>
+                        _requestTypeFilter == 'all' ||
+                        request.requestType == _requestTypeFilter,
+                  )) ...[
                     _requestCard(request),
                     const SizedBox(height: 10),
                   ],
