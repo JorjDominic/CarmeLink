@@ -78,8 +78,8 @@ void main() {
       // Total collected: pay-3 (4000.0)
       expect(controller.totalCollectedRevenue, equals(4000.0));
 
-      // Total outstanding: Due (4000.0) + Pending (600.0) = 4600.0
-      expect(controller.totalOutstandingRevenue, equals(4600.0));
+      // Due (4000) + pending utility (600) + rejected internet proof (300).
+      expect(controller.totalOutstandingRevenue, equals(4900.0));
 
       // Pending proofs: pay-2
       expect(controller.pendingPaymentProofs, equals(1));

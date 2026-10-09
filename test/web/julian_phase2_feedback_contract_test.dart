@@ -27,14 +27,13 @@ void main() {
       expect(wideBar.contains("tooltip: 'Account'"), isFalse);
     });
 
-    test('staff back and logout require confirmation before landing', () {
+    test('staff logout requires confirmation before landing', () {
       final source = File(
         'lib/web/dashboard/staff_workspace_page.dart',
       ).readAsStringSync();
 
-      expect(source.contains('PopScope('), isTrue);
-      expect(source.contains('canPop: false'), isTrue);
-      expect(source.contains('Return to landing page?'), isTrue);
+      expect(source.contains('if (!await _confirmLogout(context)) return;'),
+          isTrue);
       expect(source.contains("title: const Text('Logout?')"), isTrue);
       expect(source.contains('await SessionController.instance.signOut()'),
           isTrue);

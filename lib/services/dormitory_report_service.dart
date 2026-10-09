@@ -1,3 +1,4 @@
+import '../core/utils/financial_snapshot.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
@@ -224,34 +225,12 @@ class DormitoryReportService {
     final controller = OwnerController.instance;
     final payments = controller.payments;
 
-    double totalPaid = 0;
-    double totalPending = 0;
-    double totalDue = 0;
-
-    for (final p in payments) {
-      final s = p.status.toLowerCase();
-      if (s == 'verified' || s == 'paid') {
-        totalPaid += p.amount;
-      } else if (s.contains('pending')) {
-        totalPending += p.amount;
-      } else {
-        totalDue += p.amount;
-      }
-    }
-
-    final rentPaid = payments
-        .where((p) =>
-            p.category.toLowerCase() == 'rent' &&
-            (p.status.toLowerCase() == 'verified' ||
-                p.status.toLowerCase() == 'paid'))
-        .fold<double>(0, (sum, p) => sum + p.amount);
-
-    final utilityPaid = payments
-        .where((p) =>
-            p.category.toLowerCase() != 'rent' &&
-            (p.status.toLowerCase() == 'verified' ||
-                p.status.toLowerCase() == 'paid'))
-        .fold<double>(0, (sum, p) => sum + p.amount);
+    final financial = FinancialSnapshot(payments);
+    final totalPaid = financial.collected;
+    final totalPending = financial.pending;
+    final totalDue = financial.outstanding;
+    final rentPaid = financial.rentCollected;
+    final utilityPaid = financial.utilityCollected;
 
     pdf.addPage(
       pw.MultiPage(
@@ -294,7 +273,7 @@ class DormitoryReportService {
           ),
           pw.SizedBox(height: 16),
 
-          pw.Text('ITEMIZED PAYMENT LEDGER',
+          pw.Text('ITEMIZED BILLING SUMMARY',
               style: pw.TextStyle(
                   fontSize: 9,
                   fontWeight: pw.FontWeight.bold,
@@ -307,13 +286,17 @@ class DormitoryReportService {
               'Category',
               'Due Date',
               'Method',
-              'Amount',
+              'Bill Amount',
+              'Verified Cash',
+              'Balance',
               'Status'
             ],
             data: payments.isEmpty
                 ? [
                     [
-                      'No payment transactions recorded in the current ledger',
+                      'No billing charges recorded in the current ledger',
+                      '',
+                      '',
                       '',
                       '',
                       '',
@@ -330,8 +313,10 @@ class DormitoryReportService {
                           p.tenantName ?? 'Resident',
                           p.category.toUpperCase(),
                           _formatDate(p.dueDate),
-                          p.paymentMethod ?? 'Direct/Cash',
+                          p.paymentMethod ?? 'Not recorded',
                           _formatCurrency(p.amount),
+                          _formatCurrency(p.collectedAmount),
+                          _formatCurrency(p.isVoided ? 0 : p.outstandingAmount),
                           p.status,
                         ])
                     .toList(),
@@ -980,16 +965,9 @@ class DormitoryReportService {
         : '0';
 
     final payments = controller.payments;
-    final totalPaid = payments
-        .where((p) =>
-            p.status.toLowerCase() == 'verified' ||
-            p.status.toLowerCase() == 'paid')
-        .fold<double>(0, (sum, p) => sum + p.amount);
-    final totalDue = payments
-        .where((p) =>
-            p.status.toLowerCase() != 'verified' &&
-            p.status.toLowerCase() != 'paid')
-        .fold<double>(0, (sum, p) => sum + p.amount);
+    final financial = FinancialSnapshot(payments);
+    final totalPaid = financial.collected;
+    final totalDue = financial.outstanding;
 
     final maintenance = controller.staffMaintenanceReports;
     final openIssues = maintenance.where((m) => m.isOpen).length;

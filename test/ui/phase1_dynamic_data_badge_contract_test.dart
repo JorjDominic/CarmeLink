@@ -4,18 +4,23 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Phase 1 dynamic data and compact badge contract', () {
-    test('sidebar counts stay attached to icons instead of stretching rows', () {
+    test('sidebar counts stay attached to icons instead of stretching rows',
+        () {
       final adaptive = File(
         'lib/core/widgets/adaptive_shell.dart',
       ).readAsStringSync();
 
       expect(adaptive.contains('class _MenuIconWithBadge'), isTrue);
-      expect(adaptive.contains("key: const Key('web-staff-messages')"), isTrue);
-      expect(adaptive.contains("key: const Key('web-staff-notifications')"), isTrue);
+      final chrome =
+          File('lib/web/dashboard/widgets/staff_workspace_chrome.dart')
+              .readAsStringSync();
+      expect(chrome.contains("Key('staff-workspace-messages')"), isTrue);
+      expect(chrome.contains("Key('staff-workspace-notifications')"), isTrue);
       expect(adaptive.contains('leading: _MenuIconWithBadge('), isTrue);
       expect(adaptive.contains('textAlign: TextAlign.center'), isTrue);
       expect(adaptive.contains('trailing: unreadMessageCount > 0'), isFalse);
-      expect(adaptive.contains('trailing: unreadNotificationCount > 0'), isFalse);
+      expect(
+          adaptive.contains('trailing: unreadNotificationCount > 0'), isFalse);
     });
 
     test('table subscriptions have realtime plus bounded catch-up refresh', () {
@@ -24,16 +29,20 @@ void main() {
       ).readAsStringSync();
 
       expect(source.contains('onPostgresChanges('), isTrue);
-      expect(source.contains('catchUpInterval = const Duration(seconds: 30)'), isTrue);
+      expect(source.contains('catchUpInterval = const Duration(seconds: 30)'),
+          isTrue);
       expect(source.contains('Timer.periodic('), isTrue);
       expect(source.contains('_catchUpTimer?.cancel()'), isTrue);
     });
 
     test('role shells keep primary controller-backed data live', () {
-      final tenant = File('lib/views/tenant/tenant_shell.dart').readAsStringSync();
+      final tenant =
+          File('lib/views/tenant/tenant_shell.dart').readAsStringSync();
       final owner = File('lib/views/owner/owner_shell.dart').readAsStringSync();
-      final caretaker = File('lib/views/caretaker/caretaker_shell.dart').readAsStringSync();
-      final guardian = File('lib/controllers/guardian_controller.dart').readAsStringSync();
+      final caretaker =
+          File('lib/views/caretaker/caretaker_shell.dart').readAsStringSync();
+      final guardian =
+          File('lib/controllers/guardian_controller.dart').readAsStringSync();
 
       expect(tenant.contains("'tenant-shell-live-data'"), isTrue);
       expect(tenant.contains('loadPayments(force: true)'), isTrue);
@@ -85,7 +94,8 @@ void main() {
       for (final entry in files.entries) {
         final source = File(entry.key).readAsStringSync();
         for (final token in entry.value) {
-          expect(source.contains(token), isTrue, reason: '${entry.key}: $token');
+          expect(source.contains(token), isTrue,
+              reason: '${entry.key}: $token');
         }
       }
     });

@@ -41,7 +41,7 @@ void main() {
     });
 
     test(
-        'web staff sidebar exposes grouped desktop tools while Operations remains available',
+        'web staff sidebar exposes grouped desktop tools and Operations tools remain available',
         () {
       final shell = File(
         'lib/web/dashboard/staff_web_portal_shell.dart',
@@ -49,7 +49,7 @@ void main() {
       final owner = File('lib/views/owner/owner_pages.dart').readAsStringSync();
 
       expect(shell.contains("label: 'Residents'"), isTrue);
-      expect(shell.contains("label: 'Operations'"), isTrue);
+      expect(owner.contains('class OperationsHubPage'), isTrue);
       expect(
         shell.contains(
             'static List<AppDestination> desktopTools(UserRole role)'),

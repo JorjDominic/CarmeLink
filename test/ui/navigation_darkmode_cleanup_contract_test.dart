@@ -40,12 +40,12 @@ void main() {
       expect(helper.contains('pushAndRemoveUntil('), isTrue);
       expect(helper.contains('(route) => route.isFirst'), isTrue);
       expect(
-          source.contains(
-              "_openWebCommunicationPage(\n        _notificationsPage(),"),
+          RegExp(r'_openWebCommunicationPage\(\s*_notificationsPage\(\),')
+              .hasMatch(source),
           isTrue);
       expect(
-          source.contains(
-              "_openWebCommunicationPage(\n        widget.messagePage,"),
+          RegExp(r'_openWebCommunicationPage\(\s*widget\.messagePage,')
+              .hasMatch(source),
           isTrue);
     });
 

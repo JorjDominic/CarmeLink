@@ -96,6 +96,8 @@ try{
   await db.exec(source('202610090005_deposit_charge_settlement.sql'));
   await db.exec(source('202610090006_signed_room_transfers.sql'));
   await db.exec(source('202610090007_owner_eviction_workflow.sql'));
+  await db.exec(source('202610090009_system_qa_verified_collection_totals.sql'));
+  await db.exec(source('202610090010_system_qa_partial_payment_proof_visibility.sql'));
   await db.query("insert into profiles values($1,'Owner','owner'),($2,'Caretaker','caretaker'),($3,'Stranger','tenant'),($4,'Guardian','guardian')",[owner,caretaker,stranger,guardian]);
   await actor(owner,'owner');
   const f=await fixture(),e=await decision(f), original=(await row('select to_jsonb(c) s from tenant_contracts c where id=$1',[f.c])).s;
@@ -206,8 +208,10 @@ try{
     await settle(m,0,3500);
     await assert.rejects(close(e),/Outstanding tenant-payable/);
     const b=await row('select billing_charge_id from move_out_deductions where id=$1',[d]);
+    assert.equal(Number((await row('select verified_amount from billing_charge_summaries where id=$1',[b.billing_charge_id])).verified_amount),0);
     await db.query(`insert into payment_transactions(charge_id,contract_id,tenant_id,amount,status,submitted_by,reviewed_by,reviewed_at)
       values($1,$2,$3,500,'verified',$3,$4,now())`,[b.billing_charge_id,f.c,f.who,owner]);
+    assert.equal(Number((await row('select verified_amount from billing_charge_summaries where id=$1',[b.billing_charge_id])).verified_amount),500);
     await close(e);
     assert.equal((await eviction(e)).status,'closed');
     assert.equal((await row('select ends_on::text d from tenant_assignments where id=$1',[f.a])).d,await today());
@@ -263,6 +267,22 @@ try{
     const m=(await row("select create_move_out_case($1,current_date,current_date+30,'Later voluntary departure') id",[f.who])).id;
     assert.equal((await row('select contract_id from move_out_cases where id=$1',[m])).contract_id,c);
     await actor(owner,'owner');
+  });
+  await check('verified collection totals preserve partial cash after audited bill credits',async()=>{
+    const f=await fixture(),b=id(sequence++);
+    await db.query("insert into billing_charges(id,contract_id,tenant_id,category,title,original_amount,due_date,source) values($1,$2,$3,'rent','Cash total fixture',100,current_date,'manual')",[b,f.c,f.who]);
+    await db.query("insert into payment_transactions(charge_id,contract_id,tenant_id,amount,status,submitted_by,reviewed_by,reviewed_at) values($1,$2,$3,40,'verified',$3,$4,now())",[b,f.c,f.who,owner]);
+    await db.query("insert into billing_charge_actions(charge_id,action_type,amount_delta,reason,created_by) values($1,'credit',-10,'Owner documented billing credit',$2)",[b,owner]);
+    const summary=await row('select amount,remaining_balance,verified_amount from billing_charge_summaries where id=$1',[b]);
+    assert.deepEqual(summary,{amount:'90.00',remaining_balance:'50.00',verified_amount:'40.00'});
+  });
+  await check('a new proof stays in owner review after earlier partial cash payment',async()=>{
+    const f=await fixture(),b=id(sequence++);
+    await db.query("insert into billing_charges(id,contract_id,tenant_id,category,title,original_amount,due_date,source) values($1,$2,$3,'rent','Partial proof fixture',100,current_date,'manual')",[b,f.c,f.who]);
+    await db.query("insert into payment_transactions(charge_id,contract_id,tenant_id,amount,status,submitted_by,reviewed_by,reviewed_at,submitted_at) values($1,$2,$3,40,'verified',$3,$4,now(),now()-interval '1 minute')",[b,f.c,f.who,owner]);
+    await db.query("insert into payment_transactions(charge_id,contract_id,tenant_id,amount,status,submitted_by) values($1,$2,$3,20,'pending_verification',$3)",[b,f.c,f.who]);
+    const summary=await row('select status,remaining_balance,verified_amount,submitted_amount from billing_charge_summaries where id=$1',[b]);
+    assert.deepEqual(summary,{status:'pending_verification',remaining_balance:'60.00',verified_amount:'40.00',submitted_amount:'20.00'});
   });
   console.log(`${passed} eviction PostgreSQL checks passed.`);
 }catch(e){console.error(e.message,e.where??'',e.query??'');process.exitCode=1;}

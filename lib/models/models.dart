@@ -114,6 +114,7 @@ class Payment {
     this.reviewNotes,
     this.contractId,
     this.remainingBalance,
+    this.verifiedAmount,
     this.submittedAmount,
     this.periodStart,
     this.periodEnd,
@@ -145,6 +146,7 @@ class Payment {
   final DateTime createdAt;
   final String? contractId;
   final double? remainingBalance;
+  final double? verifiedAmount;
   final double? submittedAmount;
   final DateTime? periodStart;
   final DateTime? periodEnd;
@@ -180,6 +182,13 @@ class Payment {
   }
 
   double get outstandingAmount => remainingBalance ?? (isVerified ? 0 : amount);
+  double get collectedAmount {
+    if (verifiedAmount != null) return verifiedAmount!;
+    if (isVoided) return 0;
+    if (remainingBalance == null && status.toLowerCase() == 'paid')
+      return amount;
+    return (amount - outstandingAmount).clamp(0, amount);
+  }
 
   bool get isOverdue {
     if (isDeposit) return false;
@@ -214,6 +223,7 @@ class Payment {
     DateTime? createdAt,
     String? contractId,
     double? remainingBalance,
+    double? verifiedAmount,
     double? submittedAmount,
     DateTime? periodStart,
     DateTime? periodEnd,
@@ -243,6 +253,7 @@ class Payment {
       createdAt: createdAt ?? this.createdAt,
       contractId: contractId ?? this.contractId,
       remainingBalance: remainingBalance ?? this.remainingBalance,
+      verifiedAmount: verifiedAmount ?? this.verifiedAmount,
       submittedAmount: submittedAmount ?? this.submittedAmount,
       periodStart: periodStart ?? this.periodStart,
       periodEnd: periodEnd ?? this.periodEnd,
@@ -336,6 +347,7 @@ class Payment {
       createdAt: parsedCreatedAt,
       contractId: json['contract_id'] as String?,
       remainingBalance: (json['remaining_balance'] as num?)?.toDouble(),
+      verifiedAmount: (json['verified_amount'] as num?)?.toDouble(),
       submittedAmount: (json['submitted_amount'] as num?)?.toDouble(),
       periodStart: DateTime.tryParse(json['period_start'] as String? ?? ''),
       periodEnd: DateTime.tryParse(json['period_end'] as String? ?? ''),
@@ -376,6 +388,7 @@ class Payment {
         if (contractAmount != null) 'contract_amount': contractAmount,
         'rent_adjustment': rentAdjustment,
         'deposit_applied_amount': depositAppliedAmount,
+        if (verifiedAmount != null) 'verified_amount': verifiedAmount,
         'source': source,
       };
 

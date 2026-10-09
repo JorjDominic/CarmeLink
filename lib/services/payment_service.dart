@@ -22,7 +22,7 @@ class PaymentService {
       'payment_method, reference_number, receipt_path, paid_at, '
       'reviewed_by, reviewed_at, review_notes, created_at, updated_at, '
       'remaining_balance, period_start, period_end, source, latest_transaction_id, '
-      'tenant_name, submitted_amount, notes, created_by, contract_amount, rent_adjustment, deposit_applied_amount';
+      'tenant_name, submitted_amount, notes, created_by, contract_amount, rent_adjustment, deposit_applied_amount, verified_amount';
 
   static const String _source = 'billing_charge_summaries';
 

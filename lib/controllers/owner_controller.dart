@@ -1,3 +1,4 @@
+import '../core/utils/financial_snapshot.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -201,16 +202,9 @@ class OwnerController extends ChangeNotifier {
       .where((payment) => !payment.isDeposit && payment.isOverdue)
       .length;
 
-  double get totalCollectedRevenue => payments
-      .where((payment) => payment.isVerified && !payment.isDeposit)
-      .fold<double>(0.0, (sum, p) => sum + p.amount);
+  double get totalCollectedRevenue => FinancialSnapshot(payments).collected;
 
-  double get totalOutstandingRevenue => payments
-      .where((payment) =>
-          !payment.isDeposit &&
-          !(payment.isRent && !payment.isDueNow) &&
-          (payment.isDue || payment.isPending))
-      .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
+  double get totalOutstandingRevenue => FinancialSnapshot(payments).outstanding;
 
   int get openMaintenance => _maintenanceLoadedOnce
       ? _staffMaintenanceReports.where((report) => report.isOpen).length

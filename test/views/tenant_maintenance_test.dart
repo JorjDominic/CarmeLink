@@ -66,7 +66,12 @@ void main() {
         (tester) async {
       TenantController.instance.setMaintenanceForTesting([]);
 
+      final reports =
+          List<MaintenanceReport>.of(TenantController.instance.maintenance);
       await tester.pumpWidget(buildTestable(const MaintenanceReportsPage()));
+      await tester.pump();
+      // Simulate a completed service response after the page's initial refresh.
+      TenantController.instance.setMaintenanceForTesting(reports);
       await tester.pump();
 
       expect(find.text('REPORT SUMMARY'), findsOneWidget);
@@ -106,17 +111,24 @@ void main() {
         ),
       ]);
 
+      final reports =
+          List<MaintenanceReport>.of(TenantController.instance.maintenance);
       await tester.pumpWidget(buildTestable(const MaintenanceReportsPage()));
+      await tester.pump();
+      // Simulate a completed service response after the page's initial refresh.
+      TenantController.instance.setMaintenanceForTesting(reports);
       await tester.pump();
 
       expect(find.text('All (1)'), findsOneWidget);
       expect(find.text('Pending (1)'), findsOneWidget);
       expect(find.text('Air conditioning • Room 204'), findsOneWidget);
 
+      await tester.ensureVisible(find.text('Air conditioning • Room 204'));
       // Tap report card to open details modal sheet
       await tester.tap(find.text('Air conditioning • Room 204'));
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.text('DESCRIPTION'));
       // Verify detail sheet content
       expect(find.text('DESCRIPTION'), findsOneWidget);
       expect(find.text('AC unit blowing warm air only'), findsOneWidget);

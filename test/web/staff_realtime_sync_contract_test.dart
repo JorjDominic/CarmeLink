@@ -73,6 +73,8 @@ void main() {
         'lib/web/dashboard/staff_web_portal_shell.dart',
       ).readAsStringSync();
 
+      final router = File('lib/views/shared/notification_destination.dart')
+          .readAsStringSync();
       for (final route in [
         'payment',
         'maintenance',
@@ -87,14 +89,16 @@ void main() {
         'conversation',
         'onboarding',
       ]) {
-        expect(source.contains("'$route'"), isTrue, reason: 'Missing $route');
+        expect(router.contains("'$route'"), isTrue, reason: 'Missing $route');
       }
       expect(
         source.contains('notificationPageBuilder: _notificationDestination'),
         isTrue,
       );
-      expect(source.contains('initialConversationId: notification.routeId'),
+      expect(
+          source.contains('notificationDestination(notification, widget.role)'),
           isTrue);
+      expect(router.contains('initialConversationId:'), isTrue);
     });
   });
 }

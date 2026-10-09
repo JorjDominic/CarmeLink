@@ -1,9 +1,27 @@
 # CarmeLink Living Status and Gap Tracker
 
-> **Authoritative project status — September 30, 2026.** Historical progress,
+> **Authoritative project status — October 9, 2026.** Historical progress,
 > completion-audit, and Markdown-reconciliation trackers were consolidated here
 > to prevent contradictory readiness claims. Repository implementation is not
 > equivalent to deployed-backend or physical-device proof.
+
+## October 9, 2026 full-system QA
+
+- See [the full QA report](documentation/FULL_SYSTEM_QA_2026-10-09.md) for
+  functionality coverage, repairs, evidence, and remaining release gaps.
+- Full Flutter suite: 861 passed; analyzer clean. Web release and Android debug
+  builds passed; six native Android checks and 20 Edge-function tests passed.
+- Fixed narrow finance/analytics exports, restored deployed boundary editing,
+  removed anonymous gate-history access, corrected partial-payment financial
+  totals, and kept pending proofs visible after earlier partial payments.
+- QA migrations `202610090008` through `202610090010` are deployed. All 121
+  migrations are current; existing-record fingerprints and boundary geometry
+  were preserved. Earlier deposit, renewal, signed-transfer, and eviction
+  migrations through `202610090007` are also installed.
+- Report-push dispatcher deployment, PayMongo test credentials, authenticated
+  live QA, physical-device verification, Android release signing, and iOS/APNs
+  remain open. Passing automation is not production sign-off.
+- Source/UI fixes and rebuilt application artifacts are local, not published.
 
 ## October 4, 2026 Payments and security-deposit update
 

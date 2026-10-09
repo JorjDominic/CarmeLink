@@ -43,12 +43,12 @@ void main() {
     expect(floors, contains('static const _pageSize = 6'));
   });
 
-  test('room management exposes a labeled Floor management button', () {
+  test('room management exposes a labeled floor management button', () {
     final rooms = File(
       'lib/views/owner/room_monitoring_page.dart',
     ).readAsStringSync();
 
-    expect(rooms, contains("label: const Text('Floor management')"));
+    expect(rooms, contains("label: const Text('Manage floors')"));
     expect(rooms, contains('OutlinedButton.icon('));
     expect(rooms, contains('compactActions && owner'));
   });

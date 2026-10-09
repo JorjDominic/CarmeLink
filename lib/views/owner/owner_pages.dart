@@ -1,3 +1,4 @@
+import '../../core/utils/financial_snapshot.dart';
 import '../../core/widgets/configured_choice_field.dart';
 import '../../core/widgets/searchable_dropdown.dart';
 import '../shared/report_addenda.dart';
@@ -10557,6 +10558,60 @@ class ContractExpiryAlertsPage extends StatelessWidget {
   Widget build(BuildContext context) => const ContractsPage();
 }
 
+class _ReportExportCard extends StatelessWidget {
+  const _ReportExportCard(
+      {required this.title,
+      required this.description,
+      required this.icon,
+      required this.color,
+      required this.onExport});
+  final String title, description;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onExport;
+
+  @override
+  Widget build(BuildContext context) =>
+      CarmelitaCard(child: LayoutBuilder(builder: (context, constraints) {
+        final details = Row(children: [
+          CircleAvatar(
+              radius: 20,
+              backgroundColor: color.withValues(alpha: .12),
+              foregroundColor: color,
+              child: Icon(icon, size: 20)),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 3),
+                Text(description, style: Theme.of(context).textTheme.bodySmall),
+              ])),
+        ]);
+        final export = OutlinedButton.icon(
+            onPressed: onExport,
+            icon: Icon(Icons.picture_as_pdf_outlined, color: color),
+            label: const Text('Print / Download PDF',
+                textAlign: TextAlign.center));
+        final stacked = constraints.maxWidth < 600 ||
+            MediaQuery.textScalerOf(context).scale(14) > 18;
+        return Padding(
+            padding: const EdgeInsets.all(12),
+            child: stacked
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [details, const SizedBox(height: 12), export])
+                : Row(children: [
+                    Expanded(child: details),
+                    const SizedBox(width: 12),
+                    export
+                  ]));
+      }));
+}
+
 class ExpenseIncomeSummaryPage extends StatelessWidget {
   const ExpenseIncomeSummaryPage({super.key});
 
@@ -10570,40 +10625,15 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         final payments = controller.payments;
-        double totalPaid = 0;
-        double totalPending = 0;
-        double totalDue = 0;
-        int paidCount = 0;
-        int pendingCount = 0;
-        int dueCount = 0;
-
-        for (final p in payments) {
-          final s = p.status.toLowerCase();
-          if (s == 'verified' || s == 'paid') {
-            totalPaid += p.amount;
-            paidCount++;
-          } else if (s.contains('pending')) {
-            totalPending += p.amount;
-            pendingCount++;
-          } else {
-            totalDue += p.amount;
-            dueCount++;
-          }
-        }
-
-        final rentPaid = payments
-            .where((p) =>
-                p.category.toLowerCase() == 'rent' &&
-                (p.status.toLowerCase() == 'verified' ||
-                    p.status.toLowerCase() == 'paid'))
-            .fold<double>(0, (sum, p) => sum + p.amount);
-
-        final utilityPaid = payments
-            .where((p) =>
-                p.category.toLowerCase() != 'rent' &&
-                (p.status.toLowerCase() == 'verified' ||
-                    p.status.toLowerCase() == 'paid'))
-            .fold<double>(0, (sum, p) => sum + p.amount);
+        final snapshot = FinancialSnapshot(payments);
+        final totalPaid = snapshot.collected;
+        final totalPending = snapshot.pending;
+        final totalDue = snapshot.outstanding;
+        final paidCount = snapshot.collectedBillCount;
+        final pendingCount = snapshot.pendingProofCount;
+        final dueCount = snapshot.outstandingBillCount;
+        final rentPaid = snapshot.rentCollected;
+        final utilityPaid = snapshot.utilityCollected;
 
         return PageFrame(
           title: 'Finances',
@@ -10615,7 +10645,7 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
                 MetricCard(
                   label: 'Verified Collections',
                   value: '₱${totalPaid.toStringAsFixed(2)}',
-                  detail: '$paidCount verified payments',
+                  detail: '$paidCount bills with verified collections',
                   icon: Icons.savings_outlined,
                 ),
                 MetricCard(
@@ -10633,60 +10663,17 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
               ]),
               const SizedBox(height: 14),
 
-              // Export PDF Card
-              CarmelitaCard(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Colors.teal.withValues(alpha: 0.12),
-                        foregroundColor: Colors.teal,
-                        child:
-                            const Icon(Icons.picture_as_pdf_outlined, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Financial & Rent Statement',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Official revenue, dues, and payment ledger',
-                              style: TextStyle(
-                                  color: Colors.grey.shade600, fontSize: 11),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      OutlinedButton.icon(
-                        icon: const Icon(
-                          Icons.picture_as_pdf_outlined,
-                          color: Colors.teal,
-                        ),
-                        label: const Text('Print / Download PDF'),
-                        onPressed: () {
-                          _service.openReportPreview(
-                            context,
-                            title: 'Financial & Rent Collection Statement',
-                            fileName:
-                                'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                            documentBuilder: () =>
-                                _service.generateFinancialReportPdf(),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
+              _ReportExportCard(
+                title: 'Financial & Rent Statement',
+                description: 'Official revenue, dues, and payment ledger',
+                icon: Icons.picture_as_pdf_outlined,
+                color: Colors.teal,
+                onExport: () => _service.openReportPreview(context,
+                    title: 'Financial & Rent Collection Statement',
+                    fileName:
+                        'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                    documentBuilder: () =>
+                        _service.generateFinancialReportPdf()),
               ),
               const SizedBox(height: 14),
 
@@ -10799,53 +10786,15 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
     required String fileName,
     required Future<Uint8List> Function() documentBuilder,
   }) {
-    return CarmelitaCard(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: color.withValues(alpha: 0.12),
-              foregroundColor: color,
-              child: Icon(icon, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    description,
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 6),
-            OutlinedButton.icon(
-              icon: Icon(Icons.picture_as_pdf_outlined, color: color),
-              label: const Text('Print / Download PDF'),
-              onPressed: () {
-                _reportService.openReportPreview(
-                  context,
-                  title: title,
-                  fileName: fileName,
-                  documentBuilder: documentBuilder,
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+    return _ReportExportCard(
+        title: title,
+        description: description,
+        icon: icon,
+        color: color,
+        onExport: () => _reportService.openReportPreview(context,
+            title: title,
+            fileName: fileName,
+            documentBuilder: documentBuilder));
   }
 
   @override
@@ -10862,14 +10811,9 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
             totalCapacity > 0 ? (totalOccupied / totalCapacity * 100) : 0.0;
 
         final payments = controller.payments;
-        final verifiedCount = payments
-            .where((p) =>
-                p.status.toLowerCase() == 'verified' ||
-                p.status.toLowerCase() == 'paid')
-            .length;
-        final paymentCompliance = payments.isNotEmpty
-            ? (verifiedCount / payments.length * 100)
-            : 100.0;
+        final financial = FinancialSnapshot(payments);
+        final verifiedCount = financial.settledBillCount;
+        final paymentCompliance = financial.compliancePercent;
 
         final maintenance = controller.staffMaintenanceReports;
         final openMaintenance = maintenance.where((m) => m.isOpen).length;
@@ -10913,7 +10857,8 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
                 MetricCard(
                   label: 'Payment Compliance',
                   value: '${paymentCompliance.toStringAsFixed(0)}%',
-                  detail: '$verifiedCount of ${payments.length} verified',
+                  detail:
+                      '$verifiedCount of ${financial.eligibleBillCount} current bills settled',
                   icon: Icons.payments_outlined,
                 ),
                 MetricCard(

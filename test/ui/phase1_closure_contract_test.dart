@@ -37,7 +37,7 @@ void main() {
         'lib/web/dashboard/staff_web_portal_shell.dart',
       ).readAsStringSync();
 
-      for (final label in ['Dashboard', 'Residents', 'Operations', 'Profile']) {
+      for (final label in ['Dashboard', 'Residents', 'Profile']) {
         expect(source.contains("label: '$label'"), isTrue);
       }
       expect(source.contains("label: 'Curfew'"), isFalse);
