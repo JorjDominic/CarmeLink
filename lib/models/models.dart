@@ -1052,6 +1052,7 @@ class TenantContract {
     required this.updatedAt,
     this.notes,
     this.signatureStatus = 'not_generated',
+    this.previousContractId,
   });
 
   factory TenantContract.fromRow(Map<String, dynamic> row) {
@@ -1071,6 +1072,7 @@ class TenantContract {
       status: row['status'] as String,
       notes: row['notes'] as String?,
       signatureStatus: row['signature_status'] as String? ?? 'not_generated',
+      previousContractId: row['previous_contract_id'] as String?,
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
       updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
     );
@@ -1087,6 +1089,8 @@ class TenantContract {
   final String status;
   final String? notes;
   final String signatureStatus;
+  final String? previousContractId;
+  bool get isRenewal => previousContractId != null;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -1118,6 +1122,7 @@ class TenantContract {
         status: status ?? this.status,
         notes: notes ?? this.notes,
         signatureStatus: signatureStatus ?? this.signatureStatus,
+        previousContractId: previousContractId,
         createdAt: createdAt,
         updatedAt: updatedAt,
       );

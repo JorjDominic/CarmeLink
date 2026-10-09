@@ -37,7 +37,7 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
         List<ContractSigner> signers,
         List<ContractDocument> documents,
       })> _load() async {
-    final contract = await _service.getMyContract();
+    final contract = await _service.getMyContractForSigning();
     if (contract == null) {
       return (
         contract: null,
@@ -331,6 +331,13 @@ class _TenantRequirementsPageState extends State<TenantRequirementsPage> {
                             ],
                           ),
                           const SizedBox(height: 16),
+                          if (contract.isRenewal && !contract.isActive) ...[
+                            Text(
+                                'Renewal agreement: ₱${contract.monthlyRent.toStringAsFixed(2)} '
+                                'per month from ${shortDate(contract.startsOn)}. '
+                                'Your current contract keeps its agreed rent until it ends.'),
+                            const SizedBox(height: 16),
+                          ],
                           Text('Contract files',
                               style: Theme.of(context)
                                   .textTheme

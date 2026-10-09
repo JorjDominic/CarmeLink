@@ -14,10 +14,14 @@ class SecurityDepositRecord {
     this.settled = false,
     this.unassignedReceipts = const [],
     this.tenantName = '',
+    this.transferredToContractId,
+    this.carryoverPending = false,
   });
 
   final String contractId, contractNumber, method, reference;
   final String tenantName;
+  final String? transferredToContractId;
+  final bool carryoverPending;
   final double requiredAmount, receivedAmount, refundedAmount, deductions;
   final DateTime? receivedOn;
   final bool settled;
@@ -29,15 +33,19 @@ class SecurityDepositRecord {
           .toDouble()
       : receivedAmount;
 
-  String get status => settled
-      ? 'Settled'
-      : receivedAmount <= 0
-          ? requiredAmount <= 0
-              ? 'No deposit required'
-              : 'Receipt not confirmed'
-          : receivedAmount < requiredAmount
-              ? 'Partially received'
-              : 'Received';
+  String get status => transferredToContractId != null
+      ? 'Transferred to renewal'
+      : carryoverPending
+          ? 'Carryover pending'
+          : settled
+              ? 'Settled'
+              : receivedAmount <= 0
+                  ? requiredAmount <= 0
+                      ? 'No deposit required'
+                      : 'Receipt not confirmed'
+                  : receivedAmount < requiredAmount
+                      ? 'Partially received'
+                      : 'Received';
 }
 
 class SecurityDepositService {
@@ -51,8 +59,8 @@ class SecurityDepositService {
       final rows = await client
           .from('tenant_contracts')
           .select(
-            'id, contract_number, security_deposit, starts_on, '
-            'profiles!tenant_contracts_tenant_id_fkey(full_name), security_deposit_receipts(*)',
+            'id, contract_number, security_deposit, starts_on, status, previous_contract_id, '
+            'profiles!tenant_contracts_tenant_id_fkey(full_name), security_deposit_receipts!security_deposit_receipts_contract_id_fkey(*)',
           )
           .order('starts_on', ascending: false)
           .order('id')
@@ -79,6 +87,10 @@ class SecurityDepositService {
           refundedAmount: (receipt['refunded_amount'] as num?)?.toDouble() ?? 0,
           deductions: (receipt['approved_deductions'] as num?)?.toDouble() ?? 0,
           settled: receipt['settled_at'] != null,
+          transferredToContractId:
+              receipt['transferred_to_contract_id'] as String?,
+          carryoverPending:
+              row['previous_contract_id'] != null && row['status'] == 'draft',
         ));
       }
       if (rows.length < 200) break;
@@ -91,7 +103,7 @@ class SecurityDepositService {
     final client = SupabaseConfig.clientSafe;
     if (client == null || client.auth.currentUser == null) return null;
     var query = client.from('tenant_contracts').select(
-          'id, tenant_id, contract_number, status, security_deposit, security_deposit_receipts(*)',
+          'id, tenant_id, contract_number, status, previous_contract_id, security_deposit, security_deposit_receipts!security_deposit_receipts_contract_id_fkey(*)',
         );
     query = contractId == null
         ? query.eq('tenant_id', tenantId ?? client.auth.currentUser!.id)
@@ -119,6 +131,9 @@ class SecurityDepositService {
       refundedAmount: (receipt['refunded_amount'] as num?)?.toDouble() ?? 0,
       deductions: (receipt['approved_deductions'] as num?)?.toDouble() ?? 0,
       settled: receipt['settled_at'] != null,
+      transferredToContractId: receipt['transferred_to_contract_id'] as String?,
+      carryoverPending: contract['previous_contract_id'] != null &&
+          contract['status'] == 'draft',
       unassignedReceipts: List<Map<String, dynamic>>.from(unassigned as List),
     );
   }

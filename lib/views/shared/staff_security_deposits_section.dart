@@ -27,7 +27,16 @@ class _StaffSecurityDepositsSectionState
     _records = _load();
     _subscription = TableRefreshSubscription(
       'staff-deposits-${identityHashCode(this)}',
-      const ['tenant_contracts', 'security_deposit_receipts', 'profiles'],
+      const [
+        'tenant_contracts',
+        'security_deposit_receipts',
+        'profiles',
+        'legacy_security_deposit_links',
+        'payment_transactions',
+        'move_out_cases',
+        'move_out_settlements',
+        'move_out_deductions',
+      ],
       _reload,
     );
   }

@@ -145,4 +145,123 @@ void main() {
     expect(find.text('Draft'), findsOneWidget);
     expect(find.text('Save contract'), findsOneWidget);
   });
+
+  testWidgets('renewal locks the tenant and deposit while allowing a new rent',
+      (tester) async {
+    tester.view.physicalSize = const Size(900, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(const MaterialApp(home: ContractsPage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Renew'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Renew contract'), findsOneWidget);
+    expect(find.text('Renewing CTR-2026-001'), findsOneWidget);
+    expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+    final newRent = find.widgetWithText(TextFormField, 'New monthly rent');
+    final deposit = find.widgetWithText(TextFormField, 'Security deposit');
+    expect(
+        tester
+            .widget<TextField>(
+                find.descendant(of: newRent, matching: find.byType(TextField)))
+            .readOnly,
+        isFalse);
+    expect(
+        tester
+            .widget<TextField>(
+                find.descendant(of: deposit, matching: find.byType(TextField)))
+            .readOnly,
+        isTrue);
+    await tester.enterText(newRent, '4500.00');
+    expect(OwnerController.instance.contracts.single.monthlyRent, 4000);
+    expect(OwnerController.instance.contracts.single.status, 'active');
+    await tester.ensureVisible(find.text('Start date'));
+    expect(find.text('Sep 19, 2027'), findsOneWidget);
+    await tester.ensureVisible(find.text('Draft').last);
+    expect(
+        find.descendant(
+            of: find.byType(Form),
+            matching: find.widgetWithText(ChoiceChip, 'Active')),
+        findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renewal form scrolls on a small screen with enlarged text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: const TextScaler.linear(1.35)),
+        child: child!,
+      ),
+      home: const ContractsPage(),
+    ));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Renew'));
+    await tester.tap(find.text('Renew'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('New monthly rent'));
+    expect(find.text('Save contract').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'existing renewal shows its link and hides duplicate renewal action',
+      (tester) async {
+    final original = OwnerController.instance.contracts.single;
+    OwnerController.instance.setContractsForTesting([
+      original,
+      TenantContract(
+        id: 'renewal-1',
+        previousContractId: original.id,
+        tenantId: original.tenantId,
+        tenantName: original.tenantName,
+        contractNumber: 'CTR-2027-002',
+        startsOn: DateTime(2027, 9, 19),
+        endsOn: DateTime(2028, 9, 18),
+        monthlyRent: 4500,
+        securityDeposit: 4000,
+        status: 'draft',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ]);
+    await tester.pumpWidget(const MaterialApp(home: ContractsPage()));
+    await tester.pumpAndSettle();
+    expect(find.text('Renews CTR-2026-001'), findsOneWidget);
+    expect(find.text('Renew'), findsNothing);
+  });
+
+  testWidgets('renewal rejects invalid rent before saving', (tester) async {
+    tester.view.physicalSize = const Size(900, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(const MaterialApp(home: ContractsPage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Renew'));
+    await tester.pumpAndSettle();
+    for (final invalid in ['NaN', '4500.001', '-1']) {
+      await tester.ensureVisible(find.text('New monthly rent'));
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'New monthly rent'), invalid);
+      await tester.tap(find.text('Save contract'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter a valid amount with at most two decimals'),
+          findsOneWidget);
+    }
+    expect(OwnerController.instance.contracts.length, 1);
+  });
 }

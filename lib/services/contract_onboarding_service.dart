@@ -20,13 +20,21 @@ class ContractOnboardingService {
     return data.isEmpty ? null : TenantContract.fromRow(data);
   }
 
+  /// A renewal draft is available for signing while current residency stays active.
+  Future<TenantContract?> getMyContractForSigning() async {
+    final row = await _client.rpc('get_my_contract_for_signing');
+    if (row == null) return null;
+    final data = Map<String, dynamic>.from(row as Map);
+    return data.isEmpty ? null : TenantContract.fromRow(data);
+  }
+
   /// Returns a linked resident's current contract. Database policies ensure
   /// guardians can only request tenants connected to their own account.
   Future<TenantContract?> getContractForTenant(String tenantId) async {
     final row = await _client
         .from('tenant_contracts')
         .select(
-            'id, tenant_id, contract_number, starts_on, ends_on, monthly_rent, security_deposit, status, notes, created_at, updated_at, signature_status, profiles!tenant_contracts_tenant_id_fkey(full_name)')
+            'id, tenant_id, contract_number, starts_on, ends_on, monthly_rent, security_deposit, status, notes, created_at, updated_at, signature_status, previous_contract_id, profiles!tenant_contracts_tenant_id_fkey(full_name)')
         .eq('tenant_id', tenantId)
         .inFilter('status', const ['draft', 'active'])
         .order('starts_on', ascending: false)

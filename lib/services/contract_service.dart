@@ -8,6 +8,7 @@ class ContractService {
       'id, tenant_id, contract_number, starts_on, ends_on, monthly_rent, '
       'security_deposit, status, notes, created_at, updated_at, '
       'signature_status, '
+      'previous_contract_id, '
       'profiles!tenant_contracts_tenant_id_fkey(full_name)';
 
   Future<List<TenantContract>> listContracts() async {
@@ -58,6 +59,29 @@ class ContractService {
         })
         .eq('id', contract.id)
         .select(_selection)
+        .single();
+    return TenantContract.fromRow(row);
+  }
+
+  Future<TenantContract> renewContract({
+    required String previousContractId,
+    required DateTime startsOn,
+    required DateTime endsOn,
+    required double monthlyRent,
+    String? notes,
+  }) async {
+    final id =
+        await SupabaseConfig.client.rpc('renew_tenant_contract', params: {
+      'p_previous_contract_id': previousContractId,
+      'p_starts_on': _date(startsOn),
+      'p_ends_on': _date(endsOn),
+      'p_monthly_rent': monthlyRent,
+      'p_notes': _nullable(notes),
+    });
+    final row = await SupabaseConfig.client
+        .from('tenant_contracts')
+        .select(_selection)
+        .eq('id', id as String)
         .single();
     return TenantContract.fromRow(row);
   }

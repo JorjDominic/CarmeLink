@@ -792,8 +792,35 @@ class OwnerController extends ChangeNotifier {
     return item;
   }
 
+  Future<TenantContract> renewContract({
+    required String previousContractId,
+    required DateTime startsOn,
+    required DateTime endsOn,
+    required double monthlyRent,
+    String? notes,
+  }) async {
+    final item = await _contractService.renewContract(
+      previousContractId: previousContractId,
+      startsOn: startsOn,
+      endsOn: endsOn,
+      monthlyRent: monthlyRent,
+      notes: notes,
+    );
+    _contracts.insert(0, item);
+    notifyListeners();
+    return item;
+  }
+
   Future<TenantContract> activateContract(String contractId) async {
     final item = await _contractService.activateContract(contractId);
+    if (item.isRenewal) {
+      final previousIndex =
+          _contracts.indexWhere((value) => value.id == item.previousContractId);
+      if (previousIndex >= 0) {
+        _contracts[previousIndex] =
+            _contracts[previousIndex].copyWith(status: 'expired');
+      }
+    }
     final index = _contracts.indexWhere((value) => value.id == item.id);
     if (index >= 0) _contracts[index] = item;
     notifyListeners();

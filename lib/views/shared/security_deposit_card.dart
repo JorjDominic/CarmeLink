@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
 import '../../core/widgets/common_widgets.dart';
@@ -32,11 +32,18 @@ class _SecurityDepositCardState extends State<SecurityDepositCard> {
     super.initState();
     _subscription = TableRefreshSubscription(
       'deposit-receipt-${identityHashCode(this)}',
-      ['security_deposit_receipts', 'legacy_security_deposit_links'],
+      const [
+        'tenant_contracts',
+        'security_deposit_receipts',
+        'legacy_security_deposit_links',
+        'payment_transactions',
+        'move_out_cases',
+        'move_out_settlements',
+        'move_out_deductions',
+      ],
       () {
         if (mounted) _reload();
       },
-      catchUpInterval: null,
     );
   }
 

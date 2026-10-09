@@ -19,6 +19,7 @@ import '../shared/security_deposit_card.dart';
 Future<bool?> showContractEditor(
   BuildContext context, {
   TenantContract? contract,
+  TenantContract? renewalOf,
   String? initialTenantId,
   String? initialTenantName,
   bool lockTenant = false,
@@ -28,6 +29,7 @@ Future<bool?> showContractEditor(
     context: context,
     builder: (_) => _ContractEditor(
       contract: contract,
+      renewalOf: renewalOf,
       initialTenantId: initialTenantId,
       initialTenantName: initialTenantName,
       lockTenant: lockTenant,
@@ -204,6 +206,14 @@ class _ContractsPageState extends State<ContractsPage> {
                         onEdit: () => _openEditor(items[index]),
                         onDelete: () => _delete(items[index]),
                         onDocuments: () => _openDocuments(items[index]),
+                        onRenew: _canRenew(items[index], controller.contracts)
+                            ? () => _renew(items[index])
+                            : null,
+                        previousContractNumber: controller.contracts
+                            .where((item) =>
+                                item.id == items[index].previousContractId)
+                            .map((item) => item.contractNumber)
+                            .firstOrNull,
                       ),
                     );
                   }),
@@ -215,6 +225,30 @@ class _ContractsPageState extends State<ContractsPage> {
 
   Future<void> _openEditor([TenantContract? contract]) async {
     await showContractEditor(context, contract: contract);
+  }
+
+  bool _canRenew(TenantContract contract, List<TenantContract> contracts) =>
+      (contract.status == 'active' || contract.status == 'expired') &&
+      !contracts.any((item) =>
+          item.tenantId == contract.tenantId &&
+          item.id != contract.id &&
+          (item.status == 'draft' ||
+              item.status == 'active' ||
+              item.startsOn.isAfter(contract.endsOn) &&
+                  item.status != 'terminated'));
+
+  Future<void> _renew(TenantContract contract) async {
+    final saved = await showContractEditor(
+      context,
+      renewalOf: contract,
+      initialTenantId: contract.tenantId,
+      initialTenantName: contract.tenantName,
+      lockTenant: true,
+    );
+    if (saved == true && mounted) {
+      showAppSnackBar(context,
+          'Renewal draft saved. Complete signing, then activate it on or after its start date.');
+    }
   }
 
   Future<void> _delete(TenantContract contract) async {
@@ -261,11 +295,15 @@ class _ContractCard extends StatelessWidget {
       {required this.contract,
       required this.onEdit,
       required this.onDelete,
-      required this.onDocuments});
+      required this.onDocuments,
+      this.onRenew,
+      this.previousContractNumber});
   final TenantContract contract;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onDocuments;
+  final VoidCallback? onRenew;
+  final String? previousContractNumber;
 
   @override
   Widget build(BuildContext context) {
@@ -287,6 +325,9 @@ class _ContractCard extends StatelessWidget {
         ]),
         Text(contract.contractNumber,
             style: Theme.of(context).textTheme.bodySmall),
+        if (contract.isRenewal)
+          Text('Renews ${previousContractNumber ?? "previous contract"}',
+              style: Theme.of(context).textTheme.bodySmall),
         const Divider(height: 22),
         InfoRow(
             label: 'Term • rent due ${_ordinal(contract.billingDueDay)}',
@@ -306,6 +347,11 @@ class _ContractCard extends StatelessWidget {
         ]),
         const Spacer(),
         Wrap(alignment: WrapAlignment.end, spacing: 2, children: [
+          if (onRenew != null)
+            TextButton.icon(
+                onPressed: onRenew,
+                icon: const Icon(Icons.autorenew),
+                label: const Text('Renew')),
           IconButton(
               tooltip: 'Security deposit receipt',
               onPressed: () => showDialog<void>(
@@ -838,6 +884,8 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
       widget.documents.any((item) => item.isGenerated);
 
   bool get _canActivate =>
+      (!widget.contract.isRenewal ||
+          !widget.contract.startsOn.isAfter(_manilaToday())) &&
       widget.needs?.emailVerified == true &&
       widget.needs?.emergencyContactComplete == true &&
       _hasGeneratedContract &&
@@ -889,6 +937,14 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
             'requirement before continuing.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
+          if (widget.contract.isRenewal) ...[
+            const SizedBox(height: 8),
+            Text(
+                'Activate on or after ${_contractDate(widget.contract.startsOn)}. '
+                'The previous contract will expire, and this contract will bill '
+                'at ₱${widget.contract.monthlyRent.toStringAsFixed(2)} per month '
+                'from its start date.'),
+          ],
           const SizedBox(height: 20),
           _ActivationRequirement(
             complete: needs?.emailVerified == true,
@@ -1292,11 +1348,13 @@ class _ContractDocumentViewerState extends State<_ContractDocumentViewer> {
 class _ContractEditor extends StatefulWidget {
   const _ContractEditor({
     this.contract,
+    this.renewalOf,
     this.initialTenantId,
     this.initialTenantName,
     this.lockTenant = false,
   });
   final TenantContract? contract;
+  final TenantContract? renewalOf;
   final String? initialTenantId;
   final String? initialTenantName;
   final bool lockTenant;
@@ -1318,16 +1376,21 @@ class _ContractEditorState extends State<_ContractEditor> {
   @override
   void initState() {
     super.initState();
-    final value = widget.contract;
+    final value = widget.contract ?? widget.renewalOf;
     _rent = TextEditingController(
         text: value?.monthlyRent.toStringAsFixed(2) ?? '2500.00');
     _deposit = TextEditingController(
         text: value?.securityDeposit.toStringAsFixed(2) ?? '0');
-    _notes = TextEditingController(text: value?.notes ?? '');
+    _notes = TextEditingController(text: widget.contract?.notes ?? '');
     _tenantId = value?.tenantId ?? widget.initialTenantId;
-    _status = value?.status ?? 'draft';
-    _start = value?.startsOn ?? DateTime.now();
-    _end = value?.endsOn ?? DateTime.now().add(const Duration(days: 365));
+    _status = widget.contract?.status ?? 'draft';
+    _start = widget.renewalOf == null
+        ? value?.startsOn ?? DateTime.now()
+        : DateTime(
+            value!.endsOn.year, value.endsOn.month, value.endsOn.day + 1);
+    _end = widget.renewalOf == null
+        ? value?.endsOn ?? DateTime.now().add(const Duration(days: 365))
+        : DateTime(_start.year + 1, _start.month, _start.day - 1);
   }
 
   @override
@@ -1364,7 +1427,11 @@ class _ContractEditorState extends State<_ContractEditor> {
       ));
     }
     final compact = MediaQuery.sizeOf(context).width < 600;
-    final title = widget.contract == null ? 'Create contract' : 'Edit contract';
+    final title = widget.renewalOf != null
+        ? 'Renew contract'
+        : widget.contract == null
+            ? 'Create contract'
+            : 'Edit contract';
     final form = _buildForm(tenants, compact);
 
     if (compact) {
@@ -1446,6 +1513,17 @@ class _ContractEditorState extends State<_ContractEditor> {
   Widget _buildForm(List<TenantDirectoryEntry> tenants, bool compact) => Form(
         key: _formKey,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (widget.renewalOf case final previous?) ...[
+            Text('Renewing ${previous.contractNumber}',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+                'Current rent: ₱${previous.monthlyRent.toStringAsFixed(2)}/month '
+                'through ${_contractDate(previous.endsOn)}. '
+                'Enter the agreed rent for the new term below. '
+                'The current contract and its bills keep their original rent.'),
+            const SizedBox(height: 20),
+          ],
           const _FormSectionHeading(
             icon: Icons.person_outline,
             title: 'Tenant and agreement',
@@ -1506,24 +1584,30 @@ class _ContractEditorState extends State<_ContractEditor> {
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Monthly rent',
-                helperText: 'New rent requires a new contract.',
+              decoration: InputDecoration(
+                labelText: widget.renewalOf == null
+                    ? 'Monthly rent'
+                    : 'New monthly rent',
+                helperText: widget.renewalOf == null
+                    ? 'New rent requires a new contract.'
+                    : 'Applies only from the renewed contract start date.',
                 prefixText: '₱ ',
               ),
               validator: _moneyValidator,
             ),
             second: TextFormField(
               controller: _deposit,
-              readOnly: widget.contract != null,
+              readOnly: widget.contract != null || widget.renewalOf != null,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
               decoration: InputDecoration(
                 labelText: 'Security deposit',
-                helperText: widget.contract == null
-                    ? 'Saving records this amount as already received.'
-                    : 'New deposit terms require a new contract.',
+                helperText: widget.renewalOf != null
+                    ? 'Existing deposit carries over when the renewal is activated.'
+                    : widget.contract == null
+                        ? 'Saving records this amount as already received.'
+                        : 'New deposit terms require a new contract.',
                 prefixText: '₱ ',
               ),
               validator: _moneyValidator,
@@ -1542,11 +1626,13 @@ class _ContractEditorState extends State<_ContractEditor> {
             first: _DateField(
               label: 'Start date',
               value: _start,
+              enabled: widget.contract?.isActive != true,
               onChanged: (value) => setState(() => _start = value),
             ),
             second: _DateField(
               label: 'End date',
               value: _end,
+              enabled: widget.contract?.isActive != true,
               onChanged: (value) => setState(() => _end = value),
             ),
           ),
@@ -1563,7 +1649,11 @@ class _ContractEditorState extends State<_ContractEditor> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: ['draft', 'active', 'expired', 'terminated']
+              children: (widget.renewalOf != null
+                      ? ['draft']
+                      : widget.contract?.isRenewal == true && _status == 'draft'
+                          ? ['draft', 'terminated']
+                          : ['draft', 'active', 'expired', 'terminated'])
                   .map((status) => Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
@@ -1595,7 +1685,13 @@ class _ContractEditorState extends State<_ContractEditor> {
 
   String? _moneyValidator(String? value) {
     final amount = double.tryParse(value?.trim() ?? '');
-    return amount == null || amount < 0 ? 'Enter a valid amount' : null;
+    return amount == null ||
+            !amount.isFinite ||
+            amount < 0 ||
+            amount > 9999999999.99 ||
+            (amount * 100 - (amount * 100).round()).abs() > 0.0001
+        ? 'Enter a valid amount with at most two decimals'
+        : null;
   }
 
   Future<void> _save() async {
@@ -1604,12 +1700,25 @@ class _ContractEditorState extends State<_ContractEditor> {
       showAppSnackBar(context, 'End date must be on or after the start date.');
       return;
     }
+    if (widget.renewalOf != null && !_start.isAfter(widget.renewalOf!.endsOn)) {
+      showAppSnackBar(
+          context, 'The renewal must start after the current contract ends.');
+      return;
+    }
     setState(() => _saving = true);
     try {
       final controller = OwnerController.instance;
       final existing = widget.contract;
       late final TenantContract saved;
-      if (existing == null) {
+      if (widget.renewalOf case final previous?) {
+        saved = await controller.renewContract(
+          previousContractId: previous.id,
+          startsOn: _start,
+          endsOn: _end,
+          monthlyRent: double.parse(_rent.text.trim()),
+          notes: _notes.text,
+        );
+      } else if (existing == null) {
         saved = await controller.createContract(
           tenantId: _tenantId!,
           startsOn: _start,
@@ -1798,10 +1907,14 @@ class _EditorActions extends StatelessWidget {
 
 class _DateField extends StatelessWidget {
   const _DateField(
-      {required this.label, required this.value, required this.onChanged});
+      {required this.label,
+      required this.value,
+      required this.onChanged,
+      this.enabled = true});
   final String label;
   final DateTime value;
   final ValueChanged<DateTime> onChanged;
+  final bool enabled;
   @override
   Widget build(BuildContext context) => Semantics(
         button: true,
@@ -1809,14 +1922,16 @@ class _DateField extends StatelessWidget {
             '$label, ${_months[value.month - 1]} ${value.day}, ${value.year}',
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () async {
-            final picked = await showDatePicker(
-                context: context,
-                initialDate: value,
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2100));
-            if (picked != null) onChanged(picked);
-          },
+          onTap: !enabled
+              ? null
+              : () async {
+                  final picked = await showDatePicker(
+                      context: context,
+                      initialDate: value,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2100));
+                  if (picked != null) onChanged(picked);
+                },
           child: InputDecorator(
             decoration: InputDecoration(
               labelText: label,
@@ -1831,6 +1946,14 @@ class _DateField extends StatelessWidget {
         ),
       );
 }
+
+DateTime _manilaToday() {
+  final now = DateTime.now().toUtc().add(const Duration(hours: 8));
+  return DateTime(now.year, now.month, now.day);
+}
+
+String _contractDate(DateTime date) =>
+    '${_months[date.month - 1]} ${date.day}, ${date.year}';
 
 const _months = <String>[
   'Jan',

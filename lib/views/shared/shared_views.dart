@@ -1177,7 +1177,7 @@ class _TenantRequiredDocumentsSectionState
         List<ContractSigner> signers,
       })> _load() async {
     try {
-      final contract = await _service.getMyContract();
+      final contract = await _service.getMyContractForSigning();
       if (contract == null) {
         return (
           contract: null,

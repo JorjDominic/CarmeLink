@@ -28,4 +28,30 @@ void main() {
     expect(settled.status, 'Settled');
     expect(settled.heldAmount, 0);
   });
+
+  test('renewal carryover separates pending funds from transferred history',
+      () {
+    const pending = SecurityDepositRecord(
+        contractId: 'renewal',
+        contractNumber: 'C2',
+        requiredAmount: 5000,
+        carryoverPending: true);
+    const previous = SecurityDepositRecord(
+        contractId: 'previous',
+        contractNumber: 'C1',
+        requiredAmount: 5000,
+        settled: true,
+        transferredToContractId: 'renewal');
+    const current = SecurityDepositRecord(
+        contractId: 'renewal',
+        contractNumber: 'C2',
+        requiredAmount: 5000,
+        receivedAmount: 5000);
+    expect(pending.status, 'Carryover pending');
+    expect(pending.heldAmount, 0);
+    expect(previous.status, 'Transferred to renewal');
+    expect(previous.heldAmount, 0);
+    expect(current.status, 'Received');
+    expect(current.heldAmount, 5000);
+  });
 }

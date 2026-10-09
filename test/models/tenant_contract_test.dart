@@ -13,6 +13,7 @@ void main() {
       'security_deposit': 4000.50,
       'status': 'active',
       'notes': 'Annual agreement',
+      'previous_contract_id': 'previous-contract',
       'created_at': '2026-09-19T00:00:00Z',
       'updated_at': '2026-09-19T00:00:00Z',
       'profiles': {'full_name': 'Maria Santos'},
@@ -23,6 +24,9 @@ void main() {
     expect(contract.securityDeposit, 4000.50);
     expect(contract.isActive, isTrue);
     expect(contract.endsOn, DateTime(2027, 8, 31));
+    expect(contract.isRenewal, isTrue);
+    expect(contract.copyWith(status: 'expired').previousContractId,
+        'previous-contract');
   });
 
   test('TenantContract never exposes a null or blank contract number', () {
@@ -40,6 +44,7 @@ void main() {
     });
 
     expect(contract.contractNumber, 'Pending Generation');
+    expect(contract.isRenewal, isFalse);
   });
 
   test('copyWith preserves identity and updates editable contract fields', () {
