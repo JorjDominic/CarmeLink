@@ -3,6 +3,7 @@ import 'package:carmelitas_dormitory_system/services/payment_collection_settings
 import 'package:carmelitas_dormitory_system/views/tenant/tenant_pages.dart';
 import 'package:carmelitas_dormitory_system/views/shared/paymongo_payment_page.dart';
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _NeverCalledGateway extends PaymongoPaymentService {
@@ -73,6 +74,7 @@ void main() {
     expect(find.textContaining('DEMO ONLY'), findsOneWidget);
     await tap(tester, 'Start demo payment');
     expect(find.text('Awaiting payment'), findsOneWidget);
+    expect(find.byKey(const Key('demo-payment-qr')), findsOneWidget);
     await tap(tester, 'Simulate successful payment');
     expect(find.text('Test payment confirmed'), findsOneWidget);
     expect(find.textContaining('Actual balances unchanged.'), findsOneWidget);
@@ -93,7 +95,7 @@ void main() {
     expect(find.text('Payment cancelled'), findsOneWidget);
     expect(service.calls, 0);
   });
-  testWidgets('sandbox suppresses a scannable QR and offers test page',
+  testWidgets('sandbox displays a nonpayment demo QR and simulation link',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(
         home: Scaffold(
@@ -103,14 +105,21 @@ void main() {
           status: 'pending',
           amountCentavos: 350000,
           environment: 'test',
-          qrImage: 'data:image/png;base64,aGVsbG8=',
+          qrImage:
+              'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
           testUrl: 'https://test-sources.paymongo.com/demo'),
     ))));
     await tester.pump();
     expect(find.byType(Image), findsNothing);
+    final qr =
+        tester.widget<QrImageView>(find.byKey(const Key('demo-payment-qr')));
+    expect(qr.semanticsLabel, 'Demo QR code. Cannot collect payment.');
+    expect(find.text('DEMO QR - no real payment'), findsOneWidget);
     expect(find.text('Open test payment page'), findsOneWidget);
     expect(
-        find.textContaining('Actual bills remain unchanged.'), findsOneWidget);
+        find.textContaining(
+            'successful test payments update the shared bill balance.'),
+        findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets('demo fits a narrow iOS screen', (tester) async {

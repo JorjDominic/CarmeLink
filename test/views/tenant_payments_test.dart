@@ -81,9 +81,10 @@ void main() {
       await tester.tap(find.text('Future rent schedule'));
       await tester.pumpAndSettle();
       expect(find.text('Far future rent'), findsOneWidget);
+      expect(find.text('Submit proof'), findsNWidgets(2));
     });
 
-    testWidgets('future rent and a deposit alone do not prompt payment',
+    testWidgets('future rent can be paid early without counting as outstanding',
         (tester) async {
       TenantController.instance.setPaymentsForTesting([
         Payment(
@@ -106,6 +107,11 @@ void main() {
       expect(find.text('Pay now'), findsNothing);
       expect(find.text('Submit proof'), findsNothing);
       expect(TenantController.instance.outstandingBalance, 0);
+      await tester.ensureVisible(find.text('Future rent schedule'));
+      await tester.tap(find.text('Future rent schedule'));
+      await tester.pumpAndSettle();
+      expect(find.text('Submit proof'), findsOneWidget);
+      expect(find.text('Deposit'), findsNothing);
     });
 
     testWidgets('renders account summary, filters, and payment cards',

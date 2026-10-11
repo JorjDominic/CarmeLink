@@ -11,7 +11,7 @@ Manual mode remains active. Automatic mode is disabled until configuration is
 present and the owner enables it. No account, API key, or payment provider call
 is required for **Try payment demo (no keys needed)** in the owner's Billing
 card, or the demo button in tenant Payments. The demo uses a local sample bill
-and a nonpayable QR illustration. Success, failure, expiry, and cancellation
+and a QR encoding demo text only. Success, failure, expiry, and cancellation
 do not write to Supabase or change tenant balances.
 
 The demo works with the same Flutter screen on web, Android and iOS. Physical
@@ -30,11 +30,13 @@ completed payment on PayMongo and does not validate merchant API access.
 4. Refresh the owner's Billing setting and select Automatic. The backend checks
    the merchant credentials and matching enabled webhook before saving the mode.
 5. Create a payment request against a sample unpaid bill. Use **Open test payment
-   page** to simulate a provider outcome. Test QR images are deliberately hidden:
-   PayMongo advises using its test URL rather than scanning/paying the QR.
+   page** to simulate a provider outcome. The app displays a demo QR encoding nonpayment text instead of the provider
+   test QR. Complete the simulation through the test URL. Live mode displays
+   the actual provider payment QR.
 6. Check successful/failed/expired requests and repeat callbacks. Provider test
-   confirmations are stored in `paymongo_payment_sessions` with no ledger credit.
-   The actual bill stays unpaid, regardless of the sandbox result.
+   confirmations credit the shared payment ledger while the temporary
+   `demo_test_credits` setting is enabled. Entries are labeled Demo Test and
+   reduce the same bill balance used by manual records; no real money is received.
 
 If a response omits the provider test URL, the app does not invent a payment
 link. Check the account/API response before continuing provider testing.
@@ -50,13 +52,15 @@ link. Check the account/API response before continuing provider testing.
   session, bill metadata, exact PHP amount, environment, paid transaction, and
   QR Ph source. Neither a client success screen nor an unverified callback pays
   a bill. Webhooks validate the raw-body HMAC and timestamp first.
-- Only the service role can settle payments. Test confirmations never create
-  `payment_transactions`. Live confirmations create one verified transaction
+- Only the service role can settle payments. For the current demo, test
+  confirmations create labeled verified `payment_transactions` while
+  `payment_collection_settings.demo_test_credits` is true. Disable this setting
+  before real billing. Live confirmations create one verified transaction
   with immutable gateway provenance and a provider payment reference.
 - Owners remain the enabling actor in the existing required reviewer field;
   review notes explicitly identify automatic provider confirmation. This is
   not a manual owner approval. Live confirmation notifies the tenant/guardian.
-- An unpaid active live request blocks a second staff receipt until cancelled
+- An unpaid active live request (or test request with demo credits enabled) blocks a second staff receipt until cancelled
   or reconciled. Existing pending manual proofs remain reviewable after switching
   modes. New tenant proof submissions are rejected while automatic is selected.
 - Active requests remain accessible under Payments/Billing after mode switches.
@@ -76,7 +80,7 @@ Use live keys only after merchant approval and a successful provider sandbox
 test. Reconcile active requests before changing credentials/environments. Set
 `PAYMONGO_ENVIRONMENT=live` and `PAYMONGO_ALLOW_LIVE=true` explicitly; the default
 is test and live processing is otherwise disabled. Refresh and enable the mode
-through the owner UI, then perform an approved live smoke test. Receiving money,
+through the owner UI, set `demo_test_credits=false` in the database, then perform an approved live smoke test. Receiving money,
 settlement, account eligibility and fees remain subject to PayMongo approval.
 
 Ordinary transfers to a personal bank/GCash account cannot be automatically

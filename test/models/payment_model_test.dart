@@ -21,6 +21,24 @@ void main() {
       expect(payment.copyWith(status: 'Verified').depositAppliedAmount, 3000);
       expect(payment.toJson()['deposit_applied_amount'], 3000);
     });
+    test('upcoming dues allow early payment while ineligible bills do not', () {
+      final payment = Payment(
+        id: 'future',
+        label: 'Future rent',
+        amount: 3500,
+        dueDate: DateTime.now().add(const Duration(days: 60)),
+        status: 'Upcoming',
+        category: 'rent',
+      );
+      expect(payment.canSubmitProof, isTrue);
+      expect(payment.isDueNow, isFalse);
+      expect(payment.copyWith(status: 'Pending verification').canSubmitProof,
+          isFalse);
+      expect(payment.copyWith(status: 'Verified').canSubmitProof, isFalse);
+      expect(payment.copyWith(status: 'Voided').canSubmitProof, isFalse);
+      expect(payment.copyWith(category: 'deposit').canSubmitProof, isFalse);
+      expect(payment.copyWith(remainingBalance: 0).canSubmitProof, isFalse);
+    });
     final dueDate = DateTime(2026, 9, 20);
     final paidDate = DateTime(2026, 9, 18, 14, 30);
     final reviewedDate = DateTime(2026, 9, 19, 10, 0);

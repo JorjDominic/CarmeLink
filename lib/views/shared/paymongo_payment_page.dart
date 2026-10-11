@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../controllers/tenant_controller.dart';
 import '../../core/widgets/common_widgets.dart';
@@ -74,7 +75,7 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
       if (!mounted) return;
       final newlyPaid = session?.paid == true && _session?.paid != true;
       setState(() => _session = session);
-      if (newlyPaid && session?.isTest == false)
+      if (newlyPaid)
         unawaited(TenantController.instance.loadPayments(force: true));
     } catch (error) {
       if (mounted)
@@ -176,7 +177,7 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
                     padding: const EdgeInsets.all(16),
                     child: Text(widget.demo
                         ? 'DEMO ONLY — no money moves and no tenant bills are updated.'
-                        : 'PAYMONGO TEST MODE — use the test payment page. Do not scan or pay this QR with a real wallet. Actual bills remain unchanged.'))),
+                        : 'PAYMONGO DEMO MODE — use the test payment page. The displayed QR contains demo text only and cannot collect payment. For this demo, successful test payments update the shared bill balance. No real money is received.'))),
           if (!widget.demo &&
               widget.payment == null &&
               widget.initialSession == null) ...[
@@ -216,16 +217,25 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
                     Text(statusLabel, key: const Key('gateway-payment-status')),
                     if (session?.status == 'pending') ...[
                       const SizedBox(height: 16),
-                      if (widget.demo)
-                        const Column(children: [
-                          Icon(Icons.qr_code_2, size: 160),
-                          Text('Illustration only — no payable QR')
+                      if (isTest)
+                        Column(children: [
+                          QrImageView(
+                            key: const Key('demo-payment-qr'),
+                            data:
+                                'CARMELITA DEMO ONLY - NOT A PAYMENT: ${session!.id}',
+                            size: 220,
+                            backgroundColor: Colors.white,
+                            semanticsLabel:
+                                'Demo QR code. Cannot collect payment.',
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('DEMO QR - no real payment'),
+                          Text(widget.demo
+                              ? 'Use the simulation buttons below to demonstrate payment.'
+                              : 'Use the test payment page below to simulate payment.'),
                         ])
-                      else if (session?.qrImage != null && !isTest)
-                        _qr(session!.qrImage!)
-                      else if (isTest)
-                        const Text(
-                            'Use the test payment page below to simulate payment.'),
+                      else if (session?.qrImage != null)
+                        _qr(session!.qrImage!),
                     ],
                     if (session?.expiresAt != null &&
                         session?.isActive == true) ...[

@@ -1706,7 +1706,11 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 ),
               if (futurePayments.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                _FutureRentSchedule(payments: futurePayments),
+                _FutureRentSchedule(
+                  payments: futurePayments,
+                  automatic:
+                      _paymentSettings?.mode == PaymentCollectionMode.paymongo,
+                ),
               ],
               const PaymongoSessionsSection(),
             ],
@@ -1926,8 +1930,9 @@ class _CompactPaymentSummaryRow extends StatelessWidget {
 }
 
 class _FutureRentSchedule extends StatelessWidget {
-  const _FutureRentSchedule({required this.payments});
+  const _FutureRentSchedule({required this.payments, this.automatic = false});
   final List<Payment> payments;
+  final bool automatic;
 
   @override
   Widget build(BuildContext context) => CarmelitaCard(
@@ -1937,14 +1942,14 @@ class _FutureRentSchedule extends StatelessWidget {
             key: const Key('future-rent-schedule'),
             tilePadding: EdgeInsets.zero,
             title: const Text('Future rent schedule'),
-            subtitle: const Text('Not due yet · View scheduled installments'),
+            subtitle: const Text('View installments or pay early'),
             children: payments
-                .map((payment) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(payment.label),
-                      subtitle: Text(
-                          'Scheduled ${shortDate(payment.dueDate)} · Not due yet'),
-                      trailing: Text(money(payment.outstandingAmount)),
+                .map((payment) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _TenantPaymentCard(
+                        payment: payment,
+                        automatic: automatic,
+                      ),
                     ))
                 .toList(),
           ),
@@ -2689,7 +2694,7 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
           environment: _collectionSettings!.environment);
     }
     final unpaidBills = TenantController.instance.payments
-        .where((p) => p.canSubmitProof && !(p.isRent && !p.isDueNow))
+        .where((p) => p.canSubmitProof)
         .toList();
 
     return PageFrame(

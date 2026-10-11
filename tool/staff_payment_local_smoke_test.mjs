@@ -186,4 +186,28 @@ try {
   assert.equal((await db.query('select * from public.paymongo_payment_sessions')).rows.length,3);
   await db.exec('reset role');
   console.log('PayMongo SQL checks passed: owner-only switch, readiness, bill amount, request reuse, backend-only settlement, sandbox isolation, duplicate callbacks, mode switching, staff conflicts and reconciliation.');
+
+  await db.exec(await read('202610110001_demo_test_payment_credits.sql'));
+  await login(owner,'owner');
+  await db.exec("update public.payment_collection_settings set environment='test',mode='manual'");
+  await db.exec(`insert into public.billing_charges(id,tenant_id,title,category,original_amount,due_date,created_by)
+    values('${id(60)}','${tenant}','Demo shared balance','rent',1000,current_date,'${owner}')`);
+  await record(600,250,{bill:id(60)});
+  await db.query("select public.set_payment_collection_mode('paymongo')");
+  await login(tenant,'tenant');
+  const demoSession=(await db.query('select public.begin_paymongo_payment($1) as value',[id(60)])).rows[0].value.session.id;
+  await db.exec(`update public.paymongo_payment_sessions set provider_intent_id='pi_Demo',status='pending' where id='${demoSession}'`);
+  await login(owner,'owner');
+  await assert.rejects(()=>record(601,100,{bill:id(60)}),/automatic payment is still active/);
+  await login('', 'service_role');
+  const demoConfirmed=(await settle(demoSession,'pi_Demo','pay_Demo',75000)).rows[0].session;
+  assert.ok(demoConfirmed.credited_transaction_id);
+  assert.equal(Number(await scalar(`select remaining_balance from public.billing_charge_summaries where id='${id(60)}'`)),0);
+  assert.equal(await scalar(`select payment_method from public.payment_transactions where gateway_session_id='${demoSession}'`),'PayMongo QR Ph (Demo Test)');
+  await settle(demoSession,'pi_Demo','pay_Demo',75000);
+  assert.equal(await scalar(`select count(*) from public.payment_transactions where charge_id='${id(60)}'`),2);
+  await db.exec("update public.payment_collection_settings set demo_test_credits=false");
+  await settle(testSession,'pi_Test','pay_Test');
+  assert.equal(await scalar(`select credited_transaction_id from public.paymongo_payment_sessions where id='${testSession}'`),null);
+  console.log('Demo credit SQL checks passed: shared manual/test balance, labels, duplicate protection, active test guards and disable switch.');
 } catch(error) { console.error(error.message); process.exitCode=1; } finally { await db.close(); }
