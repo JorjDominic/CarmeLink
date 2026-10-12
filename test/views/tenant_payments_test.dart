@@ -4,6 +4,28 @@ import 'package:carmelitas_dormitory_system/controllers/tenant_controller.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/views/tenant/tenant_pages.dart';
 import 'package:carmelitas_dormitory_system/services/dormitory_configuration_service.dart';
+import 'package:carmelitas_dormitory_system/services/payment_collection_settings_service.dart';
+import 'package:carmelitas_dormitory_system/services/paymongo_payment_service.dart';
+
+class ManualSettings extends PaymentCollectionSettingsService {
+  @override
+  Future<PaymentCollectionSettings> load() async =>
+      const PaymentCollectionSettings();
+}
+
+class ExistingRequestService extends PaymongoPaymentService {
+  ExistingRequestService(this.status);
+  final String? status;
+  @override
+  Future<PaymongoPaymentSession?> blockingReceipt(String chargeId) async =>
+      status == null
+          ? null
+          : PaymongoPaymentSession(
+              id: 'existing-request',
+              status: status!,
+              amountCentavos: 350000,
+              environment: 'test');
+}
 
 void main() {
   setUp(() {
@@ -319,6 +341,28 @@ void main() {
               sortOrder: 1,
               instructions: 'Test bank payment instructions'),
         ];
+    for (final status in ['pending', 'needs_review', null]) {
+      testWidgets('manual receipt handles existing request: $status',
+          (tester) async {
+        await tester.pumpWidget(buildTestable(UploadPaymentProofPage(
+          targetPayment: testPayments.first,
+          paymentOptionsLoader: options,
+          collectionSettingsService: ManualSettings(),
+          gatewayService: ExistingRequestService(status),
+        )));
+        await tester.pumpAndSettle();
+        expect(find.text('Upload receipt'), findsOneWidget);
+        expect(find.text('Open existing request'),
+            status == null ? findsNothing : findsOneWidget);
+        final submit = tester.widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Submit proof for review'));
+        expect(submit.onPressed == null, status != null);
+        if (status == 'needs_review') {
+          expect(find.textContaining('needs staff reconciliation'),
+              findsOneWidget);
+        }
+      });
+    }
     testWidgets('renders preselected bill and dynamic payment instruction card',
         (tester) async {
       await tester.pumpWidget(

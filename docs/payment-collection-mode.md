@@ -75,8 +75,11 @@ link. Check the account/API response before continuing provider testing.
 - An unpaid active live request (or test request with demo credits enabled) blocks a second staff receipt until cancelled
   or reconciled. Existing pending manual proofs remain reviewable after switching
   modes. New tenant proof submissions are rejected while automatic is selected.
-- Active requests remain accessible under Payments/Billing after mode switches.
-  A late successful payment still settles. Duplicate callbacks never double-credit.
+- Switching to Manual saves the mode first to stop new automatic requests, then
+  automatically checks and cancels all unpaid QR requests with the provider.
+  Failed cancellations display a retry action; requests stay protected until
+  provider cancellation is confirmed. Payments already received still settle or
+  remain available for staff reconciliation. Duplicate callbacks never double-credit.
 - A changed or voided bill puts received money into `needs_review`, visible to
   staff and notified for reconciliation. It is never silently discarded or credited
   twice. Resolve bill adjustments or handle a refund through PayMongo, then refresh

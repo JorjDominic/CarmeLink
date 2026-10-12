@@ -73,6 +73,31 @@ class PaymongoPaymentSession {
 
 class PaymongoPaymentService {
   const PaymongoPaymentService();
+
+  /// Match the ledger guard, including requests from a previous environment.
+  Future<PaymongoPaymentSession?> blockingReceipt(String chargeId) async {
+    final settings = await SupabaseConfig.client
+        .from('payment_collection_settings')
+        .select('demo_test_credits')
+        .eq('id', true)
+        .single();
+    final rows = await SupabaseConfig.client
+        .from('paymongo_payment_sessions')
+        .select()
+        .contains('bill_breakdown', [
+      {'charge_id': chargeId}
+    ]).inFilter('status', ['creating', 'pending', 'needs_review']).order(
+            'created_at',
+            ascending: false);
+    for (final row in rows) {
+      if (row['environment'] == 'live' ||
+          settings['demo_test_credits'] == true) {
+        return PaymongoPaymentSession.fromJson(row);
+      }
+    }
+    return null;
+  }
+
   Future<PaymongoPaymentSession?> latest(String chargeId) async {
     final rows = await SupabaseConfig.client
         .from('paymongo_payment_sessions')

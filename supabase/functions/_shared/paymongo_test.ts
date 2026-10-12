@@ -1,7 +1,7 @@
 import { GatewayError, PayMongoClient, confirmedPayment, gatewayConfig, qrDetails, safeTestUrl,
   validateIntent, verifyWebhookSignature, type Session } from './paymongo.ts'
 import { handleRequest } from '../paymongo-payments/handler.ts'
-import { generatePaymentQr, synchronizePayment } from './paymongo_store.ts'
+import { cancelUnpaidRequests, generatePaymentQr, synchronizePayment } from './paymongo_store.ts'
 
 function assert(value: unknown, message = 'Assertion failed'): asserts value { if (!value) throw new Error(message) }
 function rejects(action: () => unknown) {
@@ -15,6 +15,57 @@ function paidIntent() {
     metadata:{gateway_session_id:'session',charge_id:'bill'}, payments:[{id:'pay_Test',attributes:{
       status:'paid',amount:350000,currency:'PHP',livemode:false,payment_intent_id:'pi_Test',source:{type:'qrph'},paid_at:1791417600,
     }}] } } }
+}
+
+for (const outcome of ['cancelled', 'succeeded', 'unconfirmed']) {
+  Deno.test(`manual switch cancels unpaid requests and handles ${outcome}`, async () => {
+    let stored = {...session}
+    let cancelled = false
+    let settles = 0
+    const query = {
+      select(){return this},
+      in(_column: string, statuses: string[]){
+        assert(JSON.stringify(statuses) === JSON.stringify(['creating', 'pending']))
+        return Promise.resolve({data:[stored],error:null})
+      },
+      update(patch: any){ stored = {...stored,...patch}; return this },
+      eq(){return this}, neq(){return this},
+      single(){return Promise.resolve({data:stored,error:null})},
+    }
+    const admin = {from:()=>query, rpc:async()=>{
+      settles++
+      stored = {...stored,status:'succeeded'}
+      return {data:stored,error:null}
+    }}
+    const client = {
+      config:{ready:true,environment:'test'},
+      retrieve:async()=> {
+        if (outcome === 'succeeded') return paidIntent()
+        const payload = paidIntent()
+        Object.assign(payload.data.attributes, {
+          status:cancelled && outcome === 'cancelled' ? 'cancelled' : 'processing', payments:[],
+        })
+        return payload
+      },
+      request:async(path:string)=>{
+        assert(path === 'payment_intents/pi_Test/cancel')
+        cancelled = true
+        return {}
+      },
+    } as unknown as PayMongoClient
+    if (outcome === 'unconfirmed') {
+      let failed = false
+      try { await cancelUnpaidRequests(admin,client) } catch (error) {
+        assert(error instanceof GatewayError && error.message.includes('Manual mode is saved'))
+        failed = true
+      }
+      assert(failed && stored.status !== 'cancelled')
+    } else {
+      await cancelUnpaidRequests(admin,client)
+      assert(stored.status === outcome)
+      assert(outcome === 'succeeded' ? settles === 1 && !cancelled : cancelled)
+    }
+  })
 }
 
 Deno.test('configuration is disabled without keys and live requires explicit enablement', () => {

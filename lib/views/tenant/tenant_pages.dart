@@ -1,6 +1,7 @@
 import '../../core/widgets/configured_choice_field.dart';
 import '../../core/config/supabase_config.dart';
 import '../../services/payment_collection_settings_service.dart';
+import '../../services/paymongo_payment_service.dart';
 import '../shared/paymongo_payment_page.dart';
 import '../shared/paymongo_sessions_section.dart';
 import '../shared/report_addenda.dart';
@@ -2413,7 +2414,9 @@ class UploadPaymentProofPage extends StatefulWidget {
       {this.targetPayment,
       super.key,
       this.paymentOptionsLoader,
+      this.gatewayService = const PaymongoPaymentService(),
       this.collectionSettingsService});
+  final PaymongoPaymentService gatewayService;
   final Payment? targetPayment;
   final Future<List<DormitoryOption>> Function(String group)?
       paymentOptionsLoader;
@@ -2430,6 +2433,28 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
   TableRefreshSubscription? _collectionSubscription;
   bool _checkingMode = false;
   String? _modeError;
+  PaymongoPaymentSession? _blockingRequest;
+
+  Future<void> _checkExistingRequest() async {
+    final bill = selectedPayment;
+    if (bill == null) return;
+    final request = await widget.gatewayService.blockingReceipt(bill.id);
+    if (mounted && selectedPayment?.id == bill.id) {
+      setState(() => _blockingRequest = request);
+    }
+  }
+
+  Future<void> _resolveExistingRequest() async {
+    final request = _blockingRequest;
+    if (request == null) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => PaymongoPaymentPage(
+            payment: selectedPayment,
+            initialSession: request,
+            environment: request.environment,
+            service: widget.gatewayService)));
+    if (mounted) await _loadCollectionMode();
+  }
 
   Future<void> _loadCollectionMode() async {
     if (_checkingMode) return;
@@ -2442,6 +2467,9 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
               const PaymentCollectionSettingsService())
           .load();
       if (mounted) setState(() => _collectionSettings = settings);
+      if (settings.mode == PaymentCollectionMode.manual) {
+        await _checkExistingRequest();
+      }
     } catch (_) {
       if (mounted)
         setState(() =>
@@ -2638,6 +2666,7 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
   }
 
   Future<void> _submit() async {
+    if (submitting) return;
     if (_paymentOption == null) {
       showAppSnackBar(context, 'Select an active payment method.');
       return;
@@ -2659,6 +2688,13 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
     setState(() => submitting = true);
 
     try {
+      await _checkExistingRequest();
+      if (!mounted) return;
+      if (_blockingRequest != null) {
+        showAppSnackBar(context,
+            'Open the existing automatic request before submitting this receipt.');
+        return;
+      }
       await TenantController.instance.submitPaymentProof(
         paymentId: selectedPayment?.id,
         amount: parsedAmount,
@@ -2677,7 +2713,15 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      showAppSnackBar(context, 'Failed to submit payment proof: $e');
+      if (e.toString().contains('An automatic payment is still active')) {
+        await _loadCollectionMode();
+        if (!mounted) return;
+        showAppSnackBar(context,
+            'An automatic request still covers this bill. Open it to check or cancel it; contact staff if it needs reconciliation.');
+      } else {
+        showAppSnackBar(
+            context, 'Could not submit the receipt. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => submitting = false);
     }
@@ -2716,6 +2760,24 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_blockingRequest != null) ...[
+              CarmelitaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Existing automatic payment request',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    Text(_blockingRequest!.status == 'needs_review'
+                        ? 'This bill has a payment that needs staff reconciliation. Contact dormitory staff before submitting another receipt.'
+                        : 'Manual mode is selected, but an earlier QR request still covers this bill. Check its status and cancel it if unpaid before uploading a receipt.'),
+                    TextButton(
+                        onPressed: _resolveExistingRequest,
+                        child: const Text('Open existing request')),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
             if (widget.targetPayment != null) ...[
               SizedBox(
                 width: double.infinity,
@@ -2775,7 +2837,9 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
                     );
                     amountController.text =
                         selectedPayment!.outstandingAmount.toStringAsFixed(2);
+                    _blockingRequest = null;
                   });
+                  _loadCollectionMode();
                 },
               ),
               const SizedBox(height: 14),
@@ -3007,8 +3071,12 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
               width: double.infinity,
               height: 48,
               child: FilledButton(
-                onPressed:
-                    submitting || _paymentOption == null ? null : _submit,
+                onPressed: submitting ||
+                        _checkingMode ||
+                        _blockingRequest != null ||
+                        _paymentOption == null
+                    ? null
+                    : _submit,
                 child: submitting
                     ? const SizedBox(
                         width: 20,

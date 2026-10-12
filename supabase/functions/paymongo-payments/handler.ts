@@ -1,6 +1,6 @@
 import { authenticatedClients, corsHeaders, json } from '../_shared/cloudinary.ts'
 import { GatewayError, PayMongoClient, gatewayConfig } from '../_shared/paymongo.ts'
-import { generatePaymentQr, synchronizePayment } from '../_shared/paymongo_store.ts'
+import { cancelUnpaidRequests, generatePaymentQr, synchronizePayment } from '../_shared/paymongo_store.ts'
 
 const uuid = (value: unknown) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 export async function handleRequest(request: Request, dependencies: {
@@ -47,6 +47,8 @@ export async function handleRequest(request: Request, dependencies: {
       }
       const { data, error } = await caller.rpc('set_payment_collection_mode', { p_mode: body.mode })
       if (error) throw new GatewayError('Could not save payment mode. Refresh and try again.', 409)
+      // Save first: the database settings lock stops new automatic requests.
+      if (body.mode === 'manual') await cancelUnpaidRequests(admin, client)
       return json({ settings: { ...data, paymongo_ready: config.ready, environment: config.environment } })
     }
     if (!config.ready) throw new GatewayError('PayMongo is not connected yet. Contact dormitory staff.', 503)

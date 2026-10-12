@@ -76,3 +76,37 @@ export async function generatePaymentQr(admin: any, client: PayMongoClient, orig
     throw error
   }
 }
+
+export async function cancelUnpaidRequests(admin: any, client: PayMongoClient) {
+  const { data: requests, error } = await admin.from('paymongo_payment_sessions')
+    .select().in('status', ['creating', 'pending'])
+  if (error) throw new GatewayError('Manual mode is saved, but QR requests could not be loaded. Select Manual again to retry.', 503)
+  let incomplete = 0
+  for (const original of requests ?? []) {
+    try {
+      if (!client.config.ready || original.environment !== client.config.environment) {
+        throw new GatewayError('Payment configuration unavailable')
+      }
+      let session = original
+      if (session.status === 'creating') {
+        // Resolve interrupted provider creation using its original idempotency keys.
+        // Never mark a request cancelled while another worker is creating its QR.
+        const { data: claimed, error: claimError } = await admin.rpc('claim_paymongo_creation', { p_session_id: session.id })
+        if (claimError || !claimed) throw new GatewayError('QR generation is in progress')
+        session = await generatePaymentQr(admin, client, claimed)
+      }
+      session = await synchronizePayment(admin, client, session)
+      if (['succeeded', 'needs_review', 'cancelled', 'expired', 'failed'].includes(session.status)) continue
+      if (!session.provider_intent_id) throw new GatewayError('Provider request unavailable')
+      await client.request(`payment_intents/${session.provider_intent_id}/cancel`, 'POST', {}, `${session.id}:cancel`)
+      session = await synchronizePayment(admin, client, session)
+      if (!['cancelled', 'succeeded', 'needs_review', 'expired', 'failed'].includes(session.status)) {
+        throw new GatewayError('Cancellation not confirmed')
+      }
+    } catch (_) {
+      incomplete++
+    }
+  }
+  if (incomplete) throw new GatewayError(
+    `Manual mode is saved, but ${incomplete} unpaid QR request(s) could not be cancelled yet. Select Manual again to retry.`, 409)
+}

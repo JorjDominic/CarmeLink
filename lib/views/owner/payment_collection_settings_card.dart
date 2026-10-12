@@ -47,7 +47,10 @@ class _PaymentCollectionSettingsCardState
   }
 
   Future<void> _save(PaymentCollectionMode mode) async {
-    if (_busy || _settings?.mode == mode) return;
+    if (_busy ||
+        (_settings?.mode == mode && mode != PaymentCollectionMode.manual)) {
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -57,10 +60,22 @@ class _PaymentCollectionSettingsCardState
       if (mounted) {
         setState(() => _settings = settings);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment collection mode saved.')),
+          SnackBar(
+              content: Text(mode == PaymentCollectionMode.manual
+                  ? 'Manual mode saved. Unpaid QR requests cancelled.'
+                  : 'Payment collection mode saved.')),
         );
       }
     } catch (error) {
+      // Cancellation can fail after Manual has already been saved.
+      if (error is PaymentGatewayException) {
+        try {
+          final settings = await widget.service.load();
+          if (mounted) setState(() => _settings = settings);
+        } catch (_) {
+          // Keep the actionable error if refreshing settings also fails.
+        }
+      }
       if (mounted) {
         setState(() => _error = error is PaymentGatewayException
             ? error.message
@@ -123,6 +138,10 @@ class _PaymentCollectionSettingsCardState
               'Manual: tenants submit a receipt photo for owner or caretaker review.',
             ),
             const Text(
+              'Switching to Manual automatically cancels unpaid QR requests. '
+              'Payments already received remain recorded or available for staff reconciliation.',
+            ),
+            const Text(
               'Automatic: PayMongo QR Ph confirms supported wallet and bank app payments.',
             ),
             if (settings != null && !settings.paymongoReady) ...[
@@ -152,6 +171,10 @@ class _PaymentCollectionSettingsCardState
               const SizedBox(height: 8),
               Text(_error!,
                   style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              TextButton(
+                  onPressed:
+                      _busy ? null : () => _save(PaymentCollectionMode.manual),
+                  child: const Text('Retry Manual and cancel unpaid requests')),
             ],
           ],
         ),
