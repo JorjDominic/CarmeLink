@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/utils/financial_snapshot.dart';
 
 import '../models/models.dart';
 import '../services/curfew_service.dart';
@@ -71,11 +72,7 @@ class GuardianController extends ChangeNotifier {
   String? get error => _error;
   bool get loadedOnce => _loadedOnce;
 
-  double get outstandingTotal => _payments
-      .where((payment) =>
-          !payment.isDeposit &&
-          !(payment.isRent && !payment.isDueNow) &&
-          (payment.isDue || payment.isPending || payment.isRejected))
+  double get outstandingTotal => FinancialSnapshot.outstandingBills(_payments)
       .fold<double>(0, (sum, payment) => sum + payment.outstandingAmount);
 
   List<GateEvent> get gateEvents => List.unmodifiable(_gateEvents);

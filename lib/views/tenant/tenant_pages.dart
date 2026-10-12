@@ -1,6 +1,7 @@
 import '../../core/widgets/configured_choice_field.dart';
 import '../../core/config/supabase_config.dart';
 import '../../services/payment_collection_settings_service.dart';
+import '../../core/utils/financial_snapshot.dart';
 import '../../services/paymongo_payment_service.dart';
 import '../shared/paymongo_payment_page.dart';
 import '../shared/paymongo_sessions_section.dart';
@@ -1463,10 +1464,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
           final allPayments = c.payments
               .where((p) => !p.isDeposit && !futurePayments.contains(p))
               .toList();
-          final currentPayments = allPayments
-              .where((p) =>
-                  !p.isVoided && !p.isVerified && p.outstandingAmount > 0)
-              .toList();
+          final currentPayments =
+              FinancialSnapshot.outstandingBills(allPayments).toList();
           final duePayments =
               c.duePayments.where(allPayments.contains).toList();
           final pendingPayments =
@@ -1762,9 +1761,8 @@ class TenantBillingDetailsPage extends StatelessWidget {
               .where((p) => !p.isVoided && p.outstandingAmount > 0)
               .toList()
             ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
-          final dueNowBills = openBills
-              .where((p) => !p.isDeposit && !(p.isRent && !p.isDueNow))
-              .toList();
+          final dueNowBills =
+              FinancialSnapshot.outstandingBills(openBills).toList();
 
           final futureRentBills =
               openBills.where((p) => p.isRent && !p.isDueNow).toList();
@@ -1830,7 +1828,7 @@ class TenantBillingDetailsPage extends StatelessWidget {
               const SizedBox(height: 18),
               const SecurityDepositCard(compact: true),
               const SizedBox(height: 18),
-              SectionTitle('Due now (${dueNowBills.length})'),
+              SectionTitle('Outstanding bills (${dueNowBills.length})'),
               const SizedBox(height: 10),
               if (dueNowBills.isEmpty)
                 const EmptyState(

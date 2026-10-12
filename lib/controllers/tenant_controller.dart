@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/utils/financial_snapshot.dart';
 
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
@@ -81,23 +82,18 @@ class TenantController extends ChangeNotifier {
   bool get paymentsLoadedOnce => _paymentsLoadedOnce;
 
   double get outstandingBalance {
-    final list = payments;
-    return list
-        .where((p) =>
-            !p.isDeposit &&
-            !(p.isRent && !p.isDueNow) &&
-            (p.isDue || p.isPending || p.isRejected))
+    return FinancialSnapshot.outstandingBills(payments)
         .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
   }
 
-  double get outstandingRent => payments
-      .where((p) =>
-          p.isRent && p.isDueNow && (p.isDue || p.isPending || p.isRejected))
+  double get outstandingRent => FinancialSnapshot.outstandingBills(payments)
+      .where((p) => p.isRent)
       .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
 
-  double get outstandingUtilities => payments
-      .where((p) => p.isUtility && (p.isDue || p.isPending || p.isRejected))
-      .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
+  double get outstandingUtilities =>
+      FinancialSnapshot.outstandingBills(payments)
+          .where((p) => p.isUtility)
+          .fold<double>(0.0, (sum, p) => sum + p.outstandingAmount);
 
   double get securityDepositBalance => payments
       .where((p) => p.isDeposit)

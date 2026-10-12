@@ -71,6 +71,58 @@ void main() {
       ];
 
   group('PaymentVerificationPage Widget Tests', () {
+    testWidgets('outstanding drill-down shows every bill contributing to 9229',
+        (tester) async {
+      tester.view.physicalSize = const Size(1200, 2200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final today = DateTime.now();
+      Payment bill(String id, double amount, String category, int days,
+              String status) =>
+          Payment(
+              id: id,
+              label: id,
+              tenantName: id,
+              amount: amount,
+              remainingBalance: amount,
+              dueDate: today.add(Duration(days: days)),
+              category: category,
+              status: status);
+      OwnerController.instance.setPaymentsForTesting([
+        bill('overdue-rent', 2500, 'rent', -3, 'Due'),
+        bill('today-rent', 2800, 'rent', 0, 'Due'),
+        bill('future-electricity', 3829, 'electricity', 49, 'Upcoming'),
+        bill('future-damage', 100, 'damage', 7, 'Upcoming'),
+        bill('scheduled-rent', 2500, 'rent', 30, 'Upcoming'),
+        bill('deposit', 2800, 'deposit', 0, 'Due'),
+      ]);
+      expect(OwnerController.instance.totalOutstandingRevenue, 9229);
+      await tester.pumpWidget(buildTestable(const PaymentVerificationPage()));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'today-rent');
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Outstanding'));
+      await tester.tap(find.text('Outstanding'));
+      await tester.pumpAndSettle();
+      expect(find.text('Outstanding (4)'), findsOneWidget);
+      for (final label in [
+        'overdue-rent',
+        'today-rent',
+        'future-electricity',
+        'future-damage'
+      ]) {
+        expect(find.text(label), findsWidgets);
+      }
+      expect(find.text('scheduled-rent'), findsNothing);
+      expect(find.text('deposit'), findsNothing);
+      expect(
+          tester
+              .widget<TextField>(find.byType(TextField).first)
+              .controller!
+              .text,
+          isEmpty);
+    });
     testWidgets('renders financial metrics grid and status chips',
         (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);

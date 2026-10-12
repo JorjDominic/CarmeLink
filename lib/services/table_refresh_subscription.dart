@@ -59,6 +59,7 @@ class TableRefreshSubscription {
       yield 'billing_charges';
       yield 'payment_transactions';
       yield 'billing_charge_actions';
+      yield 'paymongo_payment_sessions';
     }
   }
 

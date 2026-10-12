@@ -1,8 +1,41 @@
 import 'package:carmelitas_dormitory_system/core/utils/financial_snapshot.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:carmelitas_dormitory_system/controllers/tenant_controller.dart';
+import 'package:carmelitas_dormitory_system/core/utils/billing_management_policy.dart';
 
 void main() {
+  test('tenant, billing and financial totals agree for upcoming issued charges',
+      () {
+    final today = DateTime.now();
+    final payments = [
+      for (final category in ['electricity', 'damage'])
+        Payment(
+            id: category,
+            label: category,
+            amount: category == 'damage' ? 100 : 3829,
+            remainingBalance: category == 'damage' ? 100 : 3829,
+            status: 'Upcoming',
+            category: category,
+            dueDate: today.add(const Duration(days: 30))),
+      Payment(
+          id: 'future-rent',
+          label: 'future-rent',
+          amount: 2500,
+          status: 'Upcoming',
+          category: 'rent',
+          dueDate: today.add(const Duration(days: 30))),
+    ];
+    final tenant = TenantController.instance;
+    addTearDown(tenant.clear);
+    tenant.setPaymentsForTesting(payments);
+    expect(tenant.outstandingBalance, 3929);
+    expect(tenant.outstandingUtilities, 3829);
+    expect(FinancialSnapshot(payments).outstanding, tenant.outstandingBalance);
+    expect(BillingManagementPolicy.outstandingNow(payments),
+        tenant.outstandingBalance);
+    expect(FinancialSnapshot.outstandingBills(payments).length, 2);
+  });
   Payment bill(String id, String status, double amount,
           {double? balance,
           double? verified,

@@ -2,6 +2,22 @@ import '../../models/models.dart';
 
 /// Verified cash is counted separately from deposit credits and unpaid bills.
 class FinancialSnapshot {
+  /// Issued unpaid charges, excluding deposits, voided bills and future rent.
+  /// Upcoming utilities and other issued charges remain outstanding balances.
+  static Iterable<Payment> outstandingBills(Iterable<Payment> payments,
+      {DateTime? asOf}) {
+    final now = asOf ?? DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return payments.where((payment) =>
+        !payment.isDeposit &&
+        !payment.isVoided &&
+        payment.outstandingAmount > 0 &&
+        !(payment.isRent &&
+            DateTime(payment.dueDate.year, payment.dueDate.month,
+                    payment.dueDate.day)
+                .isAfter(today)));
+  }
+
   FinancialSnapshot(Iterable<Payment> payments, {DateTime? asOf}) {
     final now = asOf ?? DateTime.now();
     final today = DateTime(now.year, now.month, now.day);

@@ -1,4 +1,5 @@
 import '../../models/models.dart';
+import 'financial_snapshot.dart';
 
 enum BillingBucket { all, rent, utilities, other }
 
@@ -101,11 +102,7 @@ abstract final class BillingManagementPolicy {
   }
 
   static Iterable<Payment> payableNow(Iterable<Payment> payments) =>
-      payments.where((payment) =>
-          !payment.isDeposit &&
-          !payment.isVoided &&
-          !payment.isVerified &&
-          !payment.isUpcoming);
+      FinancialSnapshot.outstandingBills(payments);
 
   static double outstandingNow(Iterable<Payment> payments) =>
       payableNow(payments)

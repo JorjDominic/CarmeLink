@@ -2793,16 +2793,21 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
           final allPayments = controller.payments
               .where((p) => targetPayment == null || p.id == targetPayment)
               .toList();
-          final pendingCount = controller.pendingPaymentProofs;
-          final overdueCount = controller.overduePaymentCount;
+          final pendingCount =
+              allPayments.where((p) => !p.isDeposit && p.isPending).length;
+          final overdueCount =
+              allPayments.where((p) => !p.isDeposit && p.isOverdue).length;
           final verifiedCount = allPayments.where((p) => p.isVerified).length;
           final dueCount = allPayments
               .where((p) => !p.isDeposit && p.isDue && !p.isOverdue)
               .length;
           final rejectedCount = allPayments.where((p) => p.isRejected).length;
 
-          final totalCollected = controller.totalCollectedRevenue;
-          final totalOutstanding = controller.totalOutstandingRevenue;
+          final financial = FinancialSnapshot(allPayments);
+          final outstandingBills =
+              FinancialSnapshot.outstandingBills(allPayments).toList();
+          final totalCollected = financial.collected;
+          final totalOutstanding = financial.outstanding;
 
           final dashboardItems = [
             MutedDashboardItem(
@@ -2816,18 +2821,26 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
             MutedDashboardItem(
               label: 'Collected',
               value: money(totalCollected),
-              detail: '$verifiedCount verified',
+              detail: '${financial.collectedBillCount} bills with payments',
               icon: Icons.check_circle_outline_rounded,
               color: const Color(0xFF56886B),
-              onTap: () => setState(() => _filter = 'verified'),
+              onTap: () => setState(() {
+                _filter = 'collected';
+                _searchQuery = '';
+                _searchController.clear();
+              }),
             ),
             MutedDashboardItem(
               label: 'Outstanding',
               value: money(totalOutstanding),
-              detail: '${dueCount + pendingCount + overdueCount} uncollected',
+              detail: '${outstandingBills.length} unpaid bills',
               icon: Icons.account_balance_wallet_outlined,
               color: const Color(0xFF8C7355),
-              onTap: () => setState(() => _filter = 'due'),
+              onTap: () => setState(() {
+                _filter = 'outstanding';
+                _searchQuery = '';
+                _searchController.clear();
+              }),
             ),
             MutedDashboardItem(
               label: 'Overdue',
@@ -2848,6 +2861,10 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                   .toList()
               : allPayments;
           final filteredByTab = switch (_filter) {
+            'outstanding' => outstandingBills,
+            'collected' => allPayments
+                .where((p) => !p.isDeposit && p.collectedAmount > 0)
+                .toList(),
             'pending' => allPayments.where((p) => p.isPending).toList(),
             'due' => workspacePayments
                 .where((p) => !p.isDeposit && p.isDue && !p.isOverdue)
@@ -2996,6 +3013,13 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
                         onTap: () => setState(() => _filter = 'pending'),
                       ),
                     if (_workspace == 'bills') ...[
+                      _FilterChip(
+                        label: 'Outstanding (${outstandingBills.length})',
+                        selected: _filter == 'outstanding',
+                        badgeColor: const Color(0xFF8C7355),
+                        onTap: () => setState(() => _filter = 'outstanding'),
+                      ),
+                      const SizedBox(width: 8),
                       _FilterChip(
                         label: 'Due ($dueCount)',
                         selected: _filter == 'due',

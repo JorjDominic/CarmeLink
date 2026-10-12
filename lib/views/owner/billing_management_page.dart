@@ -310,9 +310,9 @@ class _BillingSummaryGrid extends StatelessWidget {
               (constraints.maxWidth - spacing * (columns - 1)) / columns;
           final cards = <Widget>[
             MetricCard(
-              label: 'Outstanding now',
+              label: 'Outstanding balance',
               value: _money(outstanding),
-              detail: 'Excludes deposits and future upcoming charges',
+              detail: 'Excludes deposits and future rent; includes issued charges',
               icon: Icons.account_balance_wallet_outlined,
             ),
             MetricCard(
