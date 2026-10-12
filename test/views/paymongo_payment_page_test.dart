@@ -5,6 +5,51 @@ import 'package:carmelitas_dormitory_system/views/shared/paymongo_payment_page.d
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:carmelitas_dormitory_system/controllers/tenant_controller.dart';
+import 'package:carmelitas_dormitory_system/models/models.dart';
+
+class _AdvanceGateway extends PaymongoPaymentService {
+  List<String>? selected;
+  bool confirmedRequested = false;
+  @override
+  Future<PaymongoPaymentSession?> confirmed(String id) async {
+    confirmedRequested = true;
+    return const PaymongoPaymentSession(
+        id: 'confirmed',
+        status: 'succeeded',
+        amountCentavos: 650000,
+        environment: 'test',
+        reference: 'pay_Receipt',
+        billBreakdown: [
+          PaymongoBillBreakdown(
+              chargeId: 'nov', title: 'November Rent', amountCentavos: 300000),
+          PaymongoBillBreakdown(
+              chargeId: 'dec', title: 'December Rent', amountCentavos: 350000),
+        ]);
+  }
+
+  @override
+  Future<PaymongoPaymentSession?> latest(String id) async => null;
+  @override
+  Future<PaymongoPaymentSession> createAdvance(List<String> ids) async {
+    selected = ids;
+    return const PaymongoPaymentSession(
+        id: 'advance',
+        status: 'pending',
+        amountCentavos: 650000,
+        environment: 'test',
+        billBreakdown: [
+          PaymongoBillBreakdown(
+              chargeId: 'nov', title: 'November Rent', amountCentavos: 300000),
+          PaymongoBillBreakdown(
+              chargeId: 'dec', title: 'December Rent', amountCentavos: 350000),
+        ]);
+  }
+
+  @override
+  Future<PaymongoPaymentSession> refresh(String id) async =>
+      throw StateError('No polling expected');
+}
 
 class _NeverCalledGateway extends PaymongoPaymentService {
   int calls = 0;
@@ -41,6 +86,110 @@ class _AutomaticSettings extends PaymentCollectionSettingsService {
 }
 
 void main() {
+  testWidgets('paid bill reopens the confirmed multi-month receipt',
+      (tester) async {
+    final gateway = _AdvanceGateway();
+    final paid = Payment(
+        id: 'dec',
+        label: 'December Rent',
+        amount: 3500,
+        remainingBalance: 0,
+        dueDate: DateTime(2026, 12, 1),
+        status: 'verified',
+        paymentMethod: 'PayMongo QR Ph (Demo Test)');
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: PaymongoPaymentPage(payment: paid, service: gateway))));
+    await tester.pumpAndSettle();
+    expect(gateway.confirmedRequested, isTrue);
+    expect(find.text('November Rent'), findsOneWidget);
+    expect(find.text('December Rent'), findsOneWidget);
+    expect(find.text('PHP 6500.00'), findsOneWidget);
+    expect(find.text('Reference: pay_Receipt'), findsOneWidget);
+    expect(find.text('Generate payment request'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets('selected rent months show balances and use one payment request',
+      (tester) async {
+    final november = Payment(
+        id: 'nov',
+        label: 'November Rent',
+        amount: 3500,
+        remainingBalance: 3000,
+        dueDate: DateTime(2026, 11, 1),
+        periodStart: DateTime(2026, 11, 1),
+        periodEnd: DateTime(2026, 11, 30),
+        status: 'upcoming');
+    final december = Payment(
+        id: 'dec',
+        label: 'December Rent',
+        amount: 3500,
+        dueDate: DateTime(2026, 12, 1),
+        periodStart: DateTime(2026, 12, 1),
+        periodEnd: DateTime(2026, 12, 31),
+        status: 'upcoming');
+    TenantController.instance.setPaymentsForTesting([
+      november,
+      december,
+      Payment(
+          id: 'utility',
+          label: 'Water',
+          amount: 500,
+          dueDate: DateTime(2026, 11, 1),
+          status: 'due',
+          category: 'utility')
+    ]);
+    addTearDown(() => TenantController.instance.setPaymentsForTesting([]));
+    final gateway = _AdvanceGateway();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: PaymongoPaymentPage(payment: november, service: gateway))));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('rent-month-utility')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('rent-month-dec')));
+    await tester.pumpAndSettle();
+    expect(find.text('PHP 6500.00'), findsOneWidget);
+    expect(find.text('Payment breakdown'), findsOneWidget);
+    expect(find.text('November 2026'), findsOneWidget);
+    expect(find.text('December 2026'), findsOneWidget);
+    await tester.ensureVisible(find.text('Generate payment request'));
+    await tester.tap(find.text('Generate payment request'));
+    await tester.pumpAndSettle();
+    expect(gateway.selected, unorderedEquals(['nov', 'dec']));
+    expect(find.byType(CheckboxListTile), findsNothing);
+    expect(find.text('November Rent'), findsOneWidget);
+    expect(find.text('December Rent'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets('confirmed payment keeps its saved month breakdown',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(
+            body: PaymongoPaymentPage(
+                initialSession: PaymongoPaymentSession(
+                    id: 'saved',
+                    status: 'succeeded',
+                    amountCentavos: 700000,
+                    environment: 'live',
+                    reference: 'pay_Saved',
+                    billBreakdown: [
+          PaymongoBillBreakdown(
+              chargeId: 'nov',
+              title: 'November 2026 Rent',
+              amountCentavos: 350000),
+          PaymongoBillBreakdown(
+              chargeId: 'dec',
+              title: 'December 2026 Rent',
+              amountCentavos: 350000),
+        ])))));
+    await tester.pumpAndSettle();
+    expect(find.text('November 2026 Rent'), findsWidgets);
+    expect(find.text('December 2026 Rent'), findsWidgets);
+    expect(find.text('PHP 7000.00'), findsOneWidget);
+    expect(find.text('Reference: pay_Saved'), findsOneWidget);
+    expect(find.text('Payment confirmed'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   testWidgets('payment entry follows the persisted automatic mode',
       (tester) async {
     await tester.pumpWidget(MaterialApp(

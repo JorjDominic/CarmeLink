@@ -52,9 +52,17 @@ export async function handleRequest(request: Request, dependencies: {
     if (!config.ready) throw new GatewayError('PayMongo is not connected yet. Contact dormitory staff.', 503)
     if (body.action === 'create') {
       if (profile.role !== 'tenant') return json({ error: 'Tenant access required' }, 403)
-      if (!uuid(body.charge_id)) throw new GatewayError('Choose a valid bill')
+      const chargeIds = body.charge_ids
+      if (chargeIds !== undefined) {
+        if (!Array.isArray(chargeIds) || chargeIds.length < 1 || chargeIds.length > 60
+          || !chargeIds.every(uuid) || new Set(chargeIds).size !== chargeIds.length) {
+          throw new GatewayError('Choose valid rent months')
+        }
+      } else if (!uuid(body.charge_id)) throw new GatewayError('Choose a valid bill')
       if (settings.environment !== config.environment) throw new GatewayError('Payment configuration needs owner attention', 409)
-      const { data, error } = await caller.rpc('begin_paymongo_payment', { p_charge_id: body.charge_id })
+      const { data, error } = chargeIds !== undefined
+        ? await caller.rpc('begin_paymongo_advance_payment', { p_charge_ids: chargeIds })
+        : await caller.rpc('begin_paymongo_payment', { p_charge_id: body.charge_id })
       if (error) throw new GatewayError(error.message, 409)
       let session = data.session
       if (data.is_new) session = await generatePaymentQr(admin, client, session)

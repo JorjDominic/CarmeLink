@@ -111,6 +111,21 @@ class _PaymongoSessionsSectionState extends State<PaymongoSessionsSection> {
                     Text(
                         '${s.isTest ? 'Test' : 'Live'} • ${s.status.replaceAll('_', ' ')}'),
                     if (s.issue != null) Text(s.issue!),
+                    if (s.billBreakdown.isNotEmpty)
+                      ExpansionTile(
+                          tilePadding: EdgeInsets.zero,
+                          title: Text(
+                              'Payment breakdown (${s.billBreakdown.length} bills)'),
+                          children: s.billBreakdown
+                              .map((item) => ListTile(
+                                  title: Text(item.title),
+                                  subtitle: item.periodStart == null
+                                      ? null
+                                      : Text(
+                                          '${item.periodStart!.year}-${item.periodStart!.month.toString().padLeft(2, '0')}'),
+                                  trailing: Text(
+                                      'PHP ${(item.amountCentavos / 100).toStringAsFixed(2)}')))
+                              .toList()),
                     Wrap(spacing: 8, children: [
                       if (!widget.staff)
                         TextButton(

@@ -210,4 +210,50 @@ try {
   await settle(testSession,'pi_Test','pay_Test');
   assert.equal(await scalar(`select credited_transaction_id from public.paymongo_payment_sessions where id='${testSession}'`),null);
   console.log('Demo credit SQL checks passed: shared manual/test balance, labels, duplicate protection, active test guards and disable switch.');
+  await db.exec(await read('202610120001_paymongo_advance_rent.sql'));
+  await db.exec("update public.payment_collection_settings set demo_test_credits=true,environment='test'");
+  await db.exec(`insert into public.billing_charges(id,tenant_id,title,category,original_amount,due_date,period_start,period_end,created_by)
+    values('${id(70)}','${tenant}','November 2026 Rent','rent',3500,'2026-11-01','2026-11-01','2026-11-30','${owner}'),
+    ('${id(71)}','${tenant}','December 2026 Rent','rent',3500,'2026-12-01','2026-12-01','2026-12-31','${owner}'),
+    ('${id(72)}','${tenant}','January 2027 Rent','rent',3500,'2027-01-01','2027-01-01','2027-01-31','${owner}'),
+    ('${id(73)}','${tenant}','February 2027 Rent','rent',3500,'2027-02-01','2027-02-01','2027-02-28','${owner}'),
+    ('${id(74)}','${tenant}','Water','utility',500,current_date,null,null,'${owner}'),
+    ('${id(75)}','${caretaker}','Other tenant rent','rent',500,current_date,null,null,'${owner}');`);
+  await login(owner,'owner');
+  await record(700,500,{bill:id(70)});
+  await login(tenant,'tenant');
+  const advance=ids=>db.query('select public.begin_paymongo_advance_payment($1::uuid[]) as value',[ids]);
+  await assert.rejects(()=>advance([]),/between 1 and 60/);
+  await assert.rejects(()=>advance([id(70),id(70)]),/only once/);
+  await assert.rejects(()=>advance([id(70),id(75)]),/Bill not found/);
+  await assert.rejects(()=>advance([id(70),id(74)]),/Only rent/);
+  const batch=(await advance([id(71),id(70)])).rows[0].value;
+  assert.equal(batch.session.amount_centavos,650000);
+  assert.deepEqual(batch.session.bill_breakdown.map(x=>x.title),['November 2026 Rent','December 2026 Rent']);
+  assert.deepEqual(batch.session.bill_breakdown.map(x=>x.amount_centavos),[300000,350000]);
+  assert.equal((await advance([id(70),id(71)])).rows[0].value.session.id,batch.session.id);
+  assert.equal((await advance([id(70),id(71)])).rows[0].value.is_new,false);
+  await assert.rejects(()=>advance([id(71),id(72)]),/active payment/);
+  await assert.rejects(()=>db.query('select public.begin_paymongo_payment($1)',[id(71)]),/active payment/);
+  await login(owner,'owner');
+  await assert.rejects(()=>record(701,100,{bill:id(71)}),/automatic payment is still active/);
+  await assert.rejects(()=>db.exec(`update public.paymongo_payment_sessions set bill_breakdown='[]' where id='${batch.session.id}'`),/immutable/);
+  await db.exec(`update public.paymongo_payment_sessions set provider_intent_id='pi_Advance',status='pending' where id='${batch.session.id}'`);
+  await login('', 'service_role');
+  await assert.rejects(()=>settle(batch.session.id,'pi_Advance','pay_Advance',649999),/does not match/);
+  assert.equal((await settle(batch.session.id,'pi_Advance','pay_Advance',650000)).rows[0].session.status,'succeeded');
+  await settle(batch.session.id,'pi_Advance','pay_Advance',650000);
+  assert.equal(await scalar(`select count(*) from public.payment_transactions where gateway_session_id='${batch.session.id}'`),2);
+  for(const billId of [id(70),id(71)]) assert.equal(Number(await scalar(`select remaining_balance from public.billing_charge_summaries where id='${billId}'`)),0);
+  await assert.rejects(()=>advance([id(70),id(71)]),/Tenant access/);
+  await login(tenant,'tenant');
+  await assert.rejects(()=>advance([id(70),id(71)]),/paid or voided/);
+  const changed=(await advance([id(72),id(73)])).rows[0].value.session;
+  await db.exec(`update public.paymongo_payment_sessions set provider_intent_id='pi_Changed',status='pending' where id='${changed.id}';
+    insert into public.billing_charge_actions(charge_id,action_type) values('${id(73)}','void')`);
+  await login('', 'service_role');
+  assert.equal((await settle(changed.id,'pi_Changed','pay_Changed',700000)).rows[0].session.status,'needs_review');
+  assert.equal(await scalar(`select count(*) from public.payment_transactions where gateway_session_id='${changed.id}'`),0);
+  assert.equal(Number(await scalar(`select remaining_balance from public.billing_charge_summaries where id='${id(72)}'`)),3500);
+  console.log('Advance rent SQL checks passed: saved month breakdown, partial balances, ownership, overlap guards, all-month settlement, duplicate confirmation and atomic reconciliation.');
 } catch(error) { console.error(error.message); process.exitCode=1; } finally { await db.close(); }

@@ -98,6 +98,32 @@ Deno.test('owner cannot enable automatic collection without credentials', async 
   assert(response.status===400)
 })
 
+Deno.test('advance requests validate month IDs and use the server-calculated session', async () => {
+  const ids = ['00000000-0000-0000-0000-000000000070', '00000000-0000-0000-0000-000000000071']
+  let calls = 0
+  const saved = {...session, provider_intent_id:null, status:'succeeded', amount_centavos:650000,
+    bill_breakdown:ids.map((id,i)=>({charge_id:id,title:`Month ${i+1}`,amount_centavos:i===0?300000:350000}))}
+  const query = {select(){return this},eq(){return this},single(){return Promise.resolve({data:{role:'tenant',environment:'test'},error:null})}}
+  const caller = {from:()=>query, rpc:async (name:string,args:any)=>{
+    calls++
+    assert(name==='begin_paymongo_advance_payment')
+    assert(JSON.stringify(args.p_charge_ids)===JSON.stringify(ids))
+    return {data:{session:saved,is_new:false},error:null}
+  }}
+  const dependencies = {env:(k:string)=>({PAYMONGO_PUBLIC_KEY:'pk_test_abc',PAYMONGO_SECRET_KEY:'sk_test_abc',PAYMONGO_WEBHOOK_SECRET:'hook'} as Record<string,string>)[k],
+    authenticate:async()=>({caller,admin:{},user:{id:'tenant'}} as any)}
+  for(const invalid of [[],[ids[0],ids[0]],['not-a-uuid'],[null],Array(61).fill(ids[0])]) {
+    const result=await handleRequest(new Request('https://app.example',{method:'POST',body:JSON.stringify({action:'create',charge_ids:invalid})}),dependencies)
+    assert(result.status===400)
+  }
+  assert(calls===0)
+  const result=await handleRequest(new Request('https://app.example',{method:'POST',body:JSON.stringify({action:'create',charge_ids:ids,amount_centavos:1})}),dependencies)
+  assert(result.status===200)
+  const body=await result.json()
+  assert(body.session.amount_centavos===650000 && body.session.bill_breakdown.length===2)
+  assert(Number(calls)===1)
+})
+
 Deno.test('interrupted QR attachment resumes the original provider intent', async () => {
   let stored: Session = { ...session, status:'creating',provider_intent_id:null,provider_method_id:null }
   let intentCreates=0

@@ -1,6 +1,27 @@
 import '../core/config/supabase_config.dart';
 import 'payment_collection_settings_service.dart';
 
+class PaymongoBillBreakdown {
+  const PaymongoBillBreakdown(
+      {required this.chargeId,
+      required this.title,
+      required this.amountCentavos,
+      this.periodStart,
+      this.periodEnd,
+      this.dueDate});
+  final String chargeId, title;
+  final int amountCentavos;
+  final DateTime? periodStart, periodEnd, dueDate;
+  factory PaymongoBillBreakdown.fromJson(Map<String, dynamic> row) =>
+      PaymongoBillBreakdown(
+          chargeId: row['charge_id'] as String,
+          title: row['title'] as String,
+          amountCentavos: (row['amount_centavos'] as num).toInt(),
+          periodStart: DateTime.tryParse(row['period_start']?.toString() ?? ''),
+          periodEnd: DateTime.tryParse(row['period_end']?.toString() ?? ''),
+          dueDate: DateTime.tryParse(row['due_date']?.toString() ?? ''));
+}
+
 class PaymongoPaymentSession {
   const PaymongoPaymentSession(
       {required this.id,
@@ -13,7 +34,9 @@ class PaymongoPaymentSession {
       this.reference,
       this.issue,
       this.billTitle,
-      this.tenantName});
+      this.tenantName,
+      this.billBreakdown = const []});
+  final List<PaymongoBillBreakdown> billBreakdown;
   final String id, status, environment;
   final int amountCentavos;
   final String? qrImage, testUrl, reference, issue;
@@ -31,6 +54,10 @@ class PaymongoPaymentSession {
           status: row['status'] as String,
           amountCentavos: (row['amount_centavos'] as num).toInt(),
           environment: row['environment'] as String,
+          billBreakdown: (row['bill_breakdown'] as List? ?? const [])
+              .map((item) => PaymongoBillBreakdown.fromJson(
+                  Map<String, dynamic>.from(item)))
+              .toList(),
           qrImage: row['qr_image'] as String?,
           testUrl: row['test_url'] as String?,
           reference: row['provider_payment_id'] as String?,
@@ -50,7 +77,9 @@ class PaymongoPaymentService {
     final rows = await SupabaseConfig.client
         .from('paymongo_payment_sessions')
         .select()
-        .eq('charge_id', chargeId)
+        .contains('bill_breakdown', [
+          {'charge_id': chargeId}
+        ])
         .order('created_at', ascending: false)
         .limit(1);
     return rows.isEmpty ? null : PaymongoPaymentSession.fromJson(rows.first);
@@ -59,7 +88,7 @@ class PaymongoPaymentService {
   Future<List<PaymongoPaymentSession>> staffActive() async {
     final rows = await SupabaseConfig.client
         .from('paymongo_payment_sessions')
-        .select(
+        .select('bill_breakdown,'
             'id,status,amount_centavos,environment,expires_at,provider_payment_id,issue,'
             'billing_charges(title),profiles!paymongo_payment_sessions_tenant_id_fkey(full_name)')
         .inFilter('status', ['creating', 'pending', 'needs_review'])
@@ -68,8 +97,24 @@ class PaymongoPaymentService {
     return rows.map(PaymongoPaymentSession.fromJson).toList();
   }
 
+  Future<PaymongoPaymentSession?> confirmed(String chargeId) async {
+    final rows = await SupabaseConfig.client
+        .from('paymongo_payment_sessions')
+        .select()
+        .contains('bill_breakdown', [
+          {'charge_id': chargeId}
+        ])
+        .eq('status', 'succeeded')
+        .not('credited_transaction_id', 'is', null)
+        .order('settled_at', ascending: false)
+        .limit(1);
+    return rows.isEmpty ? null : PaymongoPaymentSession.fromJson(rows.first);
+  }
+
   Future<PaymongoPaymentSession> create(String chargeId) =>
       _request({'action': 'create', 'charge_id': chargeId});
+  Future<PaymongoPaymentSession> createAdvance(List<String> chargeIds) =>
+      _request({'action': 'create', 'charge_ids': chargeIds});
   Future<PaymongoPaymentSession> refresh(String id) =>
       _request({'action': 'status', 'session_id': id});
   Future<PaymongoPaymentSession> cancel(String id) =>

@@ -2322,6 +2322,17 @@ class _TenantPaymentCard extends StatelessWidget {
                   ),
                 ),
               ],
+              if (payment.paymentMethod?.startsWith('PayMongo QR Ph') ==
+                  true) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                            builder: (_) =>
+                                PaymongoPaymentPage(payment: payment))),
+                    icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                    label: const Text('View payment breakdown')),
+              ],
               if (payment.canSubmitProof ||
                   (payment.receiptPath != null &&
                       payment.receiptPath!.isNotEmpty)) ...[

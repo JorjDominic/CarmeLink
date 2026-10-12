@@ -43,9 +43,21 @@ link. Check the account/API response before continuing provider testing.
 
 ## Payment and verification behavior
 
-- The backend derives the full outstanding bill amount in centavos. The tenant
-  cannot choose another tenant's bill, override the amount, or pay deposits here.
-- An active session is reused per bill/environment. Provider creation stages
+- The backend derives outstanding bill amounts in centavos. Tenants may pay one
+  bill or select multiple scheduled rent months in one QR payment. They cannot
+  choose another tenant's bill, override amounts, or pay deposits here.
+- Rent selection shows each month's billing period, due date, remaining amount,
+  and the combined total. Months come from existing contract/staff rent bills;
+  this does not create charges beyond the contract or hold unallocated credit.
+  The session saves an immutable month breakdown, available after confirmation
+  through **View payment breakdown** on each credited tenant bill and on active
+  staff requests. One confirmed provider payment creates one ledger entry per
+  selected bill with the same provider reference.
+- Overlapping active requests block new payments and staff receipts for every
+  selected month. Confirmation validates all balances before crediting any month.
+  A changed/voided bill sends the entire payment to staff reconciliation, with no
+  partial allocation. Repeated confirmations never credit the months twice.
+- An active session is reused per exact bill selection/environment. Provider creation stages
   use distinct, stable idempotency keys. Interrupted stages retain IDs and may
   resume after a lease; creation is not retried beyond the key lifetime.
 - Payment confirmation requires a fresh secret-key provider read matching the
@@ -56,7 +68,7 @@ link. Check the account/API response before continuing provider testing.
   confirmations create labeled verified `payment_transactions` while
   `payment_collection_settings.demo_test_credits` is true. Disable this setting
   before real billing. Live confirmations create one verified transaction
-  with immutable gateway provenance and a provider payment reference.
+  per selected bill with immutable gateway provenance and a provider payment reference.
 - Owners remain the enabling actor in the existing required reviewer field;
   review notes explicitly identify automatic provider confirmation. This is
   not a manual owner approval. Live confirmation notifies the tenant/guardian.
@@ -87,6 +99,11 @@ Ordinary transfers to a personal bank/GCash account cannot be automatically
 verified by this integration. Only bill-linked PayMongo QR Ph payments qualify.
 
 ## Verification
+
+Advance payment rollout requires applying
+`202610120001_paymongo_advance_rent.sql`, deploying the updated `paymongo-payments`
+function, and releasing the updated Flutter app, in that order. The migration
+backfills month breakdowns for existing sessions and retains their provider IDs.
 
 - `flutter test test/views/payment_collection_settings_card_test.dart test/views/paymongo_payment_page_test.dart test/views/tenant_payments_test.dart`
 - `npx --yes deno test --allow-env supabase/functions/_shared/paymongo_test.ts`
