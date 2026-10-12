@@ -42,7 +42,10 @@ class ContractDocumentService {
       TenantContract contract) async {
     final existing = await listDocuments(contract.id);
     final generated = existing.where((item) => item.isGenerated).firstOrNull;
-    if (generated != null) return generated;
+    if (generated != null) {
+      await finalizeDigitalExecution(contract);
+      return generated;
+    }
     if (await _assignedRoomNumber(contract.tenantId) == null) return null;
     try {
       return (await generateContract(contract)).document;
@@ -50,7 +53,10 @@ class ContractDocumentService {
       // Another staff session may have registered the PDF in the meantime.
       final documents = await listDocuments(contract.id);
       final winner = documents.where((item) => item.isGenerated).firstOrNull;
-      if (winner != null) return winner;
+      if (winner != null) {
+        await finalizeDigitalExecution(contract);
+        return winner;
+      }
       rethrow;
     }
   }
@@ -93,6 +99,7 @@ class ContractDocumentService {
       await _client.storage.from(_bucket).remove([path]);
       rethrow;
     }
+    await finalizeDigitalExecution(contract);
     return GeneratedContractFile(document: document, bytes: bytes);
   }
 
@@ -158,7 +165,16 @@ class ContractDocumentService {
     }
     final documents = await listDocuments(contract.id);
     final existing = documents.where((item) => item.isSigned).firstOrNull;
-    if (existing != null) return existing;
+    if (existing != null) {
+      if (existing.reviewStatus == 'pending') {
+        return reviewSignedDocument(
+            documentId: existing.id,
+            approve: true,
+            notes:
+                'Execution copy verified after required signer verification.');
+      }
+      return existing;
+    }
     final generated = documents.where((item) => item.isGenerated).firstOrNull;
     if (generated == null) return null;
 

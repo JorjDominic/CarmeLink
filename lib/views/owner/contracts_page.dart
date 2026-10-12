@@ -391,7 +391,7 @@ class _ContractCard extends StatelessWidget {
   String _signatureLabel(String status) => switch (status) {
         'awaiting_signature' => 'Awaiting signed copy',
         'pending_verification' => 'Signature review pending',
-        'verified' => 'Signed document verified',
+        'verified' => 'Signatures verified',
         'rejected' => 'Signed document rejected',
         _ => 'PDF not generated',
       };
@@ -494,7 +494,38 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
     } catch (error) {
       if (mounted) showAppSnackBar(context, 'Could not generate PDF: $error');
     } finally {
-      if (mounted) setState(() => _working = false);
+      if (mounted) {
+        setState(() => _working = false);
+        // The original may have saved even if signed-copy assembly failed.
+        _reload();
+        _reloadOnboardingNeeds();
+      }
+    }
+  }
+
+  Future<void> _generateSigned() async {
+    if (_working) return;
+    setState(() => _working = true);
+    try {
+      final document = await _service.finalizeDigitalExecution(widget.contract);
+      if (mounted) {
+        showAppSnackBar(
+            context,
+            document == null
+                ? 'Generate the printable PDF and verify the required signatures first.'
+                : document.reviewStatus == 'verified'
+                    ? 'Signed contract generated and verified.'
+                    : 'The signed copy needs review before activation.');
+      }
+    } catch (error) {
+      if (mounted)
+        showAppSnackBar(context, 'Could not generate signed contract: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _working = false);
+        _reload();
+        _reloadOnboardingNeeds();
+      }
     }
   }
 
@@ -689,7 +720,16 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
                     ],
                   ),
                 ),
-                StatusPill(_signatureLabel(currentSignatureStatus)),
+                FutureBuilder<_OnboardingNeeds>(
+                  future: _onboardingNeeds,
+                  builder: (context, snapshot) => StatusPill(
+                    latestSigned == null &&
+                            generated.isNotEmpty &&
+                            snapshot.data?.requiredSignersVerified == true
+                        ? 'Signed copy pending generation'
+                        : _signatureLabel(currentSignatureStatus),
+                  ),
+                ),
               ]),
             ),
             const SizedBox(height: 16),
@@ -700,6 +740,14 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
                   ? 'Generate printable PDF'
                   : 'Printable contract already generated'),
             ),
+            if (generated.isNotEmpty &&
+                latestSigned?.reviewStatus != 'verified') ...[
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                  onPressed: _working ? null : _generateSigned,
+                  icon: const Icon(Icons.draw_outlined),
+                  label: const Text('Generate signed contract')),
+            ],
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: _working
@@ -710,6 +758,7 @@ class _ContractDocumentsDialogState extends State<_ContractDocumentsDialog> {
                         contract: widget.contract,
                       );
                       _reloadOnboardingNeeds();
+                      _reload();
                     },
               icon: const Icon(Icons.fact_check_outlined),
               label: const Text('Required documents & signers'),
@@ -883,12 +932,24 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
   bool get _hasGeneratedContract =>
       widget.documents.any((item) => item.isGenerated);
 
+  bool get _hasVerifiedSignedContract {
+    final originals = widget.documents.where((item) => item.isGenerated);
+    if (originals.isEmpty) return false;
+    final version =
+        originals.map((item) => item.version).reduce((a, b) => a > b ? a : b);
+    return widget.documents.any((item) =>
+        item.isSigned &&
+        item.version == version &&
+        item.reviewStatus == 'verified');
+  }
+
   bool get _canActivate =>
       (!widget.contract.isRenewal ||
           !widget.contract.startsOn.isAfter(_manilaToday())) &&
       widget.needs?.emailVerified == true &&
       widget.needs?.emergencyContactComplete == true &&
       _hasGeneratedContract &&
+      _hasVerifiedSignedContract &&
       widget.needs?.requiredDocumentsVerified == true &&
       widget.needs?.requiredSignersVerified == true;
 
@@ -959,6 +1020,11 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
           _ActivationRequirement(
             complete: _hasGeneratedContract,
             label: 'Official contract PDF generated',
+            requiredForActivation: true,
+          ),
+          _ActivationRequirement(
+            complete: _hasVerifiedSignedContract,
+            label: 'Signed contract generated and verified',
             requiredForActivation: true,
           ),
           _ActivationRequirement(
