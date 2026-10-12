@@ -9,7 +9,7 @@ Implemented in the Flutter app and two new Supabase migrations:
 - The tenant/bill selector separates Overdue and Upcoming / due today, sorts by due date and clears selection when changing groups. Paid, voided, pending-proof and deposit bills are excluded.
 - Saved staff payment receipts open an 80 mm PDF through the platform print dialog. Reviewed payment cards also support reprinting their latest confirmed receipt. Use a printer exposed by the browser/OS print system; proprietary Bluetooth-only protocols are not implemented. No physical printer was available for testing.
 - Staff maintenance photos now use Cloudinary authorization for Cloudinary references and retain legacy Supabase Storage/HTTP support.
-- Removed the Operations navigation item for owners/caretakers; management shortcuts remain available.
+- Removed the Operations navigation item for owners/caretakers on web only; management shortcuts remain available. Mobile retains Operations for both roles.
 - Added the nightly 11 PM Asia/Manila curfew snapshot. For every tenant profile, it persists notifications for the tenant, linked guardians, all owners and all caretakers. IN/OUT comes from recorded gate presence; unavailable presence is reported explicitly. This is a status report, not a new location measurement or automatic violation. Existing push delivery handles retries. The UTC cron schedule is 15:00; daily event keys prevent duplicate notifications.
 
 ## Rollout

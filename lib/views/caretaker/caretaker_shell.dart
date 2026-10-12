@@ -2,6 +2,7 @@ import '../shared/notification_destination.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../controllers/owner_controller.dart';
 import '../../core/widgets/adaptive_shell.dart';
@@ -138,6 +139,13 @@ class _CaretakerShellState extends State<CaretakerShell>
               selectedIcon: Icons.groups,
               page: TenantDirectoryPage(),
             ),
+            if (!kIsWeb)
+              AppDestination(
+                label: 'Operations',
+                icon: Icons.tune_outlined,
+                selectedIcon: Icons.tune,
+                page: OperationsHubPage(),
+              ),
             AppDestination(
               label: 'Profile',
               icon: Icons.person_outline,
