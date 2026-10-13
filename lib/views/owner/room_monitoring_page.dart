@@ -19,6 +19,7 @@ import '../shared/room_inspection_pages.dart';
 import 'floor_plan_page.dart';
 import 'floor_management_page.dart';
 import 'owner_pages.dart';
+import 'room_occupancy_widgets.dart';
 
 enum RoomViewMode { list, floorPlan }
 
@@ -53,9 +54,11 @@ class RoomMonitoringPage extends StatefulWidget {
   const RoomMonitoringPage({
     super.key,
     this.initialMode = RoomViewMode.list,
+    this.roomService = const RoomService(),
   });
 
   final RoomViewMode initialMode;
+  final RoomService roomService;
 
   @override
   State<RoomMonitoringPage> createState() => _RoomMonitoringPageState();
@@ -63,7 +66,7 @@ class RoomMonitoringPage extends StatefulWidget {
 
 class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
   late RoomViewMode _viewMode = widget.initialMode;
-  final service = const RoomService();
+  RoomService get service => widget.roomService;
   List<RoomRecord>? rooms;
   bool loading = true;
   String? errorMessage;
@@ -82,7 +85,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
     _loadRooms(showSpinner: rooms == null);
     subscription = TableRefreshSubscription(
       'rooms',
-      ['rooms', 'bed_spaces', 'tenant_assignments'],
+      ['rooms', 'bed_spaces', 'tenant_assignments', 'profiles'],
       _onRealtimeChange,
     );
   }
@@ -228,6 +231,11 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
   }
 
   Future<void> _deleteRoom(RoomRecord room) async {
+    if (room.hasReservation) {
+      showAppSnackBar(context,
+          'This room has a contract reservation. Resolve it through the contract workflow first.');
+      return;
+    }
     if (room.occupied > 0) {
       showAppSnackBar(context, 'Move all residents before deleting this room.');
       return;
@@ -256,6 +264,11 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
   }
 
   Future<void> _toggleRoom(RoomRecord room) async {
+    if (room.isActive && room.hasReservation) {
+      showAppSnackBar(context,
+          'A reserved room cannot be archived. Resolve its contracts first.');
+      return;
+    }
     final yes = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -562,7 +575,13 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
           icon: const Icon(Icons.refresh),
         ),
       ],
-      child: pageBody,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (errorMessage != null && currentRooms != null)
+          Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text('Showing last loaded rooms. $errorMessage')),
+        pageBody,
+      ]),
     );
   }
 
@@ -675,6 +694,12 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
               ],
             ),
           ),
+          const SizedBox(height: 8),
+          RoomOccupancySummary(
+              room: room,
+              compact: true,
+              showFinancial: SessionController.instance.currentUser?.role ==
+                  UserRole.owner),
         ],
       ),
     );
@@ -743,6 +768,11 @@ class RoomQuickPreview extends StatelessWidget {
           const SizedBox(height: 8),
           Text(room.floor, style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 16),
+          RoomOccupancySummary(
+              room: room,
+              showFinancial: SessionController.instance.currentUser?.role ==
+                  UserRole.owner),
+          const SizedBox(height: 16),
           InfoRow(
             label: 'Occupied beds',
             value: '${room.occupied} of ${room.capacity}',
@@ -806,6 +836,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   late RoomRecord room;
   late final TableRefreshSubscription subscription;
   Timer? _debounceTimer;
+  int _requestVersion = 0;
+  String? _refreshError;
 
   @override
   void initState() {
@@ -813,7 +845,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     room = widget.initialRoom;
     subscription = TableRefreshSubscription(
       'room-${room.id}',
-      ['rooms', 'bed_spaces', 'tenant_assignments'],
+      ['rooms', 'bed_spaces', 'tenant_assignments', 'profiles'],
       _onRealtimeChange,
     );
   }
@@ -833,9 +865,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   Future<void> _refreshRoom() async {
+    final version = ++_requestVersion;
     try {
       final latestRooms = await widget.service.listRooms(forceRefresh: true);
-      if (!mounted) return;
+      if (!mounted || version != _requestVersion) return;
       final updated = latestRooms.cast<RoomRecord?>().firstWhere(
             (r) => r?.id == room.id,
             orElse: () => null,
@@ -843,9 +876,15 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       if (updated == null) {
         if (mounted) Navigator.of(context).pop(true);
       } else {
-        setState(() => room = updated);
+        setState(() {
+          room = updated;
+          _refreshError = null;
+        });
       }
-    } catch (_) {}
+    } catch (error) {
+      if (mounted && version == _requestVersion)
+        setState(() => _refreshError = roomServiceError(error));
+    }
   }
 
   Future<void> editRoom() async {
@@ -859,6 +898,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   Future<void> editBed(BedRecord bed) async {
+    if (room.hasReservation) {
+      showAppSnackBar(context,
+          'Reserved beds cannot be edited. Resolve the contract arrangement first.');
+      return;
+    }
     final changed = await showDialog<bool>(
       context: context,
       builder: (_) => BedEditor(service: widget.service, room: room, bed: bed),
@@ -869,6 +913,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   Future<void> _moveTenant(BedRecord bed) async {
+    if (room.hasReservation) {
+      showAppSnackBar(context,
+          'Contract occupancy moves require an approved group amendment. This workflow remains blocked.');
+      return;
+    }
     if (bed.tenantId == null) {
       showAppSnackBar(context, 'No tenant assigned to this bed space.');
       return;
@@ -951,7 +1000,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       builder: (ctx) => AlertDialog(
         title: const Text('End bed assignment?'),
         content: Text(
-          'Are you sure you want to end $tenantName\'s assignment to ${bed.label}? This bed will become available for other tenants.',
+          'End $tenantName\'s physical assignment to ${bed.label}? Contract reservations and agreed rental obligations remain in force until resolved through their contract workflow.',
         ),
         actions: [
           TextButton(
@@ -1081,7 +1130,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              subtitle: const Text('Remove tenant and mark bed as available'),
+              subtitle: const Text(
+                  'End physical assignment; preserve contract reservations'),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -1123,6 +1173,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       subtitle:
           '${room.floor} • ${room.beds.length}/${room.capacity} bed spaces',
       useScriptTitle: false,
+      onRefresh: _refreshRoom,
       actions: [
         if (SessionController.instance.currentUser?.role == UserRole.owner)
           IconButton(
@@ -1134,6 +1185,13 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_refreshError != null)
+            Text('Showing last loaded room. $_refreshError'),
+          RoomOccupancySummary(
+              room: room,
+              showFinancial: SessionController.instance.currentUser?.role ==
+                  UserRole.owner),
+          const SizedBox(height: 14),
           AdaptiveGrid(
             children: [
               MetricCard(
@@ -1616,8 +1674,5 @@ String _formatFloor(String floor) {
 }
 
 String _formatOccupancy(RoomRecord room) {
-  if (room.occupied >= room.capacity && room.capacity > 0) {
-    return '${room.occupied}/${room.capacity} • Full';
-  }
-  return '${room.occupied}/${room.capacity} • ${room.physicallyAvailable} open';
+  return '${room.occupied}/${room.capacity} • ${room.occupancyLabel}';
 }

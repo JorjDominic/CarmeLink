@@ -131,6 +131,8 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
             bedrooms.fold<int>(0, (sum, room) => sum + room.occupied);
         final capacity =
             bedrooms.fold<int>(0, (sum, room) => sum + room.capacity);
+        final available = bedrooms.fold<int>(0,
+            (sum, room) => sum + (room.roomRecord?.physicallyAvailable ?? 0));
         final maintenance = controller.maintenance
             .where((report) =>
                 report.status != 'Completed' && report.status != 'Closed')
@@ -217,10 +219,11 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
                 ),
                 _SummaryChip(
                   icon: Icons.event_available_outlined,
-                  label: '${capacity - occupied} beds available',
+                  label: '$available beds available',
                 ),
                 const _LegendDot(label: 'Available', color: Color(0xFF56886B)),
                 const _LegendDot(label: 'Full', color: Color(0xFFAA6870)),
+                const _LegendDot(label: 'Reserved', color: Color(0xFF718077)),
                 if (_mode == PlanMode.maintenance)
                   const _LegendDot(
                       label: 'Has issues', color: Color(0xFFB47A52)),
@@ -374,27 +377,26 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
   Widget _roomDetailContent(
       BuildContext context, _PlanRoom room, List<MaintenanceReport> reports) {
     final live = room.roomRecord;
-    return Padding(
+    return SingleChildScrollView(
+        child: Padding(
       padding: const EdgeInsets.fromLTRB(22, 4, 22, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Text(
-                  room.isAmenity ? room.number : 'Room ${room.number}',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
+              Text(
+                room.isAmenity ? room.number : 'Room ${room.number}',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
               ),
-              StatusPill(room.isAmenity
-                  ? 'Shared space'
-                  : room.isFull
-                      ? 'Full'
-                      : 'Available'),
+              StatusPill(
+                  room.isAmenity ? 'Shared space' : live!.occupancyLabel),
             ],
           ),
           const SizedBox(height: 16),
@@ -405,8 +407,8 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
             ),
             _DetailRow(
               Icons.event_available_outlined,
-              room.capacity > room.occupied
-                  ? '${room.capacity - room.occupied} bed(s) available for assignment'
+              (live?.physicallyAvailable ?? 0) > 0
+                  ? '${live!.physicallyAvailable} bed(s) available for assignment'
                   : 'No beds currently available',
             ),
             if (live != null)
@@ -445,7 +447,7 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   void _openFullScreen(List<MaintenanceReport> maintenance) {
@@ -577,9 +579,11 @@ class _RoomTile extends StatelessWidget {
         ? maintenanceCount > 0
             ? const Color(0xFFB47A52)
             : const Color(0xFF718077)
-        : room.isFull
-            ? const Color(0xFFAA6870)
-            : const Color(0xFF56886B);
+        : room.roomRecord?.hasReservation == true
+            ? const Color(0xFF718077)
+            : room.isFull
+                ? const Color(0xFFAA6870)
+                : const Color(0xFF56886B);
     return Material(
       color: color.withValues(alpha: selected ? .24 : .12),
       shape: RoundedRectangleBorder(

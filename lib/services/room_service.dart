@@ -25,7 +25,7 @@ class RoomService {
         DateTime.now().difference(_lastFetch!) < const Duration(seconds: 30)) {
       return _cachedRooms!;
     }
-    final results = await Future.wait([
+    final results = await Future.wait<dynamic>([
       _client
           .from('rooms')
           .select(
@@ -43,6 +43,7 @@ class RoomService {
           .from('contract_occupancy_arrangements')
           .select('room_id')
           .eq('released', false),
+      _client.rpc('get_room_contract_occupancies', params: const {}),
     ]);
     final activeAssignments = <String, Map<String, dynamic>>{};
     for (final row in results[2]) {
@@ -53,6 +54,10 @@ class RoomService {
     }
     final reservedRooms =
         results[3].map((row) => row['room_id'] as String).toSet();
+    final occupancies = (results[4] as List)
+        .map((row) =>
+            RoomContractOccupancy.fromRow(Map<String, dynamic>.from(row)))
+        .toList();
     final bedsByRoom = <String, List<BedRecord>>{};
     for (final row in results[1]) {
       final bed = BedRecord.fromRow(
@@ -66,10 +71,14 @@ class RoomService {
       );
       bedsByRoom.putIfAbsent(row['room_id'] as String, () => []).add(bed);
     }
-    final list = results[0]
-        .map((row) => RoomRecord.fromRow(
+    final list = (results[0] as List)
+        .map<RoomRecord>((row) => RoomRecord.fromRow(
               row,
               bedsByRoom[row['id'] as String] ?? const [],
+              reserved: reservedRooms.contains(row['id']),
+              occupancy: occupancies
+                  .where((g) => g.roomId == row['id'] && !g.released)
+                  .firstOrNull,
             ))
         .toList();
     _cachedRooms = list;
@@ -104,7 +113,6 @@ class RoomService {
         .update({
           'room_number': number.trim(),
           'floor': floor.trim(),
-          'capacity': 4,
           'description': description.trim()
         })
         .eq('id', id)
@@ -164,6 +172,29 @@ class RoomService {
         .select('id')
         .single();
     invalidateCache();
+  }
+
+  Future<List<RoomContractOccupancy>> listOccupancyHistory(
+      String roomId) async {
+    final rows = await _client.rpc('get_room_contract_occupancies', params: {
+      'p_room_id': roomId,
+      'p_include_history': true,
+    });
+    return (rows as List)
+        .map((row) =>
+            RoomContractOccupancy.fromRow(Map<String, dynamic>.from(row)))
+        .toList();
+  }
+
+  Future<List<RoomAssignmentHistory>> listAssignmentHistory(
+      String roomId) async {
+    final rows = await _client
+        .from('tenant_assignments')
+        .select(
+            'id,tenant_id,status,starts_on,ends_on,profiles(full_name),bed_spaces!inner(label,room_id)')
+        .eq('bed_spaces.room_id', roomId)
+        .order('starts_on', ascending: false);
+    return rows.map(RoomAssignmentHistory.fromRow).toList();
   }
 
   Future<void> createBed(
@@ -279,8 +310,11 @@ class RoomRecord {
     this.isActive = true,
     this.layoutNumber,
     this.layoutFloor,
+    this.reserved = false,
+    this.occupancy,
   });
-  factory RoomRecord.fromRow(Map<String, dynamic> row, List<BedRecord> beds) =>
+  factory RoomRecord.fromRow(Map<String, dynamic> row, List<BedRecord> beds,
+          {bool reserved = false, RoomContractOccupancy? occupancy}) =>
       RoomRecord(
         id: row['id'] as String,
         number: row['room_number'] as String,
@@ -291,16 +325,134 @@ class RoomRecord {
         beds: beds,
         layoutNumber: row['layout_number'] as String?,
         layoutFloor: row['layout_floor'] as String?,
+        reserved: reserved,
+        occupancy: occupancy,
       );
   final String id, number, floor, description;
   final String? layoutNumber, layoutFloor;
   final int capacity;
   final List<BedRecord> beds;
   final bool isActive;
+  final bool reserved;
+  final RoomContractOccupancy? occupancy;
+  bool get hasReservation =>
+      reserved || (occupancy != null && !occupancy!.released);
   int get occupied => beds.where((bed) => bed.occupied).length;
-  int get physicallyAvailable => isActive
+  int get physicallyAvailable => isActive && !hasReservation
       ? beds.where((bed) => !bed.occupied && bed.status == 'available').length
       : 0;
+  int get unusedBeds => beds.where((bed) => !bed.occupied).length;
+  String get arrangement => occupancy != null && !occupancy!.released
+      ? occupancy!.mode
+      : (occupied == 0 && !hasReservation && physicallyAvailable > 0
+          ? 'vacant'
+          : 'uncontracted');
+  String get availability => !isActive
+      ? 'unavailable'
+      : hasReservation
+          ? 'reserved'
+          : occupied >= capacity && capacity > 0
+              ? 'full'
+              : physicallyAvailable > 0
+                  ? 'available'
+                  : 'unavailable';
+  String get occupancyLabel {
+    if (!isActive) return 'Unavailable / Archived';
+    final group = occupancy;
+    if (hasReservation) {
+      if (group == null) return 'Contract Reserved';
+      if (group.members.any((m) => m.status == 'draft'))
+        return '${group.mode == 'solo' ? 'Solo' : 'Shared'} Reserved – Signing Pending';
+      if (group.mode == 'solo')
+        return group.members.any((m) => m.status == 'active')
+            ? 'Solo Occupied'
+            : 'Solo Reserved';
+      return 'Shared – Fully Reserved';
+    }
+    if (occupied >= capacity && capacity > 0) return 'Full';
+    if (occupied == 0 && physicallyAvailable > 0) return 'Vacant';
+    if (occupied > 1) return 'Shared – Partially Occupied';
+    return physicallyAvailable > 0
+        ? 'Occupied – Beds Available'
+        : 'Unavailable';
+  }
+}
+
+/// Read-only projections; amounts are supplied by the existing contract ledger.
+class RoomContractOccupancy {
+  const RoomContractOccupancy(
+      {required this.id,
+      required this.roomId,
+      required this.mode,
+      required this.released,
+      required this.members,
+      this.totalRentCents,
+      this.startsOn = '',
+      this.endsOn = ''});
+  factory RoomContractOccupancy.fromRow(Map<String, dynamic> row) =>
+      RoomContractOccupancy(
+          id: row['id'] as String,
+          roomId: row['room_id'] as String,
+          mode: row['mode'] as String,
+          released: row['released'] == true,
+          totalRentCents: (row['total_rent_cents'] as num?)?.round(),
+          startsOn: row['starts_on'] as String? ?? '',
+          endsOn: row['ends_on'] as String? ?? '',
+          members: (row['members'] as List)
+              .map((m) =>
+                  RoomContractMember.fromRow(Map<String, dynamic>.from(m)))
+              .toList());
+  final String id, roomId, mode, startsOn, endsOn;
+  final bool released;
+  final int? totalRentCents;
+  final List<RoomContractMember> members;
+}
+
+class RoomContractMember {
+  const RoomContractMember(
+      {required this.tenantId,
+      required this.name,
+      required this.bedId,
+      required this.bedLabel,
+      required this.status,
+      this.contractId,
+      this.contractNumber,
+      this.rentCents});
+  factory RoomContractMember.fromRow(Map<String, dynamic> row) =>
+      RoomContractMember(
+          tenantId: row['tenant_id'] as String,
+          name: row['name'] as String,
+          bedId: row['bed_id'] as String,
+          bedLabel: row['bed_label'] as String,
+          status: row['status'] as String? ?? 'unknown',
+          contractId: row['contract_id'] as String?,
+          contractNumber: row['contract_number'] as String?,
+          rentCents: (row['rent_cents'] as num?)?.round());
+  final String tenantId, name, bedId, bedLabel, status;
+  final String? contractId, contractNumber;
+  final int? rentCents;
+}
+
+class RoomAssignmentHistory {
+  const RoomAssignmentHistory(
+      {required this.id,
+      required this.tenantId,
+      required this.name,
+      required this.bedLabel,
+      required this.status,
+      required this.startsOn,
+      this.endsOn});
+  factory RoomAssignmentHistory.fromRow(Map<String, dynamic> row) =>
+      RoomAssignmentHistory(
+          id: row['id'] as String,
+          tenantId: row['tenant_id'] as String,
+          name: (row['profiles'] as Map?)?['full_name'] as String? ?? 'Tenant',
+          bedLabel: (row['bed_spaces'] as Map?)?['label'] as String? ?? 'Bed',
+          status: row['status'] as String,
+          startsOn: row['starts_on'] as String,
+          endsOn: row['ends_on'] as String?);
+  final String id, tenantId, name, bedLabel, status, startsOn;
+  final String? endsOn;
 }
 
 class BedRecord {
@@ -347,6 +499,12 @@ class BedRecord {
 String roomServiceError(Object error) {
   final message =
       error is PostgrestException ? error.message : error.toString();
+  if (message.contains('get_room_contract_occupancies')) {
+    return 'Room contract information is unavailable. Apply the Phase 2 and Phase 3 room migrations, then refresh.';
+  }
+  if (message.contains('occupancy') ||
+      message.contains('room identity') ||
+      (error is PostgrestException && error.code == '55P03')) return message;
   if (message.contains('room amendment') || message.contains('pending room'))
     return message;
   if (message.contains('room_floors') &&
