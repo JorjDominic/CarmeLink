@@ -46,5 +46,41 @@ left join lateral (select t.* from public.payment_transactions t
   where t.charge_id=c.id and t.status <> 'reversed'
   order by t.submitted_at desc, t.created_at desc limit 1) latest on true;
 
+create function public.create_additional_charge(
+  p_tenant_id uuid,p_title text,p_category text,p_amount numeric,p_due_date date,
+  p_notes text,p_reason text,p_specific_category text
+) returns jsonb language plpgsql security definer set search_path='' as $$
+declare v_category text:=lower(trim(p_category)); v_specific text:=nullif(btrim(p_specific_category),'');
+  v_charge_id uuid; v_row jsonb;
+begin
+  if auth.uid() is null or public.current_user_role()::text is distinct from 'owner' then raise exception 'Owner access required'; end if;
+  if v_category is null or v_category not in ('damage','fine','late_fee','cleaning','replacement','other') then raise exception 'Unsupported additional-charge category'; end if;
+  if v_category='other' and char_length(coalesce(v_specific,'')) not between 2 and 120 then raise exception 'Specify Category must contain 2 to 120 characters'; end if;
+  if v_category<>'other' and v_specific is not null then raise exception 'Specify Category only applies to Other'; end if;
+  if p_amount is null or p_amount::text in ('NaN','Infinity','-Infinity') or p_amount<=0 or p_amount>9999999999.99 or p_amount<>round(p_amount,2) then raise exception 'Enter a positive amount with at most two decimal places'; end if;
+  if p_due_date is null then raise exception 'A due date is required'; end if;
+  if char_length(trim(coalesce(p_title,''))) not between 2 and 150 then raise exception 'Title must contain 2 to 150 characters'; end if;
+  if char_length(trim(coalesce(p_reason,''))) not between 3 and 500 then raise exception 'An approval reason between 3 and 500 characters is required'; end if;
+  if not exists(select 1 from public.profiles where id=p_tenant_id and role::text='tenant') then raise exception 'A valid tenant is required'; end if;
+  insert into public.billing_charges(tenant_id,title,category,original_amount,due_date,source,terms_snapshot,notes,created_by)
+    values(p_tenant_id,trim(p_title),v_category,p_amount,p_due_date,'staff_entry',
+      jsonb_strip_nulls(jsonb_build_object('manual_approval_reason',trim(p_reason),
+        'approved_by',auth.uid(),'approved_at',now(),'specific_category',v_specific)),
+      nullif(trim(coalesce(p_notes,'')),''),auth.uid()) returning id into v_charge_id;
+  select to_jsonb(s) into v_row from public.billing_charge_summaries s where s.id=v_charge_id;
+  return v_row;
+end $$;
+-- Retain the existing seven-parameter API; fixed categories still work.
+-- Legacy Other requests cannot bypass the now-required specification.
+create or replace function public.create_additional_charge(
+  p_tenant_id uuid,p_title text,p_category text,p_amount numeric,p_due_date date,p_notes text,p_reason text
+) returns jsonb language sql security definer set search_path='' as $$
+  select public.create_additional_charge(p_tenant_id,p_title,p_category,p_amount,p_due_date,p_notes,p_reason,null);
+$$;
+revoke all on function public.create_additional_charge(uuid,text,text,numeric,date,text,text,text),
+  public.create_additional_charge(uuid,text,text,numeric,date,text,text) from public,anon;
+grant execute on function public.create_additional_charge(uuid,text,text,numeric,date,text,text,text),
+  public.create_additional_charge(uuid,text,text,numeric,date,text,text) to authenticated;
+
 notify pgrst,'reload schema';
 commit;

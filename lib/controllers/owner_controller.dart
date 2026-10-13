@@ -436,6 +436,7 @@ class OwnerController extends ChangeNotifier {
     required DateTime dueDate,
     required String reason,
     String? notes,
+    String? specificCategory,
   }) async {
     final charge = await _paymentService.createAdditionalCharge(
       tenantId: tenantId,
@@ -444,6 +445,7 @@ class OwnerController extends ChangeNotifier {
       amount: amount,
       dueDate: dueDate,
       reason: reason,
+      specificCategory: specificCategory,
       notes: notes,
     );
     _payments.insert(0, charge);

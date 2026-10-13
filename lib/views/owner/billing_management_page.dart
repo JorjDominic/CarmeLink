@@ -92,7 +92,7 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
     if (!_isOwner) return;
     final changed = await showDialog<bool>(
       context: context,
-      builder: (_) => const _AdditionalChargeDialog(),
+      builder: (_) => const AdditionalChargeDialog(),
     );
     if (changed == true && mounted) await _refresh();
   }
@@ -325,7 +325,8 @@ class _BillingSummaryGrid extends StatelessWidget {
             MetricCard(
               label: 'Outstanding balance',
               value: _money(outstanding),
-              detail: 'Excludes deposits and future rent; includes issued charges',
+              detail:
+                  'Excludes deposits and future rent; includes issued charges',
               icon: Icons.account_balance_wallet_outlined,
             ),
             MetricCard(
@@ -597,7 +598,7 @@ class _BillingChargeCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${payment.tenantName ?? 'Tenant'} • ${_categoryLabel(payment.category)}',
+                      '${payment.tenantName ?? 'Tenant'} • ${payment.specificCategory != null && payment.category == 'other' ? payment.categoryLabel : _categoryLabel(payment.category)}',
                       style: theme.textTheme.bodySmall,
                     ),
                   ],
@@ -755,20 +756,20 @@ class _BillingError extends StatelessWidget {
       );
 }
 
-class _AdditionalChargeDialog extends StatefulWidget {
-  const _AdditionalChargeDialog();
+class AdditionalChargeDialog extends StatefulWidget {
+  const AdditionalChargeDialog({super.key});
 
   @override
-  State<_AdditionalChargeDialog> createState() =>
-      _AdditionalChargeDialogState();
+  State<AdditionalChargeDialog> createState() => _AdditionalChargeDialogState();
 }
 
-class _AdditionalChargeDialogState extends State<_AdditionalChargeDialog> {
+class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
   final _formKey = GlobalKey<FormState>();
   final _title = TextEditingController();
   final _amount = TextEditingController();
   final _reason = TextEditingController();
   final _notes = TextEditingController();
+  final _specificCategory = TextEditingController();
   String? _tenantId;
   String _category = 'other';
   late DateTime _dueDate;
@@ -790,6 +791,7 @@ class _AdditionalChargeDialogState extends State<_AdditionalChargeDialog> {
     _amount.dispose();
     _reason.dispose();
     _notes.dispose();
+    _specificCategory.dispose();
     super.dispose();
   }
 
@@ -811,6 +813,8 @@ class _AdditionalChargeDialogState extends State<_AdditionalChargeDialog> {
         tenantId: _tenantId!,
         title: _title.text.trim(),
         category: _category,
+        specificCategory:
+            _category == 'other' ? _specificCategory.text.trim() : null,
         amount: double.parse(_amount.text.trim()),
         dueDate: _dueDate,
         reason: _reason.text.trim(),
@@ -866,6 +870,7 @@ class _AdditionalChargeDialogState extends State<_AdditionalChargeDialog> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: _category,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Category'),
                   items: const [
                     DropdownMenuItem(value: 'damage', child: Text('Damage')),
@@ -881,10 +886,27 @@ class _AdditionalChargeDialogState extends State<_AdditionalChargeDialog> {
                   onChanged: _saving
                       ? null
                       : (value) {
-                          if (value != null) setState(() => _category = value);
+                          if (value != null)
+                            setState(() {
+                              _category = value;
+                              if (value != 'other') _specificCategory.clear();
+                            });
                         },
                 ),
                 const SizedBox(height: 12),
+                if (_category == 'other') ...[
+                  TextFormField(
+                      key: const Key('additional-charge-specific-category'),
+                      controller: _specificCategory,
+                      enabled: !_saving,
+                      maxLength: 120,
+                      decoration:
+                          const InputDecoration(labelText: 'Specify Category'),
+                      validator: (value) => (value?.trim().length ?? 0) < 2
+                          ? 'Specify a category'
+                          : null),
+                  const SizedBox(height: 12),
+                ],
                 TextFormField(
                   controller: _title,
                   decoration: const InputDecoration(labelText: 'Charge title'),
@@ -901,10 +923,12 @@ class _AdditionalChargeDialogState extends State<_AdditionalChargeDialog> {
                     labelText: 'Amount',
                     prefixText: '₱ ',
                   ),
-                  validator: (value) =>
-                      (double.tryParse(value?.trim() ?? '') ?? 0) <= 0
-                          ? 'Enter a valid amount'
-                          : null,
+                  validator: (value) {
+                    final amount = double.tryParse(value?.trim() ?? '');
+                    return amount == null || !amount.isFinite || amount <= 0
+                        ? 'Enter a valid amount'
+                        : null;
+                  },
                 ),
                 const SizedBox(height: 12),
                 ListTile(

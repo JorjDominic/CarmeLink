@@ -317,6 +317,7 @@ class PaymentService {
     required DateTime dueDate,
     required String reason,
     String? notes,
+    String? specificCategory,
   }) async {
     _requireAuthId();
     final row = await _client.rpc('create_additional_charge', params: {
@@ -327,6 +328,9 @@ class PaymentService {
       'p_due_date': _dateOnly(dueDate),
       'p_notes': notes?.trim(),
       'p_reason': reason.trim(),
+      'p_specific_category': category.trim().toLowerCase() == 'other'
+          ? specificCategory?.trim()
+          : null,
     });
     final payment = Payment.fromJson(Map<String, dynamic>.from(row as Map));
     unawaited(AppNotificationService.instance.notifyUtilityBillCreated(
