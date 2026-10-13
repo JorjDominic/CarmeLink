@@ -12,6 +12,9 @@ import '../../services/contract_onboarding_service.dart';
 import '../../services/guardian_link_service.dart';
 import '../../services/tenant_service.dart';
 import 'contract_onboarding_checklist_page.dart';
+import 'contract_occupancy_fields.dart';
+import '../../core/utils/contract_occupancy_policy.dart';
+import '../../services/room_service.dart';
 import 'onboarding_invitation_page.dart';
 import 'tenant_onboarding_flow.dart';
 import '../shared/security_deposit_card.dart';
@@ -228,6 +231,7 @@ class _ContractsPageState extends State<ContractsPage> {
   }
 
   bool _canRenew(TenantContract contract, List<TenantContract> contracts) =>
+      contract.occupancyId == null &&
       (contract.status == 'active' || contract.status == 'expired') &&
       !contracts.any((item) =>
           item.tenantId == contract.tenantId &&
@@ -928,6 +932,7 @@ class _ActivateContractSheet extends StatefulWidget {
 
 class _ActivateContractSheetState extends State<_ActivateContractSheet> {
   bool _working = false;
+  bool _occupancyConfirmed = false;
 
   bool get _hasGeneratedContract =>
       widget.documents.any((item) => item.isGenerated);
@@ -944,6 +949,7 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
   }
 
   bool get _canActivate =>
+      (widget.contract.occupancyId == null || _occupancyConfirmed) &&
       (!widget.contract.isRenewal ||
           !widget.contract.startsOn.isAfter(_manilaToday())) &&
       widget.needs?.emailVerified == true &&
@@ -974,7 +980,8 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
   @override
   Widget build(BuildContext context) {
     final needs = widget.needs;
-    return Padding(
+    return SingleChildScrollView(
+        child: Padding(
       padding: EdgeInsets.fromLTRB(
         24,
         4,
@@ -998,6 +1005,22 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
             'requirement before continuing.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
+          if (widget.contract.occupancySnapshot != null) ...[
+            const SizedBox(height: 12),
+            for (final entry in const ContractDocumentService()
+                .occupancyDocumentRows(widget.contract)
+                .entries)
+              Text('${entry.key}: ${entry.value}'),
+            CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                    'I confirm the room arrangement and individual rental obligation.'),
+                value: _occupancyConfirmed,
+                onChanged: _working
+                    ? null
+                    : (value) =>
+                        setState(() => _occupancyConfirmed = value == true)),
+          ],
           if (widget.contract.isRenewal) ...[
             const SizedBox(height: 8),
             Text(
@@ -1077,7 +1100,7 @@ class _ActivateContractSheetState extends State<_ActivateContractSheet> {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -1443,6 +1466,9 @@ class _ContractEditorState extends State<_ContractEditor> {
   late DateTime _start;
   late DateTime _end;
   bool _saving = false;
+  ContractOccupancySelection? _occupancy;
+  bool get _preparingOccupancy =>
+      widget.contract == null && widget.renewalOf == null;
 
   @override
   void initState() {
@@ -1617,7 +1643,9 @@ class _ContractEditorState extends State<_ContractEditor> {
                   .map((tenant) => DropdownMenuItem(
                       value: tenant.id, child: Text(tenant.name)))
                   .toList(),
-              onChanged: (value) => setState(() => _tenantId = value),
+              onChanged: widget.contract?.occupancyId != null
+                  ? null
+                  : (value) => setState(() => _tenantId = value),
               validator: (value) => value == null ? 'Select a tenant' : null,
             ),
           if (!widget.lockTenant && tenants.isEmpty) ...[
@@ -1641,6 +1669,24 @@ class _ContractEditorState extends State<_ContractEditor> {
             ),
           ),
           const SizedBox(height: 28),
+          if (_preparingOccupancy) ...[
+            ContractOccupancyFields(
+                tenantId: _tenantId,
+                tenants: tenants,
+                rent: _rent,
+                onChanged: (value) => _occupancy = value),
+            const SizedBox(height: 28),
+          ],
+          if (widget.contract?.occupancySnapshot != null) ...[
+            const SectionTitle('Confirmed occupancy terms'),
+            for (final entry in const ContractDocumentService()
+                .occupancyDocumentRows(widget.contract!)
+                .entries)
+              Text('${entry.key}: ${entry.value}'),
+            const Text(
+                'Group membership, rent and dates require an approved group amendment. Existing billing is preserved.'),
+            const SizedBox(height: 28),
+          ],
           const _FormSectionHeading(
             icon: Icons.payments_outlined,
             title: 'Financial terms',
@@ -1657,7 +1703,9 @@ class _ContractEditorState extends State<_ContractEditor> {
               textInputAction: TextInputAction.next,
               decoration: InputDecoration(
                 labelText: widget.renewalOf == null
-                    ? 'Monthly rent'
+                    ? (_preparingOccupancy
+                        ? 'Total monthly room rent'
+                        : 'Monthly rent')
                     : 'New monthly rent',
                 helperText: widget.renewalOf == null
                     ? 'New rent requires a new contract.'
@@ -1697,13 +1745,15 @@ class _ContractEditorState extends State<_ContractEditor> {
             first: _DateField(
               label: 'Start date',
               value: _start,
-              enabled: widget.contract?.isActive != true,
+              enabled: widget.contract?.isActive != true &&
+                  widget.contract?.occupancyId == null,
               onChanged: (value) => setState(() => _start = value),
             ),
             second: _DateField(
               label: 'End date',
               value: _end,
-              enabled: widget.contract?.isActive != true,
+              enabled: widget.contract?.isActive != true &&
+                  widget.contract?.occupancyId == null,
               onChanged: (value) => setState(() => _end = value),
             ),
           ),
@@ -1720,11 +1770,25 @@ class _ContractEditorState extends State<_ContractEditor> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: (widget.renewalOf != null
+              children: (_preparingOccupancy
                       ? ['draft']
-                      : widget.contract?.isRenewal == true && _status == 'draft'
-                          ? ['draft', 'terminated']
-                          : ['draft', 'active', 'expired', 'terminated'])
+                      : widget.contract?.occupancyId != null
+                          ? (_status == 'draft'
+                              ? ['draft', 'terminated']
+                              : _status == 'active'
+                                  ? ['active', 'expired', 'terminated']
+                                  : [_status])
+                          : widget.renewalOf != null
+                              ? ['draft']
+                              : widget.contract?.isRenewal == true &&
+                                      _status == 'draft'
+                                  ? ['draft', 'terminated']
+                                  : [
+                                      'draft',
+                                      'active',
+                                      'expired',
+                                      'terminated'
+                                    ])
                   .map((status) => Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
@@ -1790,15 +1854,62 @@ class _ContractEditorState extends State<_ContractEditor> {
           notes: _notes.text,
         );
       } else if (existing == null) {
-        saved = await controller.createContract(
-          tenantId: _tenantId!,
+        final occupancy = _occupancy;
+        if (occupancy == null || !occupancy.beds.containsKey(_tenantId)) {
+          throw const FormatException(
+              'Select a registered room and occupant beds');
+        }
+        final shares = allocateContractRent(
+            parseRentCents(_rent.text), occupancy.beds.keys.toList());
+        final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+                  title: const Text('Confirm occupancy and rental shares'),
+                  scrollable: true,
+                  content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                            '${occupancy.mode == 'solo' ? 'Solo' : 'Shared'} | ${shares.length} occupants | PHP ${_rent.text} total room rent'),
+                        Text(
+                            'Room ${RoomService.cachedRooms?.where((room) => room.id == occupancy.roomId).firstOrNull?.number ?? 'selected registered room'}'),
+                        for (final id in shares.keys)
+                          Text(
+                              '${controller.tenants.where((t) => t.id == id).firstOrNull?.name ?? widget.initialTenantName ?? 'Tenant'}: PHP ${rentCentsText(shares[id]!)} / month'),
+                        const Text(
+                            'Each occupant receives an individual Draft contract. Deposits remain individual amounts and saving records them as received.'),
+                      ]),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        child: const Text('Cancel')),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        child: const Text('Confirm drafts'))
+                  ],
+                ));
+        if (confirmed != true) return;
+        final items = await controller.prepareContractOccupancy(
+          roomId: occupancy.roomId,
+          mode: occupancy.mode,
+          totalRentCents: parseRentCents(_rent.text),
+          members: [
+            for (final id in shares.keys)
+              {
+                'tenant_id': id,
+                'bed_id': occupancy.beds[id],
+                'security_deposit': id == _tenantId
+                    ? rentCentsText(parseRentCents(_deposit.text))
+                    : rentCentsText(occupancy.deposits[id] ?? 0)
+              }
+          ],
           startsOn: _start,
           endsOn: _end,
-          monthlyRent: double.parse(_rent.text),
-          securityDeposit: double.parse(_deposit.text),
-          status: _status,
           notes: _notes.text,
         );
+        RoomService.invalidateCache();
+        saved = items.firstWhere((item) => item.tenantId == _tenantId);
       } else {
         TenantDirectoryEntry? tenant;
         for (final value in controller.tenants) {

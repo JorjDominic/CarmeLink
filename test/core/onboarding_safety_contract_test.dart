@@ -28,8 +28,8 @@ void main() {
     final migration = File(
       'supabase/migrations/202609280001_guardian_curfew_and_presence_preferences.sql',
     ).readAsStringSync();
-    final notifier =
-        File('supabase/functions/notify-geofence/handler.ts').readAsStringSync();
+    final notifier = File('supabase/functions/notify-geofence/handler.ts')
+        .readAsStringSync();
     final processor = File(
       'supabase/functions/process-guardian-presence-alerts/index.ts',
     ).readAsStringSync();
@@ -86,7 +86,7 @@ void main() {
     expect(form, contains('Sign out, sign in with the account'));
   });
 
-  test('official lease requires and prints room but never the bed label', () {
+  test('official lease keeps room assignment and legacy bed behavior', () {
     final documents =
         File('lib/services/contract_document_service.dart').readAsStringSync();
     expect(documents, contains('_assignedRoomNumber(contract.tenantId)'));
@@ -94,7 +94,7 @@ void main() {
         documents,
         contains(
             'Assign the tenant to a room before generating the official lease'));
-    expect(documents, contains("_pdfRow('Assigned room'"));
+    expect(documents, matches(RegExp(r"_pdfRow\(\s*'Assigned room'")));
     expect(documents, isNot(contains("_pdfRow('Assigned bed'")));
   });
 }

@@ -69,7 +69,7 @@ void main() {
     expect(find.text('Contract number'), findsOneWidget);
     expect(find.text('Monthly rent'), findsWidgets);
 
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.tap(find.byType(DropdownButtonFormField<String>).first);
     await tester.pumpAndSettle();
     expect(find.text('New Tenant'), findsOneWidget);
     // Maria remains visible only on the contract card behind the dialog; she
@@ -263,5 +263,56 @@ void main() {
           findsOneWidget);
     }
     expect(OwnerController.instance.contracts.length, 1);
+  });
+  testWidgets(
+      'grouped contracts preserve confirmed terms and do not offer unsupported renewals',
+      (tester) async {
+    final original = OwnerController.instance.contracts.first;
+    final grouped = TenantContract(
+        id: original.id,
+        tenantId: original.tenantId,
+        tenantName: original.tenantName,
+        contractNumber: original.contractNumber,
+        startsOn: original.startsOn,
+        endsOn: original.endsOn,
+        monthlyRent: original.monthlyRent,
+        securityDeposit: original.securityDeposit,
+        status: 'active',
+        createdAt: original.createdAt,
+        updatedAt: original.updatedAt,
+        occupancyId: 'group',
+        occupancySnapshot: {
+          'mode': 'solo',
+          'room_number': '101',
+          'total_rent_cents': 400000,
+          'members': [
+            {
+              'tenant_id': original.tenantId,
+              'name': original.tenantName,
+              'bed_label': 'A',
+              'rent_cents': 400000
+            }
+          ]
+        });
+    OwnerController.instance.setContractsForTesting([grouped]);
+    await tester.pumpWidget(const MaterialApp(home: ContractsPage()));
+    await tester.pumpAndSettle();
+    expect(find.text('Renew'), findsNothing);
+    await tester.ensureVisible(find.byTooltip('Edit contract'));
+    await tester.tap(find.byTooltip('Edit contract'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirmed occupancy terms'), findsOneWidget);
+    expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(
+                find.byType(DropdownButtonFormField<String>))
+            .onChanged,
+        isNull);
+    expect(
+        find.descendant(
+            of: find.byType(Dialog),
+            matching: find.widgetWithText(ChoiceChip, 'Draft')),
+        findsNothing);
+    expect(tester.takeException(), isNull);
   });
 }

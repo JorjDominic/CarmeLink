@@ -46,7 +46,8 @@ class ContractDocumentService {
       await finalizeDigitalExecution(contract);
       return generated;
     }
-    if (await _assignedRoomNumber(contract.tenantId) == null) return null;
+    if (contract.occupancySnapshot == null &&
+        await _assignedRoomNumber(contract.tenantId) == null) return null;
     try {
       return (await generateContract(contract)).document;
     } catch (_) {
@@ -69,7 +70,8 @@ class ContractDocumentService {
           'A printable contract already exists. Delete it before generating another.');
     }
     final version = await _nextVersion(contract.id);
-    final roomNumber = await _assignedRoomNumber(contract.tenantId);
+    final roomNumber = contract.occupancySnapshot?['room_number'] as String? ??
+        await _assignedRoomNumber(contract.tenantId);
     if (roomNumber == null) {
       throw Exception(
         'Assign the tenant to a room before generating the official lease.',
@@ -192,7 +194,8 @@ class ContractDocumentService {
             await _client.storage.from(_bucket).download(path);
       }
     }
-    final roomNumber = await _assignedRoomNumber(contract.tenantId);
+    final roomNumber = contract.occupancySnapshot?['room_number'] as String? ??
+        await _assignedRoomNumber(contract.tenantId);
     final bytes = await buildPdfBytes(
       contract,
       generated.version,
@@ -314,6 +317,28 @@ class ContractDocumentService {
 
   /// Builds the printable document independently from storage registration.
   /// Public so PDF pagination can be regression-tested without Supabase.
+  Map<String, String> occupancyDocumentRows(TenantContract contract) {
+    final snapshot = contract.occupancySnapshot;
+    if (snapshot == null) return const {};
+    final members = (snapshot['members'] as List).cast<Map>();
+    final tenant =
+        members.firstWhere((m) => m['tenant_id'] == contract.tenantId);
+    return {
+      'Occupancy arrangement': snapshot['mode'] == 'solo' ? 'Solo' : 'Shared',
+      'Total agreed monthly room rental':
+          'PHP ${((snapshot['total_rent_cents'] as num) / 100).toStringAsFixed(2)}',
+      'Contracted occupants': '${members.length}',
+      'Individual monthly rental obligation':
+          'PHP ${contract.monthlyRent.toStringAsFixed(2)}',
+      'Assigned bed': tenant['bed_label'] as String,
+      if (snapshot['mode'] == 'shared')
+        'Registered roommates': members
+            .where((m) => m['tenant_id'] != contract.tenantId)
+            .map((m) => m['name'])
+            .join(', '),
+    };
+  }
+
   Future<Uint8List> buildPdfBytes(
     TenantContract contract,
     int version, {
@@ -377,9 +402,20 @@ class ContractDocumentService {
           _pdfRow('Lessor', OfficialLeaseContent.lessorName),
           _pdfRow('Dormitory address', OfficialLeaseContent.address),
           _pdfRow('Tenant name', contract.tenantName),
-          _pdfRow('Assigned room', roomNumber ?? 'Not assigned'),
+          _pdfRow(
+              'Assigned room',
+              contract.occupancySnapshot?['room_number'] as String? ??
+                  roomNumber ??
+                  'Not assigned'),
           _pdfRow('Tenant profile ID', contract.tenantId),
         ]),
+        if (contract.occupancySnapshot != null)
+          _pdfSection(
+              'Occupancy arrangement',
+              occupancyDocumentRows(contract)
+                  .entries
+                  .map((e) => _pdfRow(e.key, e.value))
+                  .toList()),
         _pdfSection('Agreement term', [
           _pdfRow('Start date', date(contract.startsOn)),
           _pdfRow('End date', date(contract.endsOn)),
