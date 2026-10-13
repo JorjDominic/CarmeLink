@@ -35,9 +35,7 @@ import '../../services/tenant_service.dart';
 import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../shared/account_management_page.dart';
-import '../../core/utils/billing_management_policy.dart';
 import 'billing_management_page.dart';
-import '../shared/staff_payment_received_dialog.dart';
 import '../shared/staff_quick_panel.dart';
 import '../shared/staff_curfew_requests_page.dart';
 import '../shared/cleaning_schedule_management_page.dart';
@@ -53,7 +51,6 @@ import 'contracts_page.dart';
 import 'contract_onboarding_checklist_page.dart';
 import 'onboarding_invitation_page.dart';
 import 'tenant_onboarding_flow.dart';
-import 'utility_charge_cart_dialog.dart';
 import '../../services/dormitory_report_service.dart';
 
 /// Filters existing Supabase-backed directory entries; no client-side
@@ -2597,39 +2594,11 @@ class PaymentVerificationPage extends StatefulWidget {
 }
 
 class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
-  String _workspace = 'bills';
-  String _filter = 'all';
+  String _filter = 'pending';
   late final TableRefreshSubscription _subscription;
   String? _processingPaymentId;
-  final TextEditingController _searchController = TextEditingController();
+  final _searchController = TextEditingController();
   String _searchQuery = '';
-  bool _showAllAdvanceRent = false;
-
-  int _paymentDisplayRank(Payment payment) {
-    if (payment.isPending) return 0;
-    if (payment.isOverdue) return 1;
-    if (!payment.isDeposit && payment.isDue) return 2;
-    if (payment.isUpcoming || (payment.isRent && !payment.isDueNow)) return 3;
-    if (payment.isRejected) return 4;
-    if (payment.isVerified) return 5;
-    if (payment.isVoided) return 6;
-    return 4;
-  }
-
-  int _comparePaymentsForDisplay(Payment a, Payment b) {
-    final rankComparison =
-        _paymentDisplayRank(a).compareTo(_paymentDisplayRank(b));
-    if (rankComparison != 0) return rankComparison;
-
-    final rank = _paymentDisplayRank(a);
-    if (rank <= 3) {
-      return a.dueDate.compareTo(b.dueDate);
-    }
-    return b.dueDate.compareTo(a.dueDate);
-  }
-
-  bool _isAdvanceRentOutsidePreview(Payment payment) =>
-      BillingManagementPolicy.isFutureUnpaid(payment);
 
   @override
   void initState() {
@@ -2640,16 +2609,13 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
         OwnerController.instance.loadTenants();
       }
     });
-
-    _subscription = TableRefreshSubscription(
-      'owner-payment-verification',
-      ['payments'],
-      () {
-        if (mounted) {
-          OwnerController.instance.loadPayments(force: true);
-        }
-      },
-    );
+    _subscription = TableRefreshSubscription('owner-payment-verification',
+        ['payments', 'tenant_assignments', 'profiles'], () {
+      if (mounted) {
+        OwnerController.instance.loadPayments(force: true);
+        OwnerController.instance.loadTenants(force: true);
+      }
+    });
   }
 
   @override
@@ -2659,489 +2625,191 @@ class _PaymentVerificationPageState extends State<PaymentVerificationPage> {
     super.dispose();
   }
 
-  void _openCreateInvoiceDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (_) => const UtilityChargeCartDialog(),
-    );
-  }
-
   Future<void> _handleVerify(Payment payment, bool approve,
       {String? notes}) async {
+    if (_processingPaymentId != null) return;
     setState(() => _processingPaymentId = payment.id);
     try {
-      await OwnerController.instance.verifyPayment(
-        payment,
-        approve,
-        notes: notes,
-      );
+      await OwnerController.instance
+          .verifyPayment(payment, approve, notes: notes);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            approve
-                ? 'Payment of ${money(payment.amount)} from ${payment.tenantName ?? "tenant"} verified.'
-                : 'Payment marked as rejected.',
-          ),
-          backgroundColor:
-              approve ? const Color(0xFF56886B) : const Color(0xFFB3261E),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to update payment: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      showAppSnackBar(
+          context,
+          approve
+              ? 'Payment of ${money(payment.submittedAmount ?? payment.amount)} from ${payment.tenantName ?? "tenant"} verified.'
+              : 'Payment marked as rejected.');
+    } catch (error) {
+      if (mounted) showAppSnackBar(context, 'Failed to update payment: $error');
     } finally {
-      if (mounted) {
-        setState(() => _processingPaymentId = null);
-      }
+      if (mounted) setState(() => _processingPaymentId = null);
     }
   }
 
   void _promptRejectDialog(Payment payment) {
+    if (_processingPaymentId != null) return;
     showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (bottomSheetContext) => _RejectReasonSheet(
-        payment: payment,
-        onConfirmReject: (reason) {
-          Navigator.of(bottomSheetContext).pop();
-          _handleVerify(payment, false, notes: reason);
-        },
-      ),
-    );
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (sheetContext) => _RejectReasonSheet(
+            payment: payment,
+            onConfirmReject: (reason) {
+              Navigator.of(sheetContext).pop();
+              _handleVerify(payment, false, notes: reason);
+            }));
   }
 
   void _openReceiptViewer(Payment payment, String imageUrl) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
+    Navigator.of(context).push(MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => _ReceiptViewerModal(
-          payment: payment,
-          imageUrl: imageUrl,
-          onConfirm: () => _handleVerify(payment, true),
-          onReject: () => _promptRejectDialog(payment),
-        ),
-      ),
-    );
+            payment: payment,
+            imageUrl: imageUrl,
+            onConfirm: () => _handleVerify(payment, true),
+            onReject: () => _promptRejectDialog(payment))));
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = OwnerController.instance;
-
-    return PageFrame(
-      title: 'Payments',
-      subtitle: _workspace == 'bills'
-          ? 'Issue bills and monitor tenant balances'
-          : 'Review payment proofs submitted by tenants',
-      onRefresh: () => OwnerController.instance.loadPayments(force: true),
-      actions: [
-        IconButton(
-          tooltip: 'Record payment received',
-          icon: const Icon(Icons.add_card_outlined),
-          onPressed: () => showStaffPaymentReceived(context),
-        ),
-        IconButton(
-          tooltip: 'Send payment due alerts to staff',
-          icon: const Icon(Icons.notifications_active_outlined),
-          onPressed: controller.paymentsLoading
-              ? null
-              : () async {
-                  final count =
-                      await controller.checkAndNotifyDuePayments(force: true);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          count > 0
-                              ? 'Dispatched due date alert for $count charge(s) to owners & caretakers.'
-                              : 'No payments currently due or overdue.',
-                        ),
-                      ),
-                    );
-                  }
-                },
-        ),
-        IconButton(
-          tooltip: 'Refresh payments',
-          icon: controller.paymentsLoading
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.refresh_rounded),
-          onPressed: controller.paymentsLoading
-              ? null
-              : () => controller.loadPayments(force: true),
-        ),
-      ],
-      child: AnimatedBuilder(
+    return AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
-          final targetPayment =
-              NotificationTarget.recordIdOf(context, 'payment');
-          final allPayments = controller.payments
-              .where((p) => targetPayment == null || p.id == targetPayment)
-              .toList();
-          final pendingCount =
-              allPayments.where((p) => !p.isDeposit && p.isPending).length;
-          final overdueCount =
-              allPayments.where((p) => !p.isDeposit && p.isOverdue).length;
-          final verifiedCount = allPayments.where((p) => p.isVerified).length;
-          final dueCount = allPayments
-              .where((p) => !p.isDeposit && p.isDue && !p.isOverdue)
-              .length;
-          final rejectedCount = allPayments.where((p) => p.isRejected).length;
-
-          final financial = FinancialSnapshot(allPayments);
-          final outstandingBills =
-              FinancialSnapshot.outstandingBills(allPayments).toList();
-          final totalCollected = financial.collected;
-          final totalOutstanding = financial.outstanding;
-
-          final dashboardItems = [
-            MutedDashboardItem(
-              label: 'Pending review',
-              value: '$pendingCount',
-              detail: pendingCount > 0 ? 'Needs staff action' : 'All clear',
-              icon: Icons.pending_actions_rounded,
-              color: const Color(0xFFAA8A45),
-              onTap: () => setState(() => _filter = 'pending'),
-            ),
-            MutedDashboardItem(
-              label: 'Collected',
-              value: money(totalCollected),
-              detail: '${financial.collectedBillCount} bills with payments',
-              icon: Icons.check_circle_outline_rounded,
-              color: const Color(0xFF56886B),
-              onTap: () => setState(() {
-                _filter = 'collected';
-                _searchQuery = '';
-                _searchController.clear();
-              }),
-            ),
-            MutedDashboardItem(
-              label: 'Outstanding',
-              value: money(totalOutstanding),
-              detail: '${outstandingBills.length} unpaid bills',
-              icon: Icons.account_balance_wallet_outlined,
-              color: const Color(0xFF8C7355),
-              onTap: () => setState(() {
-                _filter = 'outstanding';
-                _searchQuery = '';
-                _searchController.clear();
-              }),
-            ),
-            MutedDashboardItem(
-              label: 'Overdue',
-              value: '$overdueCount',
-              detail: overdueCount > 0 ? 'Urgent attention' : 'None overdue',
-              icon: Icons.warning_amber_rounded,
-              color: const Color(0xFFB3261E),
-              onTap: () => setState(() => _filter = 'overdue'),
-            ),
-          ];
-
-          final workspacePayments = _workspace == 'review'
-              ? allPayments
-                  .where((p) =>
-                      p.isPending ||
-                      p.isRejected ||
-                      (p.isVerified && (p.reference?.isNotEmpty ?? false)))
-                  .toList()
-              : allPayments;
-          final filteredByTab = switch (_filter) {
-            'outstanding' => outstandingBills,
-            'collected' => allPayments
-                .where((p) => !p.isDeposit && p.collectedAmount > 0)
-                .toList(),
-            'pending' => allPayments.where((p) => p.isPending).toList(),
-            'due' => workspacePayments
-                .where((p) => !p.isDeposit && p.isDue && !p.isOverdue)
-                .toList(),
-            'overdue' => workspacePayments
-                .where((p) => !p.isDeposit && p.isOverdue)
-                .toList(),
-            'verified' => workspacePayments.where((p) => p.isVerified).toList(),
-            'rejected' => workspacePayments.where((p) => p.isRejected).toList(),
-            'voided' => workspacePayments.where((p) => p.isVoided).toList(),
-            _ => workspacePayments,
+          final target = NotificationTarget.recordIdOf(context, 'payment');
+          final directory = {
+            for (final tenant in controller.tenants) tenant.id: tenant
           };
-
-          final searchFiltered = _searchQuery.trim().isEmpty
-              ? List<Payment>.from(filteredByTab)
-              : filteredByTab.where((p) {
-                  final q = _searchQuery.trim().toLowerCase();
-                  return (p.tenantName?.toLowerCase().contains(q) ?? false) ||
-                      (p.tenantRoom?.toLowerCase().contains(q) ?? false) ||
-                      p.label.toLowerCase().contains(q) ||
-                      p.category.toLowerCase().contains(q) ||
-                      (p.reference?.toLowerCase().contains(q) ?? false) ||
-                      (p.paymentMethod?.toLowerCase().contains(q) ?? false);
-                }).toList();
-
-          searchFiltered.sort(_comparePaymentsForDisplay);
-
-          final shouldLimitAdvanceRent = targetPayment == null &&
-              _workspace == 'bills' &&
-              _filter == 'all' &&
-              _searchQuery.trim().isEmpty;
-          final hiddenAdvanceRentCount = shouldLimitAdvanceRent
-              ? searchFiltered.where(_isAdvanceRentOutsidePreview).length
-              : 0;
-          final displayed = shouldLimitAdvanceRent && !_showAllAdvanceRent
-              ? searchFiltered
-                  .where((payment) => !_isAdvanceRentOutsidePreview(payment))
-                  .toList()
-              : searchFiltered;
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(
-                    value: 'bills',
-                    icon: Icon(Icons.receipt_long_outlined),
-                    label: Text('Bills'),
-                  ),
-                  ButtonSegment(
-                    value: 'review',
-                    icon: Icon(Icons.fact_check_outlined),
-                    label: Text('Payment review'),
-                  ),
-                ],
-                selected: {_workspace},
-                onSelectionChanged: (selection) => setState(() {
-                  _workspace = selection.first;
-                  _filter = _workspace == 'review' ? 'pending' : 'all';
-                }),
-              ),
-              const SizedBox(height: 14),
-              if (_workspace == 'bills')
-                Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () => showDialog<void>(
-                        context: context,
-                        builder: (_) => const _AdditionalChargeDialog(),
-                      ),
-                      icon: const Icon(Icons.receipt_long_outlined),
-                      label: const Text('Add other charge'),
-                    ),
-                    FilledButton.icon(
-                      onPressed: () => _openCreateInvoiceDialog(context),
-                      icon: const Icon(Icons.add_card_rounded),
-                      label: const Text('Add utility charge'),
-                    ),
-                  ],
-                ),
-              const SizedBox(height: 16),
-              if (_workspace == 'bills') ...[
-                MutedDashboardGrid(
-                  items: dashboardItems.sublist(1),
-                  compact: true,
-                  prominentCompactText: true,
-                ),
-                const SizedBox(height: 16),
+          final unsubmittedTarget = target != null &&
+              controller.payments
+                  .any((p) => p.id == target && !p.hasPaymentSubmission);
+          final submissions = controller.payments
+              .where((p) =>
+                  p.hasPaymentSubmission && (target == null || p.id == target))
+              .map((p) => p.copyWith(
+                  tenantRoom: directory[p.tenantId]?.room ?? p.tenantRoom))
+              .toList();
+          final pending = submissions.where((p) => p.isProofPending).length;
+          final verified = submissions.where((p) => p.isProofVerified).length;
+          final rejected = submissions.where((p) => p.isProofRejected).length;
+          final matching = submissions.where((p) {
+            final matchesStatus = target != null ||
+                switch (_filter) {
+                  'pending' => p.isProofPending,
+                  'verified' => p.isProofVerified,
+                  'rejected' => p.isProofRejected,
+                  _ => true,
+                };
+            final q = _searchQuery.trim().toLowerCase();
+            return matchesStatus &&
+                (q.isEmpty ||
+                    [
+                      p.tenantName ?? '',
+                      p.tenantRoom ?? '',
+                      p.label,
+                      p.categoryLabel,
+                      p.reference ?? '',
+                      p.paymentMethod ?? ''
+                    ].any((value) => value.toLowerCase().contains(q)));
+          }).toList()
+            ..sort((a, b) {
+              if (a.isProofPending != b.isProofPending)
+                return a.isProofPending ? -1 : 1;
+              return (b.paidAt ?? b.createdAt)
+                  .compareTo(a.paidAt ?? a.createdAt);
+            });
+          return PageFrame(
+              title: 'Payment Verification',
+              subtitle:
+                  'Review submitted proofs, confirm payments, and record rejection reasons.',
+              onRefresh: () => Future.wait([
+                    controller.loadPayments(force: true),
+                    controller.loadTenants(force: true)
+                  ]),
+              actions: [
+                IconButton(
+                    tooltip: 'Refresh payments',
+                    icon: const Icon(Icons.refresh_rounded),
+                    onPressed: controller.paymentsLoading
+                        ? null
+                        : () => controller.loadPayments(force: true))
               ],
-
-              // Search Input
-              TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search by resident, room, title, or ref...',
-                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: Theme.of(context)
-                      .colorScheme
-                      .surfaceContainerHighest
-                      .withValues(alpha: .35),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color:
-                          Theme.of(context).dividerColor.withValues(alpha: .2),
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color:
-                          Theme.of(context).dividerColor.withValues(alpha: .2),
-                    ),
-                  ),
-                ),
-                onChanged: (val) => setState(() => _searchQuery = val),
-              ),
-              const SizedBox(height: 14),
-
-              // Filter Chips Row
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (_workspace == 'review')
-                      _FilterChip(
-                        label: 'Pending ($pendingCount)',
-                        selected: _filter == 'pending',
-                        badgeColor: const Color(0xFFAA8A45),
-                        onTap: () => setState(() => _filter = 'pending'),
-                      ),
-                    if (_workspace == 'bills') ...[
-                      _FilterChip(
-                        label: 'Outstanding (${outstandingBills.length})',
-                        selected: _filter == 'outstanding',
-                        badgeColor: const Color(0xFF8C7355),
-                        onTap: () => setState(() => _filter = 'outstanding'),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'Due ($dueCount)',
-                        selected: _filter == 'due',
-                        badgeColor: const Color(0xFF8C7355),
-                        onTap: () => setState(() => _filter = 'due'),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'Overdue ($overdueCount)',
-                        selected: _filter == 'overdue',
-                        badgeColor: const Color(0xFFB3261E),
-                        onTap: () => setState(() => _filter = 'overdue'),
-                      ),
-                    ],
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Verified ($verifiedCount)',
-                      selected: _filter == 'verified',
-                      badgeColor: const Color(0xFF56886B),
-                      onTap: () => setState(() => _filter = 'verified'),
-                    ),
-                    if (_workspace == 'review') ...[
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'Rejected ($rejectedCount)',
-                        selected: _filter == 'rejected',
-                        badgeColor: const Color(0xFFB3261E),
-                        onTap: () => setState(() => _filter = 'rejected'),
-                      ),
-                    ],
-                    if (_workspace == 'bills') ...[
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'Voided',
-                        selected: _filter == 'voided',
-                        badgeColor: Colors.grey,
-                        onTap: () => setState(() => _filter = 'voided'),
-                      ),
-                    ],
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'All (${workspacePayments.length})',
-                      selected: _filter == 'all',
-                      badgeColor: Colors.grey,
-                      onTap: () => setState(() => _filter = 'all'),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              if (controller.paymentsLoading && displayed.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: CircularProgressIndicator(),
-                  ),
-                )
-              else if (displayed.isEmpty && hiddenAdvanceRentCount == 0)
-                EmptyState(
-                  icon: _filter == 'pending'
-                      ? Icons.task_alt_outlined
-                      : _filter == 'overdue'
-                          ? Icons.check_circle_outline
-                          : Icons.receipt_long_outlined,
-                  title: _searchQuery.isNotEmpty
-                      ? 'No matching payments'
-                      : _filter == 'pending'
-                          ? 'No pending reviews'
-                          : _filter == 'overdue'
-                              ? 'No overdue payments'
-                              : 'No payments in this tab',
-                  message: _searchQuery.isNotEmpty
-                      ? 'Try searching with a different name, room, or reference.'
-                      : _filter == 'pending'
-                          ? 'All resident proof uploads have been reviewed and verified.'
-                          : _filter == 'overdue'
-                              ? 'All tenant balances are current and within terms.'
-                              : 'Payments will appear here once submitted or updated.',
-                )
-              else
-                ...displayed.map(
-                  (payment) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: _PaymentReviewCard(
-                      payment: payment,
-                      isProcessing: _processingPaymentId == payment.id,
-                      onOpenReceipt: (url) => _openReceiptViewer(payment, url),
-                      onConfirm: () => _handleVerify(payment, true),
-                      onReject: () => _promptRejectDialog(payment),
-                      onManageCharge: () => showDialog<void>(
-                        context: context,
-                        builder: (_) => _ChargeActionDialog(payment: payment),
-                      ),
-                    ),
-                  ),
-                ),
-              if (shouldLimitAdvanceRent && hiddenAdvanceRentCount > 0)
-                Align(
-                  alignment: Alignment.center,
-                  child: TextButton.icon(
-                    key: const Key('owner-advance-rent-toggle'),
-                    onPressed: () => setState(
-                      () => _showAllAdvanceRent = !_showAllAdvanceRent,
-                    ),
-                    icon: Icon(
-                      _showAllAdvanceRent
-                          ? Icons.expand_less_rounded
-                          : Icons.expand_more_rounded,
-                    ),
-                    label: Text(
-                      _showAllAdvanceRent
-                          ? 'Hide upcoming bills'
-                          : 'Show upcoming bills ($hiddenAdvanceRentCount)',
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
-    );
+                    if (controller.paymentsError != null)
+                      Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Text(
+                              'Could not refresh payments. Showing the last loaded records. ${controller.paymentsError}')),
+                    TextField(
+                        key: const Key('payment-review-search'),
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                            hintText:
+                                'Search resident, room, title or reference',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _searchQuery.isEmpty
+                                ? null
+                                : IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _searchQuery = '');
+                                    })),
+                        onChanged: (value) =>
+                            setState(() => _searchQuery = value)),
+                    const SizedBox(height: 14),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      for (final entry in {
+                        'pending': 'Pending ($pending)',
+                        'verified': 'Verified ($verified)',
+                        'rejected': 'Rejected ($rejected)',
+                        'all': 'All (${submissions.length})'
+                      }.entries)
+                        _FilterChip(
+                            label: entry.value,
+                            selected: _filter == entry.key,
+                            badgeColor: Theme.of(context).colorScheme.primary,
+                            onTap: () => setState(() => _filter = entry.key)),
+                    ]),
+                    const SizedBox(height: 16),
+                    if (controller.paymentsLoading && matching.isEmpty)
+                      const Center(child: CircularProgressIndicator())
+                    else if (matching.isEmpty)
+                      EmptyState(
+                          icon: Icons.fact_check_outlined,
+                          title: unsubmittedTarget
+                              ? 'No payment proof for this bill'
+                              : _searchQuery.isNotEmpty
+                                  ? 'No matching payments'
+                                  : _filter == 'pending'
+                                      ? 'No pending reviews'
+                                      : 'No payments in this tab',
+                          message:
+                              'Submitted payment proofs appear here. Billing actions and balances remain available in Billing.',
+                          action: unsubmittedTarget
+                              ? TextButton(
+                                  onPressed: () => Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                          builder: (_) =>
+                                              const BillingManagementPage())),
+                                  child: const Text('Open Billing'))
+                              : null)
+                    else
+                      for (final payment in matching)
+                        Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: _PaymentReviewCard(
+                                payment: payment,
+                                isProcessing: _processingPaymentId != null,
+                                onOpenReceipt: (url) =>
+                                    _openReceiptViewer(payment, url),
+                                onConfirm: () => _handleVerify(payment, true),
+                                onReject: () => _promptRejectDialog(payment))),
+                  ]));
+        });
   }
 }
 
@@ -3642,169 +3310,6 @@ class _RentOverrideDialog extends StatefulWidget {
   State<_RentOverrideDialog> createState() => _RentOverrideDialogState();
 }
 
-class _AdditionalChargeDialog extends StatefulWidget {
-  const _AdditionalChargeDialog();
-
-  @override
-  State<_AdditionalChargeDialog> createState() =>
-      _AdditionalChargeDialogState();
-}
-
-class _AdditionalChargeDialogState extends State<_AdditionalChargeDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _title = TextEditingController();
-  final _amount = TextEditingController();
-  final _reason = TextEditingController();
-  final _notes = TextEditingController();
-  String _category = 'damage';
-  String? _tenantId;
-  late DateTime _dueDate;
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final tenants = OwnerController.instance.tenants;
-    _tenantId = tenants.isEmpty ? null : tenants.first.id;
-    _dueDate = DateTime.now().add(const Duration(days: 7));
-  }
-
-  @override
-  void dispose() {
-    _title.dispose();
-    _amount.dispose();
-    _reason.dispose();
-    _notes.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _dueDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 730)),
-    );
-    if (date != null && mounted) setState(() => _dueDate = date);
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _saving = true);
-    try {
-      await OwnerController.instance.createAdditionalCharge(
-        tenantId: _tenantId!,
-        title: _title.text.trim(),
-        category: _category,
-        amount: double.parse(_amount.text.trim()),
-        dueDate: _dueDate,
-        reason: _reason.text.trim(),
-        notes: _notes.text.trim(),
-      );
-      if (!mounted) return;
-      Navigator.pop(context);
-      showAppSnackBar(context, 'Additional charge issued.');
-    } catch (error) {
-      if (mounted) {
-        setState(() => _saving = false);
-        showAppSnackBar(context, 'Could not issue charge: $error');
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tenants = OwnerController.instance.tenants;
-    const categories = {
-      'damage': 'Property damage',
-      'fine': 'Approved fine',
-      'late_fee': 'Late-payment fee',
-      'cleaning': 'Cleaning charge',
-      'replacement': 'Replacement charge',
-      'other': 'Other approved charge',
-    };
-    return AlertDialog(
-      title: const Text('Add approved charge'),
-      content: SizedBox(
-          width: 440,
-          child: SingleChildScrollView(
-              child: Form(
-            key: _formKey,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Text(
-                  'This charge is entered manually. Conduct cases never create charges automatically.'),
-              const SizedBox(height: 14),
-              SearchableDropdownFormField<String>(
-                initialValue: _tenantId,
-                decoration: const InputDecoration(labelText: 'Tenant'),
-                items: tenants
-                    .map((t) => DropdownMenuItem(
-                        value: t.id, child: Text('${t.name} (${t.room})')))
-                    .toList(),
-                onChanged:
-                    _saving ? null : (v) => setState(() => _tenantId = v),
-                validator: (v) => v == null ? 'Select a tenant' : null,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _category,
-                decoration: const InputDecoration(labelText: 'Charge category'),
-                items: categories.entries
-                    .map((e) =>
-                        DropdownMenuItem(value: e.key, child: Text(e.value)))
-                    .toList(),
-                onChanged:
-                    _saving ? null : (v) => setState(() => _category = v!),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                  controller: _title,
-                  decoration:
-                      const InputDecoration(labelText: 'Title / description'),
-                  validator: (v) => (v?.trim().length ?? 0) < 2
-                      ? 'Enter a description'
-                      : null),
-              const SizedBox(height: 12),
-              TextFormField(
-                  controller: _amount,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                      labelText: 'Amount', prefixText: '₱ '),
-                  validator: (v) => (double.tryParse(v?.trim() ?? '') ?? 0) <= 0
-                      ? 'Enter a valid amount'
-                      : null),
-              const SizedBox(height: 12),
-              _UtilityPeriodField(
-                  label: 'Due date', value: _dueDate, onTap: _pickDate),
-              const SizedBox(height: 12),
-              TextFormField(
-                  controller: _reason,
-                  minLines: 2,
-                  maxLines: 3,
-                  decoration:
-                      const InputDecoration(labelText: 'Reason (Required)'),
-                  validator: (v) =>
-                      (v?.trim().length ?? 0) < 3 ? 'Enter the reason' : null),
-              const SizedBox(height: 12),
-              TextFormField(
-                  controller: _notes,
-                  decoration: const InputDecoration(
-                      labelText: 'Evidence/reference notes (optional)')),
-            ]),
-          ))),
-      actions: [
-        TextButton(
-            onPressed: _saving ? null : () => Navigator.pop(context),
-            child: const Text('Cancel')),
-        FilledButton(
-            onPressed: _saving ? null : _submit,
-            child: Text(_saving ? 'Issuing…' : 'Issue charge')),
-      ],
-    );
-  }
-}
-
 class _ChargeActionDialog extends StatefulWidget {
   const _ChargeActionDialog({required this.payment});
   final Payment payment;
@@ -4115,7 +3620,6 @@ class _PaymentReviewCard extends StatelessWidget {
     required this.onOpenReceipt,
     required this.onConfirm,
     required this.onReject,
-    required this.onManageCharge,
   });
 
   final Payment payment;
@@ -4123,7 +3627,6 @@ class _PaymentReviewCard extends StatelessWidget {
   final ValueChanged<String> onOpenReceipt;
   final VoidCallback onConfirm;
   final VoidCallback onReject;
-  final VoidCallback onManageCharge;
 
   @override
   Widget build(BuildContext context) {
@@ -4174,7 +3677,7 @@ class _PaymentReviewCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  StatusPill(payment.status),
+                  StatusPill(payment.verificationStatus),
                   if (payment.isOverdue) ...[
                     const SizedBox(height: 4),
                     Container(
@@ -4237,7 +3740,7 @@ class _PaymentReviewCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
-                        payment.category.toUpperCase(),
+                        payment.categoryLabel.toUpperCase(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -4256,7 +3759,7 @@ class _PaymentReviewCard extends StatelessWidget {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerRight,
                 child: Text(
-                  money(payment.amount),
+                  money(payment.submittedAmount ?? payment.amount),
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w900,
                     fontSize: 20,
@@ -4372,6 +3875,11 @@ class _PaymentReviewCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
+          Text('Method: ${payment.paymentMethod ?? 'Not recorded'}'),
+          Text('Submitted: ${_dateOrNone(payment.paidAt)}'),
+          Text(
+              'Bill total: ${money(payment.amount)} • Remaining: ${money(payment.outstandingAmount)}'),
+
           // Reference row with copy action
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -4450,8 +3958,7 @@ class _PaymentReviewCard extends StatelessWidget {
               payment.submittedAmount! > 0 &&
               payment.reference?.isNotEmpty == true &&
               payment.reviewedAt != null &&
-              !payment.isPending &&
-              !payment.isRejected)
+              payment.isProofVerified)
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
@@ -4510,7 +4017,7 @@ class _PaymentReviewCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Rejection reason: ${payment.reviewNotes}',
+                      '${payment.isProofRejected ? 'Rejection reason' : 'Review notes'}: ${payment.reviewNotes}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.error,
                         fontWeight: FontWeight.w600,
@@ -4524,20 +4031,8 @@ class _PaymentReviewCard extends StatelessWidget {
 
           const SizedBox(height: 14),
 
-          if (!payment.isPending && !payment.isVoided) ...[
-            Align(
-              alignment: Alignment.centerRight,
-              child: OutlinedButton.icon(
-                onPressed: onManageCharge,
-                icon: const Icon(Icons.tune_rounded, size: 16),
-                label: const Text('Manage bill'),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-
           // ACTION BUTTONS
-          if (payment.isPending)
+          if (payment.isProofPending)
             LayoutBuilder(
               builder: (context, constraints) {
                 final isNarrow = constraints.maxWidth < 260;
@@ -4943,7 +4438,7 @@ class _ReceiptViewerModal extends StatelessWidget {
                 ),
               ),
             ),
-            if (payment.isPending)
+            if (payment.isProofPending)
               Container(
                 color: Colors.black.withValues(alpha: .9),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),

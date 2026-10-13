@@ -106,6 +106,10 @@ class Payment {
     this.tenantName,
     this.tenantRoom,
     this.category = 'rent',
+    this.specificCategory,
+    this.latestTransactionId,
+    this.latestTransactionStatus,
+    this.hasDueDate = true,
     this.paymentMethod,
     this.receiptPath,
     this.paidAt,
@@ -133,6 +137,33 @@ class Payment {
   final String? tenantRoom;
   final String label;
   final String category;
+  final String? specificCategory, latestTransactionId, latestTransactionStatus;
+  final bool hasDueDate;
+  String get categoryLabel =>
+      category == 'other' && specificCategory?.trim().isNotEmpty == true
+          ? specificCategory!.trim()
+          : category;
+  String get verificationStatus => latestTransactionStatus == null
+      ? status
+      : formatStatus(latestTransactionStatus!);
+  bool get isProofPending => latestTransactionStatus == null
+      ? isPending
+      : latestTransactionStatus == 'pending_verification';
+  bool get isProofRejected => latestTransactionStatus == null
+      ? isRejected
+      : latestTransactionStatus == 'rejected';
+  bool get isProofVerified => latestTransactionStatus == null
+      ? isVerified
+      : latestTransactionStatus == 'verified';
+  bool get hasPaymentSubmission =>
+      !isDeposit &&
+      (isProofPending ||
+          isProofRejected ||
+          latestTransactionId != null ||
+          paidAt != null ||
+          submittedAmount != null ||
+          reference?.isNotEmpty == true ||
+          receiptPath?.isNotEmpty == true);
   final double amount;
   final DateTime dueDate;
   String status;
@@ -213,6 +244,10 @@ class Payment {
     String? tenantRoom,
     String? label,
     String? category,
+    String? specificCategory,
+    String? latestTransactionId,
+    String? latestTransactionStatus,
+    bool? hasDueDate,
     double? amount,
     DateTime? dueDate,
     String? status,
@@ -243,6 +278,11 @@ class Payment {
       tenantRoom: tenantRoom ?? this.tenantRoom,
       label: label ?? this.label,
       category: category ?? this.category,
+      specificCategory: specificCategory ?? this.specificCategory,
+      latestTransactionId: latestTransactionId ?? this.latestTransactionId,
+      latestTransactionStatus:
+          latestTransactionStatus ?? this.latestTransactionStatus,
+      hasDueDate: hasDueDate ?? this.hasDueDate,
       amount: amount ?? this.amount,
       dueDate: dueDate ?? this.dueDate,
       status: status ?? this.status,
@@ -336,6 +376,10 @@ class Payment {
       tenantRoom: tenantRoom ?? json['tenant_room'] as String?,
       label: json['title'] as String? ?? json['label'] as String? ?? 'Payment',
       category: json['category'] as String? ?? 'rent',
+      specificCategory: json['specific_category'] as String?,
+      latestTransactionId: json['latest_transaction_id'] as String?,
+      latestTransactionStatus: json['latest_transaction_status'] as String?,
+      hasDueDate: rawDueDate is String && DateTime.tryParse(rawDueDate) != null,
       amount: parsedAmount,
       dueDate: parsedDueDate,
       status: formatStatus(rawStatus),
@@ -369,9 +413,15 @@ class Payment {
         'tenant_id': tenantId,
         'title': label,
         'category': category,
+        if (specificCategory != null) 'specific_category': specificCategory,
+        if (latestTransactionId != null)
+          'latest_transaction_id': latestTransactionId,
+        if (latestTransactionStatus != null)
+          'latest_transaction_status': latestTransactionStatus,
         'amount': amount,
-        'due_date':
-            '${dueDate.year.toString().padLeft(4, '0')}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}',
+        'due_date': hasDueDate
+            ? '${dueDate.year.toString().padLeft(4, '0')}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}'
+            : null,
         'status': toDbStatus(status),
         if (paymentMethod != null) 'payment_method': paymentMethod,
         if (reference != null) 'reference_number': reference,

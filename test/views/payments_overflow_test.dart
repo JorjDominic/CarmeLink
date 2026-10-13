@@ -6,6 +6,7 @@ import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/views/owner/owner_pages.dart';
 import 'package:carmelitas_dormitory_system/views/tenant/tenant_pages.dart';
 import 'package:carmelitas_dormitory_system/views/guardian/guardian_pages.dart';
+import 'package:carmelitas_dormitory_system/views/owner/utility_charge_cart_dialog.dart';
 
 void main() {
   setUp(() {
@@ -149,10 +150,9 @@ void main() {
       await tester.pumpWidget(buildTestable(const PaymentVerificationPage()));
       await tester.pumpAndSettle();
 
-      // Tap the in-page utility charge action.
-      await tester.tap(
-        find.widgetWithText(FilledButton, 'Add utility charge'),
-      );
+      // Billing retains this existing form; Payments no longer issues charges.
+      await tester.pumpWidget(
+          buildTestable(const Scaffold(body: UtilityChargeCartDialog())));
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget);

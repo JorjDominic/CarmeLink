@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   tearDown(OwnerController.instance.clear);
   testWidgets(
-      'staff future bills are hidden until expanded and proof reviews stay visible',
+      'staff future invoices remain in Billing while submitted proofs are reviewable',
       (tester) async {
     OwnerController.instance.clear();
     OwnerController.instance.setPaymentsForTesting([
@@ -30,13 +30,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Future rent test'), findsNothing);
     expect(find.text('Pending proof test'), findsWidgets);
-    final toggle = find.byKey(const Key('owner-advance-rent-toggle'));
-    await tester.ensureVisible(toggle);
-    await tester.tap(toggle);
-    await tester.pumpAndSettle();
-    expect(find.text('Future rent test'), findsWidgets);
-    await tester.ensureVisible(toggle);
-    await tester.tap(toggle);
+    expect(find.byKey(const Key('owner-advance-rent-toggle')), findsNothing);
+    await tester.tap(find.text('All (1)'));
     await tester.pumpAndSettle();
     expect(find.text('Future rent test'), findsNothing);
   });

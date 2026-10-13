@@ -144,6 +144,19 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
                   'Rent, utilities, manually approved charges, balances, and payment review.',
               onRefresh: _refresh,
               actions: [
+                IconButton(
+                    tooltip: 'Send payment due alerts to staff',
+                    icon: const Icon(Icons.notifications_active_outlined),
+                    onPressed: () async {
+                      final count = await controller.checkAndNotifyDuePayments(
+                          force: true);
+                      if (context.mounted)
+                        showAppSnackBar(
+                            context,
+                            count > 0
+                                ? 'Dispatched due date alerts for $count charge(s).'
+                                : 'No payments currently due or overdue.');
+                    }),
                 FilledButton.icon(
                   onPressed: () => showStaffPaymentReceived(context),
                   icon: const Icon(Icons.add_card_outlined),
