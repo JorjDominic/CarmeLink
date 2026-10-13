@@ -63,6 +63,9 @@ void main() {
         ]));
       } else if (path == 'tenant_assignments') {
         request.response.write('[]');
+      } else if (path == 'get_room_contract_occupancies') {
+        // This fixture tests the conservative room-ID reservation fallback.
+        request.response.write('[]');
       } else if (path == 'contract_occupancy_arrangements') {
         request.response.write(jsonEncode([
           {'room_id': 'room'}
@@ -153,7 +156,15 @@ void main() {
     expect(room.capacity, 4);
     expect(room.physicallyAvailable, 0);
     expect(room.beds.every((b) => b.status == 'reserved'), isTrue);
-    expect(requests.every((r) => r.method == 'GET'), isTrue);
+    expect(
+        requests.every((r) =>
+            r.method == 'GET' ||
+            (r.method == 'POST' &&
+                r.path == 'get_room_contract_occupancies' &&
+                r.body.isEmpty)),
+        isTrue,
+        reason:
+            'Room reads may use the read-only summary RPC but must not write any table');
     RoomService.invalidateCache();
   });
 }

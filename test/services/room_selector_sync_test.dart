@@ -77,6 +77,9 @@ void main() {
       } else if (path == 'safe_delete_room_floor') {
         floors.remove(body['p_name']);
       } else if (path == 'rooms' && request.method == 'PATCH') {
+        expect(body.containsKey('capacity'), isFalse,
+            reason:
+                'Metadata edits must not silently rewrite physical capacity');
         room!.addAll(body);
         result = {'id': 'room-id'};
       } else if (path == 'rooms') {

@@ -99,6 +99,10 @@ try {
   await root.query(assignmentSql.slice(start,assignmentSql.indexOf('$$;',start)+3));
   await inversion(true);
   await root.query(readFileSync('supabase/migrations/202610130002_contract_occupancy_stabilization.sql','utf8'));
+  if(process.argv.includes('--room-display')) {
+    await root.query(readFileSync('supabase/migrations/202610130003_room_contract_occupancy_display.sql','utf8'));
+    console.log('Phase 3 room display migration included in contention validation');
+  }
   await check('inverse room/bed locking fails cleanly without a deadlock',()=>inversion(false));
   await check('two Owners reserving the same room create only one arrangement',async()=>{
     const f=await fixture();const results=await race(()=>prepare(a,f,2),()=>prepare(b,f,2));
