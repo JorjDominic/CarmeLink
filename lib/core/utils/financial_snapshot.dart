@@ -1,5 +1,16 @@
 import '../../models/models.dart';
 
+/// Report ordering only; never modifies ledger amounts or the source list.
+List<Payment> financialPaymentsByDueDate(Iterable<Payment> source) =>
+    List<Payment>.of(source)
+      ..sort((a, b) {
+        if (a.hasDueDate != b.hasDueDate) return a.hasDueDate ? -1 : 1;
+        final dateOrder = a.hasDueDate ? a.dueDate.compareTo(b.dueDate) : 0;
+        if (dateOrder != 0) return dateOrder;
+        final tenantOrder = (a.tenantName ?? '').compareTo(b.tenantName ?? '');
+        return tenantOrder != 0 ? tenantOrder : a.id.compareTo(b.id);
+      });
+
 /// Verified cash is counted separately from deposit credits and unpaid bills.
 class FinancialSnapshot {
   /// Issued unpaid charges, excluding deposits, voided bills and future rent.

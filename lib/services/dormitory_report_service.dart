@@ -223,7 +223,7 @@ class DormitoryReportService {
   Future<Uint8List> generateFinancialReportPdf() async {
     final pdf = pw.Document();
     final controller = OwnerController.instance;
-    final payments = controller.payments;
+    final payments = financialPaymentsByDueDate(controller.payments);
 
     final financial = FinancialSnapshot(payments);
     final totalPaid = financial.collected;
@@ -311,8 +311,10 @@ class DormitoryReportService {
                               p.id.substring(
                                   0, p.id.length > 8 ? 8 : p.id.length),
                           p.tenantName ?? 'Resident',
-                          p.category.toUpperCase(),
-                          _formatDate(p.dueDate),
+                          p.categoryLabel.toUpperCase(),
+                          p.hasDueDate
+                              ? _formatDate(p.dueDate)
+                              : 'Not specified',
                           p.paymentMethod ?? 'Not recorded',
                           _formatCurrency(p.amount),
                           _formatCurrency(p.collectedAmount),
