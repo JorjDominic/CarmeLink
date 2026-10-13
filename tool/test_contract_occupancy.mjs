@@ -1,14 +1,9 @@
+import {bootstrapOccupancyFixture} from './contract_occupancy_test_fixture.mjs';
 // Isolated PostgreSQL only. Reuses the existing PGlite installation; no live data.
 import { PGlite } from '../build/phase2_sql_tests/node_modules/@electric-sql/pglite/dist/index.js';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 const db = new PGlite();
-const source = file => readFileSync(`supabase/migrations/${file}`, 'utf8');
-const fn = (file, name) => {
-  const sql=source(file), start=sql.indexOf(`create or replace function public.${name}(`);
-  assert.ok(start>=0,name);
-  return sql.slice(start,sql.indexOf('$$;',sql.indexOf('as $$',start)+5)+3);
-};
 const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
 const owner=id(1); let seq=20, passed=0;
 const row=async(sql,p=[]) => (await db.query(sql,p)).rows[0];
@@ -36,52 +31,10 @@ async function approve(c) {
   await db.query("update tenant_contracts set signature_status='verified' where id=$1",[c]);
 }
 try {
-  await db.exec(`create role anon;create role authenticated;create schema auth;create schema storage;
-    create type app_role as enum('owner','caretaker','tenant','guardian');
-    create table profiles(id uuid primary key,role app_role,full_name text,email_verified_at timestamptz);
-    create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
-    create function current_user_role() returns app_role language sql security definer as $$select role from public.profiles where id=auth.uid()$$;
-    create function is_staff() returns boolean language sql security definer as $$select current_user_role() in ('owner','caretaker')$$;
-    create table tenant_details(profile_id uuid primary key,contract_starts_on date,contract_ends_on date,
-      emergency_contact_name text default 'Parent',emergency_contact_phone text default '09171234567',emergency_contact_relationship text default 'Parent');
-    create table contract_requirements(contract_id uuid,is_required boolean,status text);
-    create table move_out_cases(contract_id uuid,status text);
-    create table contract_signers(contract_id uuid,signer_role text,is_required boolean,status text);
-    create table contract_documents(contract_id uuid,document_type text,version integer,review_status text,storage_path text);
-    create table storage.objects(bucket_id text,name text);
-    create table room_transfers(id uuid,contract_id uuid,source_assignment_id uuid,destination_bed_id uuid,resulting_assignment_id uuid,tenant_id uuid,status text);
-    create table billing_charges(id uuid primary key default gen_random_uuid(),contract_id uuid,tenant_id uuid,
-      title text,category text,original_amount numeric,due_date date,period_start date,period_end date,source text,
-      terms_snapshot jsonb,created_by uuid);
-    create unique index billing_period on billing_charges(contract_id,category,period_start) where contract_id is not null;
-  `);
-  const core=source('202609070002_core_dormitory_structure.sql');
-  await db.exec(core.slice(0,core.indexOf('create or replace function public.is_staff')));
-  await db.exec('alter table rooms add column is_active boolean default true');
-  await db.query("insert into profiles values($1,'owner','Owner',now()),($2,'caretaker','Caretaker',now())",[owner,id(2)]);
-  await actor(owner);
-  await db.exec(source('202609190007_contracts_crud.sql'));
-  await db.exec("alter table tenant_contracts add column previous_contract_id uuid,add column signature_status text default 'not_generated';alter table tenant_contracts alter column contract_number set default ('CTR-'||gen_random_uuid())");
-  await db.exec(source('202609190008_contract_tenant_date_sync.sql'));
-  await db.exec(fn('202610090004_contract_renewals.sql','guard_contract_renewal'));
-  await db.exec('create trigger tenant_contracts_renewal_guard before insert or update on tenant_contracts for each row execute function guard_contract_renewal()');
-  await db.exec(fn('202609260002_onboarding_safety_gates.sql','require_verified_email_for_active_contract'));
-  await db.exec('create trigger verified_activation before insert or update on tenant_contracts for each row execute function require_verified_email_for_active_contract()');
-  await db.exec(fn('202609190010_contract_document_workflow.sql','protect_contract_after_signature'));
-  await db.exec('create trigger protect_signed before update on tenant_contracts for each row execute function protect_contract_after_signature()');
-  await db.exec(fn('202610090006_signed_room_transfers.sql','guard_signed_room_assignment'));
-  await db.exec('create trigger guard_signed_room_assignment before insert or update or delete on tenant_assignments for each row execute function guard_signed_room_assignment()');
-  await db.exec(fn('202610040002_separate_security_deposit_receipts.sql','generate_contract_billing_charges'));
-  await db.exec(fn('202609200001_contract_billing_synchronization.sql','sync_contract_billing_on_activation'));
-  await db.exec('create trigger generate_billing after insert or update of status on tenant_contracts for each row execute function sync_contract_billing_on_activation()');
-  await db.exec(source('202609280007_activate_contract_without_rewriting_terms.sql'));
-  await db.exec(source('202610120002_signed_contract_activation.sql'));
-  const legacyFixture=await fixture();
-  await db.query('insert into tenant_assignments(tenant_id,bed_space_id) values($1,$2)',[legacyFixture.tenants[0],legacyFixture.beds[0]]);
-  const legacyContract=await row('insert into tenant_contracts(tenant_id,starts_on,ends_on,monthly_rent) values($1,current_date,current_date+30,2500) returning id',[legacyFixture.tenants[0]]);
-  await db.exec(source('202610130001_contract_room_occupancy.sql'));
-  await db.exec(readFileSync('supabase/rollback/202610130001_contract_room_occupancy.sql','utf8'));
-  await db.exec(source('202610130001_contract_room_occupancy.sql'));
+  const {legacyFixture,legacyContract}=await bootstrapOccupancyFixture(db,fixture);
+  await assert.rejects(db.exec(readFileSync('supabase/rollback/202610130001_contract_room_occupancy.sql','utf8')),/reverse the stabilization/);await db.exec('rollback');
+  await db.exec(readFileSync('supabase/rollback/202610130002_contract_occupancy_stabilization.sql','utf8'));
+  await db.exec(readFileSync('supabase/migrations/202610130002_contract_occupancy_stabilization.sql','utf8'));
   console.log('PASS empty-database rollback and reapply');
   for(const n of [1,2,3,4]) await check(`${n} occupants, immutable snapshot, exact rent and unchanged deposits`,async()=>{
     const f=await fixture(), ids=await prepare(f,n);
@@ -181,10 +134,50 @@ try {
     assert.equal((await db.query('select room_id from contract_occupancy_arrangements')).rows.length,0);
     await db.exec('reset role');await actor(owner);
   });
+  await check('activation rejects missing roles, null sessions and caretaker sessions',async()=>{
+    const f=await fixture(), ids=await prepare(f,1);await approve(ids[0]);
+    for(const who of ['',id(9999999),id(2),f.tenants[0]]) {
+      await actor(who);await assert.rejects(activate(ids[0]),/Owner access required/);
+    }
+    await actor(owner);assert.equal((await row('select status from tenant_contracts where id=$1',[ids[0]])).status,'draft');
+    await activate(ids[0]);
+  });
+  await check('actual contract RLS permits own/linked reads and denies unauthorized lifecycle writes',async()=>{
+    const f=await fixture(), ids=await prepare(f,1);
+    const guardian=id(4);await db.query("insert into profiles values($1,'guardian','Fixture guardian',now())",[guardian]);
+    await db.query('insert into guardian_tenant_links(guardian_id,tenant_id) values($1,$2)',[guardian,f.tenants[0]]);
+    for(const [who,readCount] of [[owner,1],[id(2),0],[f.tenants[0],1],[guardian,1],[f.tenants[1],0]]) {
+      await actor(who);await db.exec('set role authenticated');
+      assert.equal((await db.query('select id from tenant_contracts where id=$1',[ids[0]])).rows.length,readCount);
+      if(who!==owner) {
+        assert.equal((await db.query("update tenant_contracts set notes='Unauthorized' where id=$1 returning id",[ids[0]])).rows.length,0);
+        await assert.rejects(activate(ids[0]),/Owner access required/);
+      }
+      await db.exec('reset role');
+    }
+    await actor(owner);
+  });
+  await check('evidence RPCs reject missing roles and unauthorized staff before changing records',async()=>{
+    const calls=[
+      ["select review_signed_contract_document($1,true,'Fixture review')",[id(999)]],
+      ["select review_contract_requirement($1,true,'Fixture review')",[id(999)]],
+      ['select set_contract_requirement_required($1,true)',[id(999)]],
+      ["select update_contract_signer($1,'verified')",[id(999)]],
+      ["select submit_owner_electronic_signature($1,'invalid',100,$2)",[id(999),'a'.repeat(64)]],
+    ];
+    for(const who of ['',id(999999),id(2)]) {
+      await actor(who);for(const [sql,args] of calls) await assert.rejects(db.query(sql,args),/Forbidden|Owner access required/);
+    }
+    for(const who of ['',id(999999),id(2)]) {
+      await actor(who);await assert.rejects(db.query("select submit_tenant_electronic_signature($1,'invalid',100,$2)",[id(999),'a'.repeat(64)]),/Tenant access required/);
+      await assert.rejects(db.query("select submit_contract_requirement($1,'invalid','fixture.png','image/png',100,$2,false,0::smallint)",[id(999),'a'.repeat(64)]),/Forbidden/);
+    }
+    await actor(owner);
+  });
   await check('rollback refuses to discard real contractual records',async()=>{
     await assert.rejects(db.exec(readFileSync('supabase/rollback/202610130001_contract_room_occupancy.sql','utf8')),/Rollback blocked/);
     await db.exec('rollback');
     assert.ok(Number((await row('select count(*) n from contract_occupancy_arrangements')).n)>0);
   });
-  console.log(`Passed ${passed} occupancy database checks. Multi-session concurrency remains a deployment check.`);
+  console.log(`Passed ${passed} occupancy database checks. PGlite serializes requests; run the independent PostgreSQL script for contention checks.`);
 } finally {await db.close();}
