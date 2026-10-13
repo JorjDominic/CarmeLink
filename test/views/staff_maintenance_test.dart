@@ -20,7 +20,8 @@ void main() {
   }
 
   group('StaffMaintenancePage Widget Test', () {
-    testWidgets('renders metric cards, search, and filter chips', (tester) async {
+    testWidgets('renders metric cards, search, and filter chips',
+        (tester) async {
       OwnerController.instance.setStaffMaintenanceForTesting([]);
 
       await tester.pumpWidget(buildTestable(const StaffMaintenancePage()));
@@ -93,6 +94,8 @@ void main() {
       expect(find.text('In Progress (1)'), findsOneWidget);
 
       // Both reports visible
+      expect(find.text('Report Type'), findsNWidgets(2));
+      expect(find.text('Report Details'), findsNWidgets(2));
       expect(find.text('Plumbing'), findsOneWidget);
       expect(find.text('Room 204'), findsOneWidget);
       expect(find.text('Electrical'), findsOneWidget);
@@ -158,7 +161,8 @@ void main() {
       await tester.enterText(searchFinder, 'NonExistentXYZ');
       await tester.pump();
 
-      expect(find.text('No reports match the selected filters.'), findsOneWidget);
+      expect(
+          find.text('No reports match the selected filters.'), findsOneWidget);
     });
 
     testWidgets('toggles dormitory floor plan overview', (tester) async {
@@ -186,4 +190,3 @@ void main() {
     });
   });
 }
-

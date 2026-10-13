@@ -473,6 +473,10 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    const Text('Report Type',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.w700)),
+                                    const SizedBox(height: 4),
                                     Text(
                                       report.category,
                                       maxLines: 1,
@@ -538,6 +542,8 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                           const SizedBox(height: 10),
 
                           // Description
+                          const SectionTitle('Report Details'),
+                          const SizedBox(height: 8),
                           Text(
                             report.description,
                             maxLines: 2,
@@ -864,6 +870,8 @@ class StaffMaintenanceDetailsPageState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          const SectionTitle('Report Type'),
+                          const SizedBox(height: 8),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -986,7 +994,7 @@ class StaffMaintenanceDetailsPageState
                                   size: 18, color: AppColors.brown),
                               SizedBox(width: 8),
                               Text(
-                                'Issue Description',
+                                'Report Details',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,

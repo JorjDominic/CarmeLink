@@ -9003,6 +9003,8 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            const SectionTitle('Report Type'),
+                            const SizedBox(height: 8),
                             Row(
                               children: [
                                 Expanded(
@@ -9020,7 +9022,9 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                             Text(report.tenantName,
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 16),
+                            const SectionTitle('Report Details'),
+                            const SizedBox(height: 8),
                             if (report.specificConcern.isNotEmpty) ...[
                               const Text(
                                 'Specific concern',
