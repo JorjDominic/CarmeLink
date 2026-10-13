@@ -3782,11 +3782,10 @@ class _AdditionalChargeDialogState extends State<_AdditionalChargeDialog> {
                   controller: _reason,
                   minLines: 2,
                   maxLines: 3,
-                  decoration: const InputDecoration(
-                      labelText: 'Approval reason (required)'),
-                  validator: (v) => (v?.trim().length ?? 0) < 3
-                      ? 'Enter the approval reason'
-                      : null),
+                  decoration:
+                      const InputDecoration(labelText: 'Reason (Required)'),
+                  validator: (v) =>
+                      (v?.trim().length ?? 0) < 3 ? 'Enter the reason' : null),
               const SizedBox(height: 12),
               TextFormField(
                   controller: _notes,
