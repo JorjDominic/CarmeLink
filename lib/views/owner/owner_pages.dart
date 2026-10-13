@@ -10761,38 +10761,13 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
   }
 }
 
+/// Retains the existing navigation entry while displaying the conduct queue
+/// directly, so browser history and internal Back keep their current behavior.
 class DisciplinaryRecordsPage extends StatelessWidget {
   const DisciplinaryRecordsPage({super.key});
 
   @override
-  Widget build(BuildContext context) => PageFrame(
-        title: 'Discipline',
-        subtitle: 'Verified violations and issued notices by tenant',
-        child: Column(
-          children: [
-            CarmelitaCard(
-              child: Material(
-                color: Colors.transparent,
-                child: ListTile(
-                  leading: const Icon(Icons.gavel_outlined,
-                      color: Color(0xFF6B1D2F)),
-                  title: const Text('Resident Conduct & Violation Cases'),
-                  subtitle: const Text(
-                      'Hearings, official warnings, and disciplinary records'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const StaffConductCasesPage(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
+  Widget build(BuildContext context) => const StaffConductCasesPage();
 }
 
 class ReportsAnalyticsPage extends StatefulWidget {

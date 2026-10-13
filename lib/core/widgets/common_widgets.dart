@@ -297,14 +297,17 @@ class CollapsibleInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CarmelitaCard(
         padding: EdgeInsets.zero,
-        child: ExpansionTile(
-          initiallyExpanded: initiallyExpanded,
-          leading: Icon(icon),
-          title:
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          expandedCrossAxisAlignment: CrossAxisAlignment.start,
-          children: [SizedBox(width: double.infinity, child: Text(body))],
+        child: Material(
+          color: Colors.transparent,
+          child: ExpansionTile(
+            initiallyExpanded: initiallyExpanded,
+            leading: Icon(icon),
+            title: Text(title,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            expandedCrossAxisAlignment: CrossAxisAlignment.start,
+            children: [SizedBox(width: double.infinity, child: Text(body))],
+          ),
         ),
       );
 }

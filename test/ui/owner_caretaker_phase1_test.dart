@@ -1,6 +1,8 @@
 import 'dart:io';
 
+import 'package:carmelitas_dormitory_system/views/owner/owner_pages.dart';
 import 'package:carmelitas_dormitory_system/views/shared/account_management_page.dart';
+import 'package:carmelitas_dormitory_system/views/shared/conduct_case_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -51,6 +53,31 @@ void main() {
       await tester.pumpAndSettle();
     });
   }
+
+  testWidgets('disciplinary entry opens conduct queue with one Back step',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: Builder(builder: (context) {
+        return TextButton(
+          onPressed: () => Navigator.push<void>(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const DisciplinaryRecordsPage())),
+          child: const Text('Open discipline'),
+        );
+      })),
+    ));
+    await tester.tap(find.text('Open discipline'));
+    await tester.pumpAndSettle();
+    expect(find.byType(StaffConductCasesPage), findsOneWidget);
+    expect(find.text('Resident Conduct & Violation Cases'), findsNothing);
+    final context = tester.element(find.byType(StaffConductCasesPage));
+    Navigator.pop(context);
+    await tester.pumpAndSettle();
+    expect(find.text('Open discipline'), findsOneWidget);
+    expect(find.byType(StaffConductCasesPage), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   test('account changes preserve role assignment and email/phone actions', () {
     final source = File('lib/views/shared/account_management_page.dart')
