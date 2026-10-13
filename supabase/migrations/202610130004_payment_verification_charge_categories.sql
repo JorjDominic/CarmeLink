@@ -46,6 +46,31 @@ left join lateral (select t.* from public.payment_transactions t
   where t.charge_id=c.id and t.status <> 'reversed'
   order by t.submitted_at desc, t.created_at desc limit 1) latest on true;
 
+create or replace function public.review_payment_transaction(
+  p_charge_id uuid, p_approve boolean, p_review_notes text default null
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_transaction uuid; v_row jsonb;
+begin
+  if auth.uid() is null or not coalesce(public.is_staff(),false) then raise exception 'Staff access required'; end if;
+  if p_approve is null then raise exception 'An approval decision is required'; end if;
+  perform 1 from public.billing_charges where id=p_charge_id for update;
+  select id into v_transaction from public.payment_transactions
+  where charge_id = p_charge_id and status = 'pending_verification'
+  order by submitted_at desc limit 1 for update;
+  if v_transaction is null then raise exception 'No pending transaction found'; end if;
+  if p_approve and (select amount from public.payment_transactions where id=v_transaction) >
+    (select remaining_balance from public.billing_charge_summaries where id=p_charge_id) then
+    raise exception 'Payment exceeds the current outstanding balance';
+  end if;
+  update public.payment_transactions set
+    status = case when p_approve then 'verified' else 'rejected' end,
+    reviewed_by = auth.uid(), reviewed_at = now(),
+    review_notes = nullif(trim(p_review_notes), '')
+  where id = v_transaction;
+  select to_jsonb(s) into v_row from public.billing_charge_summaries s where s.id = p_charge_id;
+  return v_row;
+end; $$;
+
 create function public.create_additional_charge(
   p_tenant_id uuid,p_title text,p_category text,p_amount numeric,p_due_date date,
   p_notes text,p_reason text,p_specific_category text
@@ -81,6 +106,26 @@ revoke all on function public.create_additional_charge(uuid,text,text,numeric,da
   public.create_additional_charge(uuid,text,text,numeric,date,text,text) from public,anon;
 grant execute on function public.create_additional_charge(uuid,text,text,numeric,date,text,text,text),
   public.create_additional_charge(uuid,text,text,numeric,date,text,text) to authenticated;
+
+-- Bind a review to the proof shown to staff. Preserve the legacy review API.
+create function public.review_payment_transaction(
+  p_charge_id uuid,p_approve boolean,p_review_notes text,p_expected_transaction_id uuid
+) returns jsonb language plpgsql security definer set search_path='' as $$
+declare v_transaction uuid;
+begin
+  if auth.uid() is null or not coalesce(public.is_staff(),false) then raise exception 'Staff access required'; end if;
+  perform 1 from public.billing_charges where id=p_charge_id for update;
+  select id into v_transaction from public.payment_transactions where charge_id=p_charge_id and status='pending_verification'
+    order by submitted_at desc limit 1 for update;
+  if p_expected_transaction_id is null or v_transaction is distinct from p_expected_transaction_id then
+    raise exception 'Payment submission changed. Refresh and review the current proof.';
+  end if;
+  return public.review_payment_transaction(p_charge_id,p_approve,p_review_notes);
+end $$;
+revoke all on function public.review_payment_transaction(uuid,boolean,text),
+  public.review_payment_transaction(uuid,boolean,text,uuid) from public,anon;
+grant execute on function public.review_payment_transaction(uuid,boolean,text),
+  public.review_payment_transaction(uuid,boolean,text,uuid) to authenticated;
 
 notify pgrst,'reload schema';
 commit;

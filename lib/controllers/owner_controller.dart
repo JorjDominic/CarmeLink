@@ -366,6 +366,7 @@ class OwnerController extends ChangeNotifier {
         paymentId: payment.id,
         approve: approve,
         reviewNotes: notes,
+        transactionId: payment.latestTransactionId,
       );
 
       final index = _payments.indexWhere((p) => p.id == payment.id);

@@ -252,12 +252,14 @@ class PaymentService {
     required String paymentId,
     required bool approve,
     String? reviewNotes,
+    String? transactionId,
   }) async {
     _requireAuthId();
     final updatedRow = await _client.rpc('review_payment_transaction', params: {
       'p_charge_id': paymentId,
       'p_approve': approve,
       'p_review_notes': reviewNotes,
+      if (transactionId != null) 'p_expected_transaction_id': transactionId,
     });
     final payment =
         Payment.fromJson(Map<String, dynamic>.from(updatedRow as Map));
@@ -266,7 +268,7 @@ class PaymentService {
       tenantId: payment.tenantId,
       paymentId: paymentId,
       approved: approve,
-      amount: payment.amount,
+      amount: payment.submittedAmount ?? payment.amount,
       reason: reviewNotes,
     ));
 
