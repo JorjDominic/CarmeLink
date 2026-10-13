@@ -28,9 +28,17 @@ List<RoomRecord> filterRoomDirectory(
   List<RoomRecord> rooms, {
   String query = '',
   String availability = 'all',
+  String floor = 'all',
+  String arrangement = 'all',
 }) {
   final needle = query.trim().toLowerCase();
   return rooms.where((room) {
+    if (floor != 'all' && room.floor != floor) return false;
+    if (arrangement != 'all' && room.arrangement != arrangement) return false;
+    if (availability == 'reserved' && room.availability != 'reserved')
+      return false;
+    if (availability == 'unavailable' && room.availability != 'unavailable')
+      return false;
     if (availability == 'available' &&
         (!room.isActive || room.physicallyAvailable == 0)) {
       return false;
@@ -45,8 +53,14 @@ List<RoomRecord> filterRoomDirectory(
     }
     if (availability == 'active' && !room.isActive) return false;
     return needle.isEmpty ||
-        [room.number, room.floor, room.description]
-            .any((value) => value.toLowerCase().contains(needle));
+        [
+          room.number,
+          room.floor,
+          room.description,
+          ...room.beds
+              .where((bed) => bed.occupied)
+              .map((bed) => bed.tenantName ?? '')
+        ].any((value) => value.toLowerCase().contains(needle));
   }).toList();
 }
 
@@ -72,6 +86,8 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
   String? errorMessage;
   String _roomQuery = '';
   String _availabilityFilter = 'all';
+  String _floorFilter = 'all';
+  String _arrangementFilter = 'all';
   int _roomPage = 1;
   int _requestVersion = 0;
   Timer? _debounceTimer;
@@ -114,6 +130,9 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
       if (mounted && version == _requestVersion) {
         setState(() {
           rooms = latest;
+          if (_floorFilter != 'all' &&
+              !latest.any((room) => room.floor == _floorFilter))
+            _floorFilter = 'all';
           loading = false;
           errorMessage = null;
         });
@@ -341,6 +360,8 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
         orderedRooms,
         query: _roomQuery,
         availability: _availabilityFilter,
+        floor: _floorFilter,
+        arrangement: _arrangementFilter,
       );
       final roomPageSize = MediaQuery.sizeOf(context).width < 600 ? 6 : 8;
       final roomPageCount = visibleRooms.isEmpty
@@ -412,7 +433,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                   key: const Key('web-room-search'),
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search),
-                    hintText: 'Search room number or floor',
+                    hintText: 'Search room, floor or assigned tenant',
                   ),
                   onChanged: (value) => setState(() {
                     _roomQuery = value;
@@ -433,6 +454,14 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                       child: Text('Beds available'),
                     ),
                     DropdownMenuItem(
+                      value: 'reserved',
+                      child: Text('Contract reserved'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'unavailable',
+                      child: Text('Unavailable'),
+                    ),
+                    DropdownMenuItem(
                       value: 'full',
                       child: Text('Fully occupied'),
                     ),
@@ -451,6 +480,46 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                   },
                 );
 
+                final floorNames = currentRooms
+                    .map((room) => room.floor)
+                    .toSet()
+                    .toList()
+                  ..sort(compareFloorLabels);
+                final floorFilter = DropdownButtonFormField<String>(
+                  key: ValueKey('room-floor-filter-$_floorFilter'),
+                  isExpanded: true,
+                  initialValue:
+                      floorNames.contains(_floorFilter) ? _floorFilter : 'all',
+                  decoration: const InputDecoration(labelText: 'Floor'),
+                  items: [
+                    const DropdownMenuItem(
+                        value: 'all', child: Text('All floors')),
+                    ...floorNames.map((floor) =>
+                        DropdownMenuItem(value: floor, child: Text(floor)))
+                  ],
+                  onChanged: (value) => setState(() {
+                    _floorFilter = value ?? 'all';
+                    _roomPage = 1;
+                  }),
+                );
+                final arrangementFilter = DropdownButtonFormField<String>(
+                  key: const Key('room-arrangement-filter'),
+                  isExpanded: true,
+                  initialValue: _arrangementFilter,
+                  decoration: const InputDecoration(labelText: 'Arrangement'),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'all', child: Text('All arrangements')),
+                    DropdownMenuItem(value: 'solo', child: Text('Solo')),
+                    DropdownMenuItem(value: 'shared', child: Text('Shared')),
+                    DropdownMenuItem(value: 'vacant', child: Text('Vacant'))
+                  ],
+                  onChanged: (value) => setState(() {
+                    _arrangementFilter = value ?? 'all';
+                    _roomPage = 1;
+                  }),
+                );
+
                 if (narrow) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -458,6 +527,10 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                       search,
                       const SizedBox(height: 10),
                       filter,
+                      const SizedBox(height: 10),
+                      floorFilter,
+                      const SizedBox(height: 10),
+                      arrangementFilter,
                       const SizedBox(height: 8),
                       Text(
                         '${visibleRooms.length} of ${currentRooms.length} rooms',
@@ -472,6 +545,8 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                   children: [
                     SizedBox(width: 300, child: search),
                     SizedBox(width: 200, child: filter),
+                    SizedBox(width: 200, child: floorFilter),
+                    SizedBox(width: 240, child: arrangementFilter),
                     Text(
                       '${visibleRooms.length} of ${currentRooms.length} rooms',
                     ),
