@@ -1,6 +1,9 @@
 -- Manual rollback only. Never erase real occupancy agreements or signed history.
 begin;
 do $$ begin
+  if to_regprocedure('public.lock_contract_occupancy_room(uuid)') is not null then
+    raise exception 'Rollback blocked: reverse the stabilization migration before the original occupancy migration.';
+  end if;
   if exists(select 1 from public.contract_occupancy_arrangements) then
     raise exception 'Rollback blocked: occupancy records exist. Restore application compatibility and preserve data; do not drop contractual history.';
   end if;
