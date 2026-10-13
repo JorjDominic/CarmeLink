@@ -43,7 +43,8 @@ Future<CreatedAccount?> showCreateTenantAccount(BuildContext context) =>
 
 /// Fetches the authoritative account record (including its email) before
 /// opening the same edit/delete actions offered by Account management.
-Future<bool> showEditTenantAccount(BuildContext context, String tenantId) async {
+Future<bool> showEditTenantAccount(
+    BuildContext context, String tenantId) async {
   final accounts = await const AccountService().listAccounts();
   final matches = accounts.where(
     (account) => account['id'] == tenantId && account['role'] == 'tenant',
@@ -193,13 +194,19 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
                           child: DropdownButtonFormField<String>(
                             key: const Key('web-account-role-filter'),
                             initialValue: roleFilter,
-                            decoration: const InputDecoration(labelText: 'Role'),
+                            decoration:
+                                const InputDecoration(labelText: 'Role'),
                             items: const [
-                              DropdownMenuItem(value: 'all', child: Text('All roles')),
-                              DropdownMenuItem(value: 'owner', child: Text('Owner')),
-                              DropdownMenuItem(value: 'caretaker', child: Text('Caretaker')),
-                              DropdownMenuItem(value: 'tenant', child: Text('Tenant')),
-                              DropdownMenuItem(value: 'guardian', child: Text('Guardian')),
+                              DropdownMenuItem(
+                                  value: 'all', child: Text('All roles')),
+                              DropdownMenuItem(
+                                  value: 'owner', child: Text('Owner')),
+                              DropdownMenuItem(
+                                  value: 'caretaker', child: Text('Caretaker')),
+                              DropdownMenuItem(
+                                  value: 'tenant', child: Text('Tenant')),
+                              DropdownMenuItem(
+                                  value: 'guardian', child: Text('Guardian')),
                             ],
                             onChanged: (value) {
                               if (value != null) {
@@ -217,46 +224,46 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
                   if (visible.isEmpty)
                     const Center(child: Text('No accounts match the filters.')),
                   ...visible
-                    .map((row) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: CarmelitaCard(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            child: ListTile(
-                              onTap: () => manage(row),
-                              contentPadding: EdgeInsets.zero,
-                              leading: CircleAvatar(
-                                child: Text((row['full_name'] as String)
-                                    .substring(0, 1)),
-                              ),
-                              title: Text(row['full_name'] as String),
-                              subtitle: Text([
-                                row['email'] as String? ?? '',
-                                (row['phone'] as String?)?.isNotEmpty == true
-                                    ? row['phone'] as String
-                                    : 'No phone number',
-                                'Email: ${row['email_verification_status'] == 'verified' ? 'Verified' : 'Pending verification'}',
-                                'Mobile: ${row['phone_verification_status'] == 'verified' ? 'Verified' : 'On hold'}',
-                              ].join('\n')),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  StatusPill(_roleLabel(row['role'] as String)),
-                                  const Icon(Icons.chevron_right, size: 18),
-                                ],
+                      .map((row) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: CarmelitaCard(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              child: ListTile(
+                                onTap: () => manage(row),
+                                contentPadding: EdgeInsets.zero,
+                                leading: CircleAvatar(
+                                  child: Text((row['full_name'] as String)
+                                      .substring(0, 1)),
+                                ),
+                                title: Text(row['full_name'] as String),
+                                subtitle: Text([
+                                  row['email'] as String? ?? '',
+                                  (row['phone'] as String?)?.isNotEmpty == true
+                                      ? row['phone'] as String
+                                      : 'No phone number',
+                                  'Email: ${row['email_verification_status'] == 'verified' ? 'Verified' : 'Pending verification'}',
+                                  'Mobile: ${row['phone_verification_status'] == 'verified' ? 'Verified' : 'On hold'}',
+                                ].join('\n')),
+                                trailing: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    StatusPill(
+                                        _roleLabel(row['role'] as String)),
+                                    const Icon(Icons.chevron_right, size: 18),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        ))
-                    .toList(),
+                          ))
+                      .toList(),
                 ],
               );
             },
           ),
         ),
       );
-
 
   Future<void> _offerContractDraft(CreatedAccount account) async {
     // Continue directly with the new tenant already selected.
@@ -464,24 +471,12 @@ class _EditAccountSheetState extends State<_EditAccountSheet> {
                 _InlineError(message: errorMessage!),
               ],
               const SizedBox(height: 18),
-              Row(children: [
-                Expanded(
-                  child: InfoRow(
-                    label: 'Email verification',
-                    value: widget.account['email_verification_status'] ==
-                            'verified'
-                        ? 'Verified'
-                        : 'Pending',
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: InfoRow(
-                    label: 'Mobile verification',
-                    value: 'On hold',
-                  ),
-                ),
-              ]),
+              InfoRow(
+                label: 'Email verification',
+                value: widget.account['email_verification_status'] == 'verified'
+                    ? 'Verified'
+                    : 'Pending',
+              ),
               if (widget.account['email_verification_status'] !=
                   'verified') ...[
                 const SizedBox(height: 8),
@@ -622,18 +617,20 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
                     decoration:
                         const InputDecoration(labelText: 'Phone number')),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: role,
-                  decoration: const InputDecoration(labelText: 'Role'),
-                  items: allowedRoles
-                      .map((value) => DropdownMenuItem(
-                          value: value, child: Text(_label(value))))
-                      .toList(),
-                  onChanged: loading || widget.tenantOnly
-                      ? null
-                      : (value) => setState(() => role = value!),
-                ),
-                const SizedBox(height: 12),
+                if (!widget.tenantOnly) ...[
+                  DropdownButtonFormField<String>(
+                    initialValue: role,
+                    decoration: const InputDecoration(labelText: 'Role'),
+                    items: allowedRoles
+                        .map((value) => DropdownMenuItem(
+                            value: value, child: Text(_label(value))))
+                        .toList(),
+                    onChanged: loading || widget.tenantOnly
+                        ? null
+                        : (value) => setState(() => role = value!),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 TextField(
                   controller: password,
                   obscureText: !passwordVisible,
