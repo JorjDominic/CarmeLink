@@ -11,6 +11,8 @@ void main() {
         (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = Size(width, 900);
+      if (width == 320)
+        tester.view.viewInsets = const FakeViewPadding(bottom: 240);
       addTearDown(tester.view.reset);
       RoomService.cachedRooms = [
         RoomRecord(
@@ -41,6 +43,11 @@ void main() {
               guardianName: '',
               guardianPhone: ''));
       await tester.pumpWidget(MaterialApp(
+          builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                    textScaler: TextScaler.linear(width == 320 ? 1.4 : 1)),
+                child: child!,
+              ),
           home: Scaffold(
               body: SingleChildScrollView(
                   child: Form(
@@ -78,6 +85,21 @@ void main() {
           .widgetList<CheckboxListTile>(find.byType(CheckboxListTile))
           .last;
       expect(extra.onChanged, isNull);
+      final depositField =
+          find.byKey(const ValueKey('occupancy-deposit-tenant-1'));
+      await tester.ensureVisible(depositField);
+      await tester.enterText(depositField, '1500.00');
+      await tester.pumpAndSettle();
+      expect(selection!.deposits['tenant-1'], 150000);
+      await tester.ensureVisible(find.text('Tenant 1'));
+      await tester.tap(find.text('Tenant 1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tenant 1'));
+      await tester.pumpAndSettle();
+      expect(selection!.deposits.containsKey('tenant-1'), isFalse,
+          reason:
+              'A recreated zero-value field must not submit a hidden old deposit');
+      expect(tester.widget<TextFormField>(depositField).initialValue, '0.00');
       rent.text = '100.00';
       await tester.pumpAndSettle();
       expect(find.text('Tenant 0: PHP 50.00 / month'), findsOneWidget);
@@ -87,5 +109,83 @@ void main() {
       rent.dispose();
       RoomService.invalidateCache();
     });
+  }
+  testWidgets(
+      'refreshing stale room choices clears invalid selection without a dropdown assertion',
+      (tester) async {
+    final oldRoom = RoomRecord(
+        id: 'old',
+        number: 'Old',
+        floor: 'Ground',
+        capacity: 1,
+        description: '',
+        beds: [
+          const BedRecord(
+              id: 'old-bed',
+              label: 'Bed A',
+              status: 'available',
+              occupied: false)
+        ]);
+    final newRoom = RoomRecord(
+        id: 'new',
+        number: 'New',
+        floor: 'Ground',
+        capacity: 1,
+        description: '',
+        beds: [
+          const BedRecord(
+              id: 'new-bed',
+              label: 'Bed A',
+              status: 'available',
+              occupied: false)
+        ]);
+    RoomService.cachedRooms = [oldRoom];
+    final service = _RefreshRooms([newRoom]);
+    final rent = TextEditingController(text: '6000.00');
+    ContractOccupancySelection? selection;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: ContractOccupancyFields(
+                    tenantId: 'tenant',
+                    tenants: const [
+                      TenantDirectoryEntry(
+                          id: 'tenant',
+                          name: 'Tenant',
+                          room: 'Unassigned',
+                          bedSpace: 'Unassigned',
+                          phone: '',
+                          guardianName: '',
+                          guardianPhone: '')
+                    ],
+                    rent: rent,
+                    roomService: service,
+                    onChanged: (value) => selection = value)))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Room Old').last);
+    await tester.pumpAndSettle();
+    expect(selection!.roomId, 'old');
+    service.fail = false;
+    await tester.tap(find.text('Retry rooms'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(selection, isNull);
+    expect(find.text('Room Old'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    rent.dispose();
+    RoomService.invalidateCache();
+  });
+}
+
+class _RefreshRooms extends RoomService {
+  _RefreshRooms(this.values);
+  bool fail = true;
+  final List<RoomRecord> values;
+  @override
+  Future<List<RoomRecord>> listRooms({bool forceRefresh = false}) async {
+    if (fail) throw StateError('Fixture initial fetch failed');
+    return values;
   }
 }

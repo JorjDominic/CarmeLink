@@ -19,7 +19,9 @@ class ContractOccupancyFields extends StatefulWidget {
       required this.tenants,
       required this.rent,
       required this.onChanged,
+      this.roomService = const RoomService(),
       super.key});
+  final RoomService roomService;
   final String? tenantId;
   final List<TenantDirectoryEntry> tenants;
   final TextEditingController rent;
@@ -51,13 +53,30 @@ class _ContractOccupancyFieldsState extends State<ContractOccupancyFields> {
 
   Future<void> _load() async {
     try {
-      final values = await const RoomService().listRooms(forceRefresh: true);
-      if (mounted)
-        setState(() {
-          rooms = values;
-          loading = false;
-          error = null;
-        });
+      final values = await widget.roomService.listRooms(forceRefresh: true);
+      if (!mounted) return;
+      final refreshed = values.where((r) => r.id == roomId).firstOrNull;
+      final invalidated = roomId != null &&
+          (refreshed == null ||
+              !refreshed.isActive ||
+              (mode == 'shared' && count > refreshed.capacity) ||
+              ids.any((id) => !refreshed.beds.any((bed) =>
+                  bed.id == beds[id] &&
+                  (bed.tenantId == id ||
+                      (!bed.occupied && bed.status == 'available')))));
+      setState(() {
+        rooms = values;
+        loading = false;
+        error = null;
+        if (invalidated) {
+          roomId = null;
+          selected.clear();
+          beds.clear();
+          deposits.clear();
+          mode = 'solo';
+        }
+      });
+      if (invalidated) _publish();
     } catch (e) {
       if (mounted)
         setState(() {
@@ -138,6 +157,7 @@ class _ContractOccupancyFieldsState extends State<ContractOccupancyFields> {
           onChanged: (id) => _change(() {
             roomId = id;
             selected.clear();
+            deposits.clear();
             beds.clear();
             count = room!.capacity.clamp(1, 2);
             mode = 'solo';
@@ -150,6 +170,7 @@ class _ContractOccupancyFieldsState extends State<ContractOccupancyFields> {
               'Capacity ${room!.capacity} | ${room!.occupied} occupants | ${room!.physicallyAvailable} available\nCurrent occupants: ${room!.beds.where((b) => b.occupied).map((b) => b.tenantName ?? 'Assigned tenant').join(', ')}'),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: mode,
             key: ValueKey('occupancy-mode-$mode'),
             decoration:
@@ -164,6 +185,7 @@ class _ContractOccupancyFieldsState extends State<ContractOccupancyFields> {
             onChanged: (value) => _change(() {
               mode = value!;
               selected.clear();
+              deposits.clear();
               beds.removeWhere((id, _) => id != widget.tenantId);
             }),
           ),
@@ -180,6 +202,7 @@ class _ContractOccupancyFieldsState extends State<ContractOccupancyFields> {
               onChanged: (value) => _change(() {
                 count = value!;
                 selected.clear();
+                deposits.clear();
                 beds.removeWhere((id, _) => id != widget.tenantId);
               }),
             ),
@@ -204,6 +227,7 @@ class _ContractOccupancyFieldsState extends State<ContractOccupancyFields> {
                                             selected.add(tenant.id);
                                           } else {
                                             selected.remove(tenant.id);
+                                            deposits.remove(tenant.id);
                                             beds.remove(tenant.id);
                                           }
                                         })),
@@ -238,7 +262,7 @@ class _ContractOccupancyFieldsState extends State<ContractOccupancyFields> {
               const SizedBox(height: 8),
               TextFormField(
                 key: ValueKey('occupancy-deposit-$id'),
-                initialValue: '0.00',
+                initialValue: rentCentsText(deposits[id] ?? 0),
                 decoration: InputDecoration(
                     labelText: 'Security deposit for ${_name(id)}',
                     helperText: 'Individual amount; deposits are not split.'),
