@@ -945,7 +945,7 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
                   minLines: 2,
                   maxLines: 4,
                   decoration: const InputDecoration(
-                    labelText: 'Approval reason (required)',
+                    labelText: 'Reason (Required)',
                   ),
                   validator: (value) => (value?.trim().length ?? 0) < 3
                       ? 'Enter an approval reason'

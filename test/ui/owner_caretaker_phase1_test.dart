@@ -116,10 +116,12 @@ void main() {
   test('charge reason rename retains required validation and stored property',
       () {
     final source = File('lib/views/owner/owner_pages.dart').readAsStringSync();
-    expect(source, contains("labelText: 'Reason (Required)'"));
+    final billing =
+        File('lib/views/owner/billing_management_page.dart').readAsStringSync();
+    expect(billing, contains("labelText: 'Reason (Required)'"));
     expect(source, isNot(contains("labelText: 'Approval reason (required)'")));
-    expect(source, contains("? 'Enter the reason'"));
-    expect(source, contains('reason: _reason.text.trim(),'));
-    expect(source, contains('(v?.trim().length ?? 0) < 3'));
+    expect(billing, contains("? 'Enter an approval reason'"));
+    expect(billing, contains('reason: _reason.text.trim(),'));
+    expect(billing, contains('(value?.trim().length ?? 0) < 3'));
   });
 }

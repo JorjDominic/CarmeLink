@@ -39,7 +39,7 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
       expect(find.text('Specify Category'), findsOneWidget);
-      expect(find.text('Approval reason (required)'), findsOneWidget);
+      expect(find.text('Reason (Required)'), findsOneWidget);
       await tester.tap(find.text('Create charge'));
       await tester.pumpAndSettle();
       expect(find.text('Specify a category'), findsOneWidget);
