@@ -44,6 +44,8 @@ PGlite setup, if absent: `npm install --prefix build/phase2_sql_tests --no-audit
 
 ## Final local results
 
+These are the original Phase 2 results. See [Phase 2 stabilization and validation](contract-room-occupancy-phase2-stabilization.md) for subsequent deadlock/authorization/UI fixes, actual independent PostgreSQL contention results, approved amendment rules, and current deployment limits.
+
 - 69 selected Flutter tests passed across 12 test files, including narrow/desktop occupancy fields, live preview updates, service payload/error handling, reservation availability, generated PDFs, legacy contracts, grouped term protections and Phase 1 regressions.
 - `flutter analyze`: no issues found.
 - 15 isolated occupancy database checks passed, plus empty-database rollback/reapply. Includes capacity/conflict checks, original assignment preservation, cents allocation, signing/activation checks, unchanged historical billing, reservation RLS and rollback protection.
