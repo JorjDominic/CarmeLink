@@ -912,6 +912,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   late final TableRefreshSubscription subscription;
   Timer? _debounceTimer;
   int _requestVersion = 0;
+  int _historyRevision = 0;
   String? _refreshError;
 
   @override
@@ -954,6 +955,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         setState(() {
           room = updated;
           _refreshError = null;
+          _historyRevision++;
         });
       }
     } catch (error) {
@@ -1307,6 +1309,13 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               ),
             ),
           ],
+          const SizedBox(height: 22),
+          RoomOccupancyHistoryView(
+              roomId: room.id,
+              service: widget.service,
+              revision: _historyRevision,
+              showFinancial: SessionController.instance.currentUser?.role ==
+                  UserRole.owner),
           const SizedBox(height: 22),
           const SectionTitle(
             'Room operations',

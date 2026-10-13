@@ -32,4 +32,27 @@ end $$;
 revoke all on function public.get_room_contract_occupancies(uuid,boolean) from public,anon;
 grant execute on function public.get_room_contract_occupancies(uuid,boolean) to authenticated;
 
+-- Reuse the existing RLS-protected rooms realtime channel. Never publish group
+-- snapshots/deposit_terms or broaden contract SELECT policies for caretakers.
+create function public.refresh_room_contract_display() returns trigger
+language plpgsql security definer set search_path='' as $$
+declare v_room uuid;
+begin
+  if tg_table_name='contract_occupancy_arrangements' then
+    v_room:=new.room_id;
+  elsif new.occupancy_id is not null then
+    select room_id into v_room from public.contract_occupancy_arrangements where id=new.occupancy_id;
+  end if;
+  if v_room is not null then
+    perform public.lock_contract_occupancy_room(v_room);
+    update public.rooms set updated_at=clock_timestamp() where id=v_room;
+  end if;
+  return new;
+end $$;
+revoke all on function public.refresh_room_contract_display() from public,anon,authenticated;
+create trigger room_occupancy_display_changed after insert or update of released
+  on public.contract_occupancy_arrangements for each row execute function public.refresh_room_contract_display();
+create trigger room_contract_display_changed after update of status
+  on public.tenant_contracts for each row when (old.status is distinct from new.status)
+  execute function public.refresh_room_contract_display();
 commit;
