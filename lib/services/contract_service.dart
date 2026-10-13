@@ -1,5 +1,6 @@
 import '../core/config/supabase_config.dart';
 import '../models/models.dart';
+import '../core/utils/contract_occupancy_policy.dart';
 
 class ContractService {
   const ContractService();
@@ -8,7 +9,7 @@ class ContractService {
       'id, tenant_id, contract_number, starts_on, ends_on, monthly_rent, '
       'security_deposit, status, notes, created_at, updated_at, '
       'signature_status, '
-      'previous_contract_id, '
+      'previous_contract_id, occupancy_id, occupancy_snapshot, '
       'profiles!tenant_contracts_tenant_id_fkey(full_name)';
 
   Future<List<TenantContract>> listContracts() async {
@@ -42,6 +43,33 @@ class ContractService {
         .select(_selection)
         .single();
     return TenantContract.fromRow(row);
+  }
+
+  /// The database reserves the room and saves all individual drafts atomically.
+  Future<List<TenantContract>> prepareOccupancy({
+    required String roomId,
+    required String mode,
+    required int totalRentCents,
+    required List<Map<String, dynamic>> members,
+    required DateTime startsOn,
+    required DateTime endsOn,
+    String? notes,
+  }) async {
+    final ids =
+        await SupabaseConfig.client.rpc('prepare_contract_occupancy', params: {
+      'p_room_id': roomId,
+      'p_mode': mode,
+      'p_total_rent': rentCentsText(totalRentCents),
+      'p_members': members,
+      'p_starts_on': _date(startsOn),
+      'p_ends_on': _date(endsOn),
+      'p_notes': _nullable(notes),
+    });
+    final rows = await SupabaseConfig.client
+        .from('tenant_contracts')
+        .select(_selection)
+        .inFilter('id', List<String>.from(ids as List));
+    return rows.map(TenantContract.fromRow).toList();
   }
 
   Future<TenantContract> updateContract(TenantContract contract) async {

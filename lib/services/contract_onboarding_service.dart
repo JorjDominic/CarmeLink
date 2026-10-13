@@ -34,7 +34,7 @@ class ContractOnboardingService {
     final row = await _client
         .from('tenant_contracts')
         .select(
-            'id, tenant_id, contract_number, starts_on, ends_on, monthly_rent, security_deposit, status, notes, created_at, updated_at, signature_status, previous_contract_id, profiles!tenant_contracts_tenant_id_fkey(full_name)')
+            'id, tenant_id, contract_number, starts_on, ends_on, monthly_rent, security_deposit, status, notes, created_at, updated_at, signature_status, previous_contract_id, occupancy_id, occupancy_snapshot, profiles!tenant_contracts_tenant_id_fkey(full_name)')
         .eq('tenant_id', tenantId)
         .inFilter('status', const ['draft', 'active'])
         .order('starts_on', ascending: false)

@@ -778,10 +778,35 @@ class OwnerController extends ChangeNotifier {
     return item;
   }
 
+  Future<List<TenantContract>> prepareContractOccupancy({
+    required String roomId,
+    required String mode,
+    required int totalRentCents,
+    required List<Map<String, dynamic>> members,
+    required DateTime startsOn,
+    required DateTime endsOn,
+    String? notes,
+  }) async {
+    final items = await _contractService.prepareOccupancy(
+        roomId: roomId,
+        mode: mode,
+        totalRentCents: totalRentCents,
+        members: members,
+        startsOn: startsOn,
+        endsOn: endsOn,
+        notes: notes);
+    _contracts.insertAll(0, items);
+    RoomService.invalidateCache();
+    notifyListeners();
+    await loadTenants();
+    return items;
+  }
+
   Future<TenantContract> updateContract(TenantContract contract) async {
     final item = await _contractService.updateContract(contract);
     final index = _contracts.indexWhere((value) => value.id == item.id);
     if (index >= 0) _contracts[index] = item;
+    if (item.occupancyId != null) RoomService.invalidateCache();
     notifyListeners();
     return item;
   }

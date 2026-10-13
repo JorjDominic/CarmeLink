@@ -39,6 +39,10 @@ class RoomService {
           .from('tenant_assignments')
           .select('id, bed_space_id, tenant_id, profiles(id, full_name, phone)')
           .eq('status', 'active'),
+      _client
+          .from('contract_occupancy_arrangements')
+          .select('room_id')
+          .eq('released', false),
     ]);
     final activeAssignments = <String, Map<String, dynamic>>{};
     for (final row in results[2]) {
@@ -47,10 +51,17 @@ class RoomService {
         activeAssignments[bedId] = row;
       }
     }
+    final reservedRooms =
+        results[3].map((row) => row['room_id'] as String).toSet();
     final bedsByRoom = <String, List<BedRecord>>{};
     for (final row in results[1]) {
       final bed = BedRecord.fromRow(
-        row,
+        {
+          ...row,
+          if (reservedRooms.contains(row['room_id']) &&
+              row['status'] == 'available')
+            'status': 'reserved'
+        },
         assignment: activeAssignments[row['id'] as String],
       );
       bedsByRoom.putIfAbsent(row['room_id'] as String, () => []).add(bed);
