@@ -1296,22 +1296,27 @@ class _ContractReviewDialogState extends State<_ContractReviewDialog> {
         title: Text(widget.approve
             ? 'Verify signed contract?'
             : 'Reject signed contract?'),
-        content: TextField(
-          controller: _notes,
-          autofocus: true,
-          minLines: 2,
-          maxLines: 4,
-          onChanged: (_) {
-            if (_error != null) setState(() => _error = null);
-          },
-          onSubmitted: (_) => _submit(),
-          decoration: InputDecoration(
-            labelText: 'Review notes',
-            hintText: widget.approve
-                ? 'Confirm signatures and document completeness'
-                : 'Explain what must be corrected',
-            errorText: _error,
-            alignLabelWithHint: true,
+        scrollable: true,
+        content: SizedBox(
+          width: 440,
+          child: TextField(
+            controller: _notes,
+            autofocus: true,
+            minLines: 2,
+            maxLines: 4,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            decoration: InputDecoration(
+              labelText: 'Review notes',
+              hintText: widget.approve
+                  ? 'Confirm signatures and document completeness'
+                  : 'Explain what must be corrected',
+              errorText: _error,
+              alignLabelWithHint: true,
+            ),
           ),
         ),
         actions: [

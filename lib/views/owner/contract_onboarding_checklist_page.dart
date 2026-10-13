@@ -682,16 +682,22 @@ class _ReviewNotesDialogState extends State<_ReviewNotesDialog> {
   @override
   Widget build(BuildContext context) => AlertDialog(
         title: Text(widget.title),
-        content: TextField(
-          controller: _controller,
-          autofocus: true,
-          minLines: 2,
-          maxLines: 4,
-          decoration: InputDecoration(
-            labelText: widget.label,
-            errorText: _error,
+        scrollable: true,
+        content: SizedBox(
+          width: 440,
+          child: TextField(
+            controller: _controller,
+            autofocus: true,
+            minLines: 2,
+            maxLines: 4,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            decoration: InputDecoration(
+              labelText: widget.label,
+              errorText: _error,
+              alignLabelWithHint: true,
+            ),
           ),
-          onSubmitted: (_) => _confirm(),
         ),
         actions: [
           TextButton(

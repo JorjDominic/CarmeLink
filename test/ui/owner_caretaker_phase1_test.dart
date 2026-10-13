@@ -65,4 +65,25 @@ void main() {
     expect(source, contains('service.sendPasswordReset'));
   });
 
+  test('document review fields wrap, scroll and keep validation/save', () {
+    for (final entry in {
+      'lib/views/owner/contracts_page.dart': '_ContractReviewDialogState',
+      'lib/views/owner/contract_onboarding_checklist_page.dart':
+          '_ReviewNotesDialogState',
+    }.entries) {
+      final source = File(entry.key).readAsStringSync();
+      final start = source.indexOf('class ${entry.value} ');
+      final end = source.indexOf('\nclass ', start + 1);
+      final dialog = source.substring(start, end);
+      expect(dialog, contains('scrollable: true'));
+      expect(dialog, contains('width: 440'));
+      expect(dialog, contains('minLines: 2'));
+      expect(dialog, contains('maxLines: 4'));
+      expect(dialog, contains('TextInputAction.newline'));
+      expect(dialog, contains('TextInputType.multiline'));
+      expect(dialog, contains('value.length < 3'));
+      expect(dialog, contains('Navigator.pop(context, value)'));
+    }
+  });
+
 }
