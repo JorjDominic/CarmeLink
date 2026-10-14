@@ -17,6 +17,8 @@ void main() {
     String select
   })>[];
   var fail = false;
+  var legacySchema = false;
+  var denyRead = false;
   setUpAll(() async {
     SharedPreferences.setMockInitialValues({});
     HttpOverrides.global = null;
@@ -34,7 +36,23 @@ void main() {
         select: request.uri.queryParameters['select'] ?? ''
       ));
       request.response.headers.contentType = ContentType.json;
-      if (fail && path == 'prepare_contract_occupancy') {
+      final select = request.uri.queryParameters['select'] ?? '';
+      if (path == 'tenant_contracts' && denyRead) {
+        request.response.statusCode = 403;
+        request.response.write(jsonEncode({
+          'code': '42501',
+          'message': 'permission denied for table tenant_contracts'
+        }));
+      } else if (path == 'tenant_contracts' &&
+          legacySchema &&
+          (select.contains('occupancy_id') ||
+              select.contains('occupancy_snapshot'))) {
+        request.response.statusCode = 400;
+        request.response.write(jsonEncode({
+          'code': '42703',
+          'message': 'column tenant_contracts.occupancy_id does not exist'
+        }));
+      } else if (fail && path == 'prepare_contract_occupancy') {
         request.response.statusCode = 400;
         request.response.write(
             jsonEncode({'code': 'P0001', 'message': 'Room already reserved'}));
@@ -85,11 +103,13 @@ void main() {
               'status': 'draft',
               'created_at': '2026-10-13T00:00:00Z',
               'updated_at': '2026-10-13T00:00:00Z',
-              'occupancy_id': 'group',
-              'occupancy_snapshot': {
-                'mode': 'shared',
-                'room_number': 'Custom-1',
-                'members': []
+              if (!legacySchema) ...{
+                'occupancy_id': 'group',
+                'occupancy_snapshot': {
+                  'mode': 'shared',
+                  'room_number': 'Custom-1',
+                  'members': []
+                }
               }
             }
         ]));
@@ -109,6 +129,12 @@ void main() {
     await server.close(force: true);
     HttpOverrides.global = oldOverrides;
   });
+  setUp(() {
+    requests.clear();
+    fail = false;
+    legacySchema = false;
+    denyRead = false;
+  });
   Future<dynamic> prepare() => const ContractService().prepareOccupancy(
       roomId: 'room',
       mode: 'shared',
@@ -119,6 +145,26 @@ void main() {
       ],
       startsOn: DateTime(2026, 10, 13),
       endsOn: DateTime(2027, 10, 12));
+  test('existing contracts load before occupancy migrations are deployed',
+      () async {
+    legacySchema = true;
+    final contracts = await const ContractService().listContracts();
+    expect(contracts, hasLength(2));
+    expect(contracts.first.contractNumber, 'CTR-a');
+    expect(contracts.first.tenantName, 'a');
+    expect(contracts.first.occupancyId, isNull);
+    expect(contracts.first.occupancySnapshot, isNull);
+    expect(requests, hasLength(1));
+    expect(requests.single.method, 'GET');
+  });
+  test('contract read permission errors remain visible', () async {
+    denyRead = true;
+    await expectLater(
+        const ContractService().listContracts(),
+        throwsA(isA<PostgrestException>()
+            .having((error) => error.code, 'code', '42501')));
+    expect(requests, hasLength(1));
+  });
   test(
       'preparation uses one atomic RPC and reloads server allocated individual contracts',
       () async {
@@ -134,7 +180,7 @@ void main() {
             .where((r) => r.path == 'tenant_contracts')
             .every((r) => r.method == 'GET'),
         isTrue);
-    expect(requests.last.select, contains('occupancy_snapshot'));
+    expect(contracts.first.occupancySnapshot?['mode'], 'shared');
   });
   test(
       'capacity/race failure is surfaced without reading or writing partial contracts',

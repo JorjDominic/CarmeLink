@@ -5,12 +5,11 @@ import '../core/utils/contract_occupancy_policy.dart';
 class ContractService {
   const ContractService();
 
+  // Optional contract fields arrive through separate database migrations.
+  // Selecting the available columns keeps existing contracts readable during
+  // rollout and still includes occupancy terms once the schema supports them.
   static const _selection =
-      'id, tenant_id, contract_number, starts_on, ends_on, monthly_rent, '
-      'security_deposit, status, notes, created_at, updated_at, '
-      'signature_status, '
-      'previous_contract_id, occupancy_id, occupancy_snapshot, '
-      'profiles!tenant_contracts_tenant_id_fkey(full_name)';
+      '*, profiles!tenant_contracts_tenant_id_fkey(full_name)';
 
   Future<List<TenantContract>> listContracts() async {
     final rows = await SupabaseConfig.client

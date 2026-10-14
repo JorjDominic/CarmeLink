@@ -112,7 +112,7 @@ void main() {
       'p_monthly_rent': 3500,
       'p_notes': 'Agreed',
     });
-    expect(requests.last.select, contains('previous_contract_id'));
+    expect(saved.tenantName, 'Tenant');
   });
 
   test('failed renewal save propagates the error without fetching a contract',
