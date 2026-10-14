@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -209,10 +210,77 @@ class ConductCaseEvidence {
   final DateTime createdAt;
 }
 
+class ConductOfficialResponse {
+  const ConductOfficialResponse(
+      {required this.id,
+      required this.body,
+      required this.authorName,
+      required this.authorRole,
+      required this.visibility,
+      required this.createdAt});
+
+  factory ConductOfficialResponse.fromRow(Map<String, dynamic> row,
+          {required bool staffMode}) =>
+      ConductOfficialResponse(
+          id: row['id'] as String,
+          body: (staffMode ? row['notes'] : row['body']) as String,
+          authorName: row['actor_name'] as String,
+          authorRole: row['actor_role'] as String,
+          visibility: staffMode ? row['visibility'] as String : 'tenant',
+          createdAt: DateTime.parse(row['created_at'] as String).toLocal());
+
+  final String id, body, authorName, authorRole, visibility;
+  final DateTime createdAt;
+}
+
 class ConductCaseService {
   const ConductCaseService();
 
   SupabaseClient get _client => SupabaseConfig.client;
+
+  String createResponseRequestId() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes.map((v) => v.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
+
+  Future<List<ConductOfficialResponse>> listOfficialResponses(String caseId,
+      {required bool staffMode}) async {
+    final dynamic result = staffMode
+        ? await _client
+            .from('conduct_case_events')
+            .select()
+            .eq('case_id', caseId)
+            .eq('event_type', 'official_response')
+            .order('created_at')
+            .order('id')
+        : await _client.rpc('get_my_conduct_official_responses',
+            params: {'p_case_id': caseId});
+    return (result as List)
+        .map((row) => ConductOfficialResponse.fromRow(
+            Map<String, dynamic>.from(row as Map),
+            staffMode: staffMode))
+        .toList();
+  }
+
+  Future<void> addOfficialResponse(
+      {required ConductCaseRecord record,
+      required String body,
+      required String visibility,
+      required String requestId}) async {
+    await _client.rpc('add_conduct_official_response', params: {
+      'p_case_id': record.id,
+      'p_expected_updated_at': record.updatedAt.toUtc().toIso8601String(),
+      'p_body': body.trim(),
+      'p_visibility': visibility,
+      'p_request_id': requestId,
+    });
+    // The existing database event trigger creates the notification atomically.
+  }
 
   static const String _staffCaseColumns =
       'id, tenant_id, category, category_detail, title, description, incident_at, status, '
@@ -689,6 +757,10 @@ class ConductCaseService {
 String conductCaseError(Object error) {
   final message =
       error is PostgrestException ? error.message : error.toString();
+
+  if (error is PostgrestException && error.code == 'PGRST202') {
+    return 'Official responses require the Phase 5 database migration.';
+  }
 
   if (message.contains('changed. Refresh')) {
     return 'This case changed. Refresh before continuing.';

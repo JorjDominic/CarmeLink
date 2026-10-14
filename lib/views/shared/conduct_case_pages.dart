@@ -10,6 +10,7 @@ import '../../services/table_refresh_subscription.dart';
 
 import 'conduct_case_appeal_panel.dart';
 import 'conduct_case_create_dialog.dart';
+import 'conduct_official_responses.dart';
 import 'review_notes_dialog.dart';
 import '../../controllers/session_controller.dart';
 import '../../models/models.dart';
@@ -320,6 +321,7 @@ class _StaffConductCaseDetailPageState
   List<ConductCaseWarning> warnings = const [];
   List<ConductCaseEvent> events = const [];
   List<ConductCaseEvidence> evidence = const [];
+  late final TableRefreshSubscription _detailSubscription;
   bool loading = true;
   String? errorMessage;
 
@@ -327,6 +329,21 @@ class _StaffConductCaseDetailPageState
   void initState() {
     super.initState();
     _refresh();
+    _detailSubscription = TableRefreshSubscription(
+        'staff-case-${record.id}',
+        [
+          'conduct_cases',
+          'conduct_case_responses',
+          'conduct_case_warnings',
+          'conduct_case_events'
+        ],
+        _refresh);
+  }
+
+  @override
+  void dispose() {
+    _detailSubscription.dispose();
+    super.dispose();
   }
 
   Future<void> _refresh() async {
@@ -708,6 +725,11 @@ class _StaffConductCaseDetailPageState
                       ),
                       const SizedBox(height: 10),
                       InfoRow(
+                        label: 'Case reference',
+                        value: record.id,
+                        icon: Icons.tag_outlined,
+                      ),
+                      InfoRow(
                         label: 'Incident',
                         value: _conductDateTime(record.incidentAt),
                         icon: Icons.schedule_outlined,
@@ -743,6 +765,8 @@ class _StaffConductCaseDetailPageState
                   ),
                 ),
                 const SizedBox(height: 14),
+                const SectionTitle('Case actions'),
+                const SizedBox(height: 10),
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
@@ -803,7 +827,7 @@ class _StaffConductCaseDetailPageState
                 ),
                 const SizedBox(height: 24),
                 SectionTitle(
-                  'Tenant responses',
+                  'Tenant explanations',
                   subtitle: '${responses.length} submitted',
                 ),
                 const SizedBox(height: 10),
@@ -833,6 +857,9 @@ class _StaffConductCaseDetailPageState
                       ),
                     ),
                   ),
+                const SizedBox(height: 20),
+                ConductOfficialResponses(
+                    record: record, staffMode: true, onSaved: _refresh),
                 const SizedBox(height: 20),
                 SectionTitle(
                   'Warnings',
@@ -1166,12 +1193,23 @@ class _TenantConductCaseDetailPageState
   late ConductCaseRecord record = widget.initialRecord;
   List<ConductCaseResponse> responses = const [];
   List<ConductCaseWarning> warnings = const [];
+  late final TableRefreshSubscription _detailSubscription;
   bool loading = true;
 
   @override
   void initState() {
     super.initState();
     _refresh();
+    _detailSubscription = TableRefreshSubscription(
+        'tenant-case-${record.id}',
+        ['conduct_cases', 'conduct_case_responses', 'conduct_case_warnings'],
+        _refresh);
+  }
+
+  @override
+  void dispose() {
+    _detailSubscription.dispose();
+    super.dispose();
   }
 
   Future<void> _refresh() async {
@@ -1369,6 +1407,9 @@ class _TenantConductCaseDetailPageState
                       ),
                     ),
                   ),
+                const SizedBox(height: 22),
+                ConductOfficialResponses(
+                    record: record, staffMode: false, onSaved: _refresh),
                 const SizedBox(height: 22),
                 ConductCaseAppealPanel(
                   caseId: record.id,
