@@ -3,6 +3,8 @@ import '../../core/widgets/configured_choice_field.dart';
 import '../../core/widgets/searchable_dropdown.dart';
 import '../shared/report_addenda.dart';
 import '../shared/review_notes_dialog.dart';
+import '../shared/report_status_actions.dart';
+import '../shared/confidential_report_history.dart';
 import '../../core/utils/confidential_review_action.dart';
 import 'dormitory_configuration_page.dart';
 import '../shared/notification_destination.dart';
@@ -8382,11 +8384,22 @@ class ConfidentialReportsPage extends StatefulWidget {
 
 class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
   final controller = OwnerController.instance;
+  late final TableRefreshSubscription _reportSubscription;
 
   @override
   void initState() {
     super.initState();
     controller.loadConcerns(force: true);
+    _reportSubscription = TableRefreshSubscription(
+        'phase5-confidential-register',
+        ['confidential_reports'],
+        () => controller.loadConcerns(force: true));
+  }
+
+  @override
+  void dispose() {
+    _reportSubscription.dispose();
+    super.dispose();
   }
 
   Future<void> _review(ConcernReport report, String status) async {
@@ -8402,7 +8415,7 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
           controller: notes,
           saving: saving,
           maxLength: 1000,
-          label: 'Private review notes',
+          label: 'Tenant-visible review response',
           hint: 'Record the action taken or reason for this decision.',
           actions: [
             TextButton(
@@ -8422,6 +8435,14 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                       }
                       setDialogState(() => saving = true);
                       try {
+                        final confirmed = await confirmReportTransition(
+                            context, report.status, status,
+                            tenantUpdate: notes.text.trim());
+                        if (!dialogContext.mounted) return;
+                        if (!confirmed) {
+                          setDialogState(() => saving = false);
+                          return;
+                        }
                         await controller.reviewConcern(
                           report: report,
                           status: status,
@@ -8540,33 +8561,36 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                             ),
                             if (report.responseNotes.isNotEmpty) ...[
                               const SizedBox(height: 8),
-                              Text('Private notes: ${report.responseNotes}'),
+                              Text(
+                                  'Tenant-visible review response: ${report.responseNotes}'),
                             ],
                             const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                OutlinedButton(
-                                  onPressed: report.isResolved
-                                      ? null
-                                      : () => _review(report, 'under_review'),
-                                  child: const Text('Mark under review'),
-                                ),
-                                FilledButton(
-                                  onPressed: report.isResolved
-                                      ? null
-                                      : () => _review(report, 'resolved'),
-                                  child: const Text('Resolve'),
-                                ),
-                                TextButton(
-                                  onPressed: report.isResolved
-                                      ? null
-                                      : () => _review(report, 'dismissed'),
-                                  child: const Text('Dismiss'),
-                                ),
-                              ],
-                            ),
+                            if (!report.isFinalized)
+                              PopupMenuButton<String>(
+                                tooltip: 'Administrative actions',
+                                onSelected: (status) => _review(report, status),
+                                itemBuilder: (_) => [
+                                  if (report.isSubmitted)
+                                    const PopupMenuItem(
+                                        value: 'under_review',
+                                        child: Text('Begin review')),
+                                  const PopupMenuItem(
+                                      value: 'resolved',
+                                      child: Text('Resolve report')),
+                                  const PopupMenuItem(
+                                      value: 'dismissed',
+                                      child: Text('Dismiss with reason')),
+                                ],
+                                child: const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: Text('Administrative actions',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.w700))),
+                              ),
+                            ConfidentialReportHistory(
+                                key: ValueKey('staff-history-${report.id}'),
+                                reportId: report.id,
+                                finalized: report.isFinalized),
                           ],
                         ),
                       ),

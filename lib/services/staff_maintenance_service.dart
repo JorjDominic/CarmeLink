@@ -34,6 +34,7 @@ class StaffMaintenanceReport {
         tenantId = row['tenant_id'] as String? ?? '',
         tenantName = (row['tenant'] as Map?)?['full_name'] as String? ??
             'Tenant unavailable',
+        responsibleStaff = (row['handler'] as Map?)?['full_name'] as String?,
         category = _displayOther(
           row['category'] as String,
           row['specific_category'] as String?,
@@ -59,6 +60,7 @@ class StaffMaintenanceReport {
   const StaffMaintenanceReport({
     required this.id,
     this.tenantId = '',
+    this.responsibleStaff,
     required this.tenantName,
     required this.category,
     required this.description,
@@ -76,6 +78,7 @@ class StaffMaintenanceReport {
   final String id;
   final String tenantId;
   final String tenantName;
+  final String? responsibleStaff;
   final String category;
   final String description;
   final String location;
@@ -123,6 +126,7 @@ class StaffMaintenanceReport {
       id: id ?? this.id,
       tenantId: tenantId ?? this.tenantId,
       tenantName: tenantName ?? this.tenantName,
+      responsibleStaff: responsibleStaff,
       category: category ?? this.category,
       description: description ?? this.description,
       location: location ?? this.location,
@@ -148,7 +152,8 @@ class StaffMaintenanceService {
   static const _columns =
       'id, tenant_id, category, description, location, room_id, urgency, status, photo_path, '
       'staff_notes, updated_at, created_at, resolved_at, specific_category, specific_location, '
-      'tenant:profiles!maintenance_reports_tenant_id_fkey(full_name)';
+      'tenant:profiles!maintenance_reports_tenant_id_fkey(full_name), '
+      'handler:profiles!maintenance_reports_handled_by_fkey(full_name)';
 
   Future<List<StaffMaintenanceReport>> listReports() async {
     final rows = await _client
@@ -195,7 +200,8 @@ class StaffMaintenanceService {
           'actor_name, previous_status, next_status, notes, created_at',
         )
         .eq('report_id', id)
-        .order('created_at', ascending: false);
+        .order('created_at')
+        .order('id');
 
     return List<Map<String, dynamic>>.from(rows);
   }

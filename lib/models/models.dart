@@ -770,6 +770,7 @@ class ConcernReport {
     this.responseNotes = '',
     this.specificConcern = '',
     this.reviewedAt,
+    this.updatedAt = '',
   });
 
   final String id;
@@ -782,9 +783,11 @@ class ConcernReport {
   final String responseNotes;
   final String specificConcern;
   final DateTime? reviewedAt;
+  final String updatedAt;
 
   bool get isSubmitted => status.toLowerCase() == 'submitted';
   bool get isResolved => status.toLowerCase() == 'resolved';
+  bool get isFinalized => isResolved || status.toLowerCase() == 'dismissed';
 
   factory ConcernReport.fromRow(Map<String, dynamic> row) {
     final rawCategory = row['category'] as String? ?? 'other';
@@ -814,6 +817,7 @@ class ConcernReport {
       status: status,
       responseNotes: row['response_notes'] as String? ?? '',
       specificConcern: row['specific_concern'] as String? ?? '',
+      updatedAt: row['updated_at'] as String? ?? '',
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
       reviewedAt: row['reviewed_at'] == null
           ? null

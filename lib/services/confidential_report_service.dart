@@ -119,9 +119,10 @@ class ConfidentialReportService {
     final original = originalReport ??
         (await listForOwner()).firstWhere((report) => report.id == reportId);
     final result = await _client.rpc(
-      'owner_review_confidential_report',
+      'review_confidential_report_guarded',
       params: {
         'p_report_id': reportId,
+        'p_expected_updated_at': original.updatedAt,
         'p_status': status,
         'p_notes': notes.trim(),
       },

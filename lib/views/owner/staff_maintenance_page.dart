@@ -6,6 +6,9 @@ import '../../core/widgets/common_widgets.dart';
 import '../../services/staff_maintenance_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../widgets/feature_widgets.dart';
+import '../shared/report_status_actions.dart';
+import '../shared/administrative_entry_dialog.dart';
+import '../../services/report_administration_service.dart';
 
 class StaffMaintenancePage extends StatefulWidget {
   const StaffMaintenancePage({super.key});
@@ -672,11 +675,13 @@ class StaffMaintenanceDetailsPage extends StatefulWidget {
   const StaffMaintenanceDetailsPage({
     required this.id,
     this.initialReport,
+    this.service = const StaffMaintenanceService(),
     super.key,
   });
 
   final String id;
   final StaffMaintenanceReport? initialReport;
+  final StaffMaintenanceService service;
 
   @override
   State<StaffMaintenanceDetailsPage> createState() =>
@@ -685,7 +690,7 @@ class StaffMaintenanceDetailsPage extends StatefulWidget {
 
 class StaffMaintenanceDetailsPageState
     extends State<StaffMaintenanceDetailsPage> {
-  final _service = const StaffMaintenanceService();
+  StaffMaintenanceService get _service => widget.service;
   final _notes = TextEditingController();
 
   StaffMaintenanceReport? _report;
@@ -697,6 +702,7 @@ class StaffMaintenanceDetailsPageState
   bool _loading = true;
   bool _saving = false;
   bool _showFloorPlanModal = false;
+  late final TableRefreshSubscription _detailSubscription;
 
   @override
   void initState() {
@@ -707,10 +713,20 @@ class StaffMaintenanceDetailsPageState
       _notes.text = widget.initialReport!.notes;
     }
     _load();
+    _detailSubscription = TableRefreshSubscription(
+        'maintenance-detail-${widget.id}',
+        ['maintenance_reports', 'maintenance_staff_history'], () {
+      if (!mounted || _saving) return;
+      // Do not overwrite a staff member's unsaved draft during a live refresh.
+      if (_report != null &&
+          (_notes.text != _report!.notes || _status != _report!.status)) return;
+      _load();
+    });
   }
 
   @override
   void dispose() {
+    _detailSubscription.dispose();
     _notes.dispose();
     super.dispose();
   }
@@ -750,6 +766,7 @@ class StaffMaintenanceDetailsPageState
   }
 
   Future<void> _save() async {
+    if (_saving || _report == null) return;
     if ((_status == 'resolved' || _status == 'cancelled') &&
         _notes.text.trim().isEmpty) {
       setState(() => _error =
@@ -763,6 +780,11 @@ class StaffMaintenanceDetailsPageState
     });
 
     try {
+      if (_status != _report!.status &&
+          !await confirmReportTransition(context, _report!.statusLabel,
+              maintenanceStatusLabels[_status] ?? _status!,
+              tenantUpdate: _notes.text.trim())) return;
+      if (!mounted) return;
       await _service.save(_report!, _status!, _notes.text);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -871,6 +893,11 @@ class StaffMaintenanceDetailsPageState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const SectionTitle('Report Type'),
+                          if (report.responsibleStaff != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                                'Responsible staff: ${report.responsibleStaff}'),
+                          ],
                           const SizedBox(height: 8),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -891,9 +918,7 @@ class StaffMaintenanceDetailsPageState
                               ),
                               const SizedBox(width: 8),
                               StatusPill(
-                                maintenanceStatusLabels[_status] ??
-                                    _status ??
-                                    report.statusLabel,
+                                report.statusLabel,
                               ),
                             ],
                           ),
@@ -993,13 +1018,13 @@ class StaffMaintenanceDetailsPageState
                               Icon(Icons.notes,
                                   size: 18, color: AppColors.brown),
                               SizedBox(width: 8),
-                              Text(
-                                'Report Details',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: scheme.onSurface,
-                                ),
+                              Expanded(
+                                child: Text('Report Details',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: scheme.onSurface,
+                                    )),
                               ),
                             ],
                           ),
@@ -1040,18 +1065,15 @@ class StaffMaintenanceDetailsPageState
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              TextButton.icon(
+                              IconButton(
+                                tooltip: _showFloorPlanModal
+                                    ? 'Hide floor plan'
+                                    : 'Show floor plan',
                                 onPressed: () => setState(() =>
                                     _showFloorPlanModal = !_showFloorPlanModal),
-                                icon: Icon(
-                                  _showFloorPlanModal
-                                      ? Icons.keyboard_arrow_up
-                                      : Icons.map,
-                                  size: 16,
-                                ),
-                                label: Text(_showFloorPlanModal
-                                    ? 'Hide Map'
-                                    : 'Floor Plan'),
+                                icon: Icon(_showFloorPlanModal
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.map_outlined),
                               ),
                             ],
                           ),
@@ -1074,13 +1096,13 @@ class StaffMaintenanceDetailsPageState
                               Icon(Icons.camera_alt_outlined,
                                   size: 18, color: AppColors.brown),
                               SizedBox(width: 8),
-                              Text(
-                                'Attached Photo Evidence',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: scheme.onSurface,
-                                ),
+                              Expanded(
+                                child: Text('Attached Photo Evidence',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: scheme.onSurface,
+                                    )),
                               ),
                             ],
                           ),
@@ -1205,116 +1227,28 @@ class StaffMaintenanceDetailsPageState
                               Icon(Icons.tune,
                                   size: 18, color: AppColors.brown),
                               SizedBox(width: 8),
-                              Text(
-                                'Status Triage & Staff Actions',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: scheme.onSurface,
-                                ),
+                              Expanded(
+                                child: Text('Administrative actions',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: scheme.onSurface,
+                                    )),
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
-
-                          // Quick Action Buttons
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              if (_status != 'in_progress' &&
-                                  allowedMaintenanceStatuses(report.status)
-                                      .contains('in_progress'))
-                                ActionChip(
-                                  avatar: const Icon(Icons.play_arrow,
-                                      size: 16, color: Colors.white),
-                                  label: const Text('Start Work'),
-                                  backgroundColor: const Color(0xFF3B5998),
-                                  labelStyle: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
-                                  onPressed: _saving
-                                      ? null
-                                      : () => setState(
-                                          () => _status = 'in_progress'),
-                                ),
-                              if (_status != 'assigned' &&
-                                  allowedMaintenanceStatuses(report.status)
-                                      .contains('assigned'))
-                                ActionChip(
-                                  avatar: const Icon(Icons.person_add,
-                                      size: 16, color: Colors.white),
-                                  label: const Text('Assign Staff'),
-                                  backgroundColor: AppColors.info,
-                                  labelStyle: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
-                                  onPressed: _saving
-                                      ? null
-                                      : () =>
-                                          setState(() => _status = 'assigned'),
-                                ),
-                              if (_status != 'resolved' &&
-                                  allowedMaintenanceStatuses(report.status)
-                                      .contains('resolved'))
-                                ActionChip(
-                                  avatar: const Icon(Icons.check,
-                                      size: 16, color: Colors.white),
-                                  label: const Text('Mark Resolved'),
-                                  backgroundColor: AppColors.success,
-                                  labelStyle: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
-                                  onPressed: _saving
-                                      ? null
-                                      : () =>
-                                          setState(() => _status = 'resolved'),
-                                ),
-                              if (_status != 'cancelled' &&
-                                  allowedMaintenanceStatuses(report.status)
-                                      .contains('cancelled'))
-                                ActionChip(
-                                  avatar: const Icon(Icons.cancel_outlined,
-                                      size: 16, color: Colors.white),
-                                  label: const Text('Cancel Request'),
-                                  backgroundColor: AppColors.danger,
-                                  labelStyle: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
-                                  onPressed: _saving
-                                      ? null
-                                      : () =>
-                                          setState(() => _status = 'cancelled'),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-
-                          DropdownButtonFormField<String>(
-                            initialValue: _status,
-                            decoration: const InputDecoration(
-                              labelText: 'Select Status',
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              border: OutlineInputBorder(),
-                            ),
-                            items: allowedMaintenanceStatuses(report.status)
-                                .map((status) => DropdownMenuItem(
-                                      value: status,
-                                      child: Text(
-                                        maintenanceStatusLabels[status] ??
-                                            status,
-                                      ),
-                                    ))
-                                .toList(),
-                            onChanged: _saving
-                                ? null
-                                : (value) => setState(() => _status = value),
+                          ReportStatusActions(
+                            currentStatus: report.status,
+                            selectedStatus: _status ?? report.status,
+                            allowedStatuses:
+                                allowedMaintenanceStatuses(report.status),
+                            labels: maintenanceStatusLabels,
+                            enabled: !_saving,
+                            onChanged: (value) =>
+                                setState(() => _status = value),
                           ),
                           const SizedBox(height: 16),
-
                           TextField(
                             controller: _notes,
                             enabled: !_saving,
@@ -1322,13 +1256,14 @@ class StaffMaintenanceDetailsPageState
                             minLines: 3,
                             maxLines: 6,
                             decoration: InputDecoration(
-                              labelText: 'Staff & Resolution Notes',
+                              labelText: 'Tenant-visible update',
                               hintText:
                                   'Record actions taken, technician assigned, parts replaced, or reason for cancellation...',
                               helperText: (_status == 'resolved' ||
                                       _status == 'cancelled')
                                   ? 'Notes are mandatory when marking as resolved or cancelled.'
-                                  : 'Optional notes for staff records and tenant updates.',
+                                  : 'The reporting tenant can read this update. Use Internal note for staff-only records.',
+                              helperMaxLines: 4,
                               helperStyle: TextStyle(
                                 color: (_status == 'resolved' ||
                                         _status == 'cancelled')
@@ -1343,7 +1278,6 @@ class StaffMaintenanceDetailsPageState
                             ),
                           ),
                           const SizedBox(height: 12),
-
                           SizedBox(
                             width: double.infinity,
                             height: 48,
@@ -1372,6 +1306,31 @@ class StaffMaintenanceDetailsPageState
                     ),
                     const SizedBox(height: 20),
 
+                    OutlinedButton.icon(
+                        onPressed: _saving ||
+                                report.status == 'resolved' ||
+                                report.status == 'cancelled'
+                            ? null
+                            : () async {
+                                if (_saving) return;
+                                setState(() => _saving = true);
+                                final saved =
+                                    await showAdministrativeEntryDialog(context,
+                                        title: 'Add internal staff note',
+                                        onSave: (body, visibility, requestId) =>
+                                            const ReportAdministrationService()
+                                                .addInternalNote(
+                                                    'maintenance',
+                                                    report.id,
+                                                    body,
+                                                    requestId));
+                                if (!mounted) return;
+                                setState(() => _saving = false);
+                                if (saved) await _load();
+                              },
+                        icon: const Icon(Icons.lock_outline),
+                        label: const Text('Add internal staff note')),
+                    const SizedBox(height: 12),
                     // History Timeline
                     CarmelitaCard(
                       child: Column(
@@ -1382,13 +1341,14 @@ class StaffMaintenanceDetailsPageState
                               const Icon(Icons.history,
                                   size: 18, color: AppColors.brown),
                               const SizedBox(width: 8),
-                              Text(
-                                'Audit Trail & History (${_history.length})',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: scheme.onSurface,
-                                ),
+                              Expanded(
+                                child: Text(
+                                    'Audit Trail & History (${_history.length})',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: scheme.onSurface,
+                                    )),
                               ),
                             ],
                           ),
