@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:convert';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/services/receipt_print_service.dart';
@@ -17,6 +18,33 @@ void main() {
         amount: 1500, reference: 'F2F-TEST', receivedOn: DateTime(2026, 10, 8));
     expect(ascii.decode(bytes.take(5).toList()), '%PDF-');
     expect(bytes.length, greaterThan(500));
+  });
+  test(
+      'stored manual and test receipts render with saved verification metadata',
+      () async {
+    final directory = Directory('build/phase1_payment_validation')
+      ..createSync(recursive: true);
+    for (final environment in ['test', 'manual']) {
+      final receipt = PaymentReceipt(
+          id: 'transaction-1',
+          number: 'PAY-TRANSACTION-1',
+          tenantId: 'sample-tenant',
+          tenantName: 'Sample Tenant',
+          chargeId: 'sample-bill',
+          billTitle: 'Sample October rent',
+          amount: 750,
+          reference: 'pay_FIXTURE',
+          method: environment == 'test' ? 'PayMongo QR Ph (Demo Test)' : 'Cash',
+          verifiedAt: DateTime(2026, 10, 16, 10),
+          receivedAt: DateTime(2026, 10, 16, 9),
+          environment: environment,
+          balanceAfter: 0);
+      final bytes =
+          await const ReceiptPrintService().buildStoredReceipt(receipt);
+      expect(ascii.decode(bytes.take(5).toList()), '%PDF-');
+      File('${directory.path}/${environment}_receipt.pdf')
+          .writeAsBytesSync(bytes);
+    }
   });
   test('rejects missing references and invalid receipt amounts', () async {
     for (final amount in [0.0, -1.0, double.nan]) {

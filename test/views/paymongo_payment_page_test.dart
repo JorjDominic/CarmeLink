@@ -267,7 +267,7 @@ void main() {
     expect(find.text('Open test payment page'), findsOneWidget);
     expect(
         find.textContaining(
-            'successful test payments update the shared bill balance.'),
+            'Successful simulations can update registered sample bills'),
         findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });

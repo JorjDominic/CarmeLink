@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,6 +10,7 @@ import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../services/payment_collection_settings_service.dart';
 import '../../services/paymongo_payment_service.dart';
+import '../../services/receipt_print_service.dart';
 
 /// Demo mode is local and never calls the gateway or billing service.
 class PaymongoPaymentPage extends StatefulWidget {
@@ -18,11 +20,13 @@ class PaymongoPaymentPage extends StatefulWidget {
       this.demo = false,
       this.environment = 'test',
       this.service = const PaymongoPaymentService(),
+      this.receiptPrinter = const ReceiptPrintService(),
       this.initialSession});
   final Payment? payment;
   final bool demo;
   final String environment;
   final PaymongoPaymentService service;
+  final ReceiptPrintService receiptPrinter;
   final PaymongoPaymentSession? initialSession;
   @override
   State<PaymongoPaymentPage> createState() => _PaymongoPaymentPageState();
@@ -34,6 +38,9 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
   Timer? _poll;
   bool _busy = false;
   String? _error;
+  String? _receiptError;
+  List<PaymentReceipt> _receipts = [];
+  final Map<String, Uint8List> _receiptDocuments = {};
   final Set<String> _selectedRentIds = {};
   @override
   void initState() {
@@ -41,6 +48,11 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
     _payment = widget.payment;
     if (_payment?.isRent == true) _selectedRentIds.add(_payment!.id);
     _session = widget.initialSession;
+    if (!widget.demo && _session?.paid == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadReceipts();
+      });
+    }
     if (!widget.demo && _session?.isActive == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _refresh();
@@ -82,6 +94,7 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
       setState(() => _session = session);
       if (newlyPaid)
         unawaited(TenantController.instance.loadPayments(force: true));
+      if (session?.paid == true) await _loadReceipts();
     } catch (error) {
       if (mounted)
         setState(() => _error = error is PaymentGatewayException
@@ -89,6 +102,41 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
             : 'Could not check this payment. Please try again.');
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _loadReceipts() async {
+    final session = _session;
+    if (widget.demo || session?.paid != true) return;
+    try {
+      final receipts = await widget.service.receipts(session!.id);
+      for (final receipt in receipts) {
+        _receiptDocuments[receipt.id] ??=
+            await widget.receiptPrinter.buildStoredReceipt(receipt);
+      }
+      if (mounted && _session?.id == session.id)
+        setState(() {
+          _receipts = receipts;
+          _receiptError = receipts.isEmpty
+              ? 'Receipt is not ready. Retry to check again.'
+              : null;
+        });
+    } catch (_) {
+      if (mounted)
+        setState(() => _receiptError =
+            'Payment remains confirmed. Could not load the receipt; retry safely.');
+    }
+  }
+
+  Future<void> _printReceipt(PaymentReceipt receipt) async {
+    try {
+      await widget.receiptPrinter
+          .printStoredReceipt(receipt, bytes: _receiptDocuments[receipt.id]);
+      if (mounted) setState(() => _receiptError = null);
+    } catch (_) {
+      if (mounted)
+        setState(() => _receiptError =
+            'Payment remains confirmed. Could not open the receipt; try again.');
     }
   }
 
@@ -212,7 +260,7 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
                     padding: const EdgeInsets.all(16),
                     child: Text(widget.demo
                         ? 'DEMO ONLY — no money moves and no tenant bills are updated.'
-                        : 'PAYMONGO DEMO MODE — use the test payment page. The displayed QR contains demo text only and cannot collect payment. For this demo, successful test payments update the shared bill balance. No real money is received.'))),
+                        : 'TEST MODE — use the test payment page. The displayed QR cannot collect payment. Successful simulations can update registered sample bills in the testing environment only. No real money is received.'))),
           if (!widget.demo &&
               widget.payment == null &&
               widget.initialSession == null) ...[
@@ -352,6 +400,24 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
                     ],
                   ]))),
           if (_busy) const LinearProgressIndicator(),
+          if (!widget.demo && session?.paid == true) ...[
+            for (final receipt in _receipts)
+              Card(
+                  child: ListTile(
+                title: Text('Receipt: ${receipt.billTitle}'),
+                subtitle: Text(
+                    '${receipt.number}\n${receipt.isTest ? PaymentReceipt.testNotice : 'Verified payment receipt'}'),
+                isThreeLine: true,
+                trailing: IconButton(
+                    tooltip: 'Print / save receipt',
+                    onPressed: () => _printReceipt(receipt),
+                    icon: const Icon(Icons.print_outlined)),
+              )),
+            if (_receiptError != null) Text(_receiptError!),
+            if (_receiptError != null)
+              TextButton(
+                  onPressed: _loadReceipts, child: const Text('Retry receipt')),
+          ],
           if (_error != null)
             Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),

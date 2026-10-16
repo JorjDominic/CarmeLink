@@ -238,7 +238,7 @@ class PaymentService {
     return await _client
         .from('payment_transactions')
         .select(
-            'amount, reference_number, received_on, submitted_at, payment_method')
+            'id, amount, reference_number, received_on, submitted_at, payment_method')
         .eq('charge_id', paymentId)
         .eq('status', 'verified')
         .order('submitted_at', ascending: false)

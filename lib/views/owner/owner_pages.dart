@@ -3959,12 +3959,10 @@ class _PaymentReviewCard extends StatelessWidget {
                       throw Exception(
                           'No confirmed receipt with a reference is available.');
                     }
-                    await const ReceiptPrintService().printPayment(payment,
-                        amount: (receipt['amount'] as num).toDouble(),
-                        reference: receipt['reference_number'] as String,
-                        receivedOn: DateTime.parse((receipt['received_on'] ??
-                                receipt['submitted_at']) as String)
-                            .toLocal());
+                    const printer = ReceiptPrintService();
+                    final stored =
+                        await printer.loadTransaction(receipt['id'] as String);
+                    await printer.printStoredReceipt(stored);
                   } catch (error) {
                     if (context.mounted)
                       showAppSnackBar(

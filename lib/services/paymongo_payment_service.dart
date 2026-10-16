@@ -1,5 +1,6 @@
 import '../core/config/supabase_config.dart';
 import 'payment_collection_settings_service.dart';
+import 'receipt_print_service.dart';
 
 class PaymongoBillBreakdown {
   const PaymongoBillBreakdown(
@@ -73,6 +74,15 @@ class PaymongoPaymentSession {
 
 class PaymongoPaymentService {
   const PaymongoPaymentService();
+
+  Future<List<PaymentReceipt>> receipts(String sessionId) async {
+    final result = await SupabaseConfig.client
+        .rpc('get_paymongo_receipts', params: {'p_session_id': sessionId});
+    return (result as List)
+        .map((row) =>
+            PaymentReceipt.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
 
   /// Match the ledger guard, including requests from a previous environment.
   Future<PaymongoPaymentSession?> blockingReceipt(String chargeId) async {
