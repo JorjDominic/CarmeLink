@@ -1,3 +1,4 @@
+import '../shared/confidentiality_agreements_page.dart';
 import '../../services/dormitory_configuration_service.dart';
 import '../../core/utils/financial_snapshot.dart';
 import '../../core/widgets/configured_choice_field.dart';
@@ -2195,6 +2196,12 @@ const _operationCategories = [
           'Manage report choices and common areas',
           Icons.settings_outlined,
           DormitoryConfigurationPage(),
+          ownerOnly: true),
+      _OperationItem(
+          'Confidentiality agreements',
+          'Publish approved versions and verify acceptance',
+          Icons.privacy_tip_outlined,
+          ConfidentialityAgreementsPage(),
           ownerOnly: true),
       _OperationItem('Disciplinary records', 'Manage violations',
           Icons.rule_outlined, DisciplinaryRecordsPage(),

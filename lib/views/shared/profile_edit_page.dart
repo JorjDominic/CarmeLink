@@ -1,3 +1,4 @@
+import 'confidentiality_agreements_page.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
@@ -198,6 +199,18 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         ),
                       ),
                       const SizedBox(height: 20),
+                      if ({UserRole.tenant, UserRole.guardian}
+                          .contains(user?.role)) ...[
+                        OutlinedButton.icon(
+                            onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        const ConfidentialityAgreementsPage())),
+                            icon: const Icon(Icons.privacy_tip_outlined),
+                            label: const Text('Confidentiality agreements')),
+                        const SizedBox(height: 16),
+                      ],
                       const SectionTitle('Editable information'),
                       const SizedBox(height: 10),
                       CarmelitaCard(
