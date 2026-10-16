@@ -1,6 +1,6 @@
 workflows:
-  ios-unsigned:
-    name: Carmelita iOS Unsigned Build
+  ios-signed:
+    name: CarmeLink iOS Signed Build
 
     instance_type: mac_mini_m2
     max_build_duration: 60
@@ -9,6 +9,11 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      ios_signing:
+        provisioning_profiles:
+          - carmelink_app_store
+        certificates:
+          - carmelink_distribution
 
     scripts:
       - name: Get Flutter packages
@@ -25,18 +30,14 @@ workflows:
           pod install
           cd ..
 
-      - name: Build unsigned iOS app
+      - name: Configure iOS code signing
         script: |
-          flutter build ios --release --no-codesign
+          xcode-project use-profiles
 
-      - name: Create IPA container
+      - name: Build signed iOS IPA
         script: |
-          rm -rf build/ios/ipa
-          mkdir -p build/ios/ipa/Payload
-          cp -R build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
-          cd build/ios/ipa
-          zip -qry Carmelitas_Dormitory.ipa Payload
-          test -f Carmelitas_Dormitory.ipa
+          flutter build ipa --release --export-options-plist="$HOME/export_options.plist"
 
     artifacts:
-      - build/ios/ipa/Carmelitas_Dormitory.ipa
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
