@@ -25,6 +25,7 @@ const row=async(sql,p=[]) => (await db.query(sql,p)).rows[0];
 const actor=who=>db.query("select set_config('test.actor',$1,false)",[who]);
 const check=async(name,run)=>{await run();passed++;console.log(`PASS ${name}`);};
 async function fixture(capacity=4) {
+  await db.exec('begin');
   const room=id(sequence++);await db.query("insert into rooms(id,room_number,floor,capacity) values($1,$2,'Ground',$3)",[room,`QA-${sequence}`,capacity]);
   const tenants=[],beds=[];
   for(let i=0;i<capacity;i++) {
@@ -33,6 +34,7 @@ async function fixture(capacity=4) {
     await db.query("insert into bed_spaces(id,room_id,label) values($1,$2,$3)",[bed,room,`Bed ${i+1}`]);
     await db.query('insert into tenant_details(profile_id) values($1)',[tenant]);
   }
+  await db.exec('commit');
   return {room,tenants,beds};
 }
 const prepare=async(f,n)=>(await row("select prepare_contract_occupancy($1,$2,6000,$3::jsonb,current_date,current_date+60,'QA rent') ids",[f.room,n===1?'solo':'shared',JSON.stringify(f.tenants.slice(0,n).map((tenant,i)=>({tenant_id:tenant,bed_id:f.beds[i],security_deposit:'1500.00'})))])).ids;
@@ -87,6 +89,8 @@ try {
     assert.deepEqual((await db.query('select * from payment_transactions order by id')).rows,oldTransactions);
     assert.deepEqual((await db.query(financialSql)).rows,oldTotals);
   });
+  await db.exec(source('202610160004_dynamic_physical_room_capacity.sql'));
+  await db.exec(source('202610160005_standard_shared_contract_occupancy.sql'));
   for(const n of [1,2,3,4]) await check(`${n} tenants receive their approved individual rent with unchanged cycles and no duplicates`,async()=>{
     const f=await fixture(),ids=await prepare(f,n);
     for(const c of ids) {await approve(c);await db.query('select activate_tenant_contract($1)',[c]);}
@@ -100,6 +104,23 @@ try {
     assert.deepEqual((await db.query('select * from billing_charges where contract_id=any($1::uuid[]) order by id',[ids])).rows,bills);
   });
   const f=await fixture();const tenant=f.tenants[0];
+  await check('Standard Shared fixed signed rents and bills survive another roommate joining',async()=>{
+    const f=await fixture();
+    const members=f.tenants.slice(0,2).map((tenant,i)=>({tenant_id:tenant,bed_id:f.beds[i],security_deposit:'1500.00',monthly_rent:String(2500+i*200)}));
+    const ids=(await row("select prepare_contract_occupancy($1,'standard_shared',6000,$2::jsonb,current_date,current_date+60) ids",[f.room,JSON.stringify(members)])).ids;
+    for(const c of ids){await approve(c);await db.query('select activate_tenant_contract($1)',[c]);}
+    const sql='select id,contract_id,category,original_amount,due_date,period_start,period_end,terms_snapshot from billing_charges where contract_id=any($1::uuid[]) order by id';
+    const before=(await db.query(sql,[ids])).rows;
+    const rates=(await db.query('select id,monthly_rent,occupancy_snapshot from tenant_contracts where id=any($1::uuid[]) order by id',[ids])).rows;
+    for(let i=0;i<2;i++){const rents=before.filter(b=>b.contract_id===ids[i]&&b.category==='rent');assert.ok(rents.length>0);assert.ok(rents.every(b=>Number(b.original_amount)===2500+i*200));}
+    const newcomer=(await row("select prepare_contract_occupancy($1,'standard_shared',6000,$2::jsonb,current_date,current_date+60) ids",[f.room,JSON.stringify([{tenant_id:f.tenants[2],bed_id:f.beds[2],security_deposit:1500,monthly_rent:3100}])])).ids;
+    await approve(newcomer[0]);await db.query('select activate_tenant_contract($1)',[newcomer[0]]);
+    for(const c of [...ids,...newcomer])await db.query('select generate_contract_billing_charges($1)',[c]);
+    assert.deepEqual((await db.query(sql,[ids])).rows,before);
+    assert.deepEqual((await db.query('select id,monthly_rent,occupancy_snapshot from tenant_contracts where id=any($1::uuid[]) order by id',[ids])).rows,rates);
+    const newBills=(await db.query("select original_amount from billing_charges where contract_id=$1 and category='rent'",[newcomer[0]])).rows;
+    assert.ok(newBills.length>0);assert.ok(newBills.every(b=>Number(b.original_amount)===3100));
+  });
   await check('Other specification reason notes and amount persist in existing metadata',async()=>{
     const c=(await charge(tenant)).c;assert.equal(c.specific_category,'Aircon repair');assert.equal(c.notes,'Original notes');
     assert.equal(c.terms_snapshot.manual_approval_reason,'Owner approved');assert.equal(c.category,'other');

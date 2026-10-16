@@ -137,6 +137,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Rejected partial proof'), findsOneWidget);
     expect(find.text('Rejection reason: Blurry receipt'), findsOneWidget);
+    expect(find.text('Print receipt'), findsOneWidget);
     expect(find.text('Confirm payment'), findsNothing);
   });
   testWidgets(

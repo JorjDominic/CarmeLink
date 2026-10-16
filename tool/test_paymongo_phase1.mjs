@@ -1,7 +1,7 @@
 // No remote connection: executes real payment SQL in disposable in-memory PostgreSQL.
 import {PGlite} from '../build/phase2_sql_tests/node_modules/@electric-sql/pglite/dist/index.js';
 import assert from 'node:assert/strict';
-import {bootstrapPaymongoFixture,id,owner,tenant,otherTenant,caretaker} from './paymongo_phase1_fixture.mjs';
+import {bootstrapPaymongoFixture,id,owner,tenant,otherTenant,caretaker,source} from './paymongo_phase1_fixture.mjs';
 const db=new PGlite();let passed=0,next=100;
 const check=async(name,run)=>{await root();await run();passed++;console.log(`PASS ${name}`)};
 const login=async(who=tenant,backend=false)=>{await db.exec('reset role');await db.query("select set_config('test.actor',$1,false),set_config('test.jwtrole',$2,false)",[who,backend?'service_role':'authenticated']);await db.exec('set role '+(backend?'service_role':'authenticated'))};
@@ -18,6 +18,7 @@ const settle=async(p,overrides={})=>{await login(owner,true);return scalar('sele
 const balance=async(key)=>{await root();return Number(await scalar('select remaining_balance from billing_charge_summaries where id=$1',[key]))};
 try {
  await bootstrapPaymongoFixture(db);
+ if(process.argv.includes('--financial-integrity')) await db.exec(source('202610160008_payment_receipt_integrity.sql'));
  await check('production default rejects test payments even with the legacy demo-credit flag',async()=>{
   await root();await db.query("update payment_collection_settings set mode='paymongo',paymongo_ready=true,updated_by=$1",[owner]);
   const key=await bill();await assert.rejects(()=>begin([key]),/disposable local or staging/);assert.equal(await balance(key),1000);

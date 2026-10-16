@@ -2,7 +2,7 @@
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import pg from '../build/phase2_sql_tests/node_modules/pg/lib/index.js';
-import {bootstrapPaymongoFixture,id,owner,tenant} from './paymongo_phase1_fixture.mjs';
+import {bootstrapPaymongoFixture,id,owner,tenant,source} from './paymongo_phase1_fixture.mjs';
 const index=process.argv.indexOf('--local-config');
 if(index<0||!process.argv.includes('--disposable')){
  console.log('PENDING EXTERNAL TESTING: provide --disposable --local-config <private JSON file> for an empty local PostgreSQL database.');process.exit(2);
@@ -27,6 +27,7 @@ try{
  await Promise.all(clients.map(c=>c.connect()));
  assert.equal(Number((await root.query("select count(*) from information_schema.tables where table_schema='public'")).rows[0].count),0,'Database must be empty');
  await bootstrapPaymongoFixture({exec:sql=>root.query(sql),query:(sql,args)=>root.query(sql,args)});
+ if(process.argv.includes('--financial-integrity')) await root.query(source('202610160008_payment_receipt_integrity.sql'));
  await root.query("update paymongo_test_configuration set deployment_environment='local'");
  await root.query("update payment_collection_settings set mode='paymongo',paymongo_ready=true,demo_test_credits=true,updated_by=$1",[owner]);
  await root.query("insert into billing_charges(id,tenant_id,title,category,original_amount,due_date) values($1,$2,'Sample concurrent bill','rent',1000,current_date)",[id(100),tenant]);

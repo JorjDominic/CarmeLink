@@ -1,3 +1,4 @@
+import 'package:carmelitas_dormitory_system/services/receipt_print_service.dart';
 // Local protocol fixture; SQL authorization is exercised by the PostgreSQL runner.
 import 'dart:convert';
 import 'dart:io';
@@ -15,6 +16,8 @@ void main() {
   const owner = '00000000-0000-0000-0000-000000000001';
   const proof = '00000000-0000-0000-0000-000000000019';
   var failReview = false;
+  var largeLedger = false;
+  final urls = <Uri>[];
   Map<String, dynamic> row() => {
         'id': 'bill',
         'tenant_id': 'tenant',
@@ -41,6 +44,7 @@ void main() {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) async {
       final path = request.uri.path.split('/').last;
+      urls.add(request.uri);
       final body = request.method == 'GET'
           ? <String, dynamic>{}
           : Map<String, dynamic>.from(
@@ -76,6 +80,27 @@ void main() {
             'user_metadata': {}
           }
         };
+      } else if (path == 'payment_transactions') {
+        result = [
+          {'id': proof}
+        ];
+      } else if (path == 'get_payment_receipt') {
+        result = {
+          'id': proof,
+          'receipt_number': 'PAY-SAVED-TRANSACTION',
+          'tenant_id': 'tenant',
+          'tenant_name': 'Original saved tenant',
+          'charge_id': 'bill',
+          'bill_title': 'Original saved title',
+          'amount': 350,
+          'reference_number': 'SAVED-REFERENCE',
+          'payment_method': 'Face-to-face receipt',
+          'verified_at': '2026-10-16T10:00:00Z',
+          'received_at': '2026-10-16T09:00:00Z',
+          'environment': 'manual',
+          'balance_after': 650,
+          'snapshot_source': 'verification'
+        };
       } else if (path == 'create_additional_charge')
         result = row();
       else if (path == 'review_payment_transaction') {
@@ -88,9 +113,26 @@ void main() {
           };
         } else
           result = row();
-      } else if (path == 'billing_charge_summaries')
-        result = [row()];
-      else if (path == 'profiles' || path == 'guardian_tenant_links')
+      } else if (path == 'billing_charge_summaries') {
+        if (largeLedger) {
+          final offset =
+              int.tryParse(request.uri.queryParameters['offset'] ?? '') ??
+                  int.tryParse((request.headers.value('range') ?? '0-199')
+                      .split('-')
+                      .first) ??
+                  0;
+          final limit =
+              int.tryParse(request.uri.queryParameters['limit'] ?? '') ?? 200;
+          result = [
+            for (var index = offset;
+                index < 1001 && index < offset + limit;
+                index++)
+              {...row(), 'id': 'bill-${index.toString().padLeft(4, '0')}'}
+          ];
+        } else {
+          result = [row()];
+        }
+      } else if (path == 'profiles' || path == 'guardian_tenant_links')
         result = [];
       request.response.write(jsonEncode(result));
       await request.response.close();
@@ -115,6 +157,7 @@ void main() {
       () async {
     final payment = await const PaymentService().createAdditionalCharge(
         tenantId: 'tenant',
+        requestId: '00000000-0000-0000-0000-000000000990',
         title: ' QA charge ',
         category: 'other',
         specificCategory: ' Aircon repair ',
@@ -124,6 +167,8 @@ void main() {
         notes: ' Evidence ');
     final request =
         requests.lastWhere((r) => r.path == 'create_additional_charge');
+    expect(
+        request.body['p_request_id'], '00000000-0000-0000-0000-000000000990');
     expect(request.body['p_specific_category'], 'Aircon repair');
     expect(request.body['p_category'], 'other');
     expect(request.body['p_reason'], 'Owner approved');
@@ -151,6 +196,66 @@ void main() {
     expect(
         requests.lastWhere((r) => r.path == 'billing_charge_summaries').select,
         contains('latest_transaction_status'));
+  });
+  test(
+      'all billing reads include records beyond the server row limit and retain scope filters',
+      () async {
+    largeLedger = true;
+    try {
+      final payments = await const PaymentService().listAllPayments();
+      expect(payments.length, 1001);
+      expect(payments.last.id, 'bill-1000');
+      expect(payments.fold<double>(0, (sum, p) => sum + p.collectedAmount),
+          350350);
+      final own = await const PaymentService().listOwnPayments();
+      expect(own.length, 1001);
+      expect(
+          urls
+              .lastWhere((u) => u.path.endsWith('/billing_charge_summaries'))
+              .queryParameters['tenant_id'],
+          'eq.$owner');
+      final pending = await const PaymentService().listPendingVerifications();
+      expect(pending.length, 1001);
+      expect(
+          urls
+              .lastWhere((u) => u.path.endsWith('/billing_charge_summaries'))
+              .queryParameters['status'],
+          'eq.pending_verification');
+    } finally {
+      largeLedger = false;
+    }
+  });
+  test(
+      'receipt history filters the bill and verified transactions independently of the newest proof',
+      () async {
+    final rows = await const ReceiptPrintService().listForCharge('bill');
+    final lookup =
+        urls.lastWhere((uri) => uri.path.endsWith('/payment_transactions'));
+    expect(lookup.queryParameters['charge_id'], 'eq.bill');
+    expect(lookup.queryParameters['status'], 'eq.verified');
+    expect(rows.single.id, proof);
+    expect(rows.single.number, 'PAY-SAVED-TRANSACTION');
+  });
+  test(
+      'staff printing resolves the exact saved request and uses its immutable receipt',
+      () async {
+    const requestId = '00000000-0000-0000-0000-000000000991';
+    final receipt =
+        await const ReceiptPrintService().loadStaffRequest(requestId);
+    final lookup =
+        urls.lastWhere((uri) => uri.path.endsWith('/payment_transactions'));
+    expect(lookup.queryParameters['staff_request_id'], 'eq.$requestId');
+    expect(lookup.queryParameters['status'], 'eq.verified');
+    expect(
+        requests
+            .lastWhere((r) => r.path == 'get_payment_receipt')
+            .body['p_transaction_id'],
+        proof);
+    expect(receipt.number, 'PAY-SAVED-TRANSACTION');
+    expect(receipt.tenantName, 'Original saved tenant');
+    expect(receipt.billTitle, 'Original saved title');
+    expect(receipt.balanceAfter, 650);
+    expect(receipt.snapshotSource, 'verification');
   });
   test(
       'changed-proof rejection is surfaced without a client-created verified result',
