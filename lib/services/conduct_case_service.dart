@@ -191,6 +191,8 @@ class ConductCaseEvidence {
   const ConductCaseEvidence({
     required this.id,
     required this.originalName,
+    this.storagePath = '',
+    this.uploadedBy = '',
     required this.caption,
     required this.createdAt,
   });
@@ -199,6 +201,8 @@ class ConductCaseEvidence {
     return ConductCaseEvidence(
       id: row['id'] as String,
       originalName: row['original_name'] as String,
+      storagePath: row['storage_path'] as String? ?? '',
+      uploadedBy: row['uploaded_by'] as String? ?? '',
       caption: row['caption'] as String? ?? '',
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
     );
@@ -206,6 +210,8 @@ class ConductCaseEvidence {
 
   final String id;
   final String originalName;
+  final String storagePath;
+  final String uploadedBy;
   final String caption;
   final DateTime createdAt;
 }
@@ -307,20 +313,28 @@ class ConductCaseService {
   }
 
   Future<List<ConductCaseRecord>> listStaffCases() async {
-    final rows = await _client
-        .from('conduct_cases')
-        .select(_staffCaseColumns)
-        .order('created_at', ascending: false);
+    final rows = <Map<String, dynamic>>[];
+    for (var offset = 0;; offset += 200) {
+      final page = await _client
+          .from('conduct_cases')
+          .select(_staffCaseColumns)
+          .order('created_at', ascending: false)
+          .order('id')
+          .range(offset, offset + 199);
+      rows.addAll(page);
+      if (page.length < 200) break;
+    }
 
     final tenantIds =
         rows.map<String>((row) => row['tenant_id'] as String).toSet().toList();
 
     final names = <String, String>{};
-    if (tenantIds.isNotEmpty) {
+    for (var start = 0; start < tenantIds.length; start += 200) {
+      final end = min(start + 200, tenantIds.length);
       final profileRows = await _client
           .from('profiles')
           .select('id, full_name')
-          .inFilter('id', tenantIds);
+          .inFilter('id', tenantIds.sublist(start, end));
       for (final row in profileRows) {
         names[row['id'] as String] =
             (row['full_name'] as String?)?.trim().isNotEmpty == true
@@ -340,8 +354,17 @@ class ConductCaseService {
   }
 
   Future<List<ConductCaseRecord>> listMyCases() async {
-    final result = await _client.rpc('get_my_conduct_cases');
-    final rows = result is List ? result : const <dynamic>[];
+    final rows = <dynamic>[];
+    for (var offset = 0;; offset += 200) {
+      final result = await _client
+          .rpc('get_my_conduct_cases')
+          .order('created_at', ascending: false)
+          .order('id')
+          .range(offset, offset + 199);
+      final page = result as List;
+      rows.addAll(page);
+      if (page.length < 200) break;
+    }
     return rows
         .map<ConductCaseRecord>(
           (row) => ConductCaseRecord.fromTenantRow(
@@ -692,7 +715,8 @@ class ConductCaseService {
   Future<List<ConductCaseEvidence>> listEvidence(String caseId) async {
     final rows = await _client
         .from('conduct_case_evidence')
-        .select('id, original_name, caption, created_at')
+        .select(
+            'id, storage_path, original_name, caption, uploaded_by, created_at')
         .eq('case_id', caseId)
         .order('created_at', ascending: false);
 
@@ -701,12 +725,38 @@ class ConductCaseService {
         .toList(growable: false);
   }
 
+  Future<String> evidencePreview(ConductCaseEvidence evidence) =>
+      _client.storage
+          .from('conduct_case_evidence')
+          .createSignedUrl(evidence.storagePath, 120);
+
+  Future<Map<String, dynamic>> investigation(String caseId) async =>
+      Map<String, dynamic>.from(await _client.rpc('get_conduct_investigation',
+          params: {'p_case_id': caseId}) as Map);
+
+  Future<void> recordDecision(
+      {required ConductCaseRecord record,
+      required String outcome,
+      required String reason,
+      required String requestId,
+      String? appealId}) async {
+    await _client.rpc('record_conduct_investigation_decision', params: {
+      'p_case_id': record.id,
+      'p_expected_updated_at': record.updatedAt.toUtc().toIso8601String(),
+      'p_outcome': outcome,
+      'p_reason': reason.trim(),
+      'p_request_id': requestId,
+      'p_appeal_id': appealId,
+    });
+  }
+
   Future<void> uploadEvidence({
     required String caseId,
     required String originalName,
     required String contentType,
     required Uint8List bytes,
     required String caption,
+    String? requestId,
   }) async {
     if (bytes.isEmpty) {
       throw ArgumentError('Evidence image cannot be empty.');
@@ -723,17 +773,20 @@ class ConductCaseService {
     final safeName = originalName
         .replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_')
         .replaceAll(RegExp(r'_+'), '_');
-    final path = '$caseId/${DateTime.now().microsecondsSinceEpoch}_'
+    if (!const ['image/jpeg', 'image/png', 'image/webp']
+        .contains(contentType)) {
+      throw ArgumentError('Unsupported evidence file type');
+    }
+    final path = '$caseId/${requestId ?? createResponseRequestId()}_'
         '${safeName.isEmpty ? 'evidence.$extension' : safeName}';
-
-    await _client.storage.from('conduct_case_evidence').uploadBinary(
-          path,
-          bytes,
-          fileOptions: FileOptions(
-            contentType: contentType,
-            upsert: false,
-          ),
-        );
+    try {
+      await _client.storage.from('conduct_case_evidence').uploadBinary(
+          path, bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: false));
+    } on StorageException catch (error) {
+      // A retry can find its original upload. Registration verifies the exact metadata.
+      if (error.statusCode != '409' && error.error != 'Duplicate') rethrow;
+    }
 
     try {
       await _client.rpc(
@@ -748,7 +801,8 @@ class ConductCaseService {
         },
       );
     } catch (_) {
-      await _client.storage.from('conduct_case_evidence').remove([path]);
+      // A lost RPC reply may mean registration succeeded. Never delete evidence
+      // on ambiguous failure; retry the same request identifier instead.
       rethrow;
     }
   }
@@ -759,7 +813,7 @@ String conductCaseError(Object error) {
       error is PostgrestException ? error.message : error.toString();
 
   if (error is PostgrestException && error.code == 'PGRST202') {
-    return 'Official responses require the Phase 5 database migration.';
+    return 'This feature requires a database update. Contact the administrator.';
   }
 
   if (message.contains('changed. Refresh')) {

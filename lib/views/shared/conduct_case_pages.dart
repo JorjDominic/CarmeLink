@@ -1,3 +1,4 @@
+import 'conduct_investigation_panel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -26,6 +27,19 @@ String _conductDateTime(DateTime value) {
   final minute = local.minute.toString().padLeft(2, '0');
   final amPm = local.hour >= 12 ? 'PM' : 'AM';
   return '${local.month}/${local.day}/${local.year} • $hour:$minute $amPm';
+}
+
+Widget _conductDetailState(bool loading, String? error, VoidCallback retry) {
+  if (loading) {
+    return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(child: CircularProgressIndicator()));
+  }
+  return CarmelitaCard(
+      child: Column(children: [
+    Text(error ?? 'Unable to load this case.'),
+    TextButton(onPressed: retry, child: const Text('Retry')),
+  ]));
 }
 
 List<ConductCaseRecord> _visibleCases(
@@ -321,8 +335,10 @@ class _StaffConductCaseDetailPageState
   List<ConductCaseWarning> warnings = const [];
   List<ConductCaseEvent> events = const [];
   List<ConductCaseEvidence> evidence = const [];
+  late int recordedCaseCount = widget.repeatCount;
   late final TableRefreshSubscription _detailSubscription;
   bool loading = true;
+  int refreshGeneration = 0;
   String? errorMessage;
 
   @override
@@ -335,7 +351,9 @@ class _StaffConductCaseDetailPageState
           'conduct_cases',
           'conduct_case_responses',
           'conduct_case_warnings',
-          'conduct_case_events'
+          'conduct_case_events',
+          'conduct_case_evidence',
+          'conduct_case_appeals'
         ],
         _refresh);
   }
@@ -347,29 +365,37 @@ class _StaffConductCaseDetailPageState
   }
 
   Future<void> _refresh() async {
+    final request = ++refreshGeneration;
+    setState(() {
+      loading = true;
+      errorMessage = null;
+    });
     try {
       final allCases = await service.listStaffCases();
       final latest = allCases.firstWhere(
         (item) => item.id == record.id,
-        orElse: () => record,
+        orElse: () => throw StateError(
+            'This conduct case is not available to your account'),
       );
       final latestResponses = await service.listStaffResponses(record.id);
       final latestWarnings = await service.listStaffWarnings(record.id);
       final latestEvents = await service.listEvents(record.id);
       final latestEvidence = await service.listEvidence(record.id);
 
-      if (!mounted) return;
+      if (!mounted || request != refreshGeneration) return;
       setState(() {
         record = latest;
         responses = latestResponses;
         warnings = latestWarnings;
         events = latestEvents;
         evidence = latestEvidence;
+        recordedCaseCount =
+            allCases.where((item) => item.tenantId == latest.tenantId).length;
         loading = false;
         errorMessage = null;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || request != refreshGeneration) return;
       setState(() {
         loading = false;
         errorMessage = conductCaseError(error);
@@ -617,67 +643,88 @@ class _StaffConductCaseDetailPageState
     }
 
     final caption = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Attach evidence'),
-        content: TextField(
-          controller: caption,
-          maxLength: 1000,
-          maxLines: 4,
-          decoration: InputDecoration(
-            labelText: 'Caption (optional)',
-            helperText: selected.name,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Upload'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) {
+    final requestId = service.createResponseRequestId();
+    var saving = false;
+    final lower = selected.name.toLowerCase();
+    if (!lower.endsWith('.jpg') &&
+        !lower.endsWith('.jpeg') &&
+        !lower.endsWith('.png') &&
+        !lower.endsWith('.webp')) {
+      caption.dispose();
+      showAppSnackBar(context, 'Use a JPG, PNG, or WebP evidence image.');
+      return;
+    }
+    final contentType = lower.endsWith('.png')
+        ? 'image/png'
+        : lower.endsWith('.webp')
+            ? 'image/webp'
+            : 'image/jpeg';
+    final bytes = await selected.readAsBytes();
+    if (!mounted) {
       caption.dispose();
       return;
     }
-
-    try {
-      final lower = selected.name.toLowerCase();
-      final contentType = lower.endsWith('.png')
-          ? 'image/png'
-          : lower.endsWith('.webp')
-              ? 'image/webp'
-              : 'image/jpeg';
-
-      await service.uploadEvidence(
-        caseId: record.id,
-        originalName: selected.name,
-        contentType: contentType,
-        bytes: await selected.readAsBytes(),
-        caption: caption.text,
-      );
-      if (mounted) {
-        showAppSnackBar(context, 'Evidence attached.');
-        await _refresh();
-      }
-    } catch (error) {
-      if (mounted) showAppSnackBar(context, conductCaseError(error));
-    } finally {
-      caption.dispose();
+    String? submittedCaption;
+    final saved = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => StatefulBuilder(
+            builder: (context, update) => AlertDialog(
+                  scrollable: true,
+                  title: const Text('Attach evidence'),
+                  content: TextField(
+                      controller: caption,
+                      enabled: !saving && submittedCaption == null,
+                      maxLength: 1000,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                          labelText: 'Caption (optional)',
+                          helperText: selected.name)),
+                  actions: [
+                    TextButton(
+                        onPressed:
+                            saving ? null : () => Navigator.pop(context, false),
+                        child: const Text('Cancel')),
+                    FilledButton(
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                submittedCaption ??= caption.text;
+                                update(() => saving = true);
+                                try {
+                                  await service.uploadEvidence(
+                                      caseId: record.id,
+                                      originalName: selected.name,
+                                      contentType: contentType,
+                                      bytes: bytes,
+                                      caption: submittedCaption!,
+                                      requestId: requestId);
+                                  if (context.mounted)
+                                    Navigator.pop(context, true);
+                                } catch (error) {
+                                  if (context.mounted) {
+                                    update(() => saving = false);
+                                    showAppSnackBar(
+                                        context, conductCaseError(error));
+                                  }
+                                }
+                              },
+                        child: Text(saving ? 'Uploading...' : 'Upload'))
+                  ],
+                )));
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    caption.dispose();
+    if (saved == true && mounted) {
+      showAppSnackBar(context, 'Evidence attached.');
+      await _refresh();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final closed = conductCaseIsClosed(record.status);
-    final canAct = record.status != 'draft' && !closed;
+    final canAct =
+        !loading && errorMessage == null && record.status != 'draft' && !closed;
 
     return PageFrame(
       heroTitle: 'Case',
@@ -692,18 +739,17 @@ class _StaffConductCaseDetailPageState
           icon: const Icon(Icons.refresh),
         ),
       ],
-      child: loading
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 48),
-              child: Center(child: CircularProgressIndicator()),
-            )
+      child: loading || errorMessage != null
+          ? _conductDetailState(loading, errorMessage, _refresh)
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (errorMessage != null) ...[
-                  CarmelitaCard(child: Text(errorMessage!)),
-                  const SizedBox(height: 12),
-                ],
+                ConductInvestigationPanel(
+                    record: record,
+                    canDecide: SessionController.instance.currentUser?.role ==
+                        UserRole.owner,
+                    onSaved: _refresh),
+                const SizedBox(height: 14),
                 CarmelitaCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -743,8 +789,8 @@ class _StaffConductCaseDetailPageState
                         icon: Icons.link_outlined,
                       ),
                       InfoRow(
-                        label: 'Recorded cases',
-                        value: '${widget.repeatCount}',
+                        label: 'Recorded cases (including drafts)',
+                        value: '$recordedCaseCount',
                         icon: Icons.history_outlined,
                       ),
                       const Divider(height: 24),
@@ -918,13 +964,15 @@ class _StaffConductCaseDetailPageState
                               style:
                                   const TextStyle(fontWeight: FontWeight.w800),
                             ),
+                            ConductEvidencePreview(
+                                evidence: item, service: service),
                             if (item.caption.trim().isNotEmpty) ...[
                               const SizedBox(height: 5),
                               Text(item.caption),
                             ],
                             const SizedBox(height: 5),
                             Text(
-                              _conductDateTime(item.createdAt),
+                              '${_conductDateTime(item.createdAt)} \u00b7 Uploaded by ${item.uploadedBy}',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ],
@@ -1195,6 +1243,8 @@ class _TenantConductCaseDetailPageState
   List<ConductCaseWarning> warnings = const [];
   late final TableRefreshSubscription _detailSubscription;
   bool loading = true;
+  int refreshGeneration = 0;
+  String? errorMessage;
 
   @override
   void initState() {
@@ -1202,7 +1252,12 @@ class _TenantConductCaseDetailPageState
     _refresh();
     _detailSubscription = TableRefreshSubscription(
         'tenant-case-${record.id}',
-        ['conduct_cases', 'conduct_case_responses', 'conduct_case_warnings'],
+        [
+          'conduct_cases',
+          'conduct_case_responses',
+          'conduct_case_warnings',
+          'conduct_case_appeals'
+        ],
         _refresh);
   }
 
@@ -1213,16 +1268,22 @@ class _TenantConductCaseDetailPageState
   }
 
   Future<void> _refresh() async {
+    final request = ++refreshGeneration;
+    setState(() {
+      loading = true;
+      errorMessage = null;
+    });
     try {
       final allCases = await service.listMyCases();
       final latest = allCases.firstWhere(
         (item) => item.id == record.id,
-        orElse: () => record,
+        orElse: () => throw StateError(
+            'This conduct case is not available to your account'),
       );
       final latestResponses = await service.listMyResponses(record.id);
       final latestWarnings = await service.listMyWarnings(record.id);
 
-      if (!mounted) return;
+      if (!mounted || request != refreshGeneration) return;
       setState(() {
         record = latest;
         responses = latestResponses;
@@ -1230,7 +1291,11 @@ class _TenantConductCaseDetailPageState
         loading = false;
       });
     } catch (error) {
-      if (mounted) showAppSnackBar(context, conductCaseError(error));
+      if (!mounted || request != refreshGeneration) return;
+      setState(() {
+        loading = false;
+        errorMessage = conductCaseError(error);
+      });
     }
   }
 
@@ -1243,6 +1308,7 @@ class _TenantConductCaseDetailPageState
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
           title: const Text('Submit response'),
           content: SizedBox(
             width: 560,
@@ -1319,21 +1385,22 @@ class _TenantConductCaseDetailPageState
       title: record.title,
       subtitle: 'Conduct case',
       onRefresh: _refresh,
-      floatingActionButton: tenantCanRespondToConductCase(record.status)
+      floatingActionButton: !loading &&
+              errorMessage == null &&
+              tenantCanRespondToConductCase(record.status)
           ? FloatingActionButton.extended(
               onPressed: _respond,
               icon: const Icon(Icons.reply_outlined),
               label: const Text('Respond'),
             )
           : null,
-      child: loading
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 48),
-              child: Center(child: CircularProgressIndicator()),
-            )
+      child: loading || errorMessage != null
+          ? _conductDetailState(loading, errorMessage, _refresh)
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                ConductInvestigationPanel(record: record),
+                const SizedBox(height: 14),
                 CarmelitaCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
