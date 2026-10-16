@@ -438,8 +438,10 @@ class OwnerController extends ChangeNotifier {
     required String reason,
     String? notes,
     String? specificCategory,
+    String? requestId,
   }) async {
     final charge = await _paymentService.createAdditionalCharge(
+      requestId: requestId,
       tenantId: tenantId,
       title: title,
       category: category,
@@ -449,7 +451,7 @@ class OwnerController extends ChangeNotifier {
       specificCategory: specificCategory,
       notes: notes,
     );
-    _payments.insert(0, charge);
+    if (!_payments.any((p) => p.id == charge.id)) _payments.insert(0, charge);
     notifyListeners();
     return charge;
   }

@@ -1,3 +1,4 @@
+import '../../services/payment_service.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -762,7 +763,9 @@ class _BillingError extends StatelessWidget {
 class AdditionalChargeDialog extends StatefulWidget {
   final Future<List<DormitoryOption>> Function(String group)?
       categoryOptionsLoader;
-  const AdditionalChargeDialog({super.key, this.categoryOptionsLoader});
+  final PaymentService? paymentService;
+  const AdditionalChargeDialog(
+      {super.key, this.categoryOptionsLoader, this.paymentService});
 
   @override
   State<AdditionalChargeDialog> createState() => _AdditionalChargeDialogState();
@@ -780,6 +783,8 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
   DormitoryOption? _categoryOption;
   late DateTime _dueDate;
   bool _saving = false;
+  bool _submitted = false;
+  final _requestId = PaymentService.createRequestId();
 
   @override
   void initState() {
@@ -812,10 +817,17 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate() || _tenantId == null) return;
-    setState(() => _saving = true);
+    if (_saving || !_formKey.currentState!.validate() || _tenantId == null)
+      return;
+    setState(() {
+      _saving = true;
+      _submitted = true;
+    });
     try {
-      await OwnerController.instance.createAdditionalCharge(
+      final submit = widget.paymentService?.createAdditionalCharge ??
+          OwnerController.instance.createAdditionalCharge;
+      await submit(
+        requestId: _requestId,
         tenantId: _tenantId!,
         title: _title.text.trim(),
         category: _category,
@@ -831,7 +843,8 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
-      showAppSnackBar(context, 'Could not create charge: $error');
+      showAppSnackBar(context,
+          'Charge save was not confirmed. Retry with the same details, or close and refresh Billing to check whether it was saved. $error');
     }
   }
 
@@ -869,7 +882,7 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
                       .toList(),
                   validator: (value) =>
                       value == null ? 'Select a tenant' : null,
-                  onChanged: _saving
+                  onChanged: _saving || _submitted
                       ? null
                       : (value) => setState(() => _tenantId = value),
                 ),
@@ -879,7 +892,7 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
                   loadOptions: widget.categoryOptionsLoader,
                   label: 'Category',
                   value: _categoryOption?.code,
-                  enabled: !_saving,
+                  enabled: !_saving && !_submitted,
                   validator: (value) =>
                       value == null ? 'Select an active category' : null,
                   onChanged: (option) => setState(() {
@@ -903,7 +916,7 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
                   TextFormField(
                       key: const Key('additional-charge-specific-category'),
                       controller: _specificCategory,
-                      enabled: !_saving,
+                      enabled: !_saving && !_submitted,
                       maxLength: 120,
                       decoration:
                           const InputDecoration(labelText: 'Specify Category'),
@@ -914,6 +927,8 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
                 ],
                 TextFormField(
                   controller: _title,
+                  maxLength: 150,
+                  enabled: !_saving && !_submitted,
                   decoration: const InputDecoration(labelText: 'Charge title'),
                   validator: (value) => (value?.trim().length ?? 0) < 2
                       ? 'Enter a charge title'
@@ -922,6 +937,7 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _amount,
+                  enabled: !_saving && !_submitted,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
@@ -930,9 +946,12 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
                   ),
                   validator: (value) {
                     final amount = double.tryParse(value?.trim() ?? '');
-                    return amount == null || !amount.isFinite || amount <= 0
-                        ? 'Enter a valid amount'
-                        : null;
+                    if (amount == null || !amount.isFinite || amount <= 0)
+                      return 'Enter a valid amount';
+                    if (amount > 9999999999.99 ||
+                        !RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(value!.trim()))
+                      return 'Enter an amount with at most two decimals';
+                    return null;
                   },
                 ),
                 const SizedBox(height: 12),
@@ -942,11 +961,13 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
                   title: const Text('Due date'),
                   subtitle: Text(shortDate(_dueDate)),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: _saving ? null : _pickDueDate,
+                  onTap: _saving || _submitted ? null : _pickDueDate,
                 ),
                 const SizedBox(height: 4),
                 TextFormField(
                   controller: _reason,
+                  maxLength: 500,
+                  enabled: !_saving && !_submitted,
                   minLines: 2,
                   maxLines: 4,
                   decoration: const InputDecoration(
@@ -959,6 +980,7 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _notes,
+                  enabled: !_saving && !_submitted,
                   minLines: 2,
                   maxLines: 4,
                   decoration:

@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -10,6 +11,15 @@ import 'secure_media_service.dart';
 
 class PaymentService {
   const PaymentService();
+
+  static String createRequestId() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
 
   static const String _receiptBucket = 'payment-proofs';
   static const int _maximumPhotoBytes = 5 * 1024 * 1024; // 5 MB
@@ -296,9 +306,11 @@ class PaymentService {
     required String reason,
     String? notes,
     String? specificCategory,
+    String? requestId,
   }) async {
     _requireAuthId();
     final row = await _client.rpc('create_additional_charge', params: {
+      'p_request_id': requestId ?? createRequestId(),
       'p_tenant_id': tenantId,
       'p_title': title.trim(),
       'p_category': category.trim().toLowerCase(),
@@ -311,12 +323,13 @@ class PaymentService {
           : null,
     });
     final payment = Payment.fromJson(Map<String, dynamic>.from(row as Map));
-    unawaited(AppNotificationService.instance.notifyUtilityBillCreated(
-      tenantId: tenantId,
-      title: title.trim(),
-      amount: amount,
-      dueDate: _dateOnly(dueDate),
-    ));
+    if (row['charge_created'] == true)
+      unawaited(AppNotificationService.instance.notifyUtilityBillCreated(
+        tenantId: tenantId,
+        title: title.trim(),
+        amount: amount,
+        dueDate: _dateOnly(dueDate),
+      ));
     return payment;
   }
 
