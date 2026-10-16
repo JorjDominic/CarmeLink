@@ -4160,9 +4160,13 @@ class _MaintenanceReportsPageState extends State<MaintenanceReportsPage> {
 }
 
 class SubmitMaintenancePage extends StatefulWidget {
-  const SubmitMaintenancePage({super.key, this.report});
+  const SubmitMaintenancePage(
+      {super.key,
+      this.report,
+      this.configurationService = const DormitoryConfigurationService()});
 
   final MaintenanceReport? report;
+  final DormitoryConfigurationService configurationService;
 
   @override
   State<SubmitMaintenancePage> createState() => _SubmitMaintenancePageState();
@@ -4176,22 +4180,45 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
   late final TableRefreshSubscription _configurationSubscription;
   bool optionsLoading = true;
   String? optionsError;
+  int _optionsRequest = 0;
+  bool _optionsLoaded = false;
   Future<void> _loadOptions() async {
+    final request = ++_optionsRequest;
     setState(() {
       optionsLoading = true;
       optionsError = null;
     });
     try {
-      const service = DormitoryConfigurationService();
+      final service = widget.configurationService;
       final results = await Future.wait([
         service.options('maintenance_category'),
         service.options('common_area')
       ]);
       final rooms = await service.maintenanceRoomLocations();
-      if (!mounted) return;
+      if (!mounted || request != _optionsRequest) return;
       setState(() {
+        final previousCategoryId = _selectedCategoryOption?.id;
+        final previousLocationId = _selectedLocationOption?.id;
         categoryOptions = List<DormitoryOption>.from(results[0]);
         commonAreaOptions = List<DormitoryOption>.from(results[1]);
+        // Keep the user's choice across renames by identity, while preserving
+        // the original wording when editing an existing report.
+        if (!(editing && category == widget.report!.category) &&
+            previousCategoryId != null) {
+          category = categoryOptions
+                  .where((o) => o.id == previousCategoryId)
+                  .firstOrNull
+                  ?.label ??
+              '';
+        }
+        if (!(editing && location == widget.report!.location) &&
+            previousLocationId != null) {
+          location = commonAreaOptions
+                  .where((o) => o.id == previousLocationId)
+                  .firstOrNull
+                  ?.label ??
+              '';
+        }
         final categoryLabels = <String>[
           ...categoryOptions.map((option) => option.label),
           if (editing) widget.report!.category,
@@ -4205,15 +4232,17 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
         configuredLocations =
             DormitoryConfigurationService.sortLabels(locationLabels);
         if (!categories.contains(category)) {
-          category = categories.firstOrNull ?? '';
+          category = !_optionsLoaded ? categories.firstOrNull ?? '' : '';
         }
         if (!configuredLocations.contains(location)) {
-          location = configuredLocations.firstOrNull ?? '';
+          location =
+              !_optionsLoaded ? configuredLocations.firstOrNull ?? '' : '';
         }
+        _optionsLoaded = true;
         optionsLoading = false;
       });
     } catch (e) {
-      if (mounted)
+      if (mounted && request == _optionsRequest)
         setState(() {
           optionsLoading = false;
           optionsError =
@@ -4286,7 +4315,7 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
     location = report?.location ?? defaultLocation;
     _configurationSubscription = TableRefreshSubscription(
       'tenant-maintenance-options',
-      const ['dormitory_options'],
+      const ['dormitory_options', 'rooms'],
       _loadOptions,
       catchUpInterval: const Duration(seconds: 15),
     );
@@ -4551,6 +4580,7 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
   @override
   Widget build(BuildContext context) => PageFrame(
         title: editing ? 'Edit report' : 'New report',
+        onRefresh: _loadOptions,
         subtitle: editing
             ? 'Update this report while it is still pending'
             : 'Describe the issue and exact location',
@@ -4560,6 +4590,11 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (optionsLoading) const LinearProgressIndicator(),
+              if (!optionsLoading &&
+                  optionsError == null &&
+                  (categories.isEmpty || configuredLocations.isEmpty))
+                const Text(
+                    'No report choices are available. Contact the owner.'),
               if (optionsError != null)
                 ListTile(
                     title: Text(optionsError!),
@@ -4568,17 +4603,19 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
                         icon: const Icon(Icons.refresh))),
               DropdownButtonFormField<String>(
                 key: ValueKey('category-$category-${categories.join('|')}'),
+                isExpanded: true,
                 initialValue: category.isEmpty ? null : category,
                 decoration: const InputDecoration(labelText: 'Issue category'),
                 items: categories
                     .map(
                       (value) => DropdownMenuItem(
                         value: value,
-                        child: Text(value),
+                        child: Text(value,
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                     )
                     .toList(),
-                onChanged: saving
+                onChanged: saving || optionsLoading || optionsError != null
                     ? null
                     : (value) => setState(() {
                           category = value ?? category;
@@ -4628,7 +4665,7 @@ class _SubmitMaintenancePageState extends State<SubmitMaintenancePage> {
                       ),
                     )
                     .toList(),
-                onChanged: saving
+                onChanged: saving || optionsLoading || optionsError != null
                     ? null
                     : (value) => setState(() {
                           location = value ?? location;
@@ -7435,7 +7472,11 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
 }
 
 class ConfidentialConcernPage extends StatefulWidget {
-  const ConfidentialConcernPage({super.key});
+  const ConfidentialConcernPage(
+      {super.key,
+      this.configurationService = const DormitoryConfigurationService()});
+
+  final DormitoryConfigurationService configurationService;
 
   @override
   State<ConfidentialConcernPage> createState() =>
@@ -7448,25 +7489,32 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
   DormitoryOption? selectedType;
   String? choicesError;
   bool choicesLoading = true;
+  int _choicesRequest = 0;
+  bool _choicesLoaded = false;
   late final TableRefreshSubscription _configurationSubscription;
   final specificConcern = TextEditingController();
   Future<void> _loadReportTypes() async {
+    final request = ++_choicesRequest;
+    setState(() {
+      choicesLoading = true;
+      choicesError = null;
+    });
     try {
-      final result =
-          await const DormitoryConfigurationService().options('report_type');
-      if (!mounted) return;
+      final result = await widget.configurationService.options('report_type');
+      if (!mounted || request != _choicesRequest) return;
       setState(() {
         final selectedId = selectedType?.id;
         reportTypes = result;
         selectedType =
             result.where((option) => option.id == selectedId).firstOrNull ??
-                result.firstOrNull;
+                (!_choicesLoaded ? result.firstOrNull : null);
         category = selectedType?.categoryCode ?? 'other';
         choicesLoading = false;
         choicesError = null;
+        _choicesLoaded = true;
       });
     } catch (e) {
-      if (mounted)
+      if (mounted && request == _choicesRequest)
         setState(() {
           choicesLoading = false;
           choicesError = 'Could not load report types. Please retry.';
@@ -7572,6 +7620,10 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
     return PageFrame(
       title: 'Concern',
       subtitle: 'Safety, rules, or roommate concerns',
+      onRefresh: () async {
+        await _loadReportTypes();
+        await TenantController.instance.loadConcerns(force: true);
+      },
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720),
         child: Column(
@@ -7625,6 +7677,8 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
             ),
             const SizedBox(height: 14),
             if (choicesLoading) const LinearProgressIndicator(),
+            if (!choicesLoading && choicesError == null && reportTypes.isEmpty)
+              const Text('No report types are available. Contact the owner.'),
             if (choicesError != null)
               ListTile(
                   title: Text(choicesError!),
@@ -7633,13 +7687,16 @@ class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
                       icon: const Icon(Icons.refresh))),
             DropdownButtonFormField<String>(
               key: ValueKey(selectedType?.id),
+              isExpanded: true,
               initialValue: selectedType?.id,
               decoration: const InputDecoration(labelText: 'Report type'),
               items: reportTypes
-                  .map((o) =>
-                      DropdownMenuItem(value: o.id, child: Text(o.label)))
+                  .map((o) => DropdownMenuItem(
+                      value: o.id,
+                      child: Text(o.label,
+                          maxLines: 1, overflow: TextOverflow.ellipsis)))
                   .toList(),
-              onChanged: saving
+              onChanged: saving || choicesLoading || choicesError != null
                   ? null
                   : (id) => setState(() {
                         selectedType =

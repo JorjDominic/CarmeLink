@@ -241,7 +241,12 @@ class DormitoryConfigurationService {
         .select('id,label')
         .eq('group_key', groupKey)
         .eq('is_active', true)
-        .ilike('label', normalized)
+        .ilike(
+            'label',
+            normalized
+                .replaceAll(r'\', r'\\')
+                .replaceAll('%', r'\%')
+                .replaceAll('_', r'\_'))
         .limit(1);
     if (rows.isEmpty) return null;
     return rows.first['id'] as String;
