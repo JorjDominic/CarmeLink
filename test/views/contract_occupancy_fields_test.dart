@@ -67,7 +67,7 @@ void main() {
       expect(find.text('Tenant 0: PHP 6000.00 / month'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('occupancy-mode-solo')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Shared Occupancy').last);
+      await tester.tap(find.text('Exclusive Shared').last);
       await tester.pumpAndSettle();
       expect(key.currentState!.validate(), isFalse);
       await tester.pump();

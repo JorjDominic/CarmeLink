@@ -106,7 +106,7 @@ void main() {
       expect(r.physicallyAvailable, 0);
       expect(r.availability, 'reserved');
       expect(r.occupancyLabel,
-          n == 1 ? 'Solo Occupied' : 'Shared – Fully Reserved');
+          n == 1 ? 'Solo Occupied' : 'Exclusive Shared – Fully Reserved');
       expect(r.occupancy!.members.length, n);
       expect(r.occupancy!.totalRentCents, 600000);
     });
@@ -115,7 +115,7 @@ void main() {
     expect(room(count: 1, occupancy: group(1, status: 'draft')).occupancyLabel,
         'Solo Reserved – Signing Pending');
     expect(room(count: 2, occupancy: group(2, status: 'draft')).occupancyLabel,
-        'Shared Reserved – Signing Pending');
+        'Exclusive Shared Reserved – Signing Pending');
     expect(room(reserved: true).physicallyAvailable, 0);
     expect(room(reserved: true).occupancyLabel, 'Contract Reserved');
   });
@@ -137,7 +137,7 @@ void main() {
     expect(
         r.occupancy!.members.map((m) => m.rentCents), [200000, 200000, 200000]);
     expect(r.physicallyAvailable, 0);
-    expect(r.occupancyLabel, 'Shared – Fully Reserved');
+    expect(r.occupancyLabel, 'Exclusive Shared – Fully Reserved');
   });
   test(
       'filters combine reservation mode floor and current assigned tenant name',
@@ -261,7 +261,7 @@ void main() {
     await tester.ensureVisible(find.text('101'));
     await tester.tap(find.text('101'));
     await tester.pumpAndSettle();
-    expect(find.text('Shared – Fully Reserved'), findsOneWidget);
+    expect(find.text('Exclusive Shared – Fully Reserved'), findsOneWidget);
     expect(find.text('No beds currently available'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -289,7 +289,8 @@ void main() {
     await tester.tap(find.text('Occupancy history'));
     await tester.pumpAndSettle();
     expect(service.historyReads, 1);
-    expect(find.text('Shared arrangement • Released'), findsOneWidget);
+    expect(
+        find.text('Exclusive Shared arrangement • Released'), findsOneWidget);
     expect(find.textContaining('CTR-0 • terminated'), findsOneWidget);
     expect(find.textContaining('2026-10-13 to 2026-10-15'), findsOneWidget);
     expect(find.textContaining('PHP'), findsNothing);

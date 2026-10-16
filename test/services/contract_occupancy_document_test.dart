@@ -50,7 +50,7 @@ void main() {
     });
     final rows =
         const ContractDocumentService().occupancyDocumentRows(contract);
-    expect(rows['Occupancy arrangement'], 'Shared');
+    expect(rows['Occupancy arrangement'], 'Exclusive Shared');
     expect(rows['Total agreed monthly room rental'], 'PHP 100.00');
     expect(rows['Individual monthly rental obligation'], 'PHP 33.34');
     expect(rows['Assigned bed'], 'Bed A');

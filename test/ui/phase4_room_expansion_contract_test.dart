@@ -4,7 +4,8 @@ import 'package:carmelitas_dormitory_system/core/utils/natural_sort.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('room expansion remains owner controlled and preserves four beds', () {
+  test('room expansion remains owner controlled with four beds as the default',
+      () {
     final service = File(
       'lib/services/room_service.dart',
     ).readAsStringSync();
@@ -17,12 +18,14 @@ void main() {
       'supabase/migrations/202610070009_room_expansion_and_dynamic_capacity.sql',
     ).readAsStringSync();
 
-    expect(service, contains("rpc('create_room_with_four_beds'"));
+    expect(service, contains("'create_room_with_four_beds'"));
+    expect(service, contains("'create_room_with_capacity'"));
+    expect(service, contains("int capacity = 4"));
     expect(page, contains("label: const Text('Add room')"));
     expect(
       page,
       contains(
-        'Four fixed bed spaces will be created automatically.',
+        'Physical bed capacity',
       ),
     );
     expect(page, contains('UserRole.owner'));

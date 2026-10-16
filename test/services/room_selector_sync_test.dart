@@ -63,12 +63,13 @@ void main() {
       } else if (path == 'create_room_floor') {
         floors.add(body['p_name'] as String);
         result = body['p_name'];
-      } else if (path == 'create_room_with_four_beds') {
+      } else if (path == 'create_room_with_four_beds' ||
+          path == 'create_room_with_capacity') {
         room = {
           'id': 'room-id',
           'room_number': body['p_room_number'],
           'floor': body['p_floor'],
-          'capacity': 4,
+          'capacity': body['p_capacity'] ?? 4,
           'description': '',
           'is_active': true
         };
@@ -94,7 +95,7 @@ void main() {
         }
         result = [
           if (room != null && (!availableQuery || room!['is_active'] == true))
-            for (var i = 0; i < 4; i++)
+            for (var i = 0; i < (room!['capacity'] as int); i++)
               {
                 'id': 'bed-$i',
                 'room_id': 'room-id',
@@ -152,6 +153,25 @@ void main() {
     expect(await tenants.loadAvailableBeds(), isEmpty);
     await rooms.deleteFloor('Upper');
     expect(await rooms.listFloors(), ['Ground']);
+  });
+  test(
+      'custom capacity reaches the creation RPC and refreshes physical bed selectors',
+      () async {
+    failSave = false;
+    await const RoomService().createRoom(
+        number: 'Expanded',
+        floor: 'Ground',
+        description: 'Approved arrangement',
+        capacity: 6);
+    final expanded =
+        (await const RoomService().listRooms(forceRefresh: true)).single;
+    expect(expanded.capacity, 6);
+    expect(expanded.beds, hasLength(6));
+    expect(await const TenantService().loadAvailableBeds(), hasLength(6));
+    await expectLater(
+        const RoomService().createRoom(
+            number: 'Invalid', floor: 'Ground', description: '', capacity: 0),
+        throwsArgumentError);
   });
   test('assignment success invalidates room cache; failure keeps known data',
       () async {

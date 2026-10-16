@@ -14,10 +14,11 @@ void main() {
   var status = 'draft';
   var released = false;
   var failSummary = false;
+  var standard = false;
   Map<String, dynamic> summary() => {
         'id': 'group',
         'room_id': 'room',
-        'mode': 'shared',
+        'mode': standard ? 'standard_shared' : 'shared',
         'released': released,
         'starts_on': '2026-10-13',
         'ends_on': '2027-10-12',
@@ -140,7 +141,7 @@ void main() {
     expect(draft.beds.last.status, 'reserved');
     status = 'active';
     final active = (await service.listRooms(forceRefresh: true)).single;
-    expect(active.occupancyLabel, 'Shared – Fully Reserved');
+    expect(active.occupancyLabel, 'Exclusive Shared – Fully Reserved');
     assigned = 2;
     final departed = (await service.listRooms(forceRefresh: true)).single;
     expect(departed.occupied, 2);
@@ -160,6 +161,19 @@ void main() {
     final assignments = await service.listAssignmentHistory('room');
     expect(assignments.length, 2);
     expect(assignments.first.name, 'Tenant 0');
+  });
+  test(
+      'Standard Shared projection leaves unused beds available and aggregates incoming contracts',
+      () async {
+    standard = true;
+    released = false;
+    assigned = 2;
+    final room =
+        (await const RoomService().listRooms(forceRefresh: true)).single;
+    expect(room.hasReservation, isFalse);
+    expect(room.physicallyAvailable, 2);
+    expect(room.beds.last.status, 'available');
+    expect(room.occupancyLabel, 'Standard Shared – Available');
   });
   test(
       'missing migration fails the load and retains previous cache for an explicit stale-data warning',

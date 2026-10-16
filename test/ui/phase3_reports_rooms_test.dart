@@ -33,7 +33,9 @@ class _Rooms extends RoomService {
       {required String id,
       required String number,
       required String floor,
-      required String description}) async {
+      required String description,
+      int? capacity,
+      int? expectedCapacity}) async {
     if (fail) throw StateError('Persistence failed');
     saved = {'id': id, 'number': number, 'floor': floor};
   }
