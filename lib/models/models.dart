@@ -109,6 +109,8 @@ class Payment {
     this.specificCategory,
     this.latestTransactionId,
     this.latestTransactionStatus,
+    this.latestGatewaySessionId,
+    this.testVerifiedAmount = 0,
     this.hasDueDate = true,
     this.paymentMethod,
     this.receiptPath,
@@ -138,6 +140,9 @@ class Payment {
   final String label;
   final String category;
   final String? specificCategory, latestTransactionId, latestTransactionStatus;
+  final String? latestGatewaySessionId;
+  final double testVerifiedAmount;
+  bool get isGatewayPayment => latestGatewaySessionId != null;
   final bool hasDueDate;
   String get categoryLabel =>
       category == 'other' && specificCategory?.trim().isNotEmpty == true
@@ -214,11 +219,14 @@ class Payment {
 
   double get outstandingAmount => remainingBalance ?? (isVerified ? 0 : amount);
   double get collectedAmount {
-    if (verifiedAmount != null) return verifiedAmount!;
+    if (verifiedAmount != null)
+      return (verifiedAmount! - testVerifiedAmount)
+          .clamp(0, double.infinity)
+          .toDouble();
     if (isVoided) return 0;
     if (remainingBalance == null && status.toLowerCase() == 'paid')
-      return amount;
-    return (amount - outstandingAmount).clamp(0, amount);
+      return (amount - testVerifiedAmount).clamp(0, amount);
+    return (amount - outstandingAmount - testVerifiedAmount).clamp(0, amount);
   }
 
   bool get isOverdue {
@@ -247,6 +255,8 @@ class Payment {
     String? specificCategory,
     String? latestTransactionId,
     String? latestTransactionStatus,
+    String? latestGatewaySessionId,
+    double? testVerifiedAmount,
     bool? hasDueDate,
     double? amount,
     DateTime? dueDate,
@@ -282,6 +292,9 @@ class Payment {
       latestTransactionId: latestTransactionId ?? this.latestTransactionId,
       latestTransactionStatus:
           latestTransactionStatus ?? this.latestTransactionStatus,
+      latestGatewaySessionId:
+          latestGatewaySessionId ?? this.latestGatewaySessionId,
+      testVerifiedAmount: testVerifiedAmount ?? this.testVerifiedAmount,
       hasDueDate: hasDueDate ?? this.hasDueDate,
       amount: amount ?? this.amount,
       dueDate: dueDate ?? this.dueDate,
@@ -379,6 +392,9 @@ class Payment {
       specificCategory: json['specific_category'] as String?,
       latestTransactionId: json['latest_transaction_id'] as String?,
       latestTransactionStatus: json['latest_transaction_status'] as String?,
+      latestGatewaySessionId: json['latest_gateway_session_id'] as String?,
+      testVerifiedAmount:
+          (json['test_verified_amount'] as num?)?.toDouble() ?? 0,
       hasDueDate: rawDueDate is String && DateTime.tryParse(rawDueDate) != null,
       amount: parsedAmount,
       dueDate: parsedDueDate,
@@ -418,6 +434,9 @@ class Payment {
           'latest_transaction_id': latestTransactionId,
         if (latestTransactionStatus != null)
           'latest_transaction_status': latestTransactionStatus,
+        'test_verified_amount': testVerifiedAmount,
+        if (latestGatewaySessionId != null)
+          'latest_gateway_session_id': latestGatewaySessionId,
         'amount': amount,
         'due_date': hasDueDate
             ? '${dueDate.year.toString().padLeft(4, '0')}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}'

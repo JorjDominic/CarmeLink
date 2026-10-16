@@ -1,3 +1,4 @@
+import '../shared/payment_receipt_history.dart';
 import '../../core/widgets/configured_choice_field.dart';
 import '../../core/config/supabase_config.dart';
 import '../../services/payment_collection_settings_service.dart';
@@ -2398,6 +2399,18 @@ class _TenantPaymentCard extends StatelessWidget {
                     );
                   },
                 ),
+              ],
+              if (!payment.isDeposit &&
+                  (payment.collectedAmount > 0 ||
+                      payment.testVerifiedAmount > 0)) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                    onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (_) =>
+                            PaymentReceiptHistoryDialog(chargeId: payment.id)),
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: const Text('Payment receipts')),
               ],
             ],
           ),

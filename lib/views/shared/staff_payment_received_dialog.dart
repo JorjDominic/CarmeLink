@@ -139,7 +139,7 @@ class _StaffPaymentReceivedDialogState
       _error = null;
     });
     try {
-      final payment = await const PaymentService().recordReceivedPayment(
+      await const PaymentService().recordReceivedPayment(
         requestId: _requestId,
         paymentId: _bill!.id,
         amount: double.parse(_amount.text.trim()),
@@ -156,20 +156,20 @@ class _StaffPaymentReceivedDialogState
             context: context,
             builder: (context) => AlertDialog(
                   title: const Text('Payment receipt'),
-                  content: Text('Receipt ${_reference.text} saved.'),
+                  content: Text(
+                      'Payment recorded. Reference: ${_reference.text}. You can retrieve and print its saved receipt below.'),
                   actions: [
                     TextButton(
                         onPressed: () async {
                           try {
-                            await const ReceiptPrintService().printPayment(
-                                payment,
-                                amount: double.parse(_amount.text),
-                                reference: _reference.text,
-                                receivedOn: _receivedOn);
+                            const printer = ReceiptPrintService();
+                            final receipt =
+                                await printer.loadStaffRequest(_requestId);
+                            await printer.printStoredReceipt(receipt);
                           } catch (error) {
                             if (context.mounted)
-                              showAppSnackBar(
-                                  context, 'Could not print receipt: $error');
+                              showAppSnackBar(context,
+                                  'Payment remains recorded. Could not print receipt; retry safely. $error');
                           }
                         },
                         child: const Text('Print receipt')),

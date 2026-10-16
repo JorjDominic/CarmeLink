@@ -315,7 +315,9 @@ class DormitoryReportService {
                           p.hasDueDate
                               ? _formatDate(p.dueDate)
                               : 'Not specified',
-                          p.paymentMethod ?? 'Not recorded',
+                          p.testVerifiedAmount > 0
+                              ? '${p.paymentMethod ?? 'Not recorded'} (TEST credits excluded)'
+                              : p.paymentMethod ?? 'Not recorded',
                           _formatCurrency(p.amount),
                           _formatCurrency(p.collectedAmount),
                           _formatCurrency(p.isVoided ? 0 : p.outstandingAmount),

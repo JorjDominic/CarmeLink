@@ -1,3 +1,4 @@
+import '../shared/payment_receipt_history.dart';
 import '../shared/confidentiality_agreements_page.dart';
 import '../../services/dormitory_configuration_service.dart';
 import '../../core/utils/financial_snapshot.dart';
@@ -34,7 +35,6 @@ import '../../services/boundary_config_service.dart';
 import '../../services/geofence_service.dart';
 import '../../services/gate_service.dart';
 import '../../services/payment_service.dart';
-import '../../services/receipt_print_service.dart';
 import '../../services/tenant_service.dart';
 import '../../services/announcement_service.dart';
 import '../../services/table_refresh_subscription.dart';
@@ -3868,6 +3868,13 @@ class _PaymentReviewCard extends StatelessWidget {
           const SizedBox(height: 10),
 
           Text('Method: ${payment.paymentMethod ?? 'Not recorded'}'),
+          if (payment.isGatewayPayment && payment.isProofVerified)
+            const Text('Automatically verified by PayMongo'),
+          if (!payment.isGatewayPayment && payment.isProofVerified)
+            const Text('Verified by staff'),
+          if (payment.testVerifiedAmount > 0)
+            const Text(
+                'Includes TEST TRANSACTION credits - excluded from actual collections'),
           Text('Submitted: ${_dateOrNone(payment.paidAt)}'),
           Text(
               'Bill total: ${money(payment.amount)} • Remaining: ${money(payment.outstandingAmount)}'),
@@ -3946,40 +3953,19 @@ class _PaymentReviewCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          if (payment.submittedAmount != null &&
-              payment.submittedAmount! > 0 &&
-              payment.reference?.isNotEmpty == true &&
-              payment.reviewedAt != null &&
-              payment.isProofVerified)
+          if (payment.collectedAmount > 0 || payment.testVerifiedAmount > 0)
             Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                icon: const Icon(Icons.print_outlined),
-                label: const Text('Print receipt'),
-                onPressed: () async {
-                  try {
-                    final receipt = await const PaymentService()
-                        .latestConfirmedReceipt(payment.id);
-                    if (receipt == null ||
-                        (receipt['reference_number'] as String?)?.isNotEmpty !=
-                            true) {
-                      throw Exception(
-                          'No confirmed receipt with a reference is available.');
-                    }
-                    const printer = ReceiptPrintService();
-                    final stored =
-                        await printer.loadTransaction(receipt['id'] as String);
-                    await printer.printStoredReceipt(stored);
-                  } catch (error) {
-                    if (context.mounted)
-                      showAppSnackBar(
-                          context, 'Could not print receipt: $error');
-                  }
-                },
-              ),
-            ),
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.print_outlined),
+                  label: const Text('Print receipt'),
+                  onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (_) =>
+                          PaymentReceiptHistoryDialog(chargeId: payment.id)),
+                )),
+          const SizedBox(height: 12),
 
-          // RECEIPT PROOF IMAGE SECTION
           _ReceiptProofThumbnail(
             receiptPath: payment.receiptPath,
             onTapFullscreen: onOpenReceipt,

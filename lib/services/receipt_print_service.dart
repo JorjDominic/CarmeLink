@@ -21,7 +21,8 @@ class PaymentReceipt {
       required this.verifiedAt,
       required this.receivedAt,
       required this.environment,
-      required this.balanceAfter});
+      required this.balanceAfter,
+      this.snapshotSource = 'legacy'});
   final String id,
       number,
       tenantId,
@@ -31,6 +32,7 @@ class PaymentReceipt {
       reference,
       method,
       environment;
+  final String snapshotSource;
   final double amount, balanceAfter;
   final DateTime verifiedAt, receivedAt;
   bool get isTest => environment == 'test';
@@ -47,6 +49,7 @@ class PaymentReceipt {
       reference: row['reference_number'] as String,
       method: row['payment_method'] as String,
       environment: row['environment'] as String,
+      snapshotSource: row['snapshot_source'] as String? ?? 'legacy',
       verifiedAt: DateTime.parse(row['verified_at'] as String).toLocal(),
       receivedAt: DateTime.parse(row['received_at'] as String).toLocal(),
       balanceAfter: (row['balance_after'] as num).toDouble());
@@ -55,6 +58,39 @@ class PaymentReceipt {
 /// Uses the platform print dialog, including installed receipt printers.
 class ReceiptPrintService {
   const ReceiptPrintService();
+
+  Future<List<PaymentReceipt>> listForCharge(String chargeId) async {
+    final ids = <String>[];
+    for (var offset = 0;; offset += 200) {
+      final rows = await SupabaseConfig.client
+          .from('payment_transactions')
+          .select('id')
+          .eq('charge_id', chargeId)
+          .eq('status', 'verified')
+          .order('reviewed_at', ascending: false)
+          .order('id')
+          .range(offset, offset + 199);
+      ids.addAll(rows.map((row) => row['id'] as String));
+      if (rows.length < 200) break;
+    }
+    final receipts = <PaymentReceipt>[];
+    for (final id in ids) {
+      receipts.add(await loadTransaction(id));
+    }
+    return receipts;
+  }
+
+  Future<PaymentReceipt> loadStaffRequest(String requestId) async {
+    final row = await SupabaseConfig.client
+        .from('payment_transactions')
+        .select('id')
+        .eq('staff_request_id', requestId)
+        .eq('status', 'verified')
+        .maybeSingle();
+    if (row == null)
+      throw StateError('Confirmed payment receipt is not available yet.');
+    return loadTransaction(row['id'] as String);
+  }
 
   Future<PaymentReceipt> loadTransaction(String transactionId) async {
     final result = await SupabaseConfig.client.rpc('get_payment_receipt',
@@ -79,7 +115,13 @@ class ReceiptPrintService {
           receivedOn: receipt.receivedAt,
           receiptNumber: receipt.number,
           verifiedAt: receipt.verifiedAt,
-          isTest: receipt.isTest);
+          isTest: receipt.isTest,
+          balanceLabel: receipt.snapshotSource == 'verification'
+              ? 'Balance after this payment'
+              : receipt.snapshotSource == 'recovery'
+                  ? 'Balance when receipt was recovered'
+                  : 'Balance recorded on receipt',
+          recoveredDetails: receipt.snapshotSource == 'recovery');
 
   Future<void> printStoredReceipt(PaymentReceipt receipt,
       {Uint8List? bytes}) async {
@@ -99,6 +141,8 @@ class ReceiptPrintService {
     String? receiptNumber,
     DateTime? verifiedAt,
     bool? isTest,
+    String? balanceLabel,
+    bool recoveredDetails = false,
   }) async {
     if (!amount.isFinite || amount <= 0 || reference.trim().isEmpty) {
       throw ArgumentError(
@@ -118,6 +162,8 @@ class ReceiptPrintService {
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
         pw.Divider(),
         pw.Text('Receipt: ${receiptNumber ?? reference}'),
+        if (recoveredDetails)
+          pw.Text('Account and bill details captured at receipt recovery.'),
         if (receiptNumber != null) pw.Text('Payment reference: $reference'),
         pw.Text('Received: ${receivedOn.toIso8601String().substring(0, 10)}'),
         if (verifiedAt != null)
@@ -130,7 +176,7 @@ class ReceiptPrintService {
         pw.Text('Amount received: PHP ${amount.toStringAsFixed(2)}',
             style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
         pw.Text(
-            '${receiptNumber == null ? 'Current bill balance' : 'Balance after this payment'}: PHP ${payment.outstandingAmount.toStringAsFixed(2)}'),
+            '${balanceLabel ?? (receiptNumber == null ? 'Current bill balance' : 'Balance after this payment')}: PHP ${payment.outstandingAmount.toStringAsFixed(2)}'),
         pw.SizedBox(height: 12),
         pw.Text('Thank you. Keep this receipt for your records.'),
       ],

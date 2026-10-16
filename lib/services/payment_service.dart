@@ -22,7 +22,7 @@ class PaymentService {
       'payment_method, reference_number, receipt_path, paid_at, '
       'reviewed_by, reviewed_at, review_notes, created_at, updated_at, '
       'remaining_balance, period_start, period_end, source, latest_transaction_id, '
-      'tenant_name, submitted_amount, notes, created_by, contract_amount, rent_adjustment, deposit_applied_amount, verified_amount, specific_category, latest_transaction_status';
+      'tenant_name, submitted_amount, notes, created_by, contract_amount, rent_adjustment, deposit_applied_amount, verified_amount, specific_category, latest_transaction_status, test_verified_amount, latest_gateway_session_id';
 
   static const String _source = 'billing_charge_summaries';
 
@@ -43,31 +43,35 @@ class PaymentService {
   // Tenant Flow
   // ===========================================================================
 
-  /// Fetches all payment records for the currently authenticated tenant.
-  Future<List<Payment>> listOwnPayments() async {
-    final tenantId = _requireAuthId();
-    final rows = await _client
-        .from(_source)
-        .select(_columns)
-        .eq('tenant_id', tenantId)
-        .order('due_date', ascending: false);
-    return rows
-        .map<Payment>((row) => Payment.fromJson(row))
-        .toList(growable: false);
+  Future<List<Payment>> _readPayments(
+      {String? tenantId,
+      String? status,
+      String orderColumn = 'due_date'}) async {
+    final payments = <String, Payment>{};
+    for (var offset = 0;; offset += 200) {
+      var query = _client.from(_source).select(_columns);
+      if (tenantId != null) query = query.eq('tenant_id', tenantId);
+      if (status != null) query = query.eq('status', status);
+      final rows = await query
+          .order(orderColumn, ascending: false)
+          .order('id')
+          .range(offset, offset + 199);
+      for (final row in rows) {
+        final payment = Payment.fromJson(row);
+        payments[payment.id] = payment;
+      }
+      if (rows.length < 200) break;
+    }
+    return payments.values.toList(growable: false);
   }
 
-  /// Fetches all payment records for a specific tenant ID.
-  /// Allowed for guardians (if linked to the tenant) or staff members by RLS.
-  Future<List<Payment>> listPaymentsForTenant(String tenantId) async {
-    final rows = await _client
-        .from(_source)
-        .select(_columns)
-        .eq('tenant_id', tenantId)
-        .order('due_date', ascending: false);
-    return rows
-        .map<Payment>((row) => Payment.fromJson(row))
-        .toList(growable: false);
-  }
+  /// Fetches all payment records for the currently authenticated tenant.
+  Future<List<Payment>> listOwnPayments() async =>
+      _readPayments(tenantId: _requireAuthId());
+
+  /// Guardian links and staff/tenant scope continue to be enforced by RLS.
+  Future<List<Payment>> listPaymentsForTenant(String tenantId) =>
+      _readPayments(tenantId: tenantId);
 
   /// Submits proof of payment (GCash/bank reference + optional receipt photo).
   Future<Payment> submitPaymentProof({
@@ -130,48 +134,20 @@ class PaymentService {
   // ===========================================================================
 
   /// Fetches payment records for a linked tenant (ward).
-  Future<List<Payment>> listGuardianTenantPayments(String tenantId) async {
-    final rows = await _client
-        .from(_source)
-        .select(_columns)
-        .eq('tenant_id', tenantId)
-        .order('due_date', ascending: false);
-    return rows
-        .map<Payment>((row) => Payment.fromJson(row))
-        .toList(growable: false);
-  }
+  Future<List<Payment>> listGuardianTenantPayments(String tenantId) =>
+      _readPayments(tenantId: tenantId);
 
-  // ===========================================================================
-  // Owner & Caretaker Flow
-  // ===========================================================================
+  // Owner/Caretaker reads keep the existing backend role restrictions.
+  Future<List<Payment>> listPendingVerifications() =>
+      _readPayments(status: 'pending_verification', orderColumn: 'created_at');
 
-  /// Lists all pending payment verifications for staff review.
-  Future<List<Payment>> listPendingVerifications() async {
-    final rows = await _client
-        .from(_source)
-        .select(_columns)
-        .eq('status', 'pending_verification')
-        .order('created_at', ascending: false);
-    return rows.map<Payment>((row) {
-      return Payment.fromJson(row);
-    }).toList(growable: false);
-  }
-
-  /// Lists all payments across all tenants with optional status and search filters.
-  Future<List<Payment>> listAllPayments({String? statusFilter}) async {
-    var query = _client.from(_source).select(_columns);
-
-    if (statusFilter != null &&
-        statusFilter.isNotEmpty &&
-        statusFilter != 'all') {
-      query = query.eq('status', Payment.toDbStatus(statusFilter));
-    }
-
-    final rows = await query.order('due_date', ascending: false);
-    return rows.map<Payment>((row) {
-      return Payment.fromJson(row);
-    }).toList(growable: false);
-  }
+  Future<List<Payment>> listAllPayments({String? statusFilter}) =>
+      _readPayments(
+          status: statusFilter == null ||
+                  statusFilter.isEmpty ||
+                  statusFilter == 'all'
+              ? null
+              : Payment.toDbStatus(statusFilter));
 
   /// Records a staff-collected payment and its private receipt evidence.
   Future<Payment> recordReceivedPayment({
