@@ -13,8 +13,18 @@ export function gatewayConfig(env: (name: string) => string | undefined): Gatewa
   const secretKey = env('PAYMONGO_SECRET_KEY') ?? ''
   const webhookSecret = env('PAYMONGO_WEBHOOK_SECRET') ?? ''
   const prefix = environment === 'live' ? 'live' : 'test'
+  const deployment = env('PAYMONGO_DEPLOYMENT_ENVIRONMENT') ?? 'production'
+  const project = env('SUPABASE_URL')?.replace(/\/$/, '')
+  const testProject = env('PAYMONGO_TEST_SUPABASE_URL')?.replace(/\/$/, '')
+  let sandbox = false
+  try {
+    const url = new URL(project ?? '')
+    sandbox = ['local', 'staging'].includes(deployment) && project === testProject
+      && (url.protocol === 'https:' || (deployment === 'local' && url.protocol === 'http:'))
+  } catch { /* Missing/invalid project configuration fails closed. */ }
   const ready = publicKey.startsWith(`pk_${prefix}_`) && secretKey.startsWith(`sk_${prefix}_`)
-    && webhookSecret.length > 0 && (environment === 'test' || env('PAYMONGO_ALLOW_LIVE') === 'true')
+    && webhookSecret.length > 0 && (environment === 'test' ? sandbox
+      : deployment === 'production' && env('PAYMONGO_ALLOW_LIVE') === 'true')
   return { environment, publicKey, secretKey, webhookSecret, ready }
 }
 export type Session = {
@@ -26,6 +36,7 @@ export type Session = {
 export class PayMongoClient {
   constructor(readonly config: GatewayConfig, readonly fetcher: typeof fetch = fetch) {}
   async request(path: string, method = 'GET', attributes?: unknown, key?: string, publicAuth = false): Promise<any> {
+    if (!this.config.ready) throw new GatewayError('Payment environment is not configured for this project.', 503)
     const response = await this.fetcher(`https://api.paymongo.com/v1/${path}`, {
       method,
       headers: {
@@ -55,7 +66,8 @@ export function validateIntent(payload: any, session: Session) {
     || a?.amount !== Number(session.amount_centavos) || a?.currency !== 'PHP'
     || a?.livemode !== (session.environment === 'live')
     || a?.metadata?.gateway_session_id !== session.id
-    || a?.metadata?.charge_id !== session.charge_id) {
+    || a?.metadata?.charge_id !== session.charge_id
+    || (a?.metadata?.tenant_id !== undefined && a.metadata.tenant_id !== session.tenant_id)) {
     throw new GatewayError('Provider payment does not match this bill', 409)
   }
   return a

@@ -47,7 +47,7 @@ export async function generatePaymentQr(admin: any, client: PayMongoClient, orig
       payload = await client.request('payment_intents', 'POST', {
         amount: Number(session.amount_centavos), currency: 'PHP', payment_method_allowed: ['qrph'],
         description: `Dormitory bill ${session.charge_id}`,
-        metadata: { gateway_session_id: session.id, charge_id: session.charge_id },
+        metadata: { gateway_session_id: session.id, charge_id: session.charge_id, tenant_id: session.tenant_id },
       }, `${session.id}:intent`)
       if (!/^pi_[A-Za-z0-9]+$/.test(payload?.data?.id)) throw new GatewayError('Could not create the payment request', 502)
       await save({ provider_intent_id: payload.data.id })

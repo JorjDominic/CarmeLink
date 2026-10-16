@@ -70,13 +70,14 @@ for (const outcome of ['cancelled', 'succeeded', 'unconfirmed']) {
 
 Deno.test('configuration is disabled without keys and live requires explicit enablement', () => {
   assert(!gatewayConfig(() => undefined).ready)
-  const secrets: Record<string,string> = { PAYMONGO_ENVIRONMENT:'test',PAYMONGO_PUBLIC_KEY:'pk_test_abc',
+  const secrets: Record<string,string> = { PAYMONGO_DEPLOYMENT_ENVIRONMENT:'staging',SUPABASE_URL:'https://staging.example',PAYMONGO_TEST_SUPABASE_URL:'https://staging.example',PAYMONGO_ENVIRONMENT:'test',PAYMONGO_PUBLIC_KEY:'pk_test_abc',
     PAYMONGO_SECRET_KEY:'sk_test_abc',PAYMONGO_WEBHOOK_SECRET:'hook' }
   assert(gatewayConfig(k => secrets[k]).ready)
   secrets.PAYMONGO_ENVIRONMENT='live'; assert(!gatewayConfig(k => secrets[k]).ready)
   secrets.PAYMONGO_PUBLIC_KEY='pk_live_abc'; secrets.PAYMONGO_SECRET_KEY='sk_live_abc'
   assert(!gatewayConfig(k => secrets[k]).ready)
-  secrets.PAYMONGO_ALLOW_LIVE='true'; assert(gatewayConfig(k => secrets[k]).ready)
+  secrets.PAYMONGO_ALLOW_LIVE='true'; assert(!gatewayConfig(k => secrets[k]).ready)
+  secrets.PAYMONGO_DEPLOYMENT_ENVIRONMENT='production'; assert(gatewayConfig(k => secrets[k]).ready)
 })
 Deno.test('verified payment must match identity, amount, currency, environment and source', () => {
   assert(confirmedPayment(paidIntent(),session)?.id==='pay_Test')
@@ -119,7 +120,7 @@ Deno.test('QR rendering and test navigation accept only provider-safe data', () 
 })
 Deno.test('provider writes use stable operation keys and correct authentication', async () => {
   const requests: RequestInit[]=[]
-  const config=gatewayConfig(k => ({PAYMONGO_PUBLIC_KEY:'pk_test_abc',PAYMONGO_SECRET_KEY:'sk_test_abc',PAYMONGO_WEBHOOK_SECRET:'hook'} as Record<string,string>)[k])
+  const config=gatewayConfig(k => ({PAYMONGO_DEPLOYMENT_ENVIRONMENT:'staging',SUPABASE_URL:'https://staging.example',PAYMONGO_TEST_SUPABASE_URL:'https://staging.example',PAYMONGO_PUBLIC_KEY:'pk_test_abc',PAYMONGO_SECRET_KEY:'sk_test_abc',PAYMONGO_WEBHOOK_SECRET:'hook'} as Record<string,string>)[k])
   const client=new PayMongoClient(config,((_url:unknown,init:RequestInit) => {
     requests.push(init); return Promise.resolve(Response.json({data:{id:'pi_Test'}}))
   }) as typeof fetch)
@@ -161,7 +162,7 @@ Deno.test('advance requests validate month IDs and use the server-calculated ses
     assert(JSON.stringify(args.p_charge_ids)===JSON.stringify(ids))
     return {data:{session:saved,is_new:false},error:null}
   }}
-  const dependencies = {env:(k:string)=>({PAYMONGO_PUBLIC_KEY:'pk_test_abc',PAYMONGO_SECRET_KEY:'sk_test_abc',PAYMONGO_WEBHOOK_SECRET:'hook'} as Record<string,string>)[k],
+  const dependencies = {env:(k:string)=>({PAYMONGO_DEPLOYMENT_ENVIRONMENT:'staging',SUPABASE_URL:'https://staging.example',PAYMONGO_TEST_SUPABASE_URL:'https://staging.example',PAYMONGO_PUBLIC_KEY:'pk_test_abc',PAYMONGO_SECRET_KEY:'sk_test_abc',PAYMONGO_WEBHOOK_SECRET:'hook'} as Record<string,string>)[k],
     authenticate:async()=>({caller,admin:{},user:{id:'tenant'}} as any)}
   for(const invalid of [[],[ids[0],ids[0]],['not-a-uuid'],[null],Array(61).fill(ids[0])]) {
     const result=await handleRequest(new Request('https://app.example',{method:'POST',body:JSON.stringify({action:'create',charge_ids:invalid})}),dependencies)
@@ -185,7 +186,7 @@ Deno.test('interrupted QR attachment resumes the original provider intent', asyn
     return {update(p:object){patch=p;return this},eq(){return this},neq(){return this},select(){return this},
       single(){stored={...stored,...patch};return Promise.resolve({data:{...stored},error:null})}}}
   }
-  const config=gatewayConfig(k => ({PAYMONGO_PUBLIC_KEY:'pk_test_abc',PAYMONGO_SECRET_KEY:'sk_test_abc',PAYMONGO_WEBHOOK_SECRET:'hook'} as Record<string,string>)[k])
+  const config=gatewayConfig(k => ({PAYMONGO_DEPLOYMENT_ENVIRONMENT:'staging',SUPABASE_URL:'https://staging.example',PAYMONGO_TEST_SUPABASE_URL:'https://staging.example',PAYMONGO_PUBLIC_KEY:'pk_test_abc',PAYMONGO_SECRET_KEY:'sk_test_abc',PAYMONGO_WEBHOOK_SECRET:'hook'} as Record<string,string>)[k])
   const payload=() => ({data:{id:'pi_Test',type:'payment_intent',attributes:{
     amount:350000,currency:'PHP',livemode:false,client_key:'client',
     metadata:{gateway_session_id:'session',charge_id:'bill'},payments:[],
