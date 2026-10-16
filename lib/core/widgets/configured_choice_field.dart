@@ -18,6 +18,7 @@ class ConfiguredChoiceField extends StatefulWidget {
     this.preservedValue,
     this.preservedLabel,
     this.loadOptions,
+    this.validator,
   });
 
   final String group, label;
@@ -25,6 +26,7 @@ class ConfiguredChoiceField extends StatefulWidget {
   final bool enabled, searchable, useLabelAsValue;
   final ValueChanged<DormitoryOption?> onChanged;
   final Future<List<DormitoryOption>> Function(String group)? loadOptions;
+  final FormFieldValidator<String>? validator;
 
   @override
   State<ConfiguredChoiceField> createState() => _ConfiguredChoiceFieldState();
@@ -168,6 +170,7 @@ class _ConfiguredChoiceFieldState extends State<ConfiguredChoiceField> {
           decoration: decoration,
           items: items,
           onChanged: enabled ? change : null,
+          validator: widget.validator,
         )
       else
         DropdownButtonFormField<String>(
@@ -177,6 +180,7 @@ class _ConfiguredChoiceFieldState extends State<ConfiguredChoiceField> {
           decoration: decoration,
           items: items,
           onChanged: enabled ? change : null,
+          validator: widget.validator,
         ),
     ]);
   }

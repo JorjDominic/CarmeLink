@@ -3,6 +3,9 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
+import '../../core/widgets/configured_choice_field.dart';
+import '../../services/dormitory_configuration_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -1317,7 +1320,10 @@ class _ClearanceDialogState extends State<_ClearanceDialog> {
 }
 
 class MoveOutChargeDeductionDialog extends StatefulWidget {
-  const MoveOutChargeDeductionDialog({super.key, this.charges = const []});
+  final Future<List<DormitoryOption>> Function(String group)?
+      categoryOptionsLoader;
+  const MoveOutChargeDeductionDialog(
+      {super.key, this.charges = const [], this.categoryOptionsLoader});
   final List<Payment> charges;
   @override
   State<MoveOutChargeDeductionDialog> createState() => _DeductionDialogState();
@@ -1325,6 +1331,7 @@ class MoveOutChargeDeductionDialog extends StatefulWidget {
 
 class _DeductionDialogState extends State<MoveOutChargeDeductionDialog> {
   String _category = 'damage';
+  DormitoryOption? _categoryOption;
   String? _chargeId;
   final _label = TextEditingController();
   final _amount = TextEditingController();
@@ -1369,6 +1376,8 @@ class _DeductionDialogState extends State<MoveOutChargeDeductionDialog> {
                     _label.text = charge.label;
                     _amount.text = charge.outstandingAmount.toStringAsFixed(2);
                     _evidence.text = charge.notes ?? '';
+                  } else {
+                    _category = _categoryOption?.categoryCode ?? 'other';
                   }
                 }),
               ),
@@ -1376,25 +1385,34 @@ class _DeductionDialogState extends State<MoveOutChargeDeductionDialog> {
               const Text(
                   'The owner must approve this proposal. Link existing bills to avoid charging for the same damage twice.'),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                  key: ValueKey(_category),
+              if (_chargeId != null)
+                DropdownButtonFormField<String>(
+                  key: ValueKey('linked-$_category'),
                   initialValue: _category,
                   decoration: const InputDecoration(labelText: 'Category'),
-                  items: const [
-                    'damage',
-                    'cleaning',
-                    'replacement',
-                    'utility',
-                    'other'
-                  ]
-                      .map((v) => DropdownMenuItem(
-                          value: v, child: Text(_categoryLabel(v))))
-                      .toList(),
-                  onChanged: _chargeId != null
-                      ? null
-                      : (v) {
-                          if (v != null) setState(() => _category = v);
-                        }),
+                  items: [
+                    DropdownMenuItem(
+                        value: _category,
+                        child: Text(_categoryLabel(_category)))
+                  ],
+                  onChanged: null,
+                )
+              else
+                ConfiguredChoiceField(
+                  group: 'deduction_category',
+                  loadOptions: widget.categoryOptionsLoader,
+                  label: 'Category',
+                  value: _categoryOption?.code,
+                  onChanged: (option) => setState(() {
+                    final previousLabel = _categoryOption?.label;
+                    _categoryOption = option;
+                    _category = option?.categoryCode ?? 'other';
+                    if (option != null &&
+                        (_label.text.isEmpty || _label.text == previousLabel)) {
+                      _label.text = option.label;
+                    }
+                  }),
+                ),
               const SizedBox(height: 12),
               TextField(
                   controller: _label,
@@ -1425,6 +1443,11 @@ class _DeductionDialogState extends State<MoveOutChargeDeductionDialog> {
               child: const Text('Cancel')),
           FilledButton(
               onPressed: () {
+                if (_chargeId == null && _categoryOption == null) {
+                  showAppSnackBar(
+                      context, 'Select an active deduction category.');
+                  return;
+                }
                 final amount = double.tryParse(_amount.text.trim()) ?? 0;
                 if (_label.text.trim().length < 2 ||
                     !amount.isFinite ||

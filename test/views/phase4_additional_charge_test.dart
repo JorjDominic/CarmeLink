@@ -1,3 +1,4 @@
+import 'package:carmelitas_dormitory_system/services/dormitory_configuration_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:carmelitas_dormitory_system/controllers/owner_controller.dart';
@@ -34,9 +35,32 @@ void main() {
                   builder: (context) => TextButton(
                       onPressed: () => showDialog<void>(
                           context: context,
-                          builder: (_) => const AdditionalChargeDialog()),
+                          builder: (_) => AdditionalChargeDialog(
+                              categoryOptionsLoader: (_) async => [
+                                    for (final entry in {
+                                      'other': 'Other',
+                                      'damage': 'Damage'
+                                    }.entries)
+                                      DormitoryOption(
+                                          id: entry.key,
+                                          groupKey:
+                                              'additional_charge_category',
+                                          code: entry.key,
+                                          label: entry.value,
+                                          categoryCode: entry.key,
+                                          isActive: true,
+                                          isSystem: false,
+                                          sortOrder: 0),
+                                  ])),
                       child: const Text('Open'))))));
       await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      final categoryDropdown =
+          find.widgetWithText(DropdownButtonFormField<String>, 'Category');
+      await tester.ensureVisible(categoryDropdown);
+      await tester.tap(categoryDropdown);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Other').last);
       await tester.pumpAndSettle();
       expect(find.text('Specify Category'), findsOneWidget);
       expect(find.text('Reason (Required)'), findsOneWidget);

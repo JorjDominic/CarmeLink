@@ -1,15 +1,5 @@
 const Duration monthlyInspectionNoticeMinimum = Duration(days: 3);
 
-const List<String> roomInspectionFindingCategories = <String>[
-  'condition',
-  'cleanliness',
-  'maintenance',
-  'safety',
-  'furniture',
-  'utilities',
-  'other',
-];
-
 const List<String> roomInspectionFindingSeverities = <String>[
   'note',
   'minor',

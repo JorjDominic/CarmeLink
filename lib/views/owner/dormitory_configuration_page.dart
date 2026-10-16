@@ -64,7 +64,11 @@ class _DormitoryConfigurationPageState
     final label = TextEditingController(text: option?.label ?? '');
     final instructions =
         TextEditingController(text: option?.instructions ?? '');
-    var categoryCode = option?.categoryCode ?? 'rule_violation';
+    final mappings = DormitoryConfigurationService.workflowMappings[_groupKey];
+    var categoryCode = option?.categoryCode ??
+        (mappings?.containsKey('other') == true
+            ? 'other'
+            : mappings?.keys.firstOrNull);
     var saving = false;
     String? message;
 
@@ -98,7 +102,7 @@ class _DormitoryConfigurationPageState
                           'Visible to tenants when they select this method.',
                     ),
                   ),
-                if (_groupKey == 'report_type') ...[
+                if (mappings != null) ...[
                   const SizedBox(height: 10),
                   if (option == null)
                     DropdownButtonFormField<String>(
@@ -108,23 +112,10 @@ class _DormitoryConfigurationPageState
                         helperText:
                             'The visible label is editable; this workflow mapping stays fixed.',
                       ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'roommate_concern',
-                          child: Text('Roommate concern'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'rule_violation',
-                          child: Text('Rule violation'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'safety_concern',
-                          child: Text('Safety concern'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'other',
-                          child: Text('Other'),
-                        ),
+                      items: [
+                        for (final entry in mappings.entries)
+                          DropdownMenuItem(
+                              value: entry.key, child: Text(entry.value)),
                       ],
                       onChanged: (value) {
                         if (value != null) categoryCode = value;

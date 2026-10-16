@@ -2,6 +2,8 @@ import 'notification_destination.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/configured_choice_field.dart';
+
 import '../../core/utils/room_inspection_policy.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../services/room_inspection_service.dart';
@@ -292,8 +294,10 @@ class _StaffRoomInspectionsPageState extends State<StaffRoomInspectionsPage> {
           (item) => item.status == 'scheduled' || item.status == 'in_progress',
         )
         .length;
-    final targetInspection = NotificationTarget.recordIdOf(context, 'inspection');
-    final visible = targetInspection == null ? _visibleInspections(inspections, scope, sort)
+    final targetInspection =
+        NotificationTarget.recordIdOf(context, 'inspection');
+    final visible = targetInspection == null
+        ? _visibleInspections(inspections, scope, sort)
         : inspections.where((item) => item.id == targetInspection).toList();
 
     return PageFrame(
@@ -484,7 +488,7 @@ class _StaffInspectionDetailPageState extends State<StaffInspectionDetailPage> {
   }
 
   Future<void> _addFinding() async {
-    var category = 'condition';
+    String? category;
     var severity = 'minor';
     final location = TextEditingController();
     final description = TextEditingController();
@@ -504,25 +508,14 @@ class _StaffInspectionDetailPageState extends State<StaffInspectionDetailPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: category,
-                    decoration:
-                        const InputDecoration(labelText: 'Finding category'),
-                    items: roomInspectionFindingCategories
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(titleCaseInspectionValue(value)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: saving
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              setDialogState(() => category = value);
-                            }
-                          },
+                  ConfiguredChoiceField(
+                    group: 'inspection_category',
+                    label: 'Finding category',
+                    value: category,
+                    useLabelAsValue: true,
+                    enabled: !saving,
+                    onChanged: (option) =>
+                        setDialogState(() => category = option?.label),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
@@ -629,6 +622,11 @@ class _StaffInspectionDetailPageState extends State<StaffInspectionDetailPage> {
               onPressed: saving
                   ? null
                   : () async {
+                      if (category == null) {
+                        showAppSnackBar(dialogContext,
+                            'Select an active finding category.');
+                        return;
+                      }
                       if (location.text.trim().length < 2) {
                         showAppSnackBar(
                           dialogContext,
@@ -648,7 +646,7 @@ class _StaffInspectionDetailPageState extends State<StaffInspectionDetailPage> {
                       try {
                         final findingId = await service.addFinding(
                           inspection: inspection,
-                          category: category,
+                          category: category!,
                           locationLabel: location.text,
                           severity: severity,
                           description: description.text,
@@ -1213,8 +1211,10 @@ class _TenantRoomInspectionsPageState extends State<TenantRoomInspectionsPage> {
         .where((item) =>
             item.status == 'scheduled' || item.status == 'in_progress')
         .length;
-    final targetInspection = NotificationTarget.recordIdOf(context, 'inspection');
-    final visible = targetInspection == null ? _visibleInspections(inspections, scope, sort)
+    final targetInspection =
+        NotificationTarget.recordIdOf(context, 'inspection');
+    final visible = targetInspection == null
+        ? _visibleInspections(inspections, scope, sort)
         : inspections.where((item) => item.id == targetInspection).toList();
     return PageFrame(
       title: 'Inspections',

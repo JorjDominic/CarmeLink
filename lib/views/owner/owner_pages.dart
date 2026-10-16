@@ -1,3 +1,4 @@
+import '../../services/dormitory_configuration_service.dart';
 import '../../core/utils/financial_snapshot.dart';
 import '../../core/widgets/configured_choice_field.dart';
 import '../../core/widgets/searchable_dropdown.dart';
@@ -2899,6 +2900,7 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
   final _formKey = GlobalKey<FormState>();
   late String _selectedTenantId;
   String _selectedCategory = 'electricity';
+  DormitoryOption? _utilityCategoryOption;
   late final TextEditingController _titleController;
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
@@ -2906,13 +2908,6 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
   late DateTime _periodStart;
   late DateTime _periodEnd;
   bool _isSubmitting = false;
-
-  final List<String> _categories = const [
-    'electricity',
-    'water',
-    'internet',
-    'utility',
-  ];
 
   @override
   void initState() {
@@ -3098,34 +3093,22 @@ class _CreateInvoiceDialogState extends State<_CreateInvoiceDialog> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: _selectedCategory,
-                  decoration: const InputDecoration(
-                    labelText: 'Billing Category',
-                    prefixIcon: Icon(Icons.category_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
-                    ),
-                  ),
-                  items: _categories.map((c) {
-                    final capitalized = c[0].toUpperCase() + c.substring(1);
-                    return DropdownMenuItem(
-                      value: c,
-                      child: Text(
-                        capitalized,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        _selectedCategory = val;
-                        _titleController.text = _defaultTitleForCategory(val);
-                      });
-                    }
-                  },
+                ConfiguredChoiceField(
+                  group: 'utility_category',
+                  label: 'Billing Category',
+                  value: _utilityCategoryOption?.code,
+                  enabled: !_isSubmitting,
+                  validator: (value) => value == null
+                      ? 'Select an active utility category'
+                      : null,
+                  onChanged: (option) => setState(() {
+                    final changed =
+                        _utilityCategoryOption?.code != option?.code;
+                    _utilityCategoryOption = option;
+                    _selectedCategory = option?.categoryCode ?? 'utility';
+                    if (changed && option != null)
+                      _titleController.text = option.label;
+                  }),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(

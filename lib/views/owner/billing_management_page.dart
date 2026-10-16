@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/configured_choice_field.dart';
+import '../../services/dormitory_configuration_service.dart';
+
 import '../../controllers/owner_controller.dart';
 import '../../controllers/session_controller.dart';
 import '../../core/utils/billing_management_policy.dart';
@@ -757,7 +760,9 @@ class _BillingError extends StatelessWidget {
 }
 
 class AdditionalChargeDialog extends StatefulWidget {
-  const AdditionalChargeDialog({super.key});
+  final Future<List<DormitoryOption>> Function(String group)?
+      categoryOptionsLoader;
+  const AdditionalChargeDialog({super.key, this.categoryOptionsLoader});
 
   @override
   State<AdditionalChargeDialog> createState() => _AdditionalChargeDialogState();
@@ -772,6 +777,7 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
   final _specificCategory = TextEditingController();
   String? _tenantId;
   String _category = 'other';
+  DormitoryOption? _categoryOption;
   late DateTime _dueDate;
   bool _saving = false;
 
@@ -868,30 +874,29 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
                       : (value) => setState(() => _tenantId = value),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _category,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Category'),
-                  items: const [
-                    DropdownMenuItem(value: 'damage', child: Text('Damage')),
-                    DropdownMenuItem(value: 'fine', child: Text('Fine')),
-                    DropdownMenuItem(
-                        value: 'late_fee', child: Text('Late fee')),
-                    DropdownMenuItem(
-                        value: 'cleaning', child: Text('Cleaning')),
-                    DropdownMenuItem(
-                        value: 'replacement', child: Text('Replacement')),
-                    DropdownMenuItem(value: 'other', child: Text('Other')),
-                  ],
-                  onChanged: _saving
-                      ? null
-                      : (value) {
-                          if (value != null)
-                            setState(() {
-                              _category = value;
-                              if (value != 'other') _specificCategory.clear();
-                            });
-                        },
+                ConfiguredChoiceField(
+                  group: 'additional_charge_category',
+                  loadOptions: widget.categoryOptionsLoader,
+                  label: 'Category',
+                  value: _categoryOption?.code,
+                  enabled: !_saving,
+                  validator: (value) =>
+                      value == null ? 'Select an active category' : null,
+                  onChanged: (option) => setState(() {
+                    final changed = _categoryOption?.code != option?.code;
+                    _categoryOption = option;
+                    _category = option?.categoryCode ?? 'other';
+                    if (changed) {
+                      _specificCategory.text = _category == 'other' &&
+                              option != null &&
+                              !option.isCatchAll
+                          ? option.label
+                          : '';
+                      if (_title.text.isEmpty &&
+                          option != null &&
+                          !option.isCatchAll) _title.text = option.label;
+                    }
+                  }),
                 ),
                 const SizedBox(height: 12),
                 if (_category == 'other') ...[

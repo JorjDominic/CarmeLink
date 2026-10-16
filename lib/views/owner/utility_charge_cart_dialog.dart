@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../controllers/owner_controller.dart';
+import '../../core/widgets/configured_choice_field.dart';
+import '../../services/dormitory_configuration_service.dart';
 
 class UtilityChargeCartDialog extends StatefulWidget {
-  const UtilityChargeCartDialog({super.key});
+  final Future<List<DormitoryOption>> Function(String group)?
+      categoryOptionsLoader;
+  const UtilityChargeCartDialog({super.key, this.categoryOptionsLoader});
 
   @override
   State<UtilityChargeCartDialog> createState() =>
@@ -17,6 +21,7 @@ class _UtilityChargeCartDialogState extends State<UtilityChargeCartDialog> {
   final List<_UtilityCartLine> _cart = [];
   String _scope = 'individual';
   String _category = 'electricity';
+  DormitoryOption? _categoryOption;
   String _allocation = 'equal_per_tenant';
   String? _tenantId;
   final Set<String> _rooms = {};
@@ -45,13 +50,6 @@ class _UtilityChargeCartDialogState extends State<UtilityChargeCartDialog> {
 
   String _date(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
-
-  String _categoryTitle(String value) => switch (value) {
-        'electricity' => 'Electricity',
-        'water' => 'Water',
-        'internet' => 'Internet',
-        _ => 'Other utility',
-      };
 
   String _scopeTitle(String value) => switch (value) {
         'individual' => 'Individual tenant',
@@ -102,6 +100,7 @@ class _UtilityChargeCartDialogState extends State<UtilityChargeCartDialog> {
       _cart.add(_UtilityCartLine(
         scope: _scope,
         category: _category,
+        categoryLabel: _categoryOption!.label,
         allocation: _scope == 'individual' ? 'equal_per_tenant' : _allocation,
         tenantId: tenant?.id,
         targetLabel: tenant?.name ??
@@ -133,8 +132,7 @@ class _UtilityChargeCartDialogState extends State<UtilityChargeCartDialog> {
                   'allocation_method': line.allocation,
                   'tenant_id': line.tenantId,
                   'room_numbers': line.roomNumbers,
-                  'title':
-                      '${_categoryTitle(line.category)} — ${_date(line.periodStart)}',
+                  'title': '${line.categoryLabel} — ${_date(line.periodStart)}',
                   'total_amount': line.total,
                   'period_start': _date(line.periodStart),
                   'period_end': _date(line.periodEnd),
@@ -249,20 +247,19 @@ class _UtilityChargeCartDialogState extends State<UtilityChargeCartDialog> {
                   ),
                 ],
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _category,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Utility type'),
-                  items: const [
-                    DropdownMenuItem(
-                        value: 'electricity', child: Text('Electricity')),
-                    DropdownMenuItem(value: 'water', child: Text('Water')),
-                    DropdownMenuItem(
-                        value: 'internet', child: Text('Internet')),
-                    DropdownMenuItem(
-                        value: 'utility', child: Text('Other utility')),
-                  ],
-                  onChanged: (value) => setState(() => _category = value!),
+                ConfiguredChoiceField(
+                  group: 'utility_category',
+                  loadOptions: widget.categoryOptionsLoader,
+                  label: 'Utility type',
+                  value: _categoryOption?.code,
+                  enabled: !_saving,
+                  validator: (value) => value == null
+                      ? 'Select an active utility category'
+                      : null,
+                  onChanged: (option) => setState(() {
+                    _categoryOption = option;
+                    _category = option?.categoryCode ?? 'utility';
+                  }),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -318,7 +315,7 @@ class _UtilityChargeCartDialogState extends State<UtilityChargeCartDialog> {
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(
-                          '${_categoryTitle(item.category)} • ${_scopeTitle(item.scope)}'),
+                          '${item.categoryLabel} • ${_scopeTitle(item.scope)}'),
                       subtitle: Text(
                           '${item.targetLabel}\nDue ${_date(item.dueDate)}'),
                       isThreeLine: true,
@@ -378,6 +375,7 @@ class _UtilityCartLine {
   const _UtilityCartLine({
     required this.scope,
     required this.category,
+    required this.categoryLabel,
     required this.allocation,
     required this.targetLabel,
     required this.roomNumbers,
@@ -388,7 +386,7 @@ class _UtilityCartLine {
     required this.notes,
     this.tenantId,
   });
-  final String scope, category, allocation, targetLabel, notes;
+  final String scope, category, categoryLabel, allocation, targetLabel, notes;
   final String? tenantId;
   final List<String> roomNumbers;
   final double total;

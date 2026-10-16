@@ -1,3 +1,5 @@
+/// Legacy codes retained for historical records. New form choices come from
+/// the owner-managed conduct_category configuration group.
 const List<String> conductCaseCategories = <String>[
   'curfew',
   'misconduct',
@@ -30,13 +32,14 @@ String conductCategoryLabel(String value) => switch (value) {
       'misconduct' => 'Misconduct',
       'safety' => 'Safety',
       'curfew' => 'Curfew',
-      _ => 'Other',
+      'other' => 'Other',
+      _ => value,
     };
 
 String conductCategoryDisplayLabel(String value, [String? detail]) {
   final label = conductCategoryLabel(value);
   final specific = detail?.trim() ?? '';
-  return value == 'other' && specific.isNotEmpty ? '$label — $specific' : label;
+  return specific.isNotEmpty ? '$label — $specific' : label;
 }
 
 String conductSourceLabel(String value) => switch (value) {

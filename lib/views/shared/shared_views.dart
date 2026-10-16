@@ -1,6 +1,9 @@
+import '../../services/dormitory_configuration_service.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../core/widgets/configured_choice_field.dart';
 
 import '../../controllers/session_controller.dart';
 import '../../controllers/theme_controller.dart';
@@ -1927,7 +1930,9 @@ class SettingsPage extends StatelessWidget {
 }
 
 class FeedbackPage extends StatefulWidget {
-  const FeedbackPage({super.key});
+  final Future<List<DormitoryOption>> Function(String group)?
+      categoryOptionsLoader;
+  const FeedbackPage({super.key, this.categoryOptionsLoader});
 
   @override
   State<FeedbackPage> createState() => _FeedbackPageState();
@@ -1935,7 +1940,7 @@ class FeedbackPage extends StatefulWidget {
 
 class _FeedbackPageState extends State<FeedbackPage> {
   final message = TextEditingController();
-  String category = 'Suggestion';
+  String? category;
   int rating = 0;
   bool includeAccountDetails = true;
   bool submitted = false;
@@ -1947,6 +1952,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
   }
 
   void _submit() {
+    if (category == null) {
+      showAppSnackBar(context, 'Select an active feedback type.');
+      return;
+    }
     final clean = message.text.trim();
     if (rating == 0) {
       showAppSnackBar(context, 'Choose a rating before submitting.');
@@ -2034,26 +2043,14 @@ class _FeedbackPageState extends State<FeedbackPage> {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 18),
-                  DropdownButtonFormField<String>(
-                    initialValue: category,
-                    decoration: const InputDecoration(
-                      labelText: 'Feedback type',
-                      prefixIcon: Icon(Icons.category_outlined),
-                    ),
-                    items: const [
-                      'Accessibility',
-                      'App issue',
-                      'Compliment',
-                      'Suggestion',
-                      'Other',
-                    ]
-                        .map((item) => DropdownMenuItem(
-                              value: item,
-                              child: Text(item),
-                            ))
-                        .toList(),
-                    onChanged: (value) => setState(() {
-                      category = value ?? category;
+                  ConfiguredChoiceField(
+                    group: 'feedback_type',
+                    loadOptions: widget.categoryOptionsLoader,
+                    label: 'Feedback type',
+                    value: category,
+                    useLabelAsValue: true,
+                    onChanged: (option) => setState(() {
+                      category = option?.label;
                       submitted = false;
                     }),
                   ),

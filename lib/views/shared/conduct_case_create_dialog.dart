@@ -2,16 +2,21 @@ import 'package:flutter/material.dart';
 
 import '../../core/utils/conduct_case_policy.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/configured_choice_field.dart';
+import '../../services/dormitory_configuration_service.dart';
 import '../../core/widgets/searchable_dropdown.dart';
 import '../../core/widgets/staff_tenant_picker.dart';
 import '../../models/staff_tenant_option.dart';
 import '../../services/conduct_case_service.dart';
 
 class ConductCaseCreateDialog extends StatefulWidget {
+  final Future<List<DormitoryOption>> Function(String group)?
+      categoryOptionsLoader;
   const ConductCaseCreateDialog({
     super.key,
     required this.service,
     required this.tenants,
+    this.categoryOptionsLoader,
   });
 
   final ConductCaseService service;
@@ -24,7 +29,8 @@ class ConductCaseCreateDialog extends StatefulWidget {
 
 class _ConductCaseCreateDialogState extends State<ConductCaseCreateDialog> {
   String? _tenantId;
-  String _category = 'rule_violation';
+  String _category = '';
+  DormitoryOption? _categoryOption;
   String _source = 'manual';
   String? _sourceRecordId;
   DateTime _incidentAt = DateTime.now();
@@ -51,6 +57,8 @@ class _ConductCaseCreateDialogState extends State<ConductCaseCreateDialog> {
     _sourceDetail.dispose();
     super.dispose();
   }
+
+  bool get _categoryNeedsDetail => _categoryOption?.isCatchAll ?? false;
 
   bool get _sourceCanLink => _source != 'manual' && _source != 'other';
 
@@ -142,7 +150,11 @@ class _ConductCaseCreateDialogState extends State<ConductCaseCreateDialog> {
       showAppSnackBar(context, 'Select a tenant before creating the case.');
       return;
     }
-    if (_category == 'other') {
+    if (_categoryOption == null) {
+      showAppSnackBar(context, 'Select an active case category.');
+      return;
+    }
+    if (_categoryNeedsDetail) {
       final error = validateConductOtherDetail(
         _categoryDetail.text,
         fieldLabel: 'the case category',
@@ -183,7 +195,7 @@ class _ConductCaseCreateDialogState extends State<ConductCaseCreateDialog> {
         tenantId: tenantId,
         category: _category,
         categoryDetail:
-            _category == 'other' ? _categoryDetail.text.trim() : null,
+            _categoryNeedsDetail ? _categoryDetail.text.trim() : null,
         title: _title.text,
         description: _description.text,
         incidentAt: _incidentAt,
@@ -239,28 +251,20 @@ class _ConductCaseCreateDialogState extends State<ConductCaseCreateDialog> {
                 },
               ),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _category,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: conductCaseCategories
-                    .map(
-                      (value) => DropdownMenuItem(
-                        value: value,
-                        child: Text(conductCategoryLabel(value)),
-                      ),
-                    )
-                    .toList(growable: false),
-                onChanged: _saving
-                    ? null
-                    : (value) {
-                        if (value == null) return;
-                        setState(() {
-                          _category = value;
-                          if (value != 'other') _categoryDetail.clear();
-                        });
-                      },
+              ConfiguredChoiceField(
+                group: 'conduct_category',
+                loadOptions: widget.categoryOptionsLoader,
+                label: 'Category',
+                value: _categoryOption?.code,
+                enabled: !_saving,
+                searchable: true,
+                onChanged: (option) => setState(() {
+                  _categoryOption = option;
+                  _category = option?.label ?? '';
+                  if (!_categoryNeedsDetail) _categoryDetail.clear();
+                }),
               ),
-              if (_category == 'other') ...[
+              if (_categoryNeedsDetail) ...[
                 const SizedBox(height: 10),
                 TextField(
                   controller: _categoryDetail,

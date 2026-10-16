@@ -55,6 +55,44 @@ class DormitoryConfigurationService {
     'report_type': 'Concern report types',
     'announcement_category': 'Announcement categories',
     'payment_method': 'Payment methods',
+    'conduct_category': 'Violation / conduct categories',
+    'inspection_category': 'Inspection finding categories',
+    'additional_charge_category': 'Additional charge categories',
+    'utility_category': 'Utility billing categories',
+    'deduction_category': 'Move-out deduction categories',
+    'feedback_type': 'Feedback types',
+  };
+
+  /// Financial choices keep a stable accounting category while their visible
+  /// labels can be added, renamed, and archived by the owner.
+  static const workflowMappings = <String, Map<String, String>>{
+    'report_type': {
+      'roommate_concern': 'Roommate concern',
+      'rule_violation': 'Rule violation',
+      'safety_concern': 'Safety concern',
+      'other': 'Other',
+    },
+    'additional_charge_category': {
+      'damage': 'Damage',
+      'fine': 'Fine',
+      'late_fee': 'Late fee',
+      'cleaning': 'Cleaning',
+      'replacement': 'Replacement',
+      'other': 'Other',
+    },
+    'utility_category': {
+      'electricity': 'Electricity',
+      'water': 'Water',
+      'internet': 'Internet',
+      'utility': 'Other utility',
+    },
+    'deduction_category': {
+      'damage': 'Damage',
+      'cleaning': 'Cleaning',
+      'replacement': 'Replacement',
+      'utility': 'Utility',
+      'other': 'Other',
+    },
   };
 
   static bool isCatchAllChoice({required String code, required String label}) {
@@ -142,6 +180,12 @@ class DormitoryConfigurationService {
         'Payment instructions must be at most 1000 characters.',
       );
     }
+    final mappings = workflowMappings[groupKey];
+    if (existing == null &&
+        mappings != null &&
+        !mappings.containsKey(categoryCode)) {
+      throw ArgumentError('Choose a supported workflow category.');
+    }
 
     if (existing == null) {
       await SupabaseConfig.client.from('dormitory_options').insert({
@@ -151,7 +195,7 @@ class DormitoryConfigurationService {
         // because the legacy column remains non-null for compatibility.
         'sort_order': 0,
         if (groupKey == 'payment_method') 'instructions': instructions.trim(),
-        if (groupKey == 'report_type') 'category_code': categoryCode,
+        if (mappings != null) 'category_code': categoryCode,
       });
       return;
     }

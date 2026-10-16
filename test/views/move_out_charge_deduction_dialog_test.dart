@@ -1,3 +1,4 @@
+import 'package:carmelitas_dormitory_system/services/dormitory_configuration_service.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/views/shared/move_out_settlement_page.dart';
 import 'package:flutter/material.dart';
@@ -12,8 +13,19 @@ void main() {
               builder: (context) => TextButton(
                     onPressed: () => showDialog<Object>(
                         context: context,
-                        builder: (_) =>
-                            MoveOutChargeDeductionDialog(charges: charges)),
+                        builder: (_) => MoveOutChargeDeductionDialog(
+                            charges: charges,
+                            categoryOptionsLoader: (_) async => [
+                                  const DormitoryOption(
+                                      id: 'damage',
+                                      groupKey: 'deduction_category',
+                                      code: 'damage',
+                                      label: 'Damage',
+                                      categoryCode: 'damage',
+                                      isActive: true,
+                                      isSystem: false,
+                                      sortOrder: 0),
+                                ])),
                     child: const Text('Open'),
                   ))),
     ));
@@ -59,6 +71,11 @@ void main() {
   testWidgets('invalid currency or missing evidence keeps the proposal open',
       (tester) async {
     await open(tester);
+    await tester
+        .tap(find.widgetWithText(DropdownButtonFormField<String>, 'Category'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Damage').last);
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(0), 'Broken door');
     for (final amount in ['NaN', 'Infinity', '-1', '80.001']) {
       await tester.enterText(find.byType(TextField).at(1), amount);
