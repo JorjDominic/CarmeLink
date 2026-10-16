@@ -22,15 +22,15 @@ class RoomOccupancySummary extends StatelessWidget {
           'Physical capacity: ${room.capacity} beds • Assigned tenants: ${room.occupied}'),
       Text(
           'Available for assignment: ${room.physicallyAvailable} • Unused beds: ${room.unusedBeds}'),
+      Text('Contractually reserved beds: ${room.contractuallyReservedBeds}'),
       if (room.hasReservation)
         const Text('Entire room reserved for the contracted occupants.'),
-      if (group != null && !group.released) ...[
-        Text(
-            '${group.members.length} contracted occupant(s) • ${group.startsOn} to ${group.endsOn}'),
-        if (showFinancial && group.totalRentCents != null)
+      if (room.contractGroups.isNotEmpty) ...[
+        Text('${room.contractMembers.length} contracted occupant(s)'),
+        if (showFinancial && group?.totalRentCents != null)
           Text(
-              'Agreed room rental: PHP ${rentCentsText(group.totalRentCents!)} / month'),
-        for (final member in group.members)
+              'Agreed room rental: PHP ${rentCentsText(group!.totalRentCents!)} / month'),
+        for (final member in room.contractMembers)
           Text('${member.name} • ${member.bedLabel} • ${member.status}'
               '${room.beds.any((bed) => bed.occupied && bed.tenantId == member.tenantId && bed.id == member.bedId) ? '' : ' • Not currently assigned'}'
               '${showFinancial && member.rentCents != null ? ' • PHP ${rentCentsText(member.rentCents!)} / month' : ''}'),
@@ -135,7 +135,7 @@ class _RoomOccupancyHistoryViewState extends State<RoomOccupancyHistoryView> {
                               const Text('No occupancy history recorded.'),
                             for (final group in history.contracts) ...[
                               Text(
-                                  '${group.mode == 'solo' ? 'Solo' : 'Shared'} arrangement • ${group.released ? 'Released' : 'Reserved'}',
+                                  '${occupancyModeLabel(group.mode)} arrangement • ${group.released ? 'Released' : 'Reserved'}',
                                   style:
                                       Theme.of(context).textTheme.titleSmall),
                               Text('${group.startsOn} to ${group.endsOn}'),

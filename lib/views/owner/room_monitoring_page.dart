@@ -179,6 +179,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
     final number = TextEditingController(text: '$nextNumber');
     final floor = TextEditingController();
     final notes = TextEditingController();
+    final capacity = TextEditingController(text: '4');
     bool saving = false;
     String? error;
     final changed = await showDialog<bool>(
@@ -199,8 +200,13 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                     TextField(
                         controller: notes,
                         decoration: const InputDecoration(labelText: 'Notes')),
-                    const Text(
-                        'Four fixed bed spaces will be created automatically.'),
+                    TextField(
+                        controller: capacity,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                            labelText: 'Physical bed capacity',
+                            helperText:
+                                'Default: 4. Use only physically approved arrangements.')),
                     if (error != null) Text(error!),
                   ])),
                   actions: [
@@ -219,10 +225,16 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                                 }
                                 update(() => saving = true);
                                 try {
+                                  final beds =
+                                      int.tryParse(capacity.text.trim());
+                                  if (beds == null || beds < 1)
+                                    throw const FormatException(
+                                        'Enter a positive physical bed capacity');
                                   await service.createRoom(
                                       number: number.text,
                                       floor: floor.text,
-                                      description: notes.text);
+                                      description: notes.text,
+                                      capacity: beds);
                                   if (ctx.mounted) Navigator.pop(ctx, true);
                                 } catch (e) {
                                   if (ctx.mounted)
@@ -239,6 +251,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
     number.dispose();
     floor.dispose();
     notes.dispose();
+    capacity.dispose();
     if (changed == true && mounted) await _loadRooms();
   }
 
@@ -264,7 +277,7 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
         builder: (ctx) => AlertDialog(
                 title: Text('Delete Room ${room.number}?'),
                 content: const Text(
-                    'Permanently delete this room and its four structural beds only if there are no linked or historical records. Otherwise deletion is blocked; archive the room instead.'),
+                    'Permanently delete this room and its unused structural beds only if there are no linked or historical records. Otherwise deletion is blocked; archive the room instead.'),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(ctx, false),
@@ -511,7 +524,11 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                     DropdownMenuItem(
                         value: 'all', child: Text('All arrangements')),
                     DropdownMenuItem(value: 'solo', child: Text('Solo')),
-                    DropdownMenuItem(value: 'shared', child: Text('Shared')),
+                    DropdownMenuItem(
+                        value: 'standard_shared',
+                        child: Text('Standard Shared')),
+                    DropdownMenuItem(
+                        value: 'shared', child: Text('Exclusive Shared')),
                     DropdownMenuItem(value: 'vacant', child: Text('Vacant'))
                   ],
                   onChanged: (value) => setState(() {
@@ -1547,6 +1564,7 @@ class _RoomEditorState extends State<RoomEditor> {
   late final TextEditingController description;
   late final TextEditingController floor;
   late final TextEditingController number;
+  late final TextEditingController capacity;
   bool saving = false;
   List<String>? _floors;
   String? _floorError;
@@ -1557,6 +1575,7 @@ class _RoomEditorState extends State<RoomEditor> {
     description = TextEditingController(text: widget.room.description);
     floor = TextEditingController(text: widget.room.floor);
     number = TextEditingController(text: widget.room.number);
+    capacity = TextEditingController(text: '${widget.room.capacity}');
     _loadFloors();
   }
 
@@ -1578,6 +1597,7 @@ class _RoomEditorState extends State<RoomEditor> {
     description.dispose();
     floor.dispose();
     number.dispose();
+    capacity.dispose();
     super.dispose();
   }
 
@@ -1591,6 +1611,8 @@ class _RoomEditorState extends State<RoomEditor> {
         number: number.text,
         floor: floor.text,
         description: description.text,
+        capacity: int.parse(capacity.text.trim()),
+        expectedCapacity: r.capacity,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -1611,7 +1633,7 @@ class _RoomEditorState extends State<RoomEditor> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${widget.room.floor} • 4 bed spaces',
+                  '${widget.room.floor} • ${widget.room.capacity} bed spaces',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
@@ -1628,6 +1650,17 @@ class _RoomEditorState extends State<RoomEditor> {
                     controller: floor,
                     floors: _floors ?? [],
                     enabled: !saving && _floors != null),
+                TextFormField(
+                    controller: capacity,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                        labelText: 'Physical bed capacity',
+                        helperText:
+                            'Use only physically approved arrangements. Referenced or reserved beds cannot be removed.'),
+                    validator: (value) =>
+                        (int.tryParse(value?.trim() ?? '') ?? 0) < 1
+                            ? 'Enter a positive bed capacity'
+                            : null),
                 if (_floors == null && _floorError == null)
                   const LinearProgressIndicator(),
                 if (_floorError != null)

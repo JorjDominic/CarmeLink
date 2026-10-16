@@ -324,18 +324,29 @@ class ContractDocumentService {
     final tenant =
         members.firstWhere((m) => m['tenant_id'] == contract.tenantId);
     return {
-      'Occupancy arrangement': snapshot['mode'] == 'solo' ? 'Solo' : 'Shared',
-      'Total agreed monthly room rental':
-          'PHP ${((snapshot['total_rent_cents'] as num) / 100).toStringAsFixed(2)}',
+      'Occupancy arrangement': snapshot['mode'] == 'solo'
+          ? 'Solo'
+          : snapshot['mode'] == 'standard_shared'
+              ? 'Standard Shared'
+              : 'Exclusive Shared',
+      if (snapshot['mode'] != 'standard_shared')
+        'Total agreed monthly room rental':
+            'PHP ${((snapshot['total_rent_cents'] as num) / 100).toStringAsFixed(2)}',
       'Contracted occupants': '${members.length}',
       'Individual monthly rental obligation':
           'PHP ${contract.monthlyRent.toStringAsFixed(2)}',
       'Assigned bed': tenant['bed_label'] as String,
-      if (snapshot['mode'] == 'shared')
-        'Registered roommates': members
+      if (snapshot['mode'] != 'solo')
+        'Registered roommates': [
+          ...members,
+          ...((snapshot['existing_roommates'] as List?) ?? [])
+        ]
             .where((m) => m['tenant_id'] != contract.tenantId)
             .map((m) => m['name'])
             .join(', '),
+      if (snapshot['mode'] == 'standard_shared')
+        'Rental agreement':
+            'Individual fixed rent; additional occupants do not change this contractual amount. Available beds may receive separate approved contracts.',
     };
   }
 

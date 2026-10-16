@@ -34,6 +34,7 @@ class RoomService {
       _client
           .from('bed_spaces')
           .select('id, room_id, label, status')
+          .isFilter('retired_at', null)
           .order('label'),
       _client
           .from('tenant_assignments')
@@ -52,12 +53,24 @@ class RoomService {
         activeAssignments[bedId] = row;
       }
     }
-    final reservedRooms =
-        results[3].map((row) => row['room_id'] as String).toSet();
     final occupancies = (results[4] as List)
         .map((row) =>
             RoomContractOccupancy.fromRow(Map<String, dynamic>.from(row)))
         .toList();
+    final reservedRooms = occupancies
+        .where((g) => !g.released && g.mode != 'standard_shared')
+        .map((g) => g.roomId)
+        .toSet();
+    // A room-ID reservation without its projection is unavailable until a
+    // refresh resolves it. Never infer free beds from incomplete contract data.
+    for (final row in results[3]) {
+      if (!occupancies.any((g) =>
+          g.roomId == row['room_id'] &&
+          !g.released &&
+          g.mode == 'standard_shared')) {
+        reservedRooms.add(row['room_id'] as String);
+      }
+    }
     final bedsByRoom = <String, List<BedRecord>>{};
     for (final row in results[1]) {
       final bed = BedRecord.fromRow(
@@ -76,6 +89,9 @@ class RoomService {
               row,
               bedsByRoom[row['id'] as String] ?? const [],
               reserved: reservedRooms.contains(row['id']),
+              occupancies: occupancies
+                  .where((g) => g.roomId == row['id'] && !g.released)
+                  .toList(),
               occupancy: occupancies
                   .where((g) => g.roomId == row['id'] && !g.released)
                   .firstOrNull,
@@ -90,15 +106,23 @@ class RoomService {
     required String number,
     required String floor,
     required String description,
+    int capacity = 4,
   }) async {
     final roomNumber = number.trim();
     final floorLabel = floor.trim();
     validateRoomIdentity(roomNumber, floorLabel);
-    await _client.rpc('create_room_with_four_beds', params: {
-      'p_room_number': roomNumber,
-      'p_floor': floorLabel,
-      'p_description': description.trim(),
-    });
+    if (capacity < 1)
+      throw ArgumentError('Enter a positive physical bed capacity');
+    await _client.rpc(
+        capacity == 4
+            ? 'create_room_with_four_beds'
+            : 'create_room_with_capacity',
+        params: {
+          'p_room_number': roomNumber,
+          'p_floor': floorLabel,
+          'p_description': description.trim(),
+          if (capacity != 4) 'p_capacity': capacity,
+        });
     invalidateCache();
   }
 
@@ -106,8 +130,24 @@ class RoomService {
       {required String id,
       required String number,
       required String floor,
-      required String description}) async {
+      required String description,
+      int? capacity,
+      int? expectedCapacity}) async {
     validateRoomIdentity(number, floor);
+    if (capacity != null) {
+      if (capacity < 1 || expectedCapacity == null)
+        throw ArgumentError('Enter a valid physical capacity');
+      await _client.rpc('configure_room_capacity', params: {
+        'p_room_id': id,
+        'p_capacity': capacity,
+        'p_expected_capacity': expectedCapacity,
+        'p_room_number': number.trim(),
+        'p_floor': floor.trim(),
+        'p_description': description.trim(),
+      });
+      invalidateCache();
+      return;
+    }
     await _client
         .from('rooms')
         .update({
@@ -312,9 +352,12 @@ class RoomRecord {
     this.layoutFloor,
     this.reserved = false,
     this.occupancy,
+    this.occupancies = const [],
   });
   factory RoomRecord.fromRow(Map<String, dynamic> row, List<BedRecord> beds,
-          {bool reserved = false, RoomContractOccupancy? occupancy}) =>
+          {bool reserved = false,
+          RoomContractOccupancy? occupancy,
+          List<RoomContractOccupancy> occupancies = const []}) =>
       RoomRecord(
         id: row['id'] as String,
         number: row['room_number'] as String,
@@ -327,6 +370,7 @@ class RoomRecord {
         layoutFloor: row['layout_floor'] as String?,
         reserved: reserved,
         occupancy: occupancy,
+        occupancies: occupancies,
       );
   final String id, number, floor, description;
   final String? layoutNumber, layoutFloor;
@@ -335,15 +379,28 @@ class RoomRecord {
   final bool isActive;
   final bool reserved;
   final RoomContractOccupancy? occupancy;
+  final List<RoomContractOccupancy> occupancies;
+  List<RoomContractOccupancy> get contractGroups => (occupancies.isNotEmpty
+          ? occupancies
+          : [if (occupancy != null) occupancy!])
+      .where((g) => !g.released)
+      .toList();
+  List<RoomContractMember> get contractMembers =>
+      contractGroups.expand((g) => g.members).toList();
   bool get hasReservation =>
-      reserved || (occupancy != null && !occupancy!.released);
+      reserved || contractGroups.any((g) => g.mode != 'standard_shared');
   int get occupied => beds.where((bed) => bed.occupied).length;
   int get physicallyAvailable => isActive && !hasReservation
       ? beds.where((bed) => !bed.occupied && bed.status == 'available').length
       : 0;
   int get unusedBeds => beds.where((bed) => !bed.occupied).length;
-  String get arrangement => occupancy != null && !occupancy!.released
-      ? occupancy!.mode
+  int get contractuallyReservedBeds => hasReservation
+      ? capacity
+      : contractMembers.map((m) => m.bedId).toSet().length;
+  String get arrangement => contractGroups.isNotEmpty
+      ? (contractGroups.first.mode == 'exclusive_shared'
+          ? 'shared'
+          : contractGroups.first.mode)
       : (occupied == 0 && !hasReservation && physicallyAvailable > 0
           ? 'vacant'
           : 'uncontracted');
@@ -358,16 +415,22 @@ class RoomRecord {
                   : 'unavailable';
   String get occupancyLabel {
     if (!isActive) return 'Unavailable / Archived';
+    if (arrangement == 'standard_shared')
+      return occupied >= capacity
+          ? 'Standard Shared – Full'
+          : physicallyAvailable > 0
+              ? 'Standard Shared – Available'
+              : 'Standard Shared – Unavailable';
     final group = occupancy;
     if (hasReservation) {
       if (group == null) return 'Contract Reserved';
       if (group.members.any((m) => m.status == 'draft'))
-        return '${group.mode == 'solo' ? 'Solo' : 'Shared'} Reserved – Signing Pending';
+        return '${group.mode == 'solo' ? 'Solo' : 'Exclusive Shared'} Reserved – Signing Pending';
       if (group.mode == 'solo')
         return group.members.any((m) => m.status == 'active')
             ? 'Solo Occupied'
             : 'Solo Reserved';
-      return 'Shared – Fully Reserved';
+      return 'Exclusive Shared – Fully Reserved';
     }
     if (occupied >= capacity && capacity > 0) return 'Full';
     if (occupied == 0 && physicallyAvailable > 0) return 'Vacant';
@@ -551,7 +614,7 @@ String roomServiceError(Object error) {
     return 'Reactivate this room before assigning a tenant.';
   }
   if (message.contains('capacity')) {
-    return 'Each dormitory room must keep exactly four bed spaces.';
+    return message;
   }
   if (message.contains('foreign key')) {
     return 'This record has assignment history and cannot be deleted.';

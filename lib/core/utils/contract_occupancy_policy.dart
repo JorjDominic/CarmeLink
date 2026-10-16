@@ -16,10 +16,9 @@ Map<String, int> allocateContractRent(int totalCents, List<String> tenantIds) {
   if (totalCents < 0 ||
       totalCents > 999999999999 ||
       tenantIds.isEmpty ||
-      tenantIds.length > 4 ||
       tenantIds.toSet().length != tenantIds.length) {
     throw ArgumentError(
-        'Select one to four unique tenants and a valid room rent');
+        'Select unique registered tenants and a valid room rent');
   }
   final ids = [...tenantIds]..sort();
   return {
@@ -30,3 +29,25 @@ Map<String, int> allocateContractRent(int totalCents, List<String> tenantIds) {
 
 String rentCentsText(int cents) =>
     '${cents ~/ 100}.${(cents % 100).toString().padLeft(2, '0')}';
+
+String occupancyModeLabel(String mode) => switch (mode) {
+      'solo' => 'Solo Occupancy',
+      'standard_shared' => 'Standard Shared',
+      'shared' || 'exclusive_shared' => 'Exclusive Shared',
+      _ => mode,
+    };
+
+Map<String, int> occupancyRentalShares(String mode, int rentCents,
+    List<String> tenantIds, Map<String, int> individualRents) {
+  if (mode != 'standard_shared')
+    return allocateContractRent(rentCents, tenantIds);
+  final result = <String, int>{};
+  for (final id in tenantIds) {
+    final amount = individualRents[id];
+    if (amount == null || amount < 0 || amount > 999999999999) {
+      throw const FormatException('Enter each tenant’s agreed individual rent');
+    }
+    result[id] = amount;
+  }
+  return result;
+}

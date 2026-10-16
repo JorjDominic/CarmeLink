@@ -1674,7 +1674,7 @@ class _ContractEditorState extends State<_ContractEditor> {
                 tenantId: _tenantId,
                 tenants: tenants,
                 rent: _rent,
-                onChanged: (value) => _occupancy = value),
+                onChanged: (value) => setState(() => _occupancy = value)),
             const SizedBox(height: 28),
           ],
           if (widget.contract?.occupancySnapshot != null) ...[
@@ -1704,7 +1704,9 @@ class _ContractEditorState extends State<_ContractEditor> {
               decoration: InputDecoration(
                 labelText: widget.renewalOf == null
                     ? (_preparingOccupancy
-                        ? 'Total monthly room rent'
+                        ? (_occupancy?.mode == 'standard_shared'
+                            ? 'Agreed individual monthly rent'
+                            : 'Total monthly room rent')
                         : 'Monthly rent')
                     : 'New monthly rent',
                 helperText: widget.renewalOf == null
@@ -1859,8 +1861,11 @@ class _ContractEditorState extends State<_ContractEditor> {
           throw const FormatException(
               'Select a registered room and occupant beds');
         }
-        final shares = allocateContractRent(
-            parseRentCents(_rent.text), occupancy.beds.keys.toList());
+        final shares = occupancyRentalShares(
+            occupancy.mode,
+            parseRentCents(_rent.text),
+            occupancy.beds.keys.toList(),
+            {...occupancy.rents, _tenantId!: parseRentCents(_rent.text)});
         final confirmed = await showDialog<bool>(
             context: context,
             builder: (dialogContext) => AlertDialog(
@@ -1871,7 +1876,7 @@ class _ContractEditorState extends State<_ContractEditor> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                            '${occupancy.mode == 'solo' ? 'Solo' : 'Shared'} | ${shares.length} occupants | PHP ${_rent.text} total room rent'),
+                            '${occupancyModeLabel(occupancy.mode)} | ${shares.length} occupants | PHP ${_rent.text} ${occupancy.mode == 'standard_shared' ? 'individual rent' : 'total room rent'}'),
                         Text(
                             'Room ${RoomService.cachedRooms?.where((room) => room.id == occupancy.roomId).firstOrNull?.number ?? 'selected registered room'}'),
                         for (final id in shares.keys)
@@ -1899,6 +1904,8 @@ class _ContractEditorState extends State<_ContractEditor> {
               {
                 'tenant_id': id,
                 'bed_id': occupancy.beds[id],
+                if (occupancy.mode == 'standard_shared')
+                  'monthly_rent': rentCentsText(shares[id]!),
                 'security_deposit': id == _tenantId
                     ? rentCentsText(parseRentCents(_deposit.text))
                     : rentCentsText(occupancy.deposits[id] ?? 0)

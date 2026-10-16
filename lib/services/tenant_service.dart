@@ -113,21 +113,31 @@ class TenantService {
 
   Future<List<AvailableBed>> loadAvailableBeds() async {
     final client = SupabaseConfig.client;
-    final results = await Future.wait([
+    final results = await Future.wait<dynamic>([
       client
           .from('bed_spaces')
-          .select('id, label, rooms!inner(room_number, floor)')
+          .select('id, label, room_id, rooms!inner(room_number, floor)')
+          .isFilter('retired_at', null)
           .eq('status', 'available')
           .eq('rooms.is_active', true),
       client
           .from('tenant_assignments')
           .select('bed_space_id')
           .eq('status', 'active'),
+      client.rpc('get_room_contract_occupancies', params: const {}),
     ]);
-    final occupied =
-        results[1].map((row) => row['bed_space_id'] as String).toSet();
-    final beds = results[0]
-        .where((row) => !occupied.contains(row['id']))
+    final occupied = (results[1] as List)
+        .map((row) => row['bed_space_id'] as String)
+        .toSet();
+    final reservedRooms = (results[2] as List)
+        .where((g) => g['released'] != true && g['mode'] != 'standard_shared')
+        .map((g) => g['room_id'])
+        .toSet();
+    final beds = (results[0] as List)
+        .cast<Map<String, dynamic>>()
+        .where((row) =>
+            !occupied.contains(row['id']) &&
+            !reservedRooms.contains(row['room_id']))
         .map(AvailableBed.fromRow)
         .toList()
       ..sort((a, b) => a.displayName.compareTo(b.displayName));
