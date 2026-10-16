@@ -18,15 +18,21 @@ The demo works with the same Flutter screen on web, Android and iOS. Physical
 iOS builds still require the normal macOS/Xcode release process. It is not a
 completed payment on PayMongo and does not validate merchant API access.
 
-## Configure PayMongo sandbox later
+## Configure PayMongo sandbox on disposable staging only
+
+Follow [Phase 1 validation and setup](phase1-paymongo-validation.md). Test payments
+are blocked by default: both backend project pinning and database sample-bill
+registration are required. Never perform this setup on the production project.
 
 1. Create a PayMongo account and obtain public and secret **test** keys.
 2. Register an enabled webhook pointing to
-   `https://iuplkgvitovzjbmtzpme.supabase.co/functions/v1/paymongo-webhook`,
+   `https://<STAGING_PROJECT_REF>.supabase.co/functions/v1/paymongo-webhook`,
    subscribed to `payment.paid`, `payment.failed`, and `qrph.expired`.
 3. Store these in Supabase Edge Function secrets, never Flutter, source code or chat:
    `PAYMONGO_PUBLIC_KEY`, `PAYMONGO_SECRET_KEY`, `PAYMONGO_WEBHOOK_SECRET`,
-   and `PAYMONGO_ENVIRONMENT=test`.
+   and `PAYMONGO_ENVIRONMENT=test`. Also set
+   `PAYMONGO_DEPLOYMENT_ENVIRONMENT=staging` and pin
+   `PAYMONGO_TEST_SUPABASE_URL` to that disposable project's `SUPABASE_URL`.
 4. Refresh the owner's Billing setting and select Automatic. The backend checks
    the merchant credentials and matching enabled webhook before saving the mode.
 5. Create a payment request against a sample unpaid bill. Use **Open test payment
@@ -34,9 +40,10 @@ completed payment on PayMongo and does not validate merchant API access.
    test QR. Complete the simulation through the test URL. Live mode displays
    the actual provider payment QR.
 6. Check successful/failed/expired requests and repeat callbacks. Provider test
-   confirmations credit the shared payment ledger while the temporary
-   `demo_test_credits` setting is enabled. Entries are labeled Demo Test and
-   reduce the same bill balance used by manual records; no real money is received.
+   confirmations credit only registered sample bills in an explicitly marked
+   local/staging database with `demo_test_credits=true`. Production defaults
+   reject sandbox creation and settlement even if the legacy flag is true.
+   Test receipts are labelled as invalid for official collection.
 
 If a response omits the provider test URL, the app does not invent a payment
 link. Check the account/API response before continuing provider testing.
@@ -65,9 +72,10 @@ link. Check the account/API response before continuing provider testing.
   QR Ph source. Neither a client success screen nor an unverified callback pays
   a bill. Webhooks validate the raw-body HMAC and timestamp first.
 - Only the service role can settle payments. For the current demo, test
-  confirmations create labeled verified `payment_transactions` while
-  `payment_collection_settings.demo_test_credits` is true. Disable this setting
-  before real billing. Live confirmations create one verified transaction
+  confirmations create labeled verified `payment_transactions` only for
+  registered sample bills, with explicit local/staging opt-in and
+  `payment_collection_settings.demo_test_credits=true`. The flag alone never
+  authorizes production test credits. Live confirmations create one verified transaction
   per selected bill with immutable gateway provenance and a provider payment reference.
 - Owners remain the enabling actor in the existing required reviewer field;
   review notes explicitly identify automatic provider confirmation. This is
