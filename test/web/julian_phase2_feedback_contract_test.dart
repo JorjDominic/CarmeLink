@@ -107,7 +107,11 @@ void main() {
       expect(owner.contains("title: 'Cleaning compliance reports'"), isFalse);
       expect(
           owner.contains('return const MaintenanceManagementPage();'), isTrue);
-      expect(owner.contains('prominentCompactText: true'), isTrue);
+      // The merged maintenance destination now owns its summary-card layout.
+      final maintenance = File('lib/views/owner/staff_maintenance_page.dart')
+          .readAsStringSync();
+      expect(owner.contains('return const StaffMaintenancePage();'), isTrue);
+      expect(maintenance.contains('prominentCompactText: true'), isTrue);
       expect(owner.contains("title: 'Maintenance reports'"), isTrue);
       expect(owner.contains("title: 'Confidential reports'"), isTrue);
       expect(owner.contains("'Announcements, messages, and contact directory'"),

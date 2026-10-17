@@ -193,9 +193,12 @@ void main() {
     final list = await const PaymentService().listAllPayments();
     expect(list.single.latestTransactionId, proof);
     expect(list.single.categoryLabel, 'Aircon repair');
-    expect(
-        requests.lastWhere((r) => r.path == 'billing_charge_summaries').select,
-        contains('latest_transaction_status'));
+    // Verify the returned proof metadata; '*' also selects this field while
+    // allowing the same reader to work before optional receipt migrations.
+    expect(list.single.latestTransactionStatus, 'verified');
+    expect(list.single.isProofVerified, isTrue);
+    expect(list.single.collectedAmount, 350);
+    expect(list.single.outstandingAmount, 650);
   });
   test(
       'all billing reads include records beyond the server row limit and retain scope filters',

@@ -5,28 +5,29 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('October tester feedback contract', () {
     test(
-      'owner billing prioritizes review work and limits advance rent preview',
+      'owner proof review prioritizes submissions and excludes unsubmitted invoices',
       () {
         final source =
             File('lib/views/owner/owner_pages.dart').readAsStringSync();
 
         expect(
-          source.contains('int _paymentDisplayRank(Payment payment)'),
+          source.contains("String _filter = 'pending';"),
           isTrue,
         );
         expect(
-          source.contains('if (payment.isPending) return 0;'),
+          source.contains('return a.isProofPending ? -1 : 1;'),
           isTrue,
         );
         expect(
-          source.contains('BillingManagementPolicy.isFutureUnpaid(payment)'),
+          source.contains(
+              'p.hasPaymentSubmission && (target == null || p.id == target)'),
           isTrue,
         );
         expect(
           source.contains("Key('owner-advance-rent-toggle')"),
-          isTrue,
+          isFalse,
         );
-        expect(source.contains('Show upcoming bills'), isTrue);
+        expect(source.contains('Show upcoming bills'), isFalse);
       },
     );
 

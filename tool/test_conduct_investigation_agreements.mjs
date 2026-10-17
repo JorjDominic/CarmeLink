@@ -237,6 +237,27 @@ try {
     await actor('owner',false);await assert.rejects(db.query('delete from confidentiality_agreement_acceptances where id=$1',[acceptance]),/immutable/);
     await assert.rejects(db.query('update confidentiality_agreement_versions set version=\'edited\' where id=$1',[tenantAgreement]),/immutable/);
   });
+  for (const role of ['owner','caretaker']) {
+    await check(`${role} retains warnings, termination-review recommendations, appeal decisions, resolution and dismissal`, async()=>{
+      const active=await createCase();await actor(role);
+      await db.query("select issue_conduct_case_warning($1,$2,'Reviewed documented warning')",[active,await version(active)]);
+      assert.equal((await one('select issued_by from conduct_case_warnings where case_id=$1',[active])).issued_by,ids[role]);
+      await db.query("select recommend_conduct_termination_review($1,$2,'Documented recommendation for review only')",[active,await version(active)]);
+      await actor('tenant');
+      const appeal=(await one("select submit_conduct_case_appeal($1,'Please review this documented recommendation.','Fixture evidence') id",[active])).id;
+      await actor(role);
+      const appealVersion=(await one('select updated_at::text v from conduct_case_appeals where id=$1',[appeal])).v;
+      await db.query("select decide_conduct_case_appeal($1,$2,'accepted','Reviewed administrative appeal decision')",[appeal,appealVersion]);
+      await db.query("select set_conduct_case_review_status($1,$2,'resolved','Reviewed and resolved with documented notes')",[active,await version(active)]);
+      assert.equal((await one('select status from conduct_cases where id=$1',[active])).status,'resolved');
+      assert.equal((await one('select status from conduct_case_appeals where id=$1',[appeal])).status,'accepted');
+      const dismissed=await createCase();await actor(role);
+      await db.query("select set_conduct_case_review_status($1,$2,'dismissed','Reviewed evidence does not support this allegation')",[dismissed,await version(dismissed)]);
+      assert.equal((await one('select status from conduct_cases where id=$1',[dismissed])).status,'dismissed');
+      const events=(await db.query("select actor_id from conduct_case_events where case_id=any($1::uuid[]) and event_type in ('warning_issued','termination_review_recommended','resolved','dismissed')",[[active,dismissed]])).rows;
+      assert.equal(events.length,4);assert.ok(events.every(event=>event.actor_id===ids[role]));
+    });
+  }
   console.log(`${passed} conduct investigation, evidence and agreement database checks passed.`);
 } catch(error) { console.error(error.message);process.exitCode=1; }
 finally { await db.close(); }
