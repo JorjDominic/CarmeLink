@@ -67,6 +67,20 @@ export async function canReadReference(caller: SupabaseClient, reference: string
   return !payments.error && (payments.data?.length ?? 0) > 0
 }
 
+/// Cleanup is limited to detached uploads. Folder ownership alone must not let
+/// an uploader destroy evidence that a committed payment/report still uses.
+/// Use the server client so RLS cannot hide a reference from this safety check.
+export async function canDeleteReference(admin: Pick<SupabaseClient, 'from'>, reference: string) {
+  for (const [table, column] of [
+    ['payment_transactions', 'receipt_path'],
+    ['maintenance_reports', 'photo_path'],
+  ]) {
+    const result = await admin.from(table).select('id').eq(column, reference).limit(1)
+    if (result.error || !Array.isArray(result.data) || result.data.length > 0) return false
+  }
+  return true
+}
+
 export async function canAttachRecord(
   caller: SupabaseClient, kind: string, recordId: string, userId: string,
 ) {

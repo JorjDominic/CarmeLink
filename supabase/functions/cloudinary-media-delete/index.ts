@@ -1,5 +1,5 @@
 import {
-  authenticatedClients, cloudinaryConfig, corsHeaders, json, parseReference, sha1Hex,
+  authenticatedClients, canDeleteReference, cloudinaryConfig, corsHeaders, json, parseReference, sha1Hex,
 } from '../_shared/cloudinary.ts'
 
 Deno.serve(async (request) => {
@@ -13,6 +13,9 @@ Deno.serve(async (request) => {
     if (!ref) return json({ error: 'Invalid media reference' }, 400)
     // Users can clean up only objects created inside their own private folder.
     if (!ref.publicId.startsWith(`${auth.user.id}/`)) return json({ error: 'Forbidden' }, 403)
+    if (!(await canDeleteReference(auth.admin, body.reference))) {
+      return json({ error: 'Attached evidence cannot be deleted. Refresh the record before retrying cleanup.' }, 409)
+    }
     const { cloudName, apiKey, apiSecret } = cloudinaryConfig()
     const timestamp = Math.floor(Date.now() / 1000)
     const signature = await sha1Hex(`public_id=${ref.publicId}&timestamp=${timestamp}&type=authenticated${apiSecret}`)
