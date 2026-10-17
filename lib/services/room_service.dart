@@ -33,8 +33,9 @@ class RoomService {
           .order('room_number'),
       _client
           .from('bed_spaces')
-          .select('id, room_id, label, status')
-          .isFilter('retired_at', null)
+          // Older deployments have no retired_at column. Read the available
+          // fields and exclude retired beds below when the column exists.
+          .select()
           .order('label'),
       _client
           .from('tenant_assignments')
@@ -73,6 +74,7 @@ class RoomService {
     }
     final bedsByRoom = <String, List<BedRecord>>{};
     for (final row in results[1]) {
+      if (row['retired_at'] != null) continue;
       final bed = BedRecord.fromRow(
         {
           ...row,

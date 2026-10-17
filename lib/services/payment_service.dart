@@ -27,12 +27,10 @@ class PaymentService {
 
   SupabaseClient get _client => SupabaseConfig.client;
 
-  static const String _columns =
-      'id, contract_id, tenant_id, title, category, amount, due_date, status, '
-      'payment_method, reference_number, receipt_path, paid_at, '
-      'reviewed_by, reviewed_at, review_notes, created_at, updated_at, '
-      'remaining_balance, period_start, period_end, source, latest_transaction_id, '
-      'tenant_name, submitted_amount, notes, created_by, contract_amount, rent_adjustment, deposit_applied_amount, verified_amount, specific_category, latest_transaction_status, test_verified_amount, latest_gateway_session_id';
+  // Read the deployed view's fields so optional receipt metadata does not make
+  // all billing reads fail before its migration is deployed. Payment.fromJson
+  // accepts older summaries and preserves the metadata on newer deployments.
+  static const String _columns = '*';
 
   static const String _source = 'billing_charge_summaries';
 

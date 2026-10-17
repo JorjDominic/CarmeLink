@@ -116,8 +116,8 @@ class TenantService {
     final results = await Future.wait<dynamic>([
       client
           .from('bed_spaces')
-          .select('id, label, room_id, rooms!inner(room_number, floor)')
-          .isFilter('retired_at', null)
+          // Include retirement metadata only when the deployed schema has it.
+          .select('*, rooms!inner(room_number, floor)')
           .eq('status', 'available')
           .eq('rooms.is_active', true),
       client
@@ -136,6 +136,7 @@ class TenantService {
     final beds = (results[0] as List)
         .cast<Map<String, dynamic>>()
         .where((row) =>
+            row['retired_at'] == null &&
             !occupied.contains(row['id']) &&
             !reservedRooms.contains(row['room_id']))
         .map(AvailableBed.fromRow)
