@@ -1,0 +1,288 @@
+{
+  "date": "2026-10-17",
+  "timezone": "Asia/Manila",
+  "status": "PARTIALLY VERIFIED",
+  "baselineCommit": "d838530",
+  "initialBranch": "main",
+  "initialWorkingTree": "clean",
+  "versions": {
+    "flutter": "3.44.8",
+    "dart": "3.12.2",
+    "deno": "2.9.6",
+    "postgresql": "18.3"
+  },
+  "flutter": {
+    "baseline": {
+      "passed": 984,
+      "skipped": 1,
+      "failed": 3
+    },
+    "final": {
+      "passed": 1006,
+      "skipped": 1,
+      "failed": 0
+    },
+    "baselineAnalyzeIssues": 0,
+    "finalAnalyzeIssues": 0,
+    "skippedTest": "test/services/contract_occupancy_staging_test.dart",
+    "skipReason": "Disposable local Supabase Auth/Storage credentials and manifest not configured"
+  },
+  "edge": {
+    "baselinePassed": 36,
+    "finalPassed": 42,
+    "failed": 0,
+    "checkedTypeScriptFiles": 31,
+    "providerCalls": "mocked; no actual PayMongo or Cloudinary operation"
+  },
+  "backend": {
+    "scripts": [
+      {
+        "script": "test_conduct_investigation_agreements.mjs",
+        "exit": 0,
+        "checks": 16,
+        "log": "build\\phase6_validation\\test_conduct_investigation_agreements.log"
+      },
+      {
+        "script": "test_configured_concern_safety.mjs",
+        "exit": 0,
+        "checks": 5,
+        "log": "build\\phase6_validation\\test_configured_concern_safety.log"
+      },
+      {
+        "script": "test_contract_occupancy.mjs",
+        "exit": 0,
+        "checks": 19,
+        "log": "build\\phase6_validation\\test_contract_occupancy.log"
+      },
+      {
+        "script": "test_contract_renewals.mjs",
+        "exit": 0,
+        "checks": 20,
+        "log": "build\\phase6_validation\\test_contract_renewals.log"
+      },
+      {
+        "script": "test_deposit_charge_settlement.mjs",
+        "exit": 0,
+        "checks": 17,
+        "log": "build\\phase6_validation\\test_deposit_charge_settlement.log"
+      },
+      {
+        "script": "test_dynamic_room_occupancy.mjs",
+        "exit": 0,
+        "checks": 17,
+        "log": "build\\phase6_validation\\test_dynamic_room_occupancy.log"
+      },
+      {
+        "script": "test_evictions.mjs",
+        "exit": 0,
+        "checks": 19,
+        "log": "build\\phase6_validation\\test_evictions.log"
+      },
+      {
+        "script": "test_financial_receipt_integrity.mjs",
+        "exit": 0,
+        "checks": 12,
+        "log": "build\\phase6_validation\\test_financial_receipt_integrity.log"
+      },
+      {
+        "script": "test_payment_realtime_sync.mjs",
+        "exit": 0,
+        "checks": 0,
+        "log": "build\\phase6_validation\\test_payment_realtime_sync.log"
+      },
+      {
+        "script": "test_paymongo_phase1.mjs",
+        "exit": 0,
+        "checks": 22,
+        "log": "build\\phase6_validation\\test_paymongo_phase1.log"
+      },
+      {
+        "script": "test_phase2_report_notifications.mjs",
+        "exit": 0,
+        "checks": 37,
+        "log": "build\\phase6_validation\\test_phase2_report_notifications.log"
+      },
+      {
+        "script": "test_phase3_report_room_safety.mjs",
+        "exit": 0,
+        "checks": 21,
+        "log": "build\\phase6_validation\\test_phase3_report_room_safety.log"
+      },
+      {
+        "script": "test_phase4_financial_integrity.mjs",
+        "exit": 0,
+        "checks": 11,
+        "log": "build\\phase6_validation\\test_phase4_financial_integrity.log"
+      },
+      {
+        "script": "test_phase5_report_conduct.mjs",
+        "exit": 0,
+        "checks": 17,
+        "log": "build\\phase6_validation\\test_phase5_report_conduct.log"
+      },
+      {
+        "script": "test_reporting_configuration_safety.mjs",
+        "exit": 0,
+        "checks": 13,
+        "log": "build\\phase6_validation\\test_reporting_configuration_safety.log"
+      },
+      {
+        "script": "test_room_contract_display.mjs",
+        "exit": 0,
+        "checks": 11,
+        "log": "build\\phase6_validation\\test_room_contract_display.log"
+      },
+      {
+        "script": "test_room_transfers.mjs",
+        "exit": 0,
+        "checks": 14,
+        "log": "build\\phase6_validation\\test_room_transfers.log"
+      },
+      {
+        "script": "test_signed_contract_activation.mjs",
+        "exit": 0,
+        "checks": 0,
+        "log": "build\\phase6_validation\\test_signed_contract_activation.log"
+      },
+      {
+        "script": "test_system_qa_repairs.mjs",
+        "exit": 0,
+        "checks": 7,
+        "log": "build\\phase6_validation\\test_system_qa_repairs.log"
+      }
+    ],
+    "printedPassGroups": 278,
+    "summaryOnlyScripts": [
+      "test_payment_realtime_sync.mjs",
+      "test_signed_contract_activation.mjs"
+    ],
+    "additionalPaymongoFinalSchemaChecks": 22,
+    "additionalPGliteScripts": [
+      "jorge_staff_payment_local_test.mjs",
+      "nightly_curfew_local_test.mjs",
+      "payment_collection_settings_local_test.mjs",
+      "security_deposit_local_smoke_test.mjs",
+      "staff_payment_local_smoke_test.mjs"
+    ],
+    "localPostgres": [
+      {
+        "script": "test_contract_occupancy_concurrency",
+        "group": "occupancy",
+        "exit": 0,
+        "checks": 8
+      },
+      {
+        "script": "test_dynamic_room_concurrency",
+        "group": "rooms",
+        "exit": 0,
+        "checks": 6
+      },
+      {
+        "script": "test_paymongo_phase1_concurrency",
+        "group": "paymongo",
+        "exit": 0,
+        "checks": 2
+      },
+      {
+        "script": "test_conduct_investigation_agreements",
+        "group": "conduct",
+        "exit": 0,
+        "checks": 14
+      },
+      {
+        "script": "test_conduct_investigation_concurrency",
+        "group": "conduct",
+        "exit": 0,
+        "checks": 5
+      },
+      {
+        "script": "test_financial_receipt_integrity",
+        "group": "financial",
+        "exit": 0,
+        "checks": 12
+      },
+      {
+        "script": "test_financial_integrity_concurrency",
+        "group": "financial",
+        "exit": 0,
+        "checks": 4
+      }
+    ],
+    "independentContentionChecks": 25,
+    "note": "Functional fixture runs overlap. Printed PASS groups do not count every SQL assertion."
+  },
+  "builds": {
+    "web": "passed",
+    "androidApk": "passed; existing debug signing, not suitable for store release",
+    "ios": "not run; macOS/Xcode/device unavailable"
+  },
+  "nativeAndroid": {
+    "suite": "LocationReminderPolicyTest",
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+  },
+  "pdf": {
+    "receiptDocumentsChecked": 9,
+    "financialAndExecutiveContent": "passed",
+    "chronologyAcrossYearsAndUndatedRows": "passed",
+    "limitation": "Default-font Unicode warnings and physical printing/device export require visual acceptance"
+  },
+  "browser": [
+    {
+      "viewport": "desktop",
+      "errors": [],
+      "steps": [
+        "landing",
+        "rooms",
+        "staff_signin",
+        "signin_validation",
+        "browser_back",
+        "browser_forward",
+        "reload"
+      ]
+    },
+    {
+      "viewport": "mobile",
+      "errors": [],
+      "steps": [
+        "landing",
+        "menu",
+        "rooms",
+        "staff_signin",
+        "signin_validation",
+        "browser_back",
+        "browser_forward",
+        "reload"
+      ]
+    }
+  ],
+  "productionAtAuditCompletion": {
+    "migrationHistoryReadOnly": true,
+    "dataModified": false,
+    "migrationsDeployed": false,
+    "functionsDeployed": false,
+    "pendingMigrationVersions": [
+      "202610160001",
+      "202610160002",
+      "202610160003",
+      "202610160004",
+      "202610160005",
+      "202610160006",
+      "202610160007",
+      "202610160008",
+      "202610160009"
+    ]
+  },
+  "externalNotVerified": [
+    "full Supabase migration replay and Auth/Storage integration",
+    "actual PayMongo sandbox callback delivery",
+    "real GCash or bank QR payments",
+    "authenticated staging role acceptance",
+    "Cloudinary provider operations and attach/delete races",
+    "physical Android and iOS devices",
+    "APNs/FCM real background delivery",
+    "production secrets/backups/recovery"
+  ],
+  "rawEvidenceDirectory": "build/phase6_validation"
+}
