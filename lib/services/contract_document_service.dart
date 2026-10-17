@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import '../core/utils/database_write_outcome.dart';
 import '../core/constants/official_lease_content.dart';
 import '../models/models.dart';
 
@@ -97,8 +98,9 @@ class ContractDocumentService {
         mimeType: 'application/pdf',
         bytes: bytes,
       );
-    } catch (_) {
-      await _client.storage.from(_bucket).remove([path]);
+    } catch (error) {
+      if (isConfirmedDatabaseRejection(error))
+        await _removeUnregisteredFile(path);
       rethrow;
     }
     await finalizeDigitalExecution(contract);
@@ -142,9 +144,18 @@ class ContractDocumentService {
         mimeType: mimeType,
         bytes: bytes,
       );
-    } catch (_) {
-      await _client.storage.from(_bucket).remove([path]);
+    } catch (error) {
+      if (isConfirmedDatabaseRejection(error))
+        await _removeUnregisteredFile(path);
       rethrow;
+    }
+  }
+
+  Future<void> _removeUnregisteredFile(String path) async {
+    try {
+      await _client.storage.from(_bucket).remove([path]);
+    } catch (_) {
+      // Cleanup must not replace the original registration error.
     }
   }
 

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import '../core/utils/database_write_outcome.dart';
 import '../models/models.dart';
 import 'dormitory_configuration_service.dart';
 import 'app_notification_service.dart';
@@ -99,6 +100,7 @@ class MaintenanceService {
     }
 
     String? uploadedPath;
+    var photoUpdateStarted = false;
 
     try {
       uploadedPath = await _uploadPhoto(
@@ -108,6 +110,7 @@ class MaintenanceService {
         mimeType: photoMimeType,
       );
 
+      photoUpdateStarted = true;
       final updatedRow = await _client
           .from('maintenance_reports')
           .update({
@@ -122,7 +125,10 @@ class MaintenanceService {
 
       _notifySubmitted(report);
       return report;
-    } catch (_) {
+    } catch (error) {
+      // A lost response may follow a committed attachment update. Preserve the
+      // report and evidence so refreshing can recover the saved submission.
+      if (photoUpdateStarted && !isConfirmedDatabaseRejection(error)) rethrow;
       if (uploadedPath != null) {
         await _safeRemovePhoto(uploadedPath);
       }
@@ -229,8 +235,8 @@ class MaintenanceService {
       }
 
       return _fromRow(row);
-    } catch (_) {
-      if (uploadedPath != null) {
+    } catch (error) {
+      if (uploadedPath != null && isConfirmedDatabaseRejection(error)) {
         await _safeRemovePhoto(uploadedPath);
       }
 

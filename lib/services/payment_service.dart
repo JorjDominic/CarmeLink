@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
+import '../core/utils/database_write_outcome.dart';
 import '../models/models.dart';
 import 'app_notification_service.dart';
 import 'secure_media_service.dart';
@@ -129,8 +130,8 @@ class PaymentService {
       ));
 
       return payment;
-    } catch (_) {
-      if (uploadedPath != null) {
+    } catch (error) {
+      if (uploadedPath != null && isConfirmedDatabaseRejection(error)) {
         await _safeRemoveReceipt(uploadedPath);
       }
       rethrow;
@@ -195,8 +196,8 @@ class PaymentService {
           'p_notes': notes.trim(),
         },
       ) as Map);
-    } on PostgrestException {
-      await _safeRemoveReceipt(path);
+    } catch (error) {
+      if (isConfirmedDatabaseRejection(error)) await _safeRemoveReceipt(path);
       rethrow;
     }
     // A transport failure may have committed: keep evidence until retry resolves.
