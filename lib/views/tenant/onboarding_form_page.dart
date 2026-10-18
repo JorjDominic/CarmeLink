@@ -257,51 +257,36 @@ class _FormView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Progress indicator
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: Row(
-            children: List.generate(3, (index) {
-              final active = index <= step;
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: index < 2 ? 6 : 0),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: active
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.outlineVariant,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
+        OnboardingProgress(step: step),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              child: switch (step) {
-                0 => _Step1Welcome(key: const ValueKey(0)),
-                1 => _Step2Academic(
-                    key: const ValueKey(1),
-                    schoolCtrl: schoolCtrl,
-                    courseCtrl: courseCtrl,
-                    yearLevelCtrl: yearLevelCtrl,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: CarmelitaCard(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    child: switch (step) {
+                      0 => _Step1Welcome(key: const ValueKey(0)),
+                      1 => _Step2Academic(
+                          key: const ValueKey(1),
+                          schoolCtrl: schoolCtrl,
+                          courseCtrl: courseCtrl,
+                          yearLevelCtrl: yearLevelCtrl,
+                        ),
+                      _ => _Step3Emergency(
+                          key: const ValueKey(2),
+                          formKey: step3Key,
+                          nameCtrl: ecNameCtrl,
+                          phoneCtrl: ecPhoneCtrl,
+                          relationshipCtrl: ecRelationshipCtrl,
+                        ),
+                    },
                   ),
-                _ => _Step3Emergency(
-                    key: const ValueKey(2),
-                    formKey: step3Key,
-                    nameCtrl: ecNameCtrl,
-                    phoneCtrl: ecPhoneCtrl,
-                    relationshipCtrl: ecRelationshipCtrl,
-                  ),
-              },
+                ),
+              ),
             ),
           ),
         ),
@@ -832,4 +817,50 @@ Future<void> showEnterOnboardingCodeDialog(BuildContext context) async {
       ),
     );
   }
+}
+
+/// Shows only the existing three steps and supplied presentation state.
+class OnboardingProgress extends StatelessWidget {
+  const OnboardingProgress({required this.step, super.key});
+  final int step;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        child: Wrap(spacing: 12, runSpacing: 8, children: [
+          for (final (index, label) in const [
+            'Welcome',
+            'Academic details',
+            'Emergency contact'
+          ].indexed)
+            Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(
+                    color: index <= step
+                        ? Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: .08)
+                        : Theme.of(context).colorScheme.surface,
+                    border: Border.all(
+                        color: index <= step
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.outlineVariant),
+                    borderRadius: BorderRadius.circular(12)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(
+                      index < step
+                          ? Icons.check_circle_outline
+                          : Icons.radio_button_unchecked,
+                      size: 18,
+                      color: index <= step
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 8),
+                  Flexible(
+                      child: Text((index + 1).toString() + '. ' + label,
+                          style: Theme.of(context).textTheme.labelMedium)),
+                ])),
+        ]),
+      );
 }

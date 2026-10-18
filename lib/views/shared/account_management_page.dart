@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import '../../core/widgets/management_record_list.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -319,54 +320,50 @@ class AccountRecordCard extends StatelessWidget {
     final theme = Theme.of(context);
     final name = account['full_name'] as String;
     return CarmelitaCard(
-        onTap: onTap,
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            CircleAvatar(
-                child: Text(name.isEmpty ? '?' : name.substring(0, 1))),
-            const SizedBox(width: 12),
-            Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text(name,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 5),
-                  Text(account['email'] as String? ?? '',
-                      style: theme.textTheme.bodySmall),
-                ])),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right, size: 18),
-          ]),
-          const SizedBox(height: 12),
-          Wrap(spacing: 8, runSpacing: 6, children: [
-            StatusPill(roleLabel),
-            Chip(
-                avatar: const Icon(Icons.mark_email_read_outlined, size: 16),
-                label: Text(account['email_verification_status'] == 'verified'
-                    ? 'Email: Verified'
-                    : 'Email: Pending verification')),
-            Chip(
-                avatar: const Icon(Icons.phone_android, size: 16),
-                label: Text(account['phone_verification_status'] == 'verified'
-                    ? 'Mobile: Verified'
-                    : 'Mobile: On hold')),
-          ]),
-          const Divider(height: 24),
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(Icons.phone_outlined,
-                size: 16, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(width: 8),
-            Expanded(
-                child: Text(
-                    (account['phone'] as String?)?.isNotEmpty == true
-                        ? account['phone'] as String
-                        : 'No phone number',
-                    style: theme.textTheme.bodySmall)),
-          ]),
-        ]));
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        CircleAvatar(
+            radius: 20, child: Text(name.isEmpty ? '?' : name.substring(0, 1))),
+        const SizedBox(width: 12),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(name,
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(account['email'] as String? ?? '',
+              style: theme.textTheme.bodySmall),
+          const SizedBox(height: 4),
+          Text(
+              (account['phone'] as String?)?.isNotEmpty == true
+                  ? account['phone'] as String
+                  : 'No phone number',
+              style: theme.textTheme.bodySmall),
+          const SizedBox(height: 10),
+          Wrap(
+              spacing: 10,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                StatusPill(roleLabel),
+                Text(
+                    account['email_verification_status'] == 'verified'
+                        ? 'Email: Verified'
+                        : 'Email: Pending verification',
+                    style: theme.textTheme.labelSmall),
+                Text(
+                    account['phone_verification_status'] == 'verified'
+                        ? 'Mobile: Verified'
+                        : 'Mobile: On hold',
+                    style: theme.textTheme.labelSmall),
+              ]),
+        ])),
+        const SizedBox(width: 6),
+        const Icon(Icons.chevron_right, size: 18),
+      ]),
+    );
   }
 }
 
@@ -490,23 +487,33 @@ class _EditAccountSheetState extends State<_EditAccountSheet> {
               const SizedBox(height: 6),
               StatusPill(_roleLabel(widget.account['role'] as String)),
               const SizedBox(height: 18),
-              TextField(
-                  controller: fullName,
-                  enabled: !loading,
-                  decoration: const InputDecoration(labelText: 'Full name')),
-              const SizedBox(height: 12),
-              TextField(
-                  controller: email,
-                  enabled: !loading,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration:
-                      const InputDecoration(labelText: 'Email address')),
-              const SizedBox(height: 12),
-              TextField(
-                  controller: phone,
-                  enabled: !loading,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Phone number')),
+              RecordSection(
+                title: 'Contact information',
+                icon: Icons.contact_page_outlined,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                          controller: fullName,
+                          enabled: !loading,
+                          decoration:
+                              const InputDecoration(labelText: 'Full name')),
+                      const SizedBox(height: 12),
+                      TextField(
+                          controller: email,
+                          enabled: !loading,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                              labelText: 'Email address')),
+                      const SizedBox(height: 12),
+                      TextField(
+                          controller: phone,
+                          enabled: !loading,
+                          keyboardType: TextInputType.phone,
+                          decoration:
+                              const InputDecoration(labelText: 'Phone number')),
+                    ]),
+              ),
               if (errorMessage != null) ...[
                 const SizedBox(height: 14),
                 _InlineError(message: errorMessage!),

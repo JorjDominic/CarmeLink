@@ -1,3 +1,7 @@
+import '../../core/widgets/chat_workspace.dart';
+import '../../core/widgets/workspace_columns.dart';
+import '../../core/widgets/notice_content.dart';
+import '../../core/widgets/financial_summary.dart';
 import '../../core/widgets/record_details.dart';
 import '../shared/payment_receipt_history.dart';
 import '../shared/confidentiality_agreements_page.dart';
@@ -882,26 +886,34 @@ class TenantQuickPreview extends StatelessWidget {
           const SizedBox(height: 6),
           StatusPill(_residencyLabel(tenant.residencyStatus)),
           const Divider(height: 32),
-          InfoRow(
-            label: 'Room and bed',
-            value: '${tenant.room} • ${tenant.bedSpace}',
-            icon: Icons.bed_outlined,
-          ),
-          Material(
-            type: MaterialType.transparency,
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.phone_outlined),
-              title: const Text('Phone'),
-              subtitle: Text(tenant.phone),
-              trailing: const Icon(Icons.call_outlined),
-              onTap: () => _openPhoneDialer(context, tenant.phone),
-            ),
-          ),
-          InfoRow(
-            label: 'Guardian',
-            value: tenant.guardianName,
-            icon: Icons.family_restroom_outlined,
+          RecordSection(
+            title: 'Contact & residence',
+            icon: Icons.person_outline,
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  InfoRow(
+                    label: 'Room and bed',
+                    value: '${tenant.room} • ${tenant.bedSpace}',
+                    icon: Icons.bed_outlined,
+                  ),
+                  Material(
+                    type: MaterialType.transparency,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.phone_outlined),
+                      title: const Text('Phone'),
+                      subtitle: Text(tenant.phone),
+                      trailing: const Icon(Icons.call_outlined),
+                      onTap: () => _openPhoneDialer(context, tenant.phone),
+                    ),
+                  ),
+                  InfoRow(
+                    label: 'Guardian',
+                    value: tenant.guardianName,
+                    icon: Icons.family_restroom_outlined,
+                  ),
+                ]),
           ),
           const SizedBox(height: 24),
           FilledButton.icon(
@@ -978,133 +990,287 @@ class TenantDetailsPage extends StatelessWidget {
               ),
             ]
           : null,
-      child: Column(
-        children: [
-          CarmelitaCard(
-            child: Column(
-              children: [
-                InfoRow(
-                  label: 'Room',
-                  value: '${tenant.room} • ${tenant.bedSpace}',
-                  icon: Icons.meeting_room_outlined,
+      child: WorkspaceColumns(
+        asideWidth: 360,
+        aside: CarmelitaCard(
+          child: Column(
+            children: [
+              InfoRow(
+                label: 'Room',
+                value: '${tenant.room} • ${tenant.bedSpace}',
+                icon: Icons.meeting_room_outlined,
+              ),
+              Material(
+                type: MaterialType.transparency,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.phone_outlined),
+                  title: const Text('Phone'),
+                  subtitle: Text(tenant.phone),
+                  trailing: const Icon(Icons.call_outlined),
+                  onTap: () => _openPhoneDialer(context, tenant.phone),
                 ),
-                Material(
-                  type: MaterialType.transparency,
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.phone_outlined),
-                    title: const Text('Phone'),
-                    subtitle: Text(tenant.phone),
-                    trailing: const Icon(Icons.call_outlined),
-                    onTap: () => _openPhoneDialer(context, tenant.phone),
-                  ),
+              ),
+              InfoRow(
+                label: 'Guardian',
+                value: tenant.guardianName,
+                icon: Icons.family_restroom_outlined,
+              ),
+              Material(
+                type: MaterialType.transparency,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.contact_phone_outlined),
+                  title: const Text('Guardian phone'),
+                  subtitle: Text(tenant.guardianPhone),
+                  trailing: const Icon(Icons.call_outlined),
+                  onTap: () => _openPhoneDialer(context, tenant.guardianPhone),
                 ),
-                InfoRow(
-                  label: 'Guardian',
-                  value: tenant.guardianName,
-                  icon: Icons.family_restroom_outlined,
-                ),
-                Material(
-                  type: MaterialType.transparency,
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.contact_phone_outlined),
-                    title: const Text('Guardian phone'),
-                    subtitle: Text(tenant.guardianPhone),
-                    trailing: const Icon(Icons.call_outlined),
-                    onTap: () =>
-                        _openPhoneDialer(context, tenant.guardianPhone),
-                  ),
-                ),
-                InfoRow(
-                    label: 'Residency status',
-                    value: _residencyLabel(tenant.residencyStatus),
-                    icon: Icons.badge_outlined),
-                InfoRow(
-                    label: 'Contract starts',
-                    value: _dateOrNone(tenant.contractStartsOn),
-                    icon: Icons.event_available_outlined),
-                InfoRow(
-                    label: 'Contract ends',
-                    value: _dateOrNone(tenant.contractEndsOn),
-                    icon: Icons.event_busy_outlined),
-              ],
-            ),
+              ),
+              InfoRow(
+                  label: 'Residency status',
+                  value: _residencyLabel(tenant.residencyStatus),
+                  icon: Icons.badge_outlined),
+              InfoRow(
+                  label: 'Contract starts',
+                  value: _dateOrNone(tenant.contractStartsOn),
+                  icon: Icons.event_available_outlined),
+              InfoRow(
+                  label: 'Contract ends',
+                  value: _dateOrNone(tenant.contractEndsOn),
+                  icon: Icons.event_busy_outlined),
+            ],
           ),
-          if (showChecklist) ...[
-            const SizedBox(height: 14),
-            CarmelitaCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.assignment_turned_in_outlined,
-                          size: 20, color: Color(0xFF627FA8)),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: SectionTitle('Onboarding checklist'),
-                      ),
-                      StatusPill(
-                          hasActiveContract && !needsBed && !needsGuardian
-                              ? 'Complete'
-                              : 'In progress'),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Contract: ${hasActiveContract ? 'Active' : draftContract != null ? 'Draft (${draftContract.contractNumber})' : 'Not created'}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: hasActiveContract
-                          ? const Color(0xFF56886B)
-                          : draftContract != null
-                              ? const Color(0xFF627FA8)
-                              : const Color(0xFFB3261E),
+        ),
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (showChecklist) ...[
+              const SizedBox(height: 14),
+              CarmelitaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.assignment_turned_in_outlined,
+                            size: 20, color: Color(0xFF627FA8)),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: SectionTitle('Onboarding checklist'),
+                        ),
+                        StatusPill(
+                            hasActiveContract && !needsBed && !needsGuardian
+                                ? 'Complete'
+                                : 'In progress'),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Room & Bed: ${needsBed ? 'Not assigned' : '${tenant.room} • ${tenant.bedSpace}'}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: needsBed
-                          ? const Color(0xFFB3261E)
-                          : const Color(0xFF56886B),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Primary guardian: ${needsGuardian ? 'Not assigned' : tenant.guardianName}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: needsGuardian
-                          ? const Color(0xFFB3261E)
-                          : const Color(0xFF56886B),
-                    ),
-                  ),
-                  if (draftContract != null) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 10),
                     Text(
-                      'Signatures: ${switch (draftContract.signatureStatus) {
-                        'signed' || 'verified' => 'Signatures verified',
-                        'pending_tenant' => 'Awaiting tenant signature',
-                        'pending_guardian' => 'Awaiting guardian signature',
-                        'not_generated' => 'Signatures pending',
-                        _ => draftContract.signatureStatus,
-                      }}',
+                      'Contract: ${hasActiveContract ? 'Active' : draftContract != null ? 'Draft (${draftContract.contractNumber})' : 'Not created'}',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        color: draftContract.signatureStatus == 'verified'
+                        color: hasActiveContract
                             ? const Color(0xFF56886B)
-                            : const Color(0xFF627FA8),
+                            : draftContract != null
+                                ? const Color(0xFF627FA8)
+                                : const Color(0xFFB3261E),
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Room & Bed: ${needsBed ? 'Not assigned' : '${tenant.room} • ${tenant.bedSpace}'}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: needsBed
+                            ? const Color(0xFFB3261E)
+                            : const Color(0xFF56886B),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Primary guardian: ${needsGuardian ? 'Not assigned' : tenant.guardianName}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: needsGuardian
+                            ? const Color(0xFFB3261E)
+                            : const Color(0xFF56886B),
+                      ),
+                    ),
+                    if (draftContract != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Signatures: ${switch (draftContract.signatureStatus) {
+                          'signed' || 'verified' => 'Signatures verified',
+                          'pending_tenant' => 'Awaiting tenant signature',
+                          'pending_guardian' => 'Awaiting guardian signature',
+                          'not_generated' => 'Signatures pending',
+                          _ => draftContract.signatureStatus,
+                        }}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: draftContract.signatureStatus == 'verified'
+                              ? const Color(0xFF56886B)
+                              : const Color(0xFF627FA8),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    if (needsContract)
+                      FilledButton.icon(
+                        key: const Key('web-tenant-onboarding-action'),
+                        onPressed: () async {
+                          final saved = await showContractEditor(
+                            context,
+                            initialTenantId: tenant.id,
+                            initialTenantName: tenant.name,
+                            lockTenant: true,
+                          );
+                          if (saved == true && context.mounted) {
+                            TenantService.invalidateCache();
+                            await OwnerController.instance
+                                .loadContracts(force: true);
+                            await OwnerController.instance
+                                .loadTenants(force: true);
+                            if (!context.mounted) return;
+                            final proceed = await showDialog<bool>(
+                              context: context,
+                              builder: (dialogCtx) => AlertDialog(
+                                icon: const Icon(Icons.check_circle_outline,
+                                    color: Color(0xFF56886B)),
+                                title: const Text('Contract draft saved'),
+                                content: Text(
+                                  'Draft contract saved for ${tenant.name}. Proceed to room assignment and guardian linking now?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(dialogCtx, false),
+                                    child: const Text('Finish later'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () =>
+                                        Navigator.pop(dialogCtx, true),
+                                    child: const Text('Continue onboarding'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (proceed == true && context.mounted) {
+                              await continueTenantOnboarding(
+                                context,
+                                tenantId: tenant.id,
+                                tenantName: tenant.name,
+                                showConfirmation: false,
+                              );
+                              if (context.mounted) {
+                                await OwnerController.instance
+                                    .loadTenants(force: true);
+                                await OwnerController.instance
+                                    .loadContracts(force: true);
+                              }
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.description_outlined),
+                        label: const Text('Create draft contract'),
+                      ),
+                    if (needsBed || needsGuardian) ...[
+                      if (needsContract) const SizedBox(height: 8),
+                      FilledButton.icon(
+                        key: const Key('web-tenant-residency-setup-action'),
+                        onPressed: () async {
+                          await continueTenantOnboarding(
+                            context,
+                            tenantId: tenant.id,
+                            tenantName: tenant.name,
+                            fromSavedContract: false,
+                            showConfirmation: false,
+                          );
+                          if (context.mounted) {
+                            TenantService.invalidateCache();
+                            await OwnerController.instance
+                                .loadTenants(force: true);
+                            await OwnerController.instance
+                                .loadContracts(force: true);
+                          }
+                        },
+                        icon: const Icon(Icons.bed_outlined),
+                        label: Text(needsBed && needsGuardian
+                            ? 'Set up room and guardian'
+                            : needsBed
+                                ? 'Assign room and bed'
+                                : 'Link guardian'),
+                      ),
+                    ],
+                    if (draftContract != null) ...[
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => showContractOnboardingChecklist(
+                          context,
+                          contract: draftContract,
+                        ),
+                        icon: const Icon(Icons.fact_check_outlined),
+                        label: const Text('Required documents & signers'),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => showOnboardingInvitations(
+                        context,
+                        tenantId: tenant.id,
+                        tenantName: tenant.name,
+                      ),
+                      icon: const Icon(Icons.qr_code_2_outlined),
+                      label: const Text('Onboarding QR & profile'),
+                    ),
                   ],
-                  const SizedBox(height: 14),
-                  if (needsContract)
+                ),
+              ),
+            ],
+            if (_showOnboardingIncomplete && tenant.hasContract == false) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.pending_actions_outlined,
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Onboarding incomplete',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onErrorContainer,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'This tenant does not have a contract yet. Create a draft to continue onboarding.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     FilledButton.icon(
-                      key: const Key('web-tenant-onboarding-action'),
                       onPressed: () async {
                         final saved = await showContractEditor(
                           context,
@@ -1113,169 +1279,20 @@ class TenantDetailsPage extends StatelessWidget {
                           lockTenant: true,
                         );
                         if (saved == true && context.mounted) {
-                          TenantService.invalidateCache();
-                          await OwnerController.instance
-                              .loadContracts(force: true);
-                          await OwnerController.instance
-                              .loadTenants(force: true);
-                          if (!context.mounted) return;
-                          final proceed = await showDialog<bool>(
-                            context: context,
-                            builder: (dialogCtx) => AlertDialog(
-                              icon: const Icon(Icons.check_circle_outline,
-                                  color: Color(0xFF56886B)),
-                              title: const Text('Contract draft saved'),
-                              content: Text(
-                                'Draft contract saved for ${tenant.name}. Proceed to room assignment and guardian linking now?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(dialogCtx, false),
-                                  child: const Text('Finish later'),
-                                ),
-                                FilledButton(
-                                  onPressed: () =>
-                                      Navigator.pop(dialogCtx, true),
-                                  child: const Text('Continue onboarding'),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (proceed == true && context.mounted) {
-                            await continueTenantOnboarding(
-                              context,
-                              tenantId: tenant.id,
-                              tenantName: tenant.name,
-                              showConfirmation: false,
-                            );
-                            if (context.mounted) {
-                              await OwnerController.instance
-                                  .loadTenants(force: true);
-                              await OwnerController.instance
-                                  .loadContracts(force: true);
-                            }
-                          }
+                          Navigator.pop(context);
                         }
                       },
                       icon: const Icon(Icons.description_outlined),
-                      label: const Text('Create draft contract'),
-                    ),
-                  if (needsBed || needsGuardian) ...[
-                    if (needsContract) const SizedBox(height: 8),
-                    FilledButton.icon(
-                      key: const Key('web-tenant-residency-setup-action'),
-                      onPressed: () async {
-                        await continueTenantOnboarding(
-                          context,
-                          tenantId: tenant.id,
-                          tenantName: tenant.name,
-                          fromSavedContract: false,
-                          showConfirmation: false,
-                        );
-                        if (context.mounted) {
-                          TenantService.invalidateCache();
-                          await OwnerController.instance
-                              .loadTenants(force: true);
-                          await OwnerController.instance
-                              .loadContracts(force: true);
-                        }
-                      },
-                      icon: const Icon(Icons.bed_outlined),
-                      label: Text(needsBed && needsGuardian
-                          ? 'Set up room and guardian'
-                          : needsBed
-                              ? 'Assign room and bed'
-                              : 'Link guardian'),
+                      label: const Text('Create contract'),
                     ),
                   ],
-                  if (draftContract != null) ...[
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: () => showContractOnboardingChecklist(
-                        context,
-                        contract: draftContract,
-                      ),
-                      icon: const Icon(Icons.fact_check_outlined),
-                      label: const Text('Required documents & signers'),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => showOnboardingInvitations(
-                      context,
-                      tenantId: tenant.id,
-                      tenantName: tenant.name,
-                    ),
-                    icon: const Icon(Icons.qr_code_2_outlined),
-                    label: const Text('Onboarding QR & profile'),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
-          if (_showOnboardingIncomplete && tenant.hasContract == false) ...[
+            ],
             const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.errorContainer,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.pending_actions_outlined,
-                        color: Theme.of(context).colorScheme.onErrorContainer,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Onboarding incomplete',
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onErrorContainer,
-                                  ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'This tenant does not have a contract yet. Create a draft to continue onboarding.',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onErrorContainer,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: () async {
-                      final saved = await showContractEditor(
-                        context,
-                        initialTenantId: tenant.id,
-                        initialTenantName: tenant.name,
-                        lockTenant: true,
-                      );
-                      if (saved == true && context.mounted) {
-                        Navigator.pop(context);
-                      }
-                    },
-                    icon: const Icon(Icons.description_outlined),
-                    label: const Text('Create contract'),
-                  ),
-                ],
-              ),
-            ),
+            _TenantAssignmentManager(tenant: tenant),
           ],
-          const SizedBox(height: 14),
-          _TenantAssignmentManager(tenant: tenant),
-        ],
+        ),
       ),
     );
   }
@@ -8152,7 +8169,8 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
               const CollapsibleInfoCard(
                 title: 'Visitor policy',
                 icon: Icons.rule_outlined,
-                body: 'Visitor policy: requests are filed at least one calendar day in advance, '
+                body:
+                    'Visitor policy: requests are filed at least one calendar day in advance, '
                     'visiting hours are 9:00 AM–9:00 PM, and visitors leave the same day. '
                     'Arrival can only be recorded after staff approval.',
               ),

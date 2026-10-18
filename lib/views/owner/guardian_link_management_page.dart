@@ -139,15 +139,27 @@ class GuardianLinkCard extends StatelessWidget {
               const Icon(Icons.chevron_right),
           ]),
           const Divider(height: 24),
-          identity('Guardian', guardian?['full_name'] as String? ?? 'Guardian',
-              Icons.person_outline),
-          const Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Icon(Icons.south, size: 16))),
-          identity('Tenant', tenant?['full_name'] as String? ?? 'Tenant',
-              Icons.home_outlined),
+          LayoutBuilder(builder: (context, bounds) {
+            final columns = bounds.maxWidth >= 440 &&
+                    MediaQuery.textScalerOf(context).scale(1) <= 1.3
+                ? 2
+                : 1;
+            final width = (bounds.maxWidth - 16 * (columns - 1)) / columns;
+            return Wrap(spacing: 16, runSpacing: 12, children: [
+              SizedBox(
+                  width: width,
+                  child: identity(
+                      'Guardian',
+                      guardian?['full_name'] as String? ?? 'Guardian',
+                      Icons.person_outline)),
+              SizedBox(
+                  width: width,
+                  child: identity(
+                      'Tenant',
+                      tenant?['full_name'] as String? ?? 'Tenant',
+                      Icons.home_outlined)),
+            ]);
+          }),
         ]));
   }
 }
@@ -294,6 +306,7 @@ class _GuardianLinkEditorState extends State<_GuardianLinkEditor> {
                   const SizedBox(height: 18),
                   DropdownButtonFormField<String>(
                     initialValue: guardianId,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Guardian'),
                     items: guardians
                         .map(
@@ -310,6 +323,7 @@ class _GuardianLinkEditorState extends State<_GuardianLinkEditor> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: tenantId,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Tenant'),
                     items: tenants
                         .map(
