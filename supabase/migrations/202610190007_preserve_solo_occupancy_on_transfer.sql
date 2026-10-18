@@ -80,8 +80,11 @@ begin
   insert into public.solo_occupancy_relocations(occupancy_id,transfer_id,source_room_id,destination_room_id,previous_snapshot,current_snapshot)
     values(g.id,t.id,g.room_id,r.id,v_previous,v_current);
   update public.contract_occupancy_arrangements set room_id=r.id,snapshot=v_current where id=g.id;
-  -- Refresh both room cards through the existing rooms realtime channel.
-  update public.rooms set updated_at=clock_timestamp() where id in (g.room_id,r.id);
+  -- Normal owner transfers refresh both cards through rooms realtime. A CLI
+  -- migration has no app user; its repair must not invoke owner-only room writes.
+  if auth.uid() is not null then
+    update public.rooms set updated_at=clock_timestamp() where id in (g.room_id,r.id);
+  end if;
   return true;
 end $$;
 revoke all on function public.relocate_completed_solo_occupancy(uuid,boolean) from public,anon,authenticated;

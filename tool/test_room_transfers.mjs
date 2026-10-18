@@ -269,7 +269,14 @@ try{
     const renewalSql=source('202610190006_occupancy_contract_renewals.sql');
     const helperStart=renewalSql.indexOf('create or replace function public.renewal_occupancy_snapshot(');
     await db.exec(renewalSql.slice(helperStart,renewalSql.indexOf('$$;',helperStart)+3));
+    await db.exec('alter table rooms add column layout_number text,add column layout_floor text');
+    const lifecycleSql=source('202610160004_dynamic_physical_room_capacity.sql');
+    const lifecycleStart=lifecycleSql.indexOf('create or replace function public.protect_room_lifecycle(');
+    await db.exec(lifecycleSql.slice(lifecycleStart,lifecycleSql.indexOf('end;',lifecycleStart)+4)+'\n$$;');
+    await db.exec('create trigger protect_room_lifecycle before update on rooms for each row execute function protect_room_lifecycle()');
+    await actor(null,null);
     await db.exec(source('202610190007_preserve_solo_occupancy_on_transfer.sql'));
+    await actor(owner,'owner');
     await db.exec('create trigger aa_contract_occupancy_terms before insert or update or delete on tenant_contracts for each row execute function guard_contract_occupancy_terms()');
     for(const name of ['guard_occupancy_bed_metadata','guard_occupancy_room_metadata']) {
       const metadataSql=source(name==='guard_occupancy_bed_metadata' ? '202610130002_contract_occupancy_stabilization.sql' : '202610130001_contract_room_occupancy.sql');
