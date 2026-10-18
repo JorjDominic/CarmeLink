@@ -18,7 +18,9 @@ async function object(path,mime='image/png'){
 }
 async function publish(t){const path=`${t}/documents/amendment.pdf`;await object(path,'application/pdf');
   await db.query('select publish_room_transfer($1,$2,$3)',[t,path,hash]);}
-async function sign(t,role,name=null){
+async function sign(t,role,name=null,acknowledge=true){
+  if(role==='tenant' && acknowledge && (await row('select tenant_id=auth.uid() as own from room_transfers where id=$1',[t]))?.own)
+    await db.query('select acknowledge_room_transfer_notice($1,$2)',[t,hash]);
   const path=`${t}/signatures/${role}-${sequence++}.png`;await object(path);
   await db.query('select sign_room_transfer($1,$2,$3,$4,$5,$6)',[t,role,path,signatureHash,hash,name]);
 }
@@ -71,6 +73,8 @@ try{
   `);
   await db.exec(source('202609100002_complete_tenant_directory.sql'));
   await db.exec(source('202610090006_signed_room_transfers.sql'));
+  await db.exec('create role service_role bypassrls;create publication supabase_realtime;');
+  await db.exec(source('202610180006_room_transfer_notice_acknowledgment.sql'));
   await db.query("insert into profiles values($1,'Owner','owner'),($2,'Caretaker','caretaker'),($3,'Stranger','tenant'),($4,'Guardian','guardian')",[owner,caretaker,stranger,guardian]);
   await actor(owner,'owner');
   const f=await fixture(), t=await propose(f);
@@ -101,13 +105,25 @@ try{
     await actor(f.tenant,'tenant');
     const path=`${t}/signatures/tenant-1.png`;await object(path);
     await assert.rejects(db.query('select sign_room_transfer($1,$2,$3,$4,$5)',[t,'tenant',path,signatureHash,'c'.repeat(64)]),/Review the current amendment/);
-    await sign(t,'tenant');
+    await sign(t,'tenant',null,false);
     assert.equal((await row("select status from room_transfer_signers where transfer_id=$1 and signer_role='tenant'",[t])).status,'signed');
     await actor(owner,'owner');
     await assert.rejects(db.query('select complete_room_transfer($1)',[t]),/Every required/);
     await verify(t);await sign(t,'lessor');
   });
   await check('completion moves the tenant once, retains signed terms and releases the reservation',async()=>{
+    await assert.rejects(db.query('select complete_room_transfer($1)',[t]),/must review and acknowledge/);
+    assert.equal((await row('select status from tenant_assignments where id=$1',[f.assignment])).status,'active');
+    for(const [uid,role] of [[owner,'owner'],[guardian,'guardian'],[stranger,'tenant']]){
+      await actor(uid,role);await assert.rejects(db.query('select acknowledge_room_transfer_notice($1,$2)',[t,hash]),/Only the moving tenant/);
+    }
+    await actor(f.tenant,'tenant');
+    await assert.rejects(db.query('select acknowledge_room_transfer_notice($1,$2)',[t,'c'.repeat(64)]),/current published amendment/);
+    await db.query('select acknowledge_room_transfer_notice($1,$2)',[t,hash]);
+    await db.query('select acknowledge_room_transfer_notice($1,$2)',[t,hash]);
+    assert.equal((await row('select count(*)::int n from room_transfer_notice_acknowledgments where transfer_id=$1',[t])).n,1);
+    await assert.rejects(db.query('delete from room_transfer_notice_acknowledgments where transfer_id=$1',[t]),/cannot be edited/);
+    await actor(owner,'owner');
     await db.query('select complete_room_transfer($1)',[t]);await db.query('select complete_room_transfer($1)',[t]);
     assert.equal((await transfer(t)).status,'completed');
     const active=await row("select count(*)::int n,max(bed_space_id::text) bed from tenant_assignments where tenant_id=$1 and status='active'",[f.tenant]);

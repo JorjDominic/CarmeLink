@@ -34,7 +34,13 @@ class _RoomTransferPageState extends State<RoomTransferPage> {
     super.initState();
     _load();
     _subscription = TableRefreshSubscription(
-        'room-transfers', ['room_transfers', 'room_transfer_signers'], _load);
+        'room-transfers',
+        [
+          'room_transfers',
+          'room_transfer_signers',
+          'room_transfer_notice_acknowledgments'
+        ],
+        _load);
   }
 
   @override
@@ -152,6 +158,11 @@ class _RoomTransferPageState extends State<RoomTransferPage> {
   }
 
   Future<void> _sign(RoomTransfer transfer, RoomTransferSigner signer) async {
+    if (signer.role == 'tenant' && !transfer.noticeAcknowledged) {
+      showAppSnackBar(context,
+          'Review and acknowledge the transfer notice before signing.');
+      return;
+    }
     if (!_viewed.contains(transfer.documentHash)) {
       showAppSnackBar(
           context, 'Open and review the amendment PDF before signing.');
@@ -279,6 +290,44 @@ class _RoomTransferPageState extends State<RoomTransferPage> {
                   Text(
                       'Effective: ${t.effectiveOn.toIso8601String().split('T').first} · ${t.status.replaceAll('_', ' ')}'),
                   Text('Reason: ${t.reason}'),
+                  if (t.status == 'awaiting_signatures') ...[
+                    Text(t.noticeAcknowledged
+                        ? 'Transfer notice acknowledged by the moving tenant.'
+                        : 'Required: the moving tenant must review and acknowledge this notice. The move cannot be completed until acknowledgment and all signatures are verified.'),
+                    if (user?.role == UserRole.tenant &&
+                        user?.id == t.tenantId &&
+                        !t.noticeAcknowledged)
+                      OutlinedButton(
+                          onPressed: _busy || !_viewed.contains(t.documentHash)
+                              ? null
+                              : () async {
+                                  final accepted = await showDialog<bool>(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                              title: const Text(
+                                                  'Acknowledge room transfer notice'),
+                                              content: Text(
+                                                  'I have reviewed the amendment for ${t.source} to ${t.destination}, the effective date and the reason. My acknowledgment does not replace the required signature.'),
+                                              actions: [
+                                                TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                            context, false),
+                                                    child: const Text('Back')),
+                                                FilledButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                            context, true),
+                                                    child: const Text(
+                                                        'I acknowledge'))
+                                              ]));
+                                  if (accepted == true && mounted)
+                                    await _run(() =>
+                                        widget.service.acknowledgeNotice(t));
+                                },
+                          child: const Text(
+                              'Acknowledge notice after reviewing PDF')),
+                  ],
                   Text(
                       'Monthly rent: ₱${t.monthlyRent.toStringAsFixed(2)} · Deposit: ₱${t.securityDeposit.toStringAsFixed(2)} (unchanged)'),
                   if (t.row['cancellation_reason'] != null)
@@ -356,6 +405,7 @@ class _RoomTransferPageState extends State<RoomTransferPage> {
                       FilledButton(
                           key: ValueKey('complete-room-transfer-${t.id}'),
                           onPressed: _busy ||
+                                  !t.noticeAcknowledged ||
                                   !t.allVerified ||
                                   today.isBefore(t.effectiveOn)
                               ? null

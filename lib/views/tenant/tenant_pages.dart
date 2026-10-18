@@ -1,3 +1,4 @@
+import '../shared/pending_room_transfer_notice.dart';
 import '../shared/payment_receipt_history.dart';
 import '../shared/module_agreement_gate.dart';
 import '../../services/confidentiality_agreement_service.dart';
@@ -115,6 +116,7 @@ class TenantDashboardPage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const _TenantOnboardingBanner(),
+              const PendingRoomTransferNotice(),
               CarmelitaCard(
                 emphasis: true,
                 onTap: () => Navigator.of(context).push(
@@ -544,6 +546,7 @@ class _MyRoomPageState extends State<MyRoomPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const PendingRoomTransferNotice(),
               PhotoHero(
                 image: AppAssets.room,
                 title: 'Room ${room.number}',

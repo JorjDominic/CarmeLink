@@ -27,6 +27,20 @@ class RoomTransfer {
   String? get documentPath => row['document_path'] as String?;
   String? get documentHash => row['document_sha256'] as String?;
   bool get pending => status == 'draft' || status == 'awaiting_signatures';
+  bool get noticeAcknowledged {
+    final value = row['room_transfer_notice_acknowledgments'];
+    // PostgREST embeds unique foreign keys as an object rather than an array.
+    final acknowledgments = value is Map
+        ? [value]
+        : value is List
+            ? value
+            : const [];
+    return acknowledgments.any((a) =>
+        a is Map &&
+        a['tenant_id'] == tenantId &&
+        a['document_sha256'] == documentHash);
+  }
+
   List<RoomTransferSigner> get signers => (row['room_transfer_signers']
               as List? ??
           [])
@@ -53,7 +67,15 @@ class RoomTransferService {
   const RoomTransferService();
   static const bucket = 'room-amendments';
   SupabaseClient get _client => SupabaseConfig.client;
-  static const _selection = '*,room_transfer_signers(*)';
+  static const _selection =
+      '*,room_transfer_signers(*),room_transfer_notice_acknowledgments(*)';
+
+  Future<void> acknowledgeNotice(RoomTransfer transfer) async {
+    await _client.rpc('acknowledge_room_transfer_notice', params: {
+      'p_id': transfer.id,
+      'p_document_sha256': transfer.documentHash,
+    });
+  }
 
   Future<List<RoomTransfer>> list({String? tenantId}) async {
     var query = _client.from('room_transfers').select(_selection);

@@ -144,6 +144,15 @@ void main() {
     expect(
         submission.body['p_path'], startsWith('transfer-1/signatures/tenant-'));
   });
+  test('notice acknowledgment submits the exact reviewed amendment hash',
+      () async {
+    await service.acknowledgeNotice(RoomTransfer(data));
+    expect(requests.single.path, 'acknowledge_room_transfer_notice');
+    expect(requests.single.body, {
+      'p_id': 'transfer-1',
+      'p_document_sha256': data['document_sha256'],
+    });
+  });
   test('completion and cancellation use the guarded server operations',
       () async {
     await service.complete('transfer-1');
