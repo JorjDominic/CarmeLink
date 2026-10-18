@@ -1,3 +1,4 @@
+import 'tenant_conduct_evidence.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/utils/conduct_case_appeal_policy.dart';
@@ -97,115 +98,12 @@ class _ConductCaseAppealPanelState extends State<ConductCaseAppealPanel> {
       appeals.any((appeal) => conductAppealIsOpen(appeal.status));
 
   Future<void> _submit() async {
-    final statement = TextEditingController();
-    final support = TextEditingController();
-    var saving = false;
-
     final submitted = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Submit conduct appeal'),
-          content: SizedBox(
-            width: 620,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Explain why you are contesting this conduct decision. '
-                    'Submitting an appeal does not automatically reverse the '
-                    'case outcome.',
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: statement,
-                    enabled: !saving,
-                    minLines: 4,
-                    maxLines: 7,
-                    maxLength: 4000,
-                    decoration: const InputDecoration(
-                      labelText: 'Appeal statement',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: support,
-                    enabled: !saving,
-                    minLines: 3,
-                    maxLines: 6,
-                    maxLength: 4000,
-                    decoration: const InputDecoration(
-                      labelText: 'Supporting information (optional)',
-                      hintText:
-                          'Add dates, context, references, or other details '
-                          'for administrative review.',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed:
-                  saving ? null : () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      final statementError =
-                          validateConductAppealStatement(statement.text);
-                      if (statementError != null) {
-                        showAppSnackBar(dialogContext, statementError);
-                        return;
-                      }
-
-                      final supportError =
-                          validateConductAppealSupportingInformation(
-                        support.text,
-                      );
-                      if (supportError != null) {
-                        showAppSnackBar(dialogContext, supportError);
-                        return;
-                      }
-
-                      setDialogState(() => saving = true);
-                      try {
-                        await service.submitAppeal(
-                          caseId: widget.caseId,
-                          statement: statement.text,
-                          supportingInformation: support.text,
-                        );
-                        if (dialogContext.mounted) {
-                          Navigator.pop(dialogContext, true);
-                        }
-                      } catch (error) {
-                        if (dialogContext.mounted) {
-                          showAppSnackBar(
-                            dialogContext,
-                            conductCaseAppealError(error),
-                          );
-                          setDialogState(() => saving = false);
-                        }
-                      }
-                    },
-              child: Text(saving ? 'Submitting…' : 'Submit appeal'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    statement.dispose();
-    support.dispose();
-
-    if (submitted == true && mounted) {
-      await _load(showSpinner: false);
-    }
+        context: context,
+        barrierDismissible: false,
+        builder: (_) =>
+            TenantConductSubmissionDialog(caseId: widget.caseId, appeal: true));
+    if (submitted == true && mounted) await _load(showSpinner: false);
   }
 
   Future<void> _withdraw(ConductCaseAppealRecord appeal) async {
@@ -389,6 +287,10 @@ class _ConductCaseAppealPanelState extends State<ConductCaseAppealPanel> {
                     ),
                     const SizedBox(height: 10),
                     Text(appeal.appealStatement),
+                    TenantConductEvidencePanel(
+                        key: ValueKey('appeal-evidence-${appeal.id}'),
+                        caseId: widget.caseId,
+                        appealId: appeal.id),
                     if (appeal.supportingInformation.trim().isNotEmpty) ...[
                       const Divider(height: 22),
                       Text(

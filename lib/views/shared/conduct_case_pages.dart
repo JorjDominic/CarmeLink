@@ -1,3 +1,4 @@
+import 'tenant_conduct_evidence.dart';
 import 'conduct_investigation_panel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -893,6 +894,11 @@ class _StaffConductCaseDetailPageState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(response.body),
+                            TenantConductEvidencePanel(
+                                key: ValueKey(
+                                    'response-evidence-${response.id}'),
+                                caseId: record.id,
+                                responseId: response.id),
                             const SizedBox(height: 6),
                             Text(
                               _conductDateTime(response.createdAt),
@@ -1300,81 +1306,11 @@ class _TenantConductCaseDetailPageState
   }
 
   Future<void> _respond() async {
-    final controller = TextEditingController();
-    var saving = false;
-
     final submitted = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          scrollable: true,
-          title: const Text('Submit response'),
-          content: SizedBox(
-            width: 560,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Use this response to provide your explanation or relevant context. A response does not automatically decide the case.',
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: controller,
-                  enabled: !saving,
-                  minLines: 4,
-                  maxLines: 7,
-                  maxLength: 4000,
-                  decoration: const InputDecoration(
-                    labelText: 'Your response',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed:
-                  saving ? null : () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      final validation =
-                          validateConductResponse(controller.text);
-                      if (validation != null) {
-                        showAppSnackBar(dialogContext, validation);
-                        return;
-                      }
-                      setDialogState(() => saving = true);
-                      try {
-                        await service.submitResponse(
-                          caseId: record.id,
-                          body: controller.text,
-                        );
-                        if (dialogContext.mounted) {
-                          Navigator.pop(dialogContext, true);
-                        }
-                      } catch (error) {
-                        if (dialogContext.mounted) {
-                          showAppSnackBar(
-                            dialogContext,
-                            conductCaseError(error),
-                          );
-                          setDialogState(() => saving = false);
-                        }
-                      }
-                    },
-              child: Text(saving ? 'Submitting…' : 'Submit response'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    controller.dispose();
+        context: context,
+        barrierDismissible: false,
+        builder: (_) =>
+            TenantConductSubmissionDialog(caseId: record.id, appeal: false));
     if (submitted == true && mounted) await _refresh();
   }
 
@@ -1464,6 +1400,11 @@ class _TenantConductCaseDetailPageState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(response.body),
+                            TenantConductEvidencePanel(
+                                key: ValueKey(
+                                    'response-evidence-${response.id}'),
+                                caseId: record.id,
+                                responseId: response.id),
                             const SizedBox(height: 6),
                             Text(
                               _conductDateTime(response.createdAt),
