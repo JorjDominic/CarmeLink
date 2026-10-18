@@ -2,7 +2,7 @@ import '../shared/notification_destination.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import '../../core/runtime/app_surface.dart';
 import '../../controllers/owner_controller.dart';
 import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
@@ -147,7 +147,7 @@ class _OwnerShellState extends State<OwnerShell> with WidgetsBindingObserver {
                 icon: Icons.groups_outlined,
                 selectedIcon: Icons.groups,
                 page: TenantDirectoryPage()),
-            if (!kIsWeb)
+            if (!CarmeLinkSurfaceScope.isWebPortal(context))
               AppDestination(
                   label: 'Operations',
                   icon: Icons.tune_outlined,
