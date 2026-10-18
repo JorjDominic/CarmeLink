@@ -11,6 +11,7 @@ import '../../services/app_notification_service.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../views/owner/billing_management_page.dart';
 import '../../views/owner/contracts_page.dart';
+import '../../views/owner/dormitory_configuration_page.dart';
 import '../../views/owner/guardian_link_management_page.dart';
 import '../../views/owner/owner_pages.dart';
 import '../../views/owner/room_monitoring_page.dart';
@@ -213,6 +214,15 @@ abstract final class StaffWebDestinations {
           page: GuardianLinkManagementPage(),
           webGroup: 'Administration',
           webDescription: 'Tenant and guardian access links',
+        ),
+      if (owner)
+        const AppDestination(
+          label: 'Dormitory configuration',
+          icon: Icons.settings_outlined,
+          selectedIcon: Icons.settings,
+          page: DormitoryConfigurationPage(),
+          webGroup: 'Administration',
+          webDescription: 'Manage dropdown choices and common areas',
         ),
       const AppDestination(
         label: 'Security & retention',
