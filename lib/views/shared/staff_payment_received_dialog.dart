@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -155,6 +156,7 @@ class _StaffPaymentReceivedDialogState
         await showDialog<void>(
             context: context,
             builder: (context) => AlertDialog(
+                  scrollable: true,
                   title: const Text('Payment receipt'),
                   content: Text(
                       'Payment recorded. Reference: ${_reference.text}. You can retrieve and print its saved receipt below.'),
@@ -196,6 +198,7 @@ class _StaffPaymentReceivedDialogState
     return PopScope(
       canPop: !_saving && !_picking,
       child: AlertDialog(
+        scrollable: true,
         title: const Text('Record payment received'),
         content: SizedBox(
           width: 480,
@@ -253,6 +256,16 @@ class _StaffPaymentReceivedDialogState
                   validator: (id) =>
                       id == null ? 'Select an unpaid bill' : null,
                 ),
+                if (_bill != null) ...[
+                  const SizedBox(height: 12),
+                  RecordFacts(items: [
+                    ('Selected bill', _bill!.label),
+                    (
+                      'Remaining balance',
+                      '\u20b1' + _bill!.outstandingAmount.toStringAsFixed(2)
+                    )
+                  ]),
+                ],
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _amount,

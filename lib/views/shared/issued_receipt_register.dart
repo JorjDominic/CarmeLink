@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../controllers/session_controller.dart';
@@ -47,6 +48,7 @@ class _IssuedReceiptRegisterState extends State<IssuedReceiptRegister> {
       await showDialog<void>(
           context: context,
           builder: (context) => AlertDialog(
+                  scrollable: true,
                   title: const Text('Issued receipt photo'),
                   content: SizedBox(
                       width: 600,
@@ -74,6 +76,7 @@ class _IssuedReceiptRegisterState extends State<IssuedReceiptRegister> {
         context: context,
         builder: (context) => StatefulBuilder(
             builder: (context, update) => AlertDialog(
+                    scrollable: true,
                     title: Text('Void receipt ${row['receipt_number']}?'),
                     content: Column(mainAxisSize: MainAxisSize.min, children: [
                       const Text(
@@ -143,8 +146,11 @@ class _IssuedReceiptRegisterState extends State<IssuedReceiptRegister> {
                     children: [
                       SelectableText(
                           '${row['receipt_number']}${row['environment'] == 'test' ? ' (TEST)' : ''} · ${row['status']}'),
-                      Text(
-                          'Issued ${row['issued_on']} · Recorded ${row['created_at']}'),
+                      const SizedBox(height: 8),
+                      RecordFacts(items: [
+                        ('Issued', row['issued_on'].toString()),
+                        ('Recorded', row['created_at'].toString())
+                      ]),
                       if (row['replaces_id'] != null)
                         const Text('Replacement receipt'),
                       if (row['void_reason'] != null)

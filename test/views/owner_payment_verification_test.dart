@@ -118,10 +118,10 @@ void main() {
       }
       expect(find.byTooltip('Record payment received'), findsNothing);
       expect(find.byTooltip('Send payment due alerts to staff'), findsNothing);
-      expect(find.text('Method: GCash'), findsOneWidget);
-      expect(find.textContaining('Submitted:'), findsOneWidget);
+      expect(find.text('GCash'), findsOneWidget);
+      expect(find.text('Submitted'), findsOneWidget);
       expect(find.text('REF-PENDING'), findsOneWidget);
-      expect(find.textContaining('Bill total:'), findsOneWidget);
+      expect(find.text('Bill total'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

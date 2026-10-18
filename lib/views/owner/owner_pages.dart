@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import '../shared/payment_receipt_history.dart';
 import '../shared/confidentiality_agreements_page.dart';
 import '../../services/confidentiality_agreement_service.dart';
@@ -3876,7 +3877,13 @@ class _PaymentReviewCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          Text('Method: ${payment.paymentMethod ?? 'Not recorded'}'),
+          RecordFacts(items: [
+            ('Method', payment.paymentMethod ?? 'Not recorded'),
+            ('Submitted', _dateOrNone(payment.paidAt)),
+            ('Bill total', money(payment.amount)),
+            ('Remaining', money(payment.outstandingAmount)),
+          ]),
+          const SizedBox(height: 8),
           if (payment.isGatewayPayment && payment.isProofVerified)
             const Text('Automatically verified by PayMongo'),
           if (!payment.isGatewayPayment && payment.isProofVerified)
@@ -3884,10 +3891,6 @@ class _PaymentReviewCard extends StatelessWidget {
           if (payment.testVerifiedAmount > 0)
             const Text(
                 'Includes sample credits, excluded from actual collections. (TEST)'),
-          Text('Submitted: ${_dateOrNone(payment.paidAt)}'),
-          Text(
-              'Bill total: ${money(payment.amount)} • Remaining: ${money(payment.outstandingAmount)}'),
-
           // Reference row with copy action
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -3914,7 +3917,7 @@ class _PaymentReviewCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     payment.reference ?? 'Not specified',
-                    overflow: TextOverflow.ellipsis,
+                    softWrap: true,
                     style: const TextStyle(
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.w700,
@@ -3975,10 +3978,13 @@ class _PaymentReviewCard extends StatelessWidget {
                 )),
           const SizedBox(height: 12),
 
-          _ReceiptProofThumbnail(
-            receiptPath: payment.receiptPath,
-            onTapFullscreen: onOpenReceipt,
-          ),
+          RecordSection(
+              title: 'Proof of payment',
+              icon: Icons.image_outlined,
+              child: _ReceiptProofThumbnail(
+                receiptPath: payment.receiptPath,
+                onTapFullscreen: onOpenReceipt,
+              )),
 
           // Review Notes if rejected
           if (payment.reviewNotes != null &&

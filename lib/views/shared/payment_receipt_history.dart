@@ -1,3 +1,5 @@
+import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/record_details.dart';
 import 'package:flutter/material.dart';
 import '../../services/receipt_print_service.dart';
 import '../../core/config/supabase_config.dart';
@@ -74,34 +76,60 @@ class _PaymentReceiptHistoryDialogState
                         for (final receipt in rows)
                           Padding(
                               padding: const EdgeInsets.only(bottom: 16),
-                              child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    SelectableText(receipt.number,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold)),
-                                    if (receipt.isTest)
-                                      const Text(PaymentReceipt.testNotice),
-                                    Text(
-                                        '${receipt.tenantName} · ${receipt.billTitle}'),
-                                    Text(
-                                        'PHP ${receipt.amount.toStringAsFixed(2)} · ${receipt.method}'),
-                                    Text('Received ${receipt.receivedAt}'),
-                                    SelectableText(
-                                        'Payment reference: ${receipt.reference}'),
-                                    OutlinedButton.icon(
-                                        onPressed: printing != null
-                                            ? null
-                                            : () => printReceipt(receipt),
-                                        icon: const Icon(Icons.print_outlined),
-                                        label: Text(printing == receipt.id
-                                            ? 'Printing...'
-                                            : 'Print receipt')),
-                                    if (SupabaseConfig.isInitialized)
-                                      IssuedReceiptRegister(
-                                          key: ValueKey(receipt.id),
-                                          receipt: receipt),
-                                  ])),
+                              child: RecordSection(
+                                  title: 'Saved payment receipt',
+                                  icon: Icons.receipt_long_outlined,
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        SelectableText(receipt.number,
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold)),
+                                        if (receipt.isTest)
+                                          const Text(PaymentReceipt.testNotice),
+                                        const SizedBox(height: 10),
+                                        RecordFacts(
+                                            emphasizeFirst: true,
+                                            items: [
+                                              (
+                                                'Amount received',
+                                                'PHP ' +
+                                                    receipt.amount
+                                                        .toStringAsFixed(2)
+                                              ),
+                                              ('Payer', receipt.tenantName),
+                                              ('Bill', receipt.billTitle),
+                                              ('Method', receipt.method),
+                                              (
+                                                'Received',
+                                                shortDate(receipt.receivedAt) +
+                                                    ' ' +
+                                                    MaterialLocalizations.of(
+                                                            context)
+                                                        .formatTimeOfDay(TimeOfDay
+                                                            .fromDateTime(receipt
+                                                                .receivedAt))
+                                              ),
+                                            ]),
+                                        const SizedBox(height: 10),
+                                        SelectableText('Payment reference: ' +
+                                            receipt.reference),
+                                        const SizedBox(height: 10),
+                                        OutlinedButton.icon(
+                                            onPressed: printing != null
+                                                ? null
+                                                : () => printReceipt(receipt),
+                                            icon: const Icon(
+                                                Icons.print_outlined),
+                                            label: Text(printing == receipt.id
+                                                ? 'Printing...'
+                                                : 'Print receipt')),
+                                        if (SupabaseConfig.isInitialized)
+                                          IssuedReceiptRegister(
+                                              key: ValueKey(receipt.id),
+                                              receipt: receipt),
+                                      ]))),
                       ]);
                 })),
         actions: [

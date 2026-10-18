@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import '../shared/pending_room_transfer_notice.dart';
 import '../shared/payment_receipt_history.dart';
 import '../shared/module_agreement_gate.dart';
@@ -2023,19 +2024,15 @@ class _TenantPaymentCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  if (payment.reference != null &&
-                      payment.reference!.isNotEmpty)
-                    Text(
-                      'Reference: ${payment.reference}',
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  if (payment.paymentMethod != null)
-                    Text('Method: ${payment.paymentMethod}'),
-                  if (payment.paidAt != null)
-                    Text('Submitted: ${shortDate(payment.paidAt!)}'),
+                  RecordFacts(items: [
+                    if (payment.reference != null &&
+                        payment.reference!.isNotEmpty)
+                      ('Reference', payment.reference!),
+                    if (payment.paymentMethod != null)
+                      ('Method', payment.paymentMethod!),
+                    if (payment.paidAt != null)
+                      ('Submitted', shortDate(payment.paidAt!)),
+                  ]),
                   const SizedBox(height: 12),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
@@ -2159,75 +2156,36 @@ class _TenantPaymentCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    money(payment.amount),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 17,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: payment.isDeposit
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF627FA8)
-                                  .withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              payment.isVerified
-                                  ? 'Deposit held on account'
-                                  : 'Refundable security deposit',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF2C4A6F),
-                              ),
-                            ),
-                          )
-                        : payment.isOverdue
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border:
-                                      Border.all(color: Colors.red.shade300),
-                                ),
-                                child: Text(
-                                  'Overdue • Due ${shortDate(payment.dueDate)}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.red.shade800,
-                                  ),
-                                ),
-                              )
-                            : Text(
-                                'Due ${shortDate(payment.dueDate)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                  ),
-                ],
-              ),
+              RecordFacts(emphasizeFirst: true, items: [
+                ('Bill total', money(payment.amount)),
+                ('Remaining', money(payment.outstandingAmount)),
+                (
+                  'Due',
+                  payment.isDeposit
+                      ? (payment.isVerified
+                          ? 'Deposit held on account'
+                          : 'Refundable security deposit')
+                      : shortDate(payment.dueDate)
+                ),
+              ]),
+              if (payment.isOverdue && !payment.isDeposit) ...[
+                const SizedBox(height: 6),
+                Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.red.shade300)),
+                      child: Text(
+                          'Overdue \u2022 Due ' + shortDate(payment.dueDate),
+                          style: TextStyle(
+                              color: Colors.red.shade800,
+                              fontWeight: FontWeight.w700)),
+                    )),
+              ],
               if (payment.reference != null &&
                   payment.reference!.isNotEmpty) ...[
                 const SizedBox(height: 6),
@@ -3082,6 +3040,18 @@ class _UploadPaymentProofPageState extends State<UploadPaymentProofPage> {
                   ],
                 ),
               ),
+              const SizedBox(height: 10),
+              RecordSection(
+                  title: 'Receipt scan details',
+                  icon: Icons.document_scanner_outlined,
+                  child: RecordFacts(items: [
+                    if (_lastOcrResult!.amount != null)
+                      ('Detected amount', money(_lastOcrResult!.amount!)),
+                    if (_lastOcrResult!.referenceNumber != null)
+                      ('Detected reference', _lastOcrResult!.referenceNumber!),
+                    if (_lastOcrResult!.paymentMethod != null)
+                      ('Detected method', _lastOcrResult!.paymentMethod!),
+                  ])),
             ],
             const SizedBox(height: 20),
             SizedBox(
