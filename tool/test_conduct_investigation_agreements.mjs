@@ -1,3 +1,4 @@
+import { checkSystemMaintenance } from './system_maintenance_checks.mjs';
 // In-memory PostgreSQL only. No credentials, Supabase connection, or production writes.
 // node tool/test_conduct_investigation_agreements.mjs
 import { PGlite } from '../build/phase2_sql_tests/node_modules/@electric-sql/pglite/dist/index.js';
@@ -258,6 +259,7 @@ try {
       assert.equal(events.length,4);assert.ok(events.every(event=>event.actor_id===ids[role]));
     });
   }
-  console.log(`${passed} conduct investigation, evidence and agreement database checks passed.`);
+  await checkSystemMaintenance({db, ids, actor, check});
+  console.log(`${passed} conduct investigation, evidence, agreement and system maintenance database checks passed.`);
 } catch(error) { console.error(error.message);process.exitCode=1; }
 finally { await db.close(); }
