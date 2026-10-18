@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -470,6 +471,7 @@ class ConversationThreadPanel extends StatefulWidget {
 class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
   final ScrollController _scrollController = ScrollController();
   bool _showNewMessages = false;
+  bool _sendInProgress = false;
   int _previousMessageCount = 0;
 
   @override
@@ -527,10 +529,35 @@ class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
     }
   }
 
+  void _insertComposerLine() {
+    final controller = widget.composerController;
+    final value = controller.value;
+    if (widget.sending ||
+        (value.composing.isValid && !value.composing.isCollapsed)) return;
+    final selection = value.selection;
+    final start = selection.isValid ? selection.start : value.text.length;
+    final end = selection.isValid ? selection.end : value.text.length;
+    controller.value = TextEditingValue(
+      text: value.text.replaceRange(start, end, '\n'),
+      selection: TextSelection.collapsed(offset: start + 1),
+    );
+  }
+
   Future<void> _send() async {
-    if (widget.sending || widget.composerController.text.trim().isEmpty) return;
-    await widget.onSend();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToLatest());
+    final value = widget.composerController.value;
+    if (_sendInProgress ||
+        widget.sending ||
+        value.text.trim().isEmpty ||
+        (value.composing.isValid && !value.composing.isCollapsed)) return;
+    _sendInProgress = true;
+    try {
+      await widget.onSend();
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToLatest());
+      }
+    } finally {
+      _sendInProgress = false;
+    }
   }
 
   @override
@@ -640,38 +667,50 @@ class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
               top: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-                child: TextField(
-                  key: const Key('conversation-composer'),
-                  controller: widget.composerController,
-                  enabled: !widget.sending,
-                  minLines: 1,
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    hintText: widget.hintText,
-                    filled: true,
-                    fillColor:
-                        Theme.of(context).colorScheme.surfaceContainerLow,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24)),
-                    prefixIcon: const Icon(Icons.chat_bubble_outline_rounded),
-                    suffixIcon: widget.sending
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                child: CallbackShortcuts(
+                  bindings: {
+                    const SingleActivator(LogicalKeyboardKey.enter,
+                        shift: true): _insertComposerLine,
+                    const SingleActivator(LogicalKeyboardKey.numpadEnter,
+                        shift: true): _insertComposerLine,
+                    const SingleActivator(LogicalKeyboardKey.enter): _send,
+                    const SingleActivator(LogicalKeyboardKey.numpadEnter):
+                        _send,
+                  },
+                  child: TextField(
+                    key: const Key('conversation-composer'),
+                    controller: widget.composerController,
+                    enabled: !widget.sending,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: widget.hintText,
+                      filled: true,
+                      fillColor:
+                          Theme.of(context).colorScheme.surfaceContainerLow,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24)),
+                      prefixIcon: const Icon(Icons.chat_bubble_outline_rounded),
+                      suffixIcon: widget.sending
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : IconButton(
+                              tooltip: 'Send message',
+                              onPressed: _send,
+                              icon: const Icon(Icons.send_outlined),
                             ),
-                          )
-                        : IconButton(
-                            tooltip: 'Send message',
-                            onPressed: _send,
-                            icon: const Icon(Icons.send_outlined),
-                          ),
+                    ),
+                    onSubmitted: (_) => _send(),
                   ),
-                  onSubmitted: (_) => _send(),
                 ),
               ),
             ),
