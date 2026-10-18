@@ -276,6 +276,7 @@ class _DormitoryConfigurationPageState
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: _groupKey,
                     decoration:
                         const InputDecoration(labelText: 'Configuration group'),
@@ -283,7 +284,11 @@ class _DormitoryConfigurationPageState
                       for (final entry in groupEntries)
                         DropdownMenuItem(
                           value: entry.key,
-                          child: Text(entry.value),
+                          child: Tooltip(
+                            message: entry.value,
+                            child: Text(entry.value,
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
                         ),
                     ],
                     onChanged: (value) {
@@ -307,17 +312,24 @@ class _DormitoryConfigurationPageState
                     }),
                   ),
                   const SizedBox(height: 12),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: 'active', label: Text('Active')),
-                      ButtonSegment(value: 'archived', label: Text('Archived')),
-                      ButtonSegment(value: 'all', label: Text('All')),
-                    ],
-                    selected: {_visibility},
-                    onSelectionChanged: (values) => setState(() {
-                      _visibility = values.first;
-                      _resetPage();
-                    }),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SegmentedButton<String>(
+                      style: const ButtonStyle(
+                          padding: WidgetStatePropertyAll(
+                              EdgeInsets.symmetric(horizontal: 8))),
+                      segments: const [
+                        ButtonSegment(value: 'active', label: Text('Active')),
+                        ButtonSegment(
+                            value: 'archived', label: Text('Archived')),
+                        ButtonSegment(value: 'all', label: Text('All')),
+                      ],
+                      selected: {_visibility},
+                      onSelectionChanged: (values) => setState(() {
+                        _visibility = values.first;
+                        _resetPage();
+                      }),
+                    ),
                   ),
                 ]),
           ),
