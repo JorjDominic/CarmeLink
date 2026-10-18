@@ -920,20 +920,57 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
                 : null,
           ),
           const SizedBox(height: 10),
-          RecordFacts(emphasizeFirst: true, items: [
-            (
-              'Contract deposit',
-              _money(details.caseRecord.contractDepositAmount)
-            ),
-            ('Confirmed received', _money(s.depositReceivedAmount)),
-            ('Approved deductions', _money(s.approvedDeductions)),
-            ('Refundable', _money(s.refundableAmount)),
-            ('Shortfall', _money(s.shortfallAmount)),
-            (
-              'Outcome',
-              refundOverdue ? 'Refund overdue' : _statusLabel(s.refundStatus)
-            ),
-          ]),
+          Table(
+              columnWidths: const {
+                0: FlexColumnWidth(1.1),
+                1: FlexColumnWidth(1.7)
+              },
+              defaultVerticalAlignment: TableCellVerticalAlignment.top,
+              children: [
+                for (final fact in <(String, String)>[
+                  (
+                    'Contract deposit',
+                    _money(details.caseRecord.contractDepositAmount)
+                  ),
+                  ('Confirmed received', _money(s.depositReceivedAmount)),
+                  ('Approved deductions', _money(s.approvedDeductions)),
+                  ('Refundable', _money(s.refundableAmount)),
+                  ('Shortfall', _money(s.shortfallAmount)),
+                  (
+                    'Outcome',
+                    refundOverdue
+                        ? 'Refund overdue'
+                        : _statusLabel(s.refundStatus)
+                  ),
+                ])
+                  TableRow(
+                      decoration: BoxDecoration(
+                          border: Border(
+                              bottom: BorderSide(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .outlineVariant
+                                      .withValues(alpha: .5)))),
+                      children: [
+                        Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 8, 12, 8),
+                            child: Text(fact.$1,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant))),
+                        Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Text(fact.$2,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600))),
+                      ]),
+              ]),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -968,25 +1005,66 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            RecordFacts(emphasizeFirst: true, items: [
-                              ('Deduction', _money(item.amount)),
-                              ('Category', _categoryLabel(item.category)),
-                              if (item.billingChargeId != null)
-                                (
-                                  'Linked bill',
-                                  item.billingTitle ?? item.label
-                                ),
-                              if (item.depositAppliedAmount > 0)
-                                (
-                                  'Covered by deposit',
-                                  _money(item.depositAppliedAmount)
-                                ),
-                              if (item.billingChargeId != null)
-                                (
-                                  'Bill balance',
-                                  _money(item.outstandingAmount ?? 0)
-                                ),
-                            ]),
+                            Table(
+                              columnWidths: const {
+                                0: FlexColumnWidth(1.1),
+                                1: FlexColumnWidth(1.7)
+                              },
+                              defaultVerticalAlignment:
+                                  TableCellVerticalAlignment.top,
+                              children: [
+                                for (final fact in <(String, String)>[
+                                  ('Deduction', _money(item.amount)),
+                                  ('Category', _categoryLabel(item.category)),
+                                  if (item.billingChargeId != null)
+                                    (
+                                      'Linked bill',
+                                      item.billingTitle ?? item.label
+                                    ),
+                                  if (item.depositAppliedAmount > 0)
+                                    (
+                                      'Covered by deposit',
+                                      _money(item.depositAppliedAmount)
+                                    ),
+                                  if (item.billingChargeId != null)
+                                    (
+                                      'Bill balance',
+                                      _money(item.outstandingAmount ?? 0)
+                                    ),
+                                ])
+                                  TableRow(
+                                      decoration: BoxDecoration(
+                                          border: Border(
+                                              bottom: BorderSide(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .outlineVariant
+                                                      .withValues(alpha: .5)))),
+                                      children: [
+                                        Padding(
+                                            padding: const EdgeInsets.fromLTRB(
+                                                0, 8, 12, 8),
+                                            child: Text(fact.$1,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.copyWith(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurfaceVariant))),
+                                        Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8),
+                                            child: Text(fact.$2,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium
+                                                    ?.copyWith(
+                                                        fontWeight:
+                                                            FontWeight.w600))),
+                                      ]),
+                              ],
+                            ),
                             const SizedBox(height: 8),
                             Text(item.evidenceNote),
                             const SizedBox(height: 8),

@@ -1,4 +1,3 @@
-import '../../core/widgets/record_details.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
@@ -143,26 +142,62 @@ class _SecurityDepositCardState extends State<SecurityDepositCard> {
                 const SizedBox(height: 8),
               ],
               const SizedBox(height: 12),
-              RecordFacts(emphasizeFirst: true, items: [
-                ('Contract amount', money(record.requiredAmount)),
-                ('Confirmed received', money(record.receivedAmount)),
-                if (!widget.compact &&
-                    !record.settled &&
-                    record.receivedAmount > 0)
-                  ('Held for settlement', money(record.heldAmount)),
-                if (record.receivedOn != null)
-                  (
-                    'Received on',
-                    record.receivedOn!.toIso8601String().substring(0, 10)
-                  ),
-                if (record.method.isNotEmpty) ('Method', record.method),
-                if (record.reference.isNotEmpty)
-                  ('Reference', record.reference),
-                if (record.settled) ...[
-                  ('Approved deductions', money(record.deductions)),
-                  ('Refund recorded', money(record.refundedAmount)),
+              Table(
+                columnWidths: const {
+                  0: FlexColumnWidth(1.1),
+                  1: FlexColumnWidth(1.7)
+                },
+                defaultVerticalAlignment: TableCellVerticalAlignment.top,
+                children: [
+                  for (final fact in <(String, String)>[
+                    ('Contract amount', money(record.requiredAmount)),
+                    ('Confirmed received', money(record.receivedAmount)),
+                    if (!widget.compact &&
+                        !record.settled &&
+                        record.receivedAmount > 0)
+                      ('Held for settlement', money(record.heldAmount)),
+                    if (record.receivedOn != null)
+                      (
+                        'Received on',
+                        record.receivedOn!.toIso8601String().substring(0, 10)
+                      ),
+                    if (record.method.isNotEmpty) ('Method', record.method),
+                    if (record.reference.isNotEmpty)
+                      ('Reference', record.reference),
+                    if (record.settled) ...[
+                      ('Approved deductions', money(record.deductions)),
+                      ('Refund recorded', money(record.refundedAmount)),
+                    ],
+                  ])
+                    TableRow(
+                        decoration: BoxDecoration(
+                            border: Border(
+                                bottom: BorderSide(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .outlineVariant
+                                        .withValues(alpha: .5)))),
+                        children: [
+                          Padding(
+                              padding: const EdgeInsets.fromLTRB(0, 8, 12, 8),
+                              child: Text(fact.$1,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant))),
+                          Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(fact.$2,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600))),
+                        ]),
                 ],
-              ]),
+              ),
               const SizedBox(height: 8),
               Text('Separate from bills; settled at move-out.',
                   style: Theme.of(context).textTheme.bodySmall),

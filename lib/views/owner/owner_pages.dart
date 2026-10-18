@@ -10206,71 +10206,78 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
         return PageFrame(
           title: 'Finances',
           subtitle: 'Operational financial snapshot',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AdaptiveGrid(children: [
-                MetricCard(
-                  label: 'Verified Collections',
-                  value: '₱${totalPaid.toStringAsFixed(2)}',
-                  detail: '$paidCount bills with verified collections',
-                  icon: Icons.savings_outlined,
-                ),
-                MetricCard(
-                  label: 'Pending Verification',
-                  value: '₱${totalPending.toStringAsFixed(2)}',
-                  detail: '$pendingCount receipts awaiting review',
-                  icon: Icons.pending_actions_outlined,
-                ),
-                MetricCard(
-                  label: 'Outstanding Dues',
-                  value: '₱${totalDue.toStringAsFixed(2)}',
-                  detail: '$dueCount unpaid bills',
-                  icon: Icons.receipt_long_outlined,
-                ),
-              ]),
-              const SizedBox(height: 14),
-
-              _ReportExportCard(
-                title: 'Financial & Rent Statement',
-                description: 'Official revenue, dues, and payment ledger',
-                icon: Icons.picture_as_pdf_outlined,
-                color: Colors.teal,
-                onExport: () => _service.openReportPreview(context,
-                    title: 'Financial & Rent Collection Statement',
-                    fileName:
-                        'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                    documentBuilder: () =>
-                        _service.generateFinancialReportPdf()),
-              ),
-              const SizedBox(height: 14),
-
-              // Category Breakdown Card
-              CarmelitaCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('COLLECTIONS BY CATEGORY',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            letterSpacing: 0.5)),
-                    const SizedBox(height: 12),
-                    RecordFacts(items: [
-                      (
-                        'Rent Collections',
-                        '\u20b1' + rentPaid.toStringAsFixed(2)
-                      ),
-                      (
-                        'Utility Collections',
-                        '\u20b1' + utilityPaid.toStringAsFixed(2)
-                      )
-                    ]),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          child: LayoutBuilder(builder: (context, bounds) {
+            final wide = bounds.maxWidth >= 1000 &&
+                MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+            return Wrap(spacing: 16, runSpacing: 16, children: [
+              SizedBox(
+                  width: wide ? (bounds.maxWidth - 16) * .65 : bounds.maxWidth,
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AdaptiveGrid(children: [
+                          MetricCard(
+                            label: 'Verified Collections',
+                            value: '₱${totalPaid.toStringAsFixed(2)}',
+                            detail:
+                                '$paidCount bills with verified collections',
+                            icon: Icons.savings_outlined,
+                          ),
+                          MetricCard(
+                            label: 'Pending Verification',
+                            value: '₱${totalPending.toStringAsFixed(2)}',
+                            detail: '$pendingCount receipts awaiting review',
+                            icon: Icons.pending_actions_outlined,
+                          ),
+                          MetricCard(
+                            label: 'Outstanding Dues',
+                            value: '₱${totalDue.toStringAsFixed(2)}',
+                            detail: '$dueCount unpaid bills',
+                            icon: Icons.receipt_long_outlined,
+                          ),
+                        ]),
+                        const SizedBox(height: 14),
+                        _ReportExportCard(
+                          title: 'Financial & Rent Statement',
+                          description:
+                              'Official revenue, dues, and payment ledger',
+                          icon: Icons.picture_as_pdf_outlined,
+                          color: Colors.teal,
+                          onExport: () => _service.openReportPreview(context,
+                              title: 'Financial & Rent Collection Statement',
+                              fileName:
+                                  'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                              documentBuilder: () =>
+                                  _service.generateFinancialReportPdf()),
+                        ),
+                      ])),
+              SizedBox(
+                  width: wide ? (bounds.maxWidth - 16) * .35 : bounds.maxWidth,
+                  child: CarmelitaCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('COLLECTIONS BY CATEGORY',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                letterSpacing: 0.5)),
+                        const SizedBox(height: 12),
+                        RecordFacts(items: [
+                          (
+                            'Rent Collections',
+                            '\u20b1' + rentPaid.toStringAsFixed(2)
+                          ),
+                          (
+                            'Utility Collections',
+                            '\u20b1' + utilityPaid.toStringAsFixed(2)
+                          )
+                        ]),
+                      ],
+                    ),
+                  )),
+            ]);
+          }),
         );
       },
     );

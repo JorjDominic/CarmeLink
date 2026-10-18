@@ -42,6 +42,9 @@ class _PaymentReceiptHistoryDialogState
   @override
   Widget build(BuildContext context) => AlertDialog(
         scrollable: true,
+        insetPadding: EdgeInsets.symmetric(
+            horizontal: MediaQuery.sizeOf(context).width < 400 ? 12 : 40,
+            vertical: 24),
         title: const Text('Payment receipts'),
         content: SizedBox(
             width: 620,
@@ -89,9 +92,16 @@ class _PaymentReceiptHistoryDialogState
                                         if (receipt.isTest)
                                           const Text(PaymentReceipt.testNotice),
                                         const SizedBox(height: 10),
-                                        RecordFacts(
-                                            emphasizeFirst: true,
-                                            items: [
+                                        Table(
+                                          columnWidths: const {
+                                            0: FlexColumnWidth(1.1),
+                                            1: FlexColumnWidth(1.7)
+                                          },
+                                          defaultVerticalAlignment:
+                                              TableCellVerticalAlignment.top,
+                                          children: [
+                                            for (final fact
+                                                in <(String, String)>[
                                               (
                                                 'Amount received',
                                                 'PHP ' +
@@ -111,7 +121,51 @@ class _PaymentReceiptHistoryDialogState
                                                             .fromDateTime(receipt
                                                                 .receivedAt))
                                               ),
-                                            ]),
+                                            ])
+                                              TableRow(
+                                                  decoration: BoxDecoration(
+                                                      border: Border(
+                                                          bottom: BorderSide(
+                                                              color: Theme.of(
+                                                                      context)
+                                                                  .colorScheme
+                                                                  .outlineVariant
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          .5)))),
+                                                  children: [
+                                                    Padding(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .fromLTRB(
+                                                                0, 8, 12, 8),
+                                                        child: Text(fact.$1,
+                                                            style: Theme.of(
+                                                                    context)
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                                    color: Theme.of(
+                                                                            context)
+                                                                        .colorScheme
+                                                                        .onSurfaceVariant))),
+                                                    Padding(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                vertical: 8),
+                                                        child: Text(fact.$2,
+                                                            style: Theme.of(
+                                                                    context)
+                                                                .textTheme
+                                                                .bodyMedium
+                                                                ?.copyWith(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600))),
+                                                  ]),
+                                          ],
+                                        ),
                                         const SizedBox(height: 10),
                                         SelectableText('Payment reference: ' +
                                             receipt.reference),

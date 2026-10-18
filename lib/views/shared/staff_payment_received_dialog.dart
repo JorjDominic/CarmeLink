@@ -199,6 +199,9 @@ class _StaffPaymentReceivedDialogState
       canPop: !_saving && !_picking,
       child: AlertDialog(
         scrollable: true,
+        insetPadding: EdgeInsets.symmetric(
+            horizontal: MediaQuery.sizeOf(context).width < 400 ? 12 : 40,
+            vertical: 24),
         title: const Text('Record payment received'),
         content: SizedBox(
           width: 480,
@@ -212,133 +215,169 @@ class _StaffPaymentReceivedDialogState
                 if (_eligible.isEmpty)
                   const Text('No eligible unpaid bills. Review pending proofs '
                       'first. Security deposits are recorded separately.'),
-                DropdownButtonFormField<String>(
-                  initialValue: _billGroup,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Bill group'),
-                  items: const [
-                    DropdownMenuItem(value: 'overdue', child: Text('Overdue')),
-                    DropdownMenuItem(
-                        value: 'upcoming',
-                        child: Text('Upcoming / due today',
-                            maxLines: 1, overflow: TextOverflow.ellipsis)),
-                  ],
-                  onChanged: !editable
-                      ? null
-                      : (value) => setState(() {
-                            _billGroup = value!;
-                            _bill = null;
-                            _amount.clear();
-                          }),
-                ),
+                RecordSection(
+                    title: 'Bill selection',
+                    icon: Icons.receipt_long_outlined,
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          DropdownButtonFormField<String>(
+                            initialValue: _billGroup,
+                            isExpanded: true,
+                            decoration:
+                                const InputDecoration(labelText: 'Bill group'),
+                            items: const [
+                              DropdownMenuItem(
+                                  value: 'overdue', child: Text('Overdue')),
+                              DropdownMenuItem(
+                                  value: 'upcoming',
+                                  child: Text('Upcoming / due today',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis)),
+                            ],
+                            onChanged: !editable
+                                ? null
+                                : (value) => setState(() {
+                                      _billGroup = value!;
+                                      _bill = null;
+                                      _amount.clear();
+                                    }),
+                          ),
+                          const SizedBox(height: 12),
+                          SearchableDropdownFormField<String>(
+                            initialValue: _bill?.id,
+                            decoration: const InputDecoration(
+                                labelText: 'Tenant and bill'),
+                            items: _visibleBills
+                                .map((p) => DropdownMenuItem(
+                                      value: p.id,
+                                      child: Text(
+                                          '${p.tenantName ?? p.tenantId} — ${p.label} '
+                                          '(₱${p.outstandingAmount.toStringAsFixed(2)} remaining)'),
+                                    ))
+                                .toList(),
+                            onChanged: !editable
+                                ? null
+                                : (id) => setState(() {
+                                      _bill = _eligible
+                                          .where((p) => p.id == id)
+                                          .firstOrNull;
+                                      _amount.text = _bill?.outstandingAmount
+                                              .toStringAsFixed(2) ??
+                                          '';
+                                    }),
+                            validator: (id) =>
+                                id == null ? 'Select an unpaid bill' : null,
+                          ),
+                          if (_bill != null) ...[
+                            const SizedBox(height: 12),
+                            RecordFacts(items: [
+                              ('Selected bill', _bill!.label),
+                              (
+                                'Remaining balance',
+                                '\u20b1' +
+                                    _bill!.outstandingAmount.toStringAsFixed(2)
+                              )
+                            ]),
+                          ],
+                          const SizedBox(height: 12),
+                        ])),
                 const SizedBox(height: 12),
-                SearchableDropdownFormField<String>(
-                  initialValue: _bill?.id,
-                  decoration:
-                      const InputDecoration(labelText: 'Tenant and bill'),
-                  items: _visibleBills
-                      .map((p) => DropdownMenuItem(
-                            value: p.id,
-                            child: Text(
-                                '${p.tenantName ?? p.tenantId} — ${p.label} '
-                                '(₱${p.outstandingAmount.toStringAsFixed(2)} remaining)'),
-                          ))
-                      .toList(),
-                  onChanged: !editable
-                      ? null
-                      : (id) => setState(() {
-                            _bill =
-                                _eligible.where((p) => p.id == id).firstOrNull;
-                            _amount.text =
-                                _bill?.outstandingAmount.toStringAsFixed(2) ??
-                                    '';
-                          }),
-                  validator: (id) =>
-                      id == null ? 'Select an unpaid bill' : null,
-                ),
-                if (_bill != null) ...[
-                  const SizedBox(height: 12),
-                  RecordFacts(items: [
-                    ('Selected bill', _bill!.label),
-                    (
-                      'Remaining balance',
-                      '\u20b1' + _bill!.outstandingAmount.toStringAsFixed(2)
-                    )
-                  ]),
-                ],
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _amount,
-                  enabled: editable,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                      labelText: 'Amount received', prefixText: '₱ '),
-                  validator: (value) {
-                    final amount = double.tryParse(value?.trim() ?? '');
-                    if (!RegExp(r'^\d+(\.\d{1,2})?$')
-                            .hasMatch(value?.trim() ?? '') ||
-                        amount == null ||
-                        !amount.isFinite ||
-                        amount <= 0) {
-                      return 'Enter a positive amount with at most two decimals';
-                    }
-                    if (_bill != null && amount > _bill!.outstandingAmount) {
-                      return 'Amount exceeds the remaining balance';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                const Text('Payment method: Face-to-face receipt'),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Date received'),
-                  subtitle:
-                      Text(_receivedOn.toIso8601String().substring(0, 10)),
-                  trailing: const Icon(Icons.calendar_today_outlined),
-                  onTap: !editable
-                      ? null
-                      : () async {
-                          final date = await showDatePicker(
-                              context: context,
-                              initialDate: _receivedOn,
-                              firstDate: DateTime(2000),
-                              lastDate: DateTime.now());
-                          if (date != null && mounted)
-                            setState(() => _receivedOn = date);
-                        },
-                ),
-                TextFormField(
-                    controller: _reference,
-                    readOnly: true,
-                    decoration: const InputDecoration(
-                        labelText: 'Receipt / reference number (generated)')),
-                const SizedBox(height: 12),
-                TextFormField(
-                    controller: _notes,
-                    enabled: editable,
-                    maxLines: 2,
-                    decoration:
-                        const InputDecoration(labelText: 'Notes (optional)')),
-                const SizedBox(height: 12),
-                const Text(
-                    'Receipt photo required · JPG, PNG or WEBP · up to 5 MB'),
-                Wrap(spacing: 8, children: [
-                  TextButton.icon(
-                      onPressed:
-                          !editable ? null : () => _pick(ImageSource.gallery),
-                      icon: const Icon(Icons.photo_library_outlined),
-                      label: const Text('Attach photo')),
-                  TextButton.icon(
-                      onPressed:
-                          !editable ? null : () => _pick(ImageSource.camera),
-                      icon: const Icon(Icons.camera_alt_outlined),
-                      label: const Text('Take photo')),
-                ]),
-                if (_picking) const LinearProgressIndicator(),
-                if (_photo != null)
-                  Image.memory(_photo!, height: 150, fit: BoxFit.contain),
+                RecordSection(
+                    title: 'Payment details',
+                    icon: Icons.payments_outlined,
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            controller: _amount,
+                            enabled: editable,
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            decoration: const InputDecoration(
+                                labelText: 'Amount received', prefixText: '₱ '),
+                            validator: (value) {
+                              final amount =
+                                  double.tryParse(value?.trim() ?? '');
+                              if (!RegExp(r'^\d+(\.\d{1,2})?$')
+                                      .hasMatch(value?.trim() ?? '') ||
+                                  amount == null ||
+                                  !amount.isFinite ||
+                                  amount <= 0) {
+                                return 'Enter a positive amount with at most two decimals';
+                              }
+                              if (_bill != null &&
+                                  amount > _bill!.outstandingAmount) {
+                                return 'Amount exceeds the remaining balance';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          const Text('Payment method: Face-to-face receipt'),
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Date received'),
+                            subtitle: Text(
+                                _receivedOn.toIso8601String().substring(0, 10)),
+                            trailing: const Icon(Icons.calendar_today_outlined),
+                            onTap: !editable
+                                ? null
+                                : () async {
+                                    final date = await showDatePicker(
+                                        context: context,
+                                        initialDate: _receivedOn,
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime.now());
+                                    if (date != null && mounted)
+                                      setState(() => _receivedOn = date);
+                                  },
+                          ),
+                          TextFormField(
+                              controller: _reference,
+                              readOnly: true,
+                              decoration: const InputDecoration(
+                                  labelText:
+                                      'Receipt / reference number (generated)')),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                              controller: _notes,
+                              enabled: editable,
+                              maxLines: 2,
+                              decoration: const InputDecoration(
+                                  labelText: 'Notes (optional)')),
+                          const SizedBox(height: 12),
+                          const Text(
+                              'Receipt photo required · JPG, PNG or WEBP · up to 5 MB'),
+                          Wrap(spacing: 8, children: [
+                            TextButton.icon(
+                                onPressed: !editable
+                                    ? null
+                                    : () => _pick(ImageSource.gallery),
+                                icon: const Icon(Icons.photo_library_outlined),
+                                label: const Text('Attach photo')),
+                            TextButton.icon(
+                                onPressed: !editable
+                                    ? null
+                                    : () => _pick(ImageSource.camera),
+                                icon: const Icon(Icons.camera_alt_outlined),
+                                label: const Text('Take photo')),
+                          ]),
+                          if (_picking) const LinearProgressIndicator(),
+                          if (_photo != null)
+                            Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .outlineVariant),
+                                    borderRadius: BorderRadius.circular(12)),
+                                child: Image.memory(_photo!,
+                                    height: 150, fit: BoxFit.contain)),
+                        ])),
                 if (_error != null)
                   Text(_error!,
                       style: TextStyle(

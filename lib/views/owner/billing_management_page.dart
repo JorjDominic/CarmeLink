@@ -1,5 +1,4 @@
 import '../../core/widgets/numbered_pagination.dart';
-import '../../core/widgets/record_details.dart';
 import '../../core/widgets/financial_summary.dart';
 import '../../services/payment_service.dart';
 import 'dart:async';
@@ -612,15 +611,51 @@ class _BillingChargeCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          RecordFacts(emphasizeFirst: true, items: [
-            ('Charge', _money(payment.amount)),
-            (
-              deposit ? 'Payable balance' : 'Balance',
-              deposit ? '\u20b10.00' : _money(payment.outstandingAmount)
-            ),
-            ('Due', shortDate(payment.dueDate)),
-            if (period != null) ('Billing period', period),
-          ]),
+          Table(
+            columnWidths: const {
+              0: FlexColumnWidth(1.1),
+              1: FlexColumnWidth(1.7)
+            },
+            defaultVerticalAlignment: TableCellVerticalAlignment.top,
+            children: [
+              for (final fact in <(String, String)>[
+                ('Charge', _money(payment.amount)),
+                (
+                  deposit ? 'Payable balance' : 'Balance',
+                  deposit ? '\u20b10.00' : _money(payment.outstandingAmount)
+                ),
+                ('Due', shortDate(payment.dueDate)),
+                if (period != null) ('Billing period', period),
+              ])
+                TableRow(
+                    decoration: BoxDecoration(
+                        border: Border(
+                            bottom: BorderSide(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant
+                                    .withValues(alpha: .5)))),
+                    children: [
+                      Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 8, 12, 8),
+                          child: Text(fact.$1,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant))),
+                      Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(fact.$2,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600))),
+                    ]),
+            ],
+          ),
           if (deposit) ...[
             const SizedBox(height: 10),
             Text(
