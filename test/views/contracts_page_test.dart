@@ -48,6 +48,50 @@ void main() {
 
   tearDown(OwnerController.instance.clear);
 
+  for (final mode in ['solo', 'standard_shared', 'shared']) {
+    for (final status in ['active', 'expired']) {
+      testWidgets('$status $mode contracts show renewal eligibility',
+          (tester) async {
+        final original = OwnerController.instance.contracts.single;
+        OwnerController.instance.setContractsForTesting([
+          TenantContract(
+            id: original.id,
+            tenantId: original.tenantId,
+            tenantName: original.tenantName,
+            contractNumber: original.contractNumber,
+            startsOn: original.startsOn,
+            endsOn: original.endsOn,
+            monthlyRent: original.monthlyRent,
+            securityDeposit: original.securityDeposit,
+            status: status,
+            createdAt: now,
+            updatedAt: now,
+            occupancyId: 'occupancy',
+            occupancySnapshot: {'mode': mode},
+          ),
+        ]);
+        await tester.pumpWidget(const MaterialApp(home: ContractsPage()));
+        await tester.pumpAndSettle();
+        final button = find.widgetWithText(TextButton, 'Renew');
+        expect(button, findsOneWidget);
+        if (mode == 'shared') {
+          expect(tester.widget<TextButton>(button).onPressed, isNull);
+          expect(
+              find.text('Exclusive Shared renewals require a group amendment.'),
+              findsOneWidget);
+        } else {
+          expect(tester.widget<TextButton>(button).onPressed, isNotNull);
+          await tester.ensureVisible(button);
+          await tester.tap(button);
+          await tester.pumpAndSettle();
+          expect(find.text('Renew contract'), findsOneWidget);
+          expect(find.text('Renewing CTR-2026-001'), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('renders live contract data and opens the editor',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -216,7 +260,7 @@ void main() {
   });
 
   testWidgets(
-      'existing renewal shows its link and hides duplicate renewal action',
+      'existing renewal shows its link and explains why another renewal is blocked',
       (tester) async {
     final original = OwnerController.instance.contracts.single;
     OwnerController.instance.setContractsForTesting([
@@ -239,7 +283,13 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: ContractsPage()));
     await tester.pumpAndSettle();
     expect(find.text('Renews CTR-2026-001'), findsOneWidget);
-    expect(find.text('Renew'), findsNothing);
+    expect(find.text('Renew'), findsOneWidget);
+    expect(
+        tester
+            .widget<TextButton>(find.widgetWithText(TextButton, 'Renew'))
+            .onPressed,
+        isNull);
+    expect(find.textContaining('Resolve the tenant’s other'), findsOneWidget);
   });
 
   testWidgets('renewal rejects invalid rent before saving', (tester) async {
@@ -265,7 +315,7 @@ void main() {
     expect(OwnerController.instance.contracts.length, 1);
   });
   testWidgets(
-      'grouped contracts preserve confirmed terms and do not offer unsupported renewals',
+      'solo occupancy contracts offer renewal while preserving confirmed terms',
       (tester) async {
     final original = OwnerController.instance.contracts.first;
     final grouped = TenantContract(
@@ -297,7 +347,15 @@ void main() {
     OwnerController.instance.setContractsForTesting([grouped]);
     await tester.pumpWidget(const MaterialApp(home: ContractsPage()));
     await tester.pumpAndSettle();
-    expect(find.text('Renew'), findsNothing);
+    expect(find.text('Renew'), findsOneWidget);
+    await tester.ensureVisible(find.text('Renew'));
+    await tester.tap(find.text('Renew'));
+    await tester.pumpAndSettle();
+    expect(find.text('Renew contract'), findsOneWidget);
+    expect(find.text('Renewing CTR-2026-001'), findsOneWidget);
+    await tester.ensureVisible(find.text('Cancel'));
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.byTooltip('Edit contract'));
     await tester.tap(find.byTooltip('Edit contract'));
     await tester.pumpAndSettle();

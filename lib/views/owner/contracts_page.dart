@@ -209,10 +209,13 @@ class _ContractsPageState extends State<ContractsPage> {
                               onEdit: () => _openEditor(items[index]),
                               onDelete: () => _delete(items[index]),
                               onDocuments: () => _openDocuments(items[index]),
-                              onRenew:
-                                  _canRenew(items[index], controller.contracts)
-                                      ? () => _renew(items[index])
-                                      : null,
+                              onRenew: _renewalBlockReason(
+                                          items[index], controller.contracts) ==
+                                      null
+                                  ? () => _renew(items[index])
+                                  : null,
+                              renewalBlockReason: _renewalBlockReason(
+                                  items[index], controller.contracts),
                               previousContractNumber: controller.contracts
                                   .where((item) =>
                                       item.id ==
@@ -232,16 +235,27 @@ class _ContractsPageState extends State<ContractsPage> {
     await showContractEditor(context, contract: contract);
   }
 
-  bool _canRenew(TenantContract contract, List<TenantContract> contracts) =>
-      contract.occupancyId == null &&
-      (contract.status == 'active' || contract.status == 'expired') &&
-      !contracts.any((item) =>
-          item.tenantId == contract.tenantId &&
-          item.id != contract.id &&
-          (item.status == 'draft' ||
-              item.status == 'active' ||
-              item.startsOn.isAfter(contract.endsOn) &&
-                  item.status != 'terminated'));
+  String? _renewalBlockReason(
+      TenantContract contract, List<TenantContract> contracts) {
+    if (contract.status != 'active' && contract.status != 'expired') {
+      return 'Only active or expired contracts can be renewed.';
+    }
+    if (contract.occupancyId != null &&
+        !const ['solo', 'standard_shared']
+            .contains(contract.occupancySnapshot?['mode'])) {
+      return 'Exclusive Shared renewals require a group amendment.';
+    }
+    if (contracts.any((item) =>
+        item.tenantId == contract.tenantId &&
+        item.id != contract.id &&
+        (item.status == 'draft' ||
+            item.status == 'active' ||
+            item.startsOn.isAfter(contract.endsOn) &&
+                item.status != 'terminated'))) {
+      return 'Resolve the tenant’s other draft, active, or later contract before renewing.';
+    }
+    return null;
+  }
 
   Future<void> _renew(TenantContract contract) async {
     final saved = await showContractEditor(
@@ -303,12 +317,14 @@ class _ContractCard extends StatelessWidget {
       required this.onDelete,
       required this.onDocuments,
       this.onRenew,
+      this.renewalBlockReason,
       this.previousContractNumber});
   final TenantContract contract;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onDocuments;
   final VoidCallback? onRenew;
+  final String? renewalBlockReason;
   final String? previousContractNumber;
 
   @override
@@ -373,7 +389,7 @@ class _ContractCard extends StatelessWidget {
         const Divider(height: 16),
         const SizedBox(height: 16),
         Wrap(alignment: WrapAlignment.end, spacing: 2, children: [
-          if (onRenew != null)
+          if (contract.status == 'active' || contract.status == 'expired')
             TextButton.icon(
                 onPressed: onRenew,
                 icon: const Icon(Icons.autorenew),
@@ -410,6 +426,12 @@ class _ContractCard extends StatelessWidget {
               onPressed: onDelete,
               icon: const Icon(Icons.delete_outline)),
         ]),
+        if (renewalBlockReason != null &&
+            (contract.status == 'active' || contract.status == 'expired')) ...[
+          const SizedBox(height: 8),
+          Text(renewalBlockReason!,
+              style: Theme.of(context).textTheme.bodySmall),
+        ],
       ]),
     );
   }
