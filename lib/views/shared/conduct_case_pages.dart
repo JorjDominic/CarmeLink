@@ -1,3 +1,4 @@
+import '../../models/tenant_conduct_status.dart';
 import 'tenant_conduct_evidence.dart';
 import 'conduct_investigation_panel.dart';
 import 'package:file_picker/file_picker.dart';
@@ -76,6 +77,9 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
   late final TableRefreshSubscription subscription;
   List<ConductCaseRecord> cases = const [];
   List<StaffTenantOption> tenants = const [];
+  Map<String, TenantConductStatus> tenantStatuses = const {};
+  bool repeatOnly = false;
+  int loadGeneration = 0;
   bool loading = true;
   String? errorMessage;
   RecordListScope scope = RecordListScope.active;
@@ -107,6 +111,7 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
   }
 
   Future<void> _load({bool showSpinner = true}) async {
+    final generation = ++loadGeneration;
     if (showSpinner && mounted) {
       setState(() {
         loading = true;
@@ -117,15 +122,19 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
     try {
       final latestTenants = await tenantPickerService.listTenantOptions();
       final latestCases = await service.listStaffCases();
-      if (!mounted) return;
+      final latestStatuses = await service.tenantStatuses();
+      if (!mounted || generation != loadGeneration) return;
       setState(() {
         tenants = latestTenants;
         cases = latestCases;
+        tenantStatuses = latestStatuses;
         loading = false;
         errorMessage = null;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != loadGeneration) return;
+      cases = const [];
+      tenantStatuses = const {};
       setState(() {
         loading = false;
         errorMessage = conductCaseError(error);
@@ -191,7 +200,10 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
 
     final active =
         cases.where((record) => !conductCaseIsClosed(record.status)).length;
-    final visible = _visibleCases(cases, scope, sort);
+    final visible = _visibleCases(cases, scope, sort)
+        .where((record) =>
+            !repeatOnly || tenantStatuses[record.tenantId]?.needsReview == true)
+        .toList();
 
     return PageFrame(
       title: 'Conduct',
@@ -229,6 +241,14 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
                   CarmelitaCard(child: Text(errorMessage!)),
                 ],
                 const SizedBox(height: 14),
+                FilterChip(
+                  label: Text(
+                      'Repeated / continuous violations (${tenantStatuses.values.where((s) => s.needsReview).length} tenants)'),
+                  selected: repeatOnly,
+                  onSelected: (value) => setState(() => repeatOnly = value),
+                ),
+                const Text(
+                    'Repeated: 2+ confirmed incidents. Continuous: 3+ within 90 days. Closed cases remain in History.'),
                 RecordListToolbar(
                   scope: scope,
                   sort: sort,
@@ -297,6 +317,14 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 8),
+                                  if (tenantStatuses[record.tenantId]
+                                      case final status?) ...[
+                                    Text(status.label,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w700)),
+                                    Text(
+                                        '${status.confirmed} confirmed incidents; ${status.recentConfirmed} within 90 days'),
+                                  ],
                                   Text(
                                     'Recorded cases for this tenant: ${_repeatCount(record)}',
                                     style:

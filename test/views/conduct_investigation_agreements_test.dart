@@ -47,6 +47,12 @@ class Investigation extends ConductCaseService {
   Future<Map<String, dynamic>> investigation(String id) async {
     if (fail) throw StateError('Offline');
     return {
+      'tenant_status': {
+        'tenant_id': 'tenant-1',
+        'status': 'continuous_violations',
+        'confirmed': 4,
+        'recent_confirmed': 3
+      },
       'counts': {
         'total': 4,
         'confirmed': 2,
@@ -140,6 +146,8 @@ void main() {
                   child: ConductInvestigationPanel(
                       record: record, service: Investigation())))));
       await tester.pumpAndSettle();
+      expect(find.text('Tenant conduct status: Continuous violations'),
+          findsOneWidget);
       expect(find.text('Confirmed violation'), findsOneWidget);
       expect(find.textContaining('Confirmed incidents: 2'), findsOneWidget);
       expect(find.text('Confirm violation'), findsNothing);

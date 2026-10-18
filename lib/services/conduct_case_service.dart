@@ -1,3 +1,4 @@
+import '../models/tenant_conduct_status.dart';
 import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
@@ -729,6 +730,20 @@ class ConductCaseService {
       _client.storage
           .from('conduct_case_evidence')
           .createSignedUrl(evidence.storagePath, 120);
+
+  Future<Map<String, TenantConductStatus>> tenantStatuses() async {
+    final result = <String, TenantConductStatus>{};
+    for (var offset = 0;; offset += 200) {
+      final page = await _client.rpc('list_conduct_tenant_statuses',
+          params: {'p_offset': offset, 'p_limit': 200}) as List;
+      for (final row in page) {
+        final status =
+            TenantConductStatus.fromJson(Map<String, dynamic>.from(row as Map));
+        result[status.tenantId] = status;
+      }
+      if (page.length < 200) return result;
+    }
+  }
 
   Future<Map<String, dynamic>> investigation(String caseId) async =>
       Map<String, dynamic>.from(await _client.rpc('get_conduct_investigation',

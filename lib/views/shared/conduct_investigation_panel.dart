@@ -1,3 +1,4 @@
+import '../../models/tenant_conduct_status.dart';
 import 'package:flutter/material.dart';
 import '../../core/utils/conduct_case_policy.dart';
 import '../../core/widgets/common_widgets.dart';
@@ -156,6 +157,10 @@ class _ConductInvestigationPanelState extends State<ConductInvestigationPanel> {
   Widget build(BuildContext context) {
     final decisions = (data?['decisions'] as List?) ?? [];
     final counts = (data?['counts'] as Map?) ?? {};
+    final tenantStatus = data?['tenant_status'] is Map
+        ? TenantConductStatus.fromJson(
+            Map<String, dynamic>.from(data!['tenant_status'] as Map))
+        : null;
     final outcome = decisions.isEmpty ? null : decisions.first['outcome'];
     final state = widget.record.status == 'dismissed'
         ? 'Dismissed / not confirmed'
@@ -178,6 +183,15 @@ class _ConductInvestigationPanelState extends State<ConductInvestigationPanel> {
       ] else if (data == null)
         const LinearProgressIndicator()
       else ...[
+        if (tenantStatus != null) ...[
+          Text('Tenant conduct status: ${tenantStatus.label}',
+              style: const TextStyle(fontWeight: FontWeight.w800)),
+          Text(
+              '${tenantStatus.confirmed} confirmed incidents; ${tenantStatus.recentConfirmed} within 90 days.'),
+          const Text(
+              'Repeated: 2+ confirmed incidents. Continuous: 3+ within 90 days. This flag requires staff review and does not change residency.'),
+          const SizedBox(height: 12),
+        ],
         Text(state, style: const TextStyle(fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
         Text(
