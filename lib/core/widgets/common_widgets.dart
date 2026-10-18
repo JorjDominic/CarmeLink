@@ -421,8 +421,9 @@ class MessageDeliveryMeta extends StatelessWidget {
     final style = Theme.of(context).textTheme.bodySmall;
     if (!isMine) return Text(timeText(message.sentAt), style: style);
     final read = message.isRead && message.readAt != null;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      runSpacing: 3,
       children: [
         Text('${timeText(message.sentAt)} • ', style: style),
         Icon(
@@ -446,6 +447,8 @@ class ConversationThreadPanel extends StatefulWidget {
     this.sending = false,
     this.emptyMessage = 'No messages yet.',
     this.hintText = 'Write a message...',
+    this.participantName,
+    this.participantRole,
     super.key,
   });
 
@@ -456,6 +459,8 @@ class ConversationThreadPanel extends StatefulWidget {
   final bool sending;
   final String emptyMessage;
   final String hintText;
+  final String? participantName;
+  final String? participantRole;
 
   @override
   State<ConversationThreadPanel> createState() =>
@@ -545,7 +550,7 @@ class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
         media.size.height - keyboardInset - (desktop ? 220.0 : 176.0);
     final panelHeight = availableHeight
         .clamp(
-          desktop ? 430.0 : 340.0,
+          160.0,
           desktop ? 680.0 : 620.0,
         )
         .toDouble();
@@ -557,6 +562,33 @@ class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
         padding: EdgeInsets.zero,
         child: Column(
           children: [
+            if (widget.participantName != null) ...[
+              Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(children: [
+                    CircleAvatar(
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: .10),
+                        child: const Icon(Icons.person_outline)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Text(widget.participantName!,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700)),
+                          if (widget.participantRole?.isNotEmpty == true)
+                            Text(widget.participantRole!,
+                                style: Theme.of(context).textTheme.bodySmall),
+                        ])),
+                  ])),
+              const Divider(height: 1),
+            ],
             Expanded(
               child: Stack(
                 children: [
@@ -584,58 +616,8 @@ class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
                       itemBuilder: (context, index) {
                         final item = widget.messages[index];
                         final mine = widget.isMine(item);
-                        return Align(
-                          alignment: mine
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
-                          child: Container(
-                            constraints: const BoxConstraints(maxWidth: 560),
-                            margin: const EdgeInsets.symmetric(vertical: 5),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 9,
-                            ),
-                            decoration: BoxDecoration(
-                              color: mine
-                                  ? const Color(0xFF627FA8)
-                                      .withValues(alpha: .10)
-                                  : Theme.of(context)
-                                      .colorScheme
-                                      .surfaceContainerHighest
-                                      .withValues(alpha: .55),
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(15),
-                                topRight: const Radius.circular(15),
-                                bottomLeft: Radius.circular(mine ? 15 : 4),
-                                bottomRight: Radius.circular(mine ? 4 : 15),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: mine
-                                  ? CrossAxisAlignment.end
-                                  : CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.senderName,
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  item.body,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                                const SizedBox(height: 3),
-                                MessageDeliveryMeta(
-                                  message: item,
-                                  isMine: mine,
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
+                        return ConversationMessageBubble(
+                            message: item, mine: mine);
                       },
                     ),
                   if (_showNewMessages)
@@ -666,6 +648,13 @@ class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
                   maxLines: 4,
                   decoration: InputDecoration(
                     hintText: widget.hintText,
+                    filled: true,
+                    fillColor:
+                        Theme.of(context).colorScheme.surfaceContainerLow,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24)),
                     prefixIcon: const Icon(Icons.chat_bubble_outline_rounded),
                     suffixIcon: widget.sending
                         ? const Padding(
@@ -685,6 +674,70 @@ class _ConversationThreadPanelState extends State<ConversationThreadPanel> {
                   onSubmitted: (_) => _send(),
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Presentation only: the existing thread owns ordering, delivery and scrolling.
+class ConversationMessageBubble extends StatelessWidget {
+  const ConversationMessageBubble(
+      {required this.message, required this.mine, super.key});
+  final ChatMessage message;
+  final bool mine;
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        constraints: BoxConstraints(
+            maxWidth:
+                (MediaQuery.sizeOf(context).width * .78).clamp(180.0, 560.0)),
+        margin: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        decoration: BoxDecoration(
+          color: mine
+              ? const Color(0xFF627FA8).withValues(alpha: .10)
+              : Theme.of(context)
+                  .colorScheme
+                  .surfaceContainerHighest
+                  .withValues(alpha: .55),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(15),
+            topRight: const Radius.circular(15),
+            bottomLeft: Radius.circular(mine ? 15 : 4),
+            bottomRight: Radius.circular(mine ? 4 : 15),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment:
+              mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Text(
+              message.senderName,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              message.body,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(height: 1.45),
+            ),
+            const SizedBox(height: 3),
+            MessageDeliveryMeta(
+              message: message,
+              isMine: mine,
             ),
           ],
         ),
@@ -2066,6 +2119,7 @@ class ConversationListCard extends StatelessWidget {
     this.lastMessageText,
     this.lastMessageTime,
     this.unreadCount = 0,
+    this.selected = false,
     required this.onTap,
     super.key,
   });
@@ -2076,6 +2130,7 @@ class ConversationListCard extends StatelessWidget {
   final String? lastMessageText;
   final DateTime? lastMessageTime;
   final int unreadCount;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
@@ -2084,68 +2139,79 @@ class ConversationListCard extends StatelessWidget {
         lastMessage?.body ?? lastMessageText ?? 'No messages yet';
     final previewTime = lastMessage?.sentAt ?? lastMessageTime;
 
-    return CarmelitaCard(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      child: ListTile(
-        dense: true,
-        contentPadding: EdgeInsets.zero,
-        leading: CircleAvatar(
-          radius: 22,
-          backgroundColor:
-              Theme.of(context).colorScheme.primary.withValues(alpha: .10),
-          foregroundColor: Theme.of(context).colorScheme.primary,
-          child: Text(
-            name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-            if (previewTime != null) ...[
-              const SizedBox(width: 8),
-              Text(
-                timeText(previewTime),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ],
-        ),
-        subtitle: Text(
-          '$role • $previewText',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (unreadCount > 0)
-              Container(
-                margin: const EdgeInsets.only(right: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(10),
-                ),
+    final theme = Theme.of(context);
+    return Material(
+      color: selected
+          ? theme.colorScheme.primary.withValues(alpha: .08)
+          : theme.colorScheme.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+              border: Border(
+                  bottom: BorderSide(color: theme.colorScheme.outlineVariant))),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            CircleAvatar(
+                radius: 19,
+                backgroundColor:
+                    theme.colorScheme.primary.withValues(alpha: .10),
+                foregroundColor: theme.colorScheme.primary,
                 child: Text(
-                  unreadCount.toString(),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            const Icon(Icons.chevron_right_rounded, size: 20),
-          ],
+                    name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
+                    style: const TextStyle(fontWeight: FontWeight.w800))),
+            const SizedBox(width: 12),
+            Expanded(child: LayoutBuilder(builder: (context, bounds) {
+              final identity = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 3),
+                    Text(role,
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: theme.colorScheme.primary)),
+                  ]);
+              final preview = Text(previewText,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant));
+              return bounds.maxWidth >= 580 &&
+                      MediaQuery.textScalerOf(context).scale(1) <= 1.3
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                          SizedBox(
+                              width: bounds.maxWidth * .38, child: identity),
+                          const SizedBox(width: 16),
+                          Expanded(child: preview)
+                        ])
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [identity, const SizedBox(height: 6), preview]);
+            })),
+            const SizedBox(width: 10),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              if (previewTime != null)
+                Text(timeText(previewTime), style: theme.textTheme.labelSmall),
+              const SizedBox(height: 6),
+              if (unreadCount > 0)
+                Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Text(unreadCount.toString(),
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: theme.colorScheme.onPrimary))),
+              const Icon(Icons.chevron_right_rounded, size: 18),
+            ]),
+          ]),
         ),
       ),
     );
