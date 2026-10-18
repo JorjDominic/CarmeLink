@@ -116,18 +116,7 @@ class PaymentService {
 
       final payment =
           Payment.fromJson(Map<String, dynamic>.from(updatedRow as Map));
-      final resolvedName = (payment.tenantName != null &&
-              payment.tenantName!.isNotEmpty)
-          ? payment.tenantName!
-          : (_client.auth.currentUser?.userMetadata?['full_name'] as String? ??
-              'A tenant');
-
-      unawaited(AppNotificationService.instance.notifyPaymentSubmitted(
-        paymentId: paymentId,
-        tenantName: resolvedName,
-        amount: amount,
-        referenceNumber: referenceNumber.trim(),
-      ));
+      // The ledger trigger persists notifications and queues retryable FCM pushes.
 
       return payment;
     } catch (error) {
@@ -205,14 +194,7 @@ class PaymentService {
     final payment = Payment.fromJson(
       Map<String, dynamic>.from(result['payment'] as Map),
     );
-    if (result['is_new'] == true)
-      unawaited(AppNotificationService.instance.notifyPaymentReviewed(
-        tenantId: payment.tenantId,
-        paymentId: paymentId,
-        approved: true,
-        amount: amount,
-        reason: 'Payment received by staff.',
-      ));
+    // New ledger entries notify every recipient; idempotent retries add no alerts.
     return payment;
   }
 
@@ -249,13 +231,7 @@ class PaymentService {
     final payment =
         Payment.fromJson(Map<String, dynamic>.from(updatedRow as Map));
 
-    unawaited(AppNotificationService.instance.notifyPaymentReviewed(
-      tenantId: payment.tenantId,
-      paymentId: paymentId,
-      approved: approve,
-      amount: payment.submittedAmount ?? payment.amount,
-      reason: reviewNotes,
-    ));
+    // Review notifications are committed with the ledger status transition.
 
     return payment;
   }
