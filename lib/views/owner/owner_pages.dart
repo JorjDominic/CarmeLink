@@ -2167,7 +2167,7 @@ const _operationCategories = [
     [
       _OperationItem(
           'Rooms & inspections',
-          'Occupancy, floor plan, inspection notices, and findings',
+          'Occupancy, inspection notices, and findings',
           Icons.bed_outlined,
           RoomMonitoringPage()),
       _OperationItem(

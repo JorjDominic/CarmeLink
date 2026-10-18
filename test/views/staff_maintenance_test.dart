@@ -165,7 +165,8 @@ void main() {
           find.text('No reports match the selected filters.'), findsOneWidget);
     });
 
-    testWidgets('toggles dormitory floor plan overview', (tester) async {
+    testWidgets('hides the disabled dormitory floor plan overview',
+        (tester) async {
       OwnerController.instance.setStaffMaintenanceForTesting([]);
 
       await tester.pumpWidget(buildTestable(const StaffMaintenancePage()));
@@ -173,20 +174,8 @@ void main() {
 
       expect(find.text('Dormitory Floor Plan Monitoring'), findsNothing);
 
-      // Tap floor plan icon button
-      final mapIconFinder = find.byIcon(Icons.map_outlined);
-      expect(mapIconFinder, findsOneWidget);
-      await tester.tap(mapIconFinder);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Dormitory Floor Plan Monitoring'), findsOneWidget);
-
-      // Tap close button on floor plan card
-      final closeFinder = find.byIcon(Icons.close);
-      await tester.tap(closeFinder);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Dormitory Floor Plan Monitoring'), findsNothing);
+      expect(find.byTooltip('Floor Plan Overview'), findsNothing);
+      expect(find.byIcon(Icons.map_outlined), findsNothing);
     });
   });
 }

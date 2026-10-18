@@ -1,3 +1,4 @@
+import '../../core/config/app_features.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/common_widgets.dart';
@@ -30,6 +31,8 @@ class _FloorPlanCanvasState extends State<FloorPlanCanvas> {
 
   @override
   Widget build(BuildContext context) {
+    if (!AppFeatures.floorPlanEnabled)
+      return const Text('Floor plan is currently disabled.');
     return CarmelitaCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

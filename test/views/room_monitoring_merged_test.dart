@@ -7,7 +7,8 @@ import 'package:carmelitas_dormitory_system/services/room_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('RoomMonitoringPage supports List view and Floor plan view modes',
+  testWidgets(
+      'RoomMonitoringPage retains room lists while floor plan is disabled',
       (tester) async {
     // Seed cached rooms so the page renders synchronously
     RoomService.cachedRooms = const [
@@ -61,35 +62,17 @@ void main() {
     expect(find.text('Occupied beds'), findsOneWidget);
     expect(find.text('Available beds'), findsOneWidget);
 
-    // Verify segmented control
-    expect(find.text('List view'), findsOneWidget);
-    expect(find.text('Floor plan map'), findsOneWidget);
+    // Floor-plan mode controls are hidden.
+    expect(find.text('Floor plan map'), findsNothing);
 
     // Verify room cards are in List view
     expect(find.text('Room 101'), findsOneWidget);
     expect(find.text('Room 204'), findsOneWidget);
 
-    // 2. Switch to Floor plan map mode
-    await tester.tap(find.text('Floor plan map'));
-    await tester.pumpAndSettle();
-
-    // Verify Floor plan controls are rendered
-    expect(find.byType(RoomFloorPlanView), findsOneWidget);
-    expect(find.text('Ground floor'), findsOneWidget);
-    expect(find.text('Second floor'), findsOneWidget);
-    expect(find.text('Occupancy'), findsOneWidget);
-    expect(find.text('Maintenance'), findsOneWidget);
-
-    // 3. Switch back to List view
-    await tester.tap(find.text('List view'));
-    await tester.pumpAndSettle();
-
     expect(find.byType(RoomFloorPlanView), findsNothing);
-    expect(find.text('Room 101'), findsOneWidget);
   });
 
-  testWidgets(
-      'AdminFloorPlanPage backward compatibility routes to floor plan mode',
+  testWidgets('AdminFloorPlanPage falls back to room lists while disabled',
       (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
@@ -98,8 +81,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify it renders RoomMonitoringPage with FloorPlanView active
+    // Legacy entry points retain access to the room directory.
     expect(find.byType(RoomMonitoringPage), findsOneWidget);
-    expect(find.text('Floor plan map'), findsOneWidget);
+    expect(find.text('Floor plan map'), findsNothing);
+    expect(find.byType(RoomFloorPlanView), findsNothing);
   });
 }

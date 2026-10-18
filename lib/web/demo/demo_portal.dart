@@ -1,3 +1,4 @@
+import '../../core/config/app_features.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -96,7 +97,8 @@ class _DemoPortalState extends State<DemoPortal> {
         const Divider(),
         Expanded(child: ListView(children: [
           nav('overview', 'Overview', Icons.space_dashboard_outlined),
-          nav('floor', 'Interactive floor plan', Icons.grid_view_outlined),
+          if (AppFeatures.floorPlanEnabled)
+            nav('floor', 'Interactive floor plan', Icons.grid_view_outlined),
           const Padding(padding: EdgeInsets.fromLTRB(24, 18, 12, 6),
             child: Text('MANAGEMENT', style: TextStyle(color: WebPalette.muted,
               letterSpacing: 1, fontSize: 10, fontWeight: FontWeight.w800))),
@@ -141,7 +143,7 @@ class _DemoPortalState extends State<DemoPortal> {
     if (_selected == 'overview') {
       return _Overview(store: _store, role: widget.role, onNavigate: _navigate);
     }
-    if (_selected == 'floor') {
+    if (AppFeatures.floorPlanEnabled && _selected == 'floor') {
       return _FloorPlan(store: _store, onNavigate: _navigate);
     }
     if (_selected == 'reports' && _owner) {

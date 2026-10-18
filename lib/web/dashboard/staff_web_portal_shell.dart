@@ -68,7 +68,7 @@ abstract final class StaffWebDestinations {
         selectedIcon: Icons.meeting_room,
         page: RoomMonitoringPage(),
         webGroup: 'Facilities',
-        webDescription: 'Occupancy, floor plan, cleaning and inspections',
+        webDescription: 'Occupancy, cleaning and inspections',
       ),
       const AppDestination(
         label: 'Cleaning schedules & reports',

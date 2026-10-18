@@ -1,3 +1,4 @@
+import '../../core/config/app_features.dart';
 import '../../controllers/session_controller.dart';
 import '../../models/models.dart';
 import 'dart:async';
@@ -79,7 +80,8 @@ class RoomMonitoringPage extends StatefulWidget {
 }
 
 class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
-  late RoomViewMode _viewMode = widget.initialMode;
+  late RoomViewMode _viewMode =
+      AppFeatures.floorPlanEnabled ? widget.initialMode : RoomViewMode.list;
   RoomService get service => widget.roomService;
   List<RoomRecord>? rooms;
   bool loading = true;
@@ -413,32 +415,34 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
             ),
           ]),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: SegmentedButton<RoomViewMode>(
-                  segments: const [
-                    ButtonSegment(
-                      value: RoomViewMode.list,
-                      label: Text('List view'),
-                      icon: Icon(Icons.view_agenda_outlined),
-                    ),
-                    ButtonSegment(
-                      value: RoomViewMode.floorPlan,
-                      label: Text('Floor plan map'),
-                      icon: Icon(Icons.map_outlined),
-                    ),
-                  ],
-                  selected: {_viewMode},
-                  onSelectionChanged: (selection) {
-                    setState(() => _viewMode = selection.first);
-                  },
+          if (AppFeatures.floorPlanEnabled)
+            Row(
+              children: [
+                Expanded(
+                  child: SegmentedButton<RoomViewMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: RoomViewMode.list,
+                        label: Text('List view'),
+                        icon: Icon(Icons.view_agenda_outlined),
+                      ),
+                      ButtonSegment(
+                        value: RoomViewMode.floorPlan,
+                        label: Text('Floor plan map'),
+                        icon: Icon(Icons.map_outlined),
+                      ),
+                    ],
+                    selected: {_viewMode},
+                    onSelectionChanged: (selection) {
+                      setState(() => _viewMode = selection.first);
+                    },
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           const SizedBox(height: 18),
-          if (_viewMode == RoomViewMode.list) ...[
+          if (!AppFeatures.floorPlanEnabled ||
+              _viewMode == RoomViewMode.list) ...[
             LayoutBuilder(
               builder: (context, constraints) {
                 final narrow = constraints.maxWidth < 620;
@@ -573,7 +577,8 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
             ),
             const SizedBox(height: 14),
           ],
-          if (_viewMode == RoomViewMode.list) ...[
+          if (!AppFeatures.floorPlanEnabled ||
+              _viewMode == RoomViewMode.list) ...[
             if (visibleRooms.isEmpty)
               const EmptyState(
                 icon: Icons.search_off_outlined,

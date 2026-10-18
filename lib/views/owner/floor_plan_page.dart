@@ -1,3 +1,4 @@
+import '../../core/config/app_features.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/owner_controller.dart';
@@ -14,7 +15,10 @@ class AdminFloorPlanPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const RoomMonitoringPage(initialMode: RoomViewMode.floorPlan);
+    return const RoomMonitoringPage(
+        initialMode: AppFeatures.floorPlanEnabled
+            ? RoomViewMode.floorPlan
+            : RoomViewMode.list);
   }
 }
 
@@ -119,6 +123,8 @@ class _RoomFloorPlanViewState extends State<RoomFloorPlanView> {
 
   @override
   Widget build(BuildContext context) {
+    if (!AppFeatures.floorPlanEnabled)
+      return const Text('Floor plan is currently disabled.');
     if (widget.rooms.isEmpty) return const Text('No rooms to display.');
     final controller = OwnerController.instance;
 

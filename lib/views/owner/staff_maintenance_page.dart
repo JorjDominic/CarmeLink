@@ -1,3 +1,4 @@
+import '../../core/config/app_features.dart';
 import '../../core/widgets/record_details.dart';
 import 'package:flutter/material.dart';
 
@@ -175,19 +176,20 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                   const SizedBox(width: 8),
                   Row(
                     children: [
-                      IconButton(
-                        icon: Icon(
-                          _showFloorPlan ? Icons.map : Icons.map_outlined,
-                          color: _showFloorPlan
-                              ? AppColors.brown
-                              : AppColors.taupe,
+                      if (AppFeatures.floorPlanEnabled)
+                        IconButton(
+                          icon: Icon(
+                            _showFloorPlan ? Icons.map : Icons.map_outlined,
+                            color: _showFloorPlan
+                                ? AppColors.brown
+                                : AppColors.taupe,
+                          ),
+                          tooltip: _showFloorPlan
+                              ? 'Hide Floor Plan'
+                              : 'Floor Plan Overview',
+                          onPressed: () =>
+                              setState(() => _showFloorPlan = !_showFloorPlan),
                         ),
-                        tooltip: _showFloorPlan
-                            ? 'Hide Floor Plan'
-                            : 'Floor Plan Overview',
-                        onPressed: () =>
-                            setState(() => _showFloorPlan = !_showFloorPlan),
-                      ),
                       IconButton(
                         icon: const Icon(Icons.refresh),
                         tooltip: 'Refresh list',
@@ -245,7 +247,7 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
               const SizedBox(height: 16),
 
               // Optional Floor Plan Section
-              if (_showFloorPlan) ...[
+              if (AppFeatures.floorPlanEnabled && _showFloorPlan) ...[
                 CarmelitaCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -935,19 +937,22 @@ class StaffMaintenanceDetailsPageState
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              IconButton(
-                                tooltip: _showFloorPlanModal
-                                    ? 'Hide floor plan'
-                                    : 'Show floor plan',
-                                onPressed: () => setState(() =>
-                                    _showFloorPlanModal = !_showFloorPlanModal),
-                                icon: Icon(_showFloorPlanModal
-                                    ? Icons.keyboard_arrow_up
-                                    : Icons.map_outlined),
-                              ),
+                              if (AppFeatures.floorPlanEnabled)
+                                IconButton(
+                                  tooltip: _showFloorPlanModal
+                                      ? 'Hide floor plan'
+                                      : 'Show floor plan',
+                                  onPressed: () => setState(() =>
+                                      _showFloorPlanModal =
+                                          !_showFloorPlanModal),
+                                  icon: Icon(_showFloorPlanModal
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.map_outlined),
+                                ),
                             ],
                           ),
-                          if (_showFloorPlanModal) ...[
+                          if (AppFeatures.floorPlanEnabled &&
+                              _showFloorPlanModal) ...[
                             const SizedBox(height: 10),
                             const FloorPlanCanvas(monitorMode: true),
                           ],
