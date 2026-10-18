@@ -9718,117 +9718,136 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
                 ),
                 const SizedBox(height: 12),
               ],
-              const StaffMessageContacts(),
-              const SizedBox(height: 16),
-              // Search bar
-              TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search by resident name or room...',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear_rounded),
-                          onPressed: () {
-                            _searchController.clear();
-                            messaging.setSearchQuery('');
-                          },
-                        )
-                      : null,
-                ),
-                onChanged: (value) => messaging.setSearchQuery(value),
-              ),
-              const SizedBox(height: 12),
-
-              // Filter chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _FilterChip(
-                      label: 'All',
-                      selected: filter == 'all',
-                      badgeColor: Theme.of(context).colorScheme.primary,
-                      onTap: () => messaging.setFilter('all'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Tenants',
-                      selected: filter == 'tenant',
-                      badgeColor: Theme.of(context).colorScheme.primary,
-                      onTap: () => messaging.setFilter('tenant'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Guardians',
-                      selected: filter == 'guardian',
-                      badgeColor: Theme.of(context).colorScheme.primary,
-                      onTap: () => messaging.setFilter('guardian'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Staff',
-                      selected: filter == 'staff',
-                      badgeColor: Theme.of(context).colorScheme.primary,
-                      onTap: () => messaging.setFilter('staff'),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Conversation list
-              if (messaging.loadingConversations && conversations.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: CircularProgressIndicator(),
-                  ),
-                )
-              else if (conversations.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.chat_bubble_outline_rounded,
-                          size: 48,
-                          color: Theme.of(context).colorScheme.outline,
+              ChatWorkspace(
+                contactsBuilder: (select, selectedKey) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (select == null) const StaffMessageContacts(),
+                      // Search bar
+                      TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search by resident name or room...',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    messaging.setSearchQuery('');
+                                  },
+                                )
+                              : null,
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No conversations found',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.outline,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                ...conversations.map(
-                  (conv) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: ConversationListCard(
-                      name: conv.title,
-                      role: conv.subtitle,
-                      lastMessageText:
-                          conv.lastMessagePreview ?? 'No messages yet',
-                      lastMessageTime: conv.lastMessageAt,
-                      unreadCount: conv.unreadCount,
-                      onTap: () => _ownerPush(
-                        context,
-                        OwnerConversationPage(
-                          record: conv,
+                        onChanged: (value) => messaging.setSearchQuery(value),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Filter chips
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _FilterChip(
+                              label: 'All',
+                              selected: filter == 'all',
+                              badgeColor: Theme.of(context).colorScheme.primary,
+                              onTap: () => messaging.setFilter('all'),
+                            ),
+                            const SizedBox(width: 8),
+                            _FilterChip(
+                              label: 'Tenants',
+                              selected: filter == 'tenant',
+                              badgeColor: Theme.of(context).colorScheme.primary,
+                              onTap: () => messaging.setFilter('tenant'),
+                            ),
+                            const SizedBox(width: 8),
+                            _FilterChip(
+                              label: 'Guardians',
+                              selected: filter == 'guardian',
+                              badgeColor: Theme.of(context).colorScheme.primary,
+                              onTap: () => messaging.setFilter('guardian'),
+                            ),
+                            const SizedBox(width: 8),
+                            _FilterChip(
+                              label: 'Staff',
+                              selected: filter == 'staff',
+                              badgeColor: Theme.of(context).colorScheme.primary,
+                              onTap: () => messaging.setFilter('staff'),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ),
-                ),
+                      const SizedBox(height: 16),
+
+                      // Conversation list
+                      if (messaging.loadingConversations &&
+                          conversations.isEmpty)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      else if (conversations.isEmpty)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  size: 48,
+                                  color: Theme.of(context).colorScheme.outline,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No conversations found',
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.outline,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        ...conversations.map(
+                          (conv) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: ConversationListCard(
+                              selected:
+                                  selectedKey == ValueKey('inbox-' + conv.id),
+                              name: conv.title,
+                              role: conv.subtitle,
+                              lastMessageText:
+                                  conv.lastMessagePreview ?? 'No messages yet',
+                              lastMessageTime: conv.lastMessageAt,
+                              unreadCount: conv.unreadCount,
+                              onTap: () => select != null
+                                  ? select(OwnerConversationPage(
+                                      key: ValueKey('inbox-' + conv.id),
+                                      record: conv,
+                                      embedded: true))
+                                  : _ownerPush(
+                                      context,
+                                      OwnerConversationPage(
+                                        record: conv,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      if (select != null) ...[
+                        const Divider(height: 24),
+                        StaffMessageContacts(
+                            onOpen: select, selectedKey: selectedKey),
+                      ],
+                    ]),
+              ),
             ],
           );
         },
@@ -9841,9 +9860,11 @@ class OwnerConversationPage extends StatefulWidget {
   const OwnerConversationPage({
     this.conversation,
     this.record,
+    this.embedded = false,
     super.key,
   }) : assert(conversation != null || record != null);
 
+  final bool embedded;
   final OwnerConversation? conversation;
   final ConversationRecord? record;
 
@@ -9859,7 +9880,9 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
     super.initState();
     final rec = widget.record;
     if (rec != null) {
-      MessagingController.instance.openConversation(rec);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) MessagingController.instance.openConversation(rec);
+      });
     }
   }
 
@@ -9867,7 +9890,12 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
   void dispose() {
     message.dispose();
     if (widget.record != null) {
-      MessagingController.instance.closeActiveConversation();
+      final id = widget.record!.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (MessagingController.instance.activeConversation?.id == id) {
+          MessagingController.instance.closeActiveConversation();
+        }
+      });
     }
     super.dispose();
   }
@@ -9890,54 +9918,59 @@ class _OwnerConversationPageState extends State<OwnerConversationPage> {
     final subtitle =
         widget.record?.subtitle ?? widget.conversation?.personRole ?? '';
 
+    final content = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 1280),
+      child: AnimatedBuilder(
+        animation: messaging,
+        builder: (context, _) {
+          final messagesList = widget.record != null
+              ? messaging.activeMessages
+              : (widget.conversation?.messages ?? []);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'CONVERSATION',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      letterSpacing: 1.3,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              ConversationThreadPanel(
+                participantName: title,
+                participantRole: subtitle,
+                messages: messagesList,
+                composerController: message,
+                sending: messaging.sendingMessage,
+                emptyMessage: 'No messages yet. Send a message to start.',
+                hintText: 'Write a message...',
+                onSend: _handleSend,
+                isMine: (item) {
+                  if (widget.record != null) {
+                    return item.isMine(
+                      SessionController.instance.currentUser?.id,
+                    );
+                  }
+                  return item.senderRole == 'owner' ||
+                      item.senderRole == 'caretaker' ||
+                      item.senderRole == 'ownerCaretaker';
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (widget.embedded) return content;
     return PageFrame(
+      maxWidth: 1320,
       heroTitle: 'Chat',
       title: title,
       subtitle: subtitle.isEmpty ? title : '$title - $subtitle',
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 980),
-        child: AnimatedBuilder(
-          animation: messaging,
-          builder: (context, _) {
-            final messagesList = widget.record != null
-                ? messaging.activeMessages
-                : (widget.conversation?.messages ?? []);
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'CONVERSATION',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        letterSpacing: 1.3,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                ConversationThreadPanel(
-                  messages: messagesList,
-                  composerController: message,
-                  sending: messaging.sendingMessage,
-                  emptyMessage: 'No messages yet. Send a message to start.',
-                  hintText: 'Write a message...',
-                  onSend: _handleSend,
-                  isMine: (item) {
-                    if (widget.record != null) {
-                      return item.isMine(
-                        SessionController.instance.currentUser?.id,
-                      );
-                    }
-                    return item.senderRole == 'owner' ||
-                        item.senderRole == 'caretaker' ||
-                        item.senderRole == 'ownerCaretaker';
-                  },
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+      child: content,
     );
   }
 }

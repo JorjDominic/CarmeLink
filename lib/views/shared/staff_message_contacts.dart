@@ -1,3 +1,4 @@
+import '../../core/widgets/chat_workspace.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/messaging_controller.dart';
@@ -8,13 +9,16 @@ import '../../services/messaging_service.dart';
 import '../../services/table_refresh_subscription.dart';
 
 class StaffMessageContacts extends StatefulWidget {
-  const StaffMessageContacts({super.key});
+  const StaffMessageContacts({super.key, this.onOpen, this.selectedKey});
+  final ValueChanged<Widget>? onOpen;
+  final Key? selectedKey;
 
   @override
   State<StaffMessageContacts> createState() => _StaffMessageContactsState();
 }
 
 class _StaffMessageContactsState extends State<StaffMessageContacts> {
+  String _search = '';
   static const _service = MessagingService();
   late Future<List<Object>> _future = _load();
   late final TableRefreshSubscription _subscription;
@@ -45,7 +49,15 @@ class _StaffMessageContactsState extends State<StaffMessageContacts> {
   }
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<List<Object>>(
+  Widget build(BuildContext context) => widget.onOpen != null
+      ? _contacts(context, widget.onOpen, widget.selectedKey)
+      : ChatWorkspace(
+          contactsBuilder: (select, selectedKey) =>
+              _contacts(context, select, selectedKey));
+
+  Widget _contacts(BuildContext context, ValueChanged<Widget>? select,
+          Key? selectedKey) =>
+      FutureBuilder<List<Object>>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
@@ -58,6 +70,11 @@ class _StaffMessageContactsState extends State<StaffMessageContacts> {
           if (!snapshot.hasData) return const LinearProgressIndicator();
           final contacts = snapshot.data![0] as List<Map<String, dynamic>>;
           final conversations = snapshot.data![1] as List<ConversationRecord>;
+          final visibleContacts = contacts
+              .where((contact) => (contact['full_name'] as String)
+                  .toLowerCase()
+                  .contains(_search))
+              .toList();
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -65,10 +82,20 @@ class _StaffMessageContactsState extends State<StaffMessageContacts> {
                   subtitle:
                       'Private conversations with individual staff accounts'),
               const SizedBox(height: 8),
+              TextField(
+                decoration: const InputDecoration(
+                    hintText: 'Search staff contacts',
+                    prefixIcon: Icon(Icons.search)),
+                onChanged: (value) =>
+                    setState(() => _search = value.trim().toLowerCase()),
+              ),
+              const SizedBox(height: 8),
               if (contacts.isEmpty)
                 const Text(
                     'No other owner or caretaker accounts are available.'),
-              for (final contact in contacts)
+              if (contacts.isNotEmpty && visibleContacts.isEmpty)
+                const Text('No matching staff contacts.'),
+              for (final contact in visibleContacts)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Builder(builder: (context) {
@@ -81,6 +108,8 @@ class _StaffMessageContactsState extends State<StaffMessageContacts> {
                         .where((item) => item.directPeerId == contact['id'])
                         .firstOrNull;
                     return ConversationListCard(
+                      selected: selectedKey ==
+                          ValueKey('direct-' + (contact['id'] as String)),
                       name: name,
                       role: role,
                       lastMessageText: record?.lastMessagePreview ??
@@ -88,6 +117,15 @@ class _StaffMessageContactsState extends State<StaffMessageContacts> {
                       lastMessageTime: record?.lastMessageAt,
                       unreadCount: record?.unreadCount ?? 0,
                       onTap: () async {
+                        if (select != null) {
+                          select(DirectStaffConversationPage(
+                              key: ValueKey(
+                                  'direct-' + (contact['id'] as String)),
+                              staffId: contact['id'] as String,
+                              contactName: name,
+                              embedded: true));
+                          return;
+                        }
                         await Navigator.of(context)
                             .push(MaterialPageRoute<void>(
                           builder: (_) => DirectStaffConversationPage(
@@ -107,9 +145,14 @@ class _StaffMessageContactsState extends State<StaffMessageContacts> {
 
 class DirectStaffConversationPage extends StatefulWidget {
   const DirectStaffConversationPage(
-      {super.key, this.staffId, this.conversationId, this.contactName})
+      {super.key,
+      this.staffId,
+      this.conversationId,
+      this.contactName,
+      this.embedded = false})
       : assert(staffId != null || conversationId != null);
   final String? staffId, conversationId, contactName;
+  final bool embedded;
 
   @override
   State<DirectStaffConversationPage> createState() =>
@@ -170,36 +213,55 @@ class _DirectStaffConversationPageState
   @override
   void dispose() {
     _composer.dispose();
-    MessagingController.instance.closeActiveConversation();
-    MessagingController.instance.startForCurrentRole();
+    if (widget.embedded) {
+      final id = _record?.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (id != null &&
+            MessagingController.instance.activeConversation?.id == id) {
+          MessagingController.instance.closeActiveConversation();
+          MessagingController.instance.startForCurrentRole();
+        }
+      });
+    } else {
+      MessagingController.instance.closeActiveConversation();
+      MessagingController.instance.startForCurrentRole();
+    }
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => PageFrame(
-        title: 'Chat',
-        subtitle:
-            _record?.title ?? widget.contactName ?? 'Private conversation',
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? Column(children: [
-                    Text(_error!),
-                    TextButton(onPressed: _open, child: const Text('Retry'))
-                  ])
-                : AnimatedBuilder(
-                    animation: MessagingController.instance,
-                    builder: (context, _) => ConversationThreadPanel(
-                      messages: MessagingController.instance.activeMessages,
-                      composerController: _composer,
-                      sending: MessagingController.instance.sendingMessage,
-                      emptyMessage:
-                          'No messages yet. Start a private conversation.',
-                      hintText: 'Write a message...',
-                      onSend: _send,
-                      isMine: (message) => message
-                          .isMine(SessionController.instance.currentUser?.id),
-                    ),
-                  ),
-      );
+  Widget build(BuildContext context) {
+    final content = _loading
+        ? const Center(child: CircularProgressIndicator())
+        : _error != null
+            ? Column(children: [
+                Text(_error!),
+                TextButton(onPressed: _open, child: const Text('Retry'))
+              ])
+            : AnimatedBuilder(
+                animation: MessagingController.instance,
+                builder: (context, _) => ConversationThreadPanel(
+                  participantName: _record?.title ??
+                      widget.contactName ??
+                      'Private conversation',
+                  participantRole: _record?.subtitle ?? '',
+                  messages: MessagingController.instance.activeMessages,
+                  composerController: _composer,
+                  sending: MessagingController.instance.sendingMessage,
+                  emptyMessage:
+                      'No messages yet. Start a private conversation.',
+                  hintText: 'Write a message...',
+                  onSend: _send,
+                  isMine: (message) => message
+                      .isMine(SessionController.instance.currentUser?.id),
+                ),
+              );
+    if (widget.embedded) return content;
+    return PageFrame(
+      maxWidth: 1280,
+      title: 'Chat',
+      subtitle: _record?.title ?? widget.contactName ?? 'Private conversation',
+      child: content,
+    );
+  }
 }
