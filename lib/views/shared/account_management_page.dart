@@ -1,3 +1,4 @@
+import '../../core/widgets/management_record_list.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
@@ -223,41 +224,16 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
                   ],
                   if (visible.isEmpty)
                     const Center(child: Text('No accounts match the filters.')),
-                  ...visible
-                      .map((row) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: CarmelitaCard(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              child: ListTile(
-                                onTap: () => manage(row),
-                                contentPadding: EdgeInsets.zero,
-                                leading: CircleAvatar(
-                                  child: Text((row['full_name'] as String)
-                                      .substring(0, 1)),
-                                ),
-                                title: Text(row['full_name'] as String),
-                                subtitle: Text([
-                                  row['email'] as String? ?? '',
-                                  (row['phone'] as String?)?.isNotEmpty == true
-                                      ? row['phone'] as String
-                                      : 'No phone number',
-                                  'Email: ${row['email_verification_status'] == 'verified' ? 'Verified' : 'Pending verification'}',
-                                  'Mobile: ${row['phone_verification_status'] == 'verified' ? 'Verified' : 'On hold'}',
-                                ].join('\n')),
-                                trailing: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    StatusPill(
-                                        _roleLabel(row['role'] as String)),
-                                    const Icon(Icons.chevron_right, size: 18),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ))
-                      .toList(),
+                  ManagementRecordList<Map<String, dynamic>>(
+                    bottomClearance: 72,
+                    key: ValueKey(searchQuery + '|' + roleFilter),
+                    items: visible,
+                    itemLabel: 'accounts',
+                    itemBuilder: (row) => AccountRecordCard(
+                        account: row,
+                        roleLabel: _roleLabel(row['role'] as String),
+                        onTap: () => manage(row)),
+                  ),
                 ],
               );
             },
@@ -327,6 +303,71 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
         'guardian' => 'Guardian',
         _ => 'Tenant',
       };
+}
+
+class AccountRecordCard extends StatelessWidget {
+  const AccountRecordCard(
+      {required this.account,
+      required this.roleLabel,
+      required this.onTap,
+      super.key});
+  final Map<String, dynamic> account;
+  final String roleLabel;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final name = account['full_name'] as String;
+    return CarmelitaCard(
+        onTap: onTap,
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            CircleAvatar(
+                child: Text(name.isEmpty ? '?' : name.substring(0, 1))),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(name,
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 5),
+                  Text(account['email'] as String? ?? '',
+                      style: theme.textTheme.bodySmall),
+                ])),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right, size: 18),
+          ]),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 6, children: [
+            StatusPill(roleLabel),
+            Chip(
+                avatar: const Icon(Icons.mark_email_read_outlined, size: 16),
+                label: Text(account['email_verification_status'] == 'verified'
+                    ? 'Email: Verified'
+                    : 'Email: Pending verification')),
+            Chip(
+                avatar: const Icon(Icons.phone_android, size: 16),
+                label: Text(account['phone_verification_status'] == 'verified'
+                    ? 'Mobile: Verified'
+                    : 'Mobile: On hold')),
+          ]),
+          const Divider(height: 24),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(Icons.phone_outlined,
+                size: 16, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text(
+                    (account['phone'] as String?)?.isNotEmpty == true
+                        ? account['phone'] as String
+                        : 'No phone number',
+                    style: theme.textTheme.bodySmall)),
+          ]),
+        ]));
+  }
 }
 
 class _EditAccountSheet extends StatefulWidget {

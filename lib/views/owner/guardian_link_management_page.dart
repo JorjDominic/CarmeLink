@@ -1,3 +1,4 @@
+import '../../core/widgets/management_record_list.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/common_widgets.dart';
@@ -84,36 +85,71 @@ class _GuardianLinkManagementPageState
                   message: 'Add a guardian-to-tenant relationship.',
                 );
               }
-              return Column(
-                children: rows.map((link) {
-                  final guardian = link['guardian'] as Map<String, dynamic>?;
-                  final tenant = link['tenant'] as Map<String, dynamic>?;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: CarmelitaCard(
-                      onTap: () => openEditor(link),
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.family_restroom_outlined),
-                        title: Text(
-                          '${guardian?['full_name'] ?? 'Guardian'} to '
-                          '${tenant?['full_name'] ?? 'Tenant'}',
-                        ),
-                        subtitle: Text(
-                          link['relationship'] as String? ?? 'Guardian',
-                        ),
-                        trailing: link['is_primary'] == true
-                            ? const StatusPill('Primary')
-                            : const Icon(Icons.chevron_right),
-                      ),
-                    ),
-                  );
-                }).toList(),
+              return ManagementRecordList<Map<String, dynamic>>(
+                bottomClearance: 72,
+                items: rows.cast<Map<String, dynamic>>(),
+                itemLabel: 'links',
+                itemBuilder: (link) =>
+                    GuardianLinkCard(link: link, onTap: () => openEditor(link)),
               );
             },
           ),
         ),
       );
+}
+
+class GuardianLinkCard extends StatelessWidget {
+  const GuardianLinkCard({required this.link, required this.onTap, super.key});
+  final Map<String, dynamic> link;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final guardian = link['guardian'] as Map<String, dynamic>?;
+    final tenant = link['tenant'] as Map<String, dynamic>?;
+    final theme = Theme.of(context);
+    Widget identity(String label, String name, IconData icon) =>
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, size: 20, color: theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(label,
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                Text(name,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+              ])),
+        ]);
+    return CarmelitaCard(
+        onTap: onTap,
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Icon(Icons.link, size: 18, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text(link['relationship'] as String? ?? 'Guardian',
+                    style: theme.textTheme.titleSmall)),
+            if (link['is_primary'] == true)
+              const StatusPill('Primary')
+            else
+              const Icon(Icons.chevron_right),
+          ]),
+          const Divider(height: 24),
+          identity('Guardian', guardian?['full_name'] as String? ?? 'Guardian',
+              Icons.person_outline),
+          const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Icon(Icons.south, size: 16))),
+          identity('Tenant', tenant?['full_name'] as String? ?? 'Tenant',
+              Icons.home_outlined),
+        ]));
+  }
 }
 
 class _GuardianLinkEditor extends StatefulWidget {
