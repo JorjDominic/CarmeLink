@@ -76,8 +76,25 @@ try{
   await db.exec('create role service_role bypassrls;create publication supabase_realtime;');
   await db.exec(source('202610180006_room_transfer_notice_acknowledgment.sql'));
   await db.query("insert into profiles values($1,'Owner','owner'),($2,'Caretaker','caretaker'),($3,'Stranger','tenant'),($4,'Guardian','guardian')",[owner,caretaker,stranger,guardian]);
+  // Include real occupancy guards in the signed-amendment lifecycle fixture.
+  await db.exec(`alter table tenant_contracts add column occupancy_id uuid;
+    alter table bed_spaces add column retired_at timestamptz;
+    create table contract_occupancy_arrangements(id uuid primary key,room_id uuid,snapshot jsonb,released boolean default false);`);
+  const locks=source('202610130002_contract_occupancy_stabilization.sql');
+  const lockStart=locks.indexOf('create function public.lock_contract_occupancy_room(');
+  await db.exec(locks.slice(lockStart,locks.indexOf('end $$;',lockStart)+8));
+  await db.exec(source('202610190001_allow_standard_shared_room_transfer.sql'));
+  await db.exec(source('202610190005_preserve_standard_shared_transfer_guards.sql'));
+  await db.exec(`create trigger aa_contract_occupancy_assignment before insert or update or delete on tenant_assignments
+    for each row execute function guard_contract_occupancy_assignment();
+    create trigger group_occupancy_room_transfer before insert on room_transfers
+    for each row execute function guard_group_room_transfer();`);
   await actor(owner,'owner');
-  const f=await fixture(), t=await propose(f);
+  const f=await fixture();
+  await db.query("insert into contract_occupancy_arrangements(id,room_id,snapshot) values($1,$2,jsonb_build_object('mode','standard_shared','members',jsonb_build_array(jsonb_build_object('tenant_id',$3::text,'bed_id',$4::text))))",
+    [f.contract,f.r1,f.tenant,f.sourceBed]);
+  await db.query('update tenant_contracts set occupancy_id=$1 where id=$1',[f.contract]);
+  const t=await propose(f);
   const original=await row('select to_jsonb(c) snapshot from tenant_contracts c where id=$1',[f.contract]);
   await check('proposal reserves the destination and preserves the current assignment',async()=>{
     assert.equal((await row('select status from bed_spaces where id=$1',[f.destination])).status,'reserved');
@@ -209,6 +226,15 @@ try{
     assert.equal((await transfer(t)).status,'completed');
     assert.equal((await row("select bed_space_id from tenant_assignments where tenant_id=$1 and status='active'",[f.tenant])).bed_space_id,f.sourceBed);
     assert.equal((await row('select count(*)::int n from room_transfers where tenant_id=$1',[f.tenant])).n,2);
+  });
+  await check('shared and exclusive-shared contracts still require the group amendment workflow',async()=>{
+    for(const mode of ['shared','exclusive_shared']) {
+      const group=await fixture();
+      await db.query("insert into contract_occupancy_arrangements(id,room_id,snapshot) values($1,$2,jsonb_build_object('mode',$3::text,'members',jsonb_build_array(jsonb_build_object('tenant_id',$4::text,'bed_id',$5::text))))",
+        [group.contract,group.r1,mode,group.tenant,group.sourceBed]);
+      await db.query('update tenant_contracts set occupancy_id=$1 where id=$1',[group.contract]);
+      await assert.rejects(propose(group),/Group occupancy room changes/);
+    }
   });
   console.log(`${passed} room transfer PostgreSQL checks passed.`);
 }catch(e){console.error(e.message,e.where??'',e.query??'');process.exitCode=1;}

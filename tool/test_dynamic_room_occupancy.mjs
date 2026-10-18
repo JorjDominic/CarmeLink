@@ -1,3 +1,4 @@
+import {checkStandardSharedTransferGuards} from './standard_shared_transfer_guard_checks.mjs';
 // In-memory disposable PostgreSQL only; no production connection.
 import { PGlite } from '../build/phase2_sql_tests/node_modules/@electric-sql/pglite/dist/index.js';
 import { randomUUID } from 'node:crypto';
@@ -137,6 +138,7 @@ try {
   await assert.rejects(db.query("insert into tenant_contracts(tenant_id,starts_on,ends_on,monthly_rent,previous_contract_id) values($1,current_date+31,current_date+61,3000,$2)",[c.members[0].tenant_id,c.ids[0]]),/amendment|renew|expired|ended|reserved/);
   await assert.rejects(db.query('insert into room_transfers(id,contract_id,tenant_id) values($1,$2,$3)',[randomUUID(),c.ids[0],c.members[0].tenant_id]),/amendment/);
  });
+ await checkStandardSharedTransferGuards({db,check,room,prepare,resize,approve,actor,owner,original});
  console.log(`${passed} dynamic room/occupancy PostgreSQL checks passed.`);
 } catch(error){console.error(error);process.exitCode=1;}
 finally{await db.close();}
