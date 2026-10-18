@@ -186,7 +186,7 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
       return;
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
         mounted) {
-      setState(() => _error = 'Could not open the test payment page.');
+      setState(() => _error = 'Could not open the payment page. (TEST)');
     }
   }
 
@@ -235,8 +235,8 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
             .toList();
     final selectedTotal =
         selectedBills.fold<double>(0, (sum, p) => sum + p.outstandingAmount);
-    final statusLabel = switch (session?.status) {
-      'succeeded' => isTest ? 'Test payment confirmed' : 'Payment confirmed',
+    final baseStatusLabel = switch (session?.status) {
+      'succeeded' => 'Payment confirmed',
       'pending' => 'Awaiting payment',
       'creating' => 'Preparing payment request',
       'expired' => 'QR expired',
@@ -245,9 +245,10 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
       'needs_review' => 'Payment needs staff reconciliation',
       _ => 'Ready to start',
     };
+    final statusLabel = '$baseStatusLabel${isTest ? ' (TEST)' : ''}';
     return PageFrame(
         title:
-            widget.demo ? 'Payment workflow demo' : 'Pay with PayMongo QR Ph',
+            '${widget.demo ? 'Payment workflow' : 'Pay with PayMongo QR Ph'}${isTest ? ' (TEST)' : ''}',
         subtitle: widget.demo
             ? 'No account or API keys required'
             : 'Pay a bill or select rent months in advance',
@@ -259,8 +260,8 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
                 child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Text(widget.demo
-                        ? 'DEMO ONLY — no money moves and no tenant bills are updated.'
-                        : 'TEST MODE — use the test payment page. The displayed QR cannot collect payment. Successful simulations can update registered sample bills in the testing environment only. No real money is received.'))),
+                        ? 'Payment preview; bills remain unchanged. (TEST)'
+                        : 'Use the payment page below to simulate payment. No real money is received. (TEST)'))),
           if (!widget.demo &&
               widget.payment == null &&
               widget.initialSession == null) ...[
@@ -321,7 +322,7 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
                   child: Column(children: [
                     Text(
                         widget.demo
-                            ? 'Sample rent bill'
+                            ? 'Rent bill (TEST)'
                             : breakdown.length > 1
                                 ? 'Rent payment · ${breakdown.length} months'
                                 : _payment?.label ??
@@ -371,10 +372,10 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
                                 'Demo QR code. Cannot collect payment.',
                           ),
                           const SizedBox(height: 8),
-                          const Text('DEMO QR - no real payment'),
+                          const Text('Payment QR (TEST)'),
                           Text(widget.demo
                               ? 'Use the simulation buttons below to demonstrate payment.'
-                              : 'Use the test payment page below to simulate payment.'),
+                              : 'Use the payment page below to simulate payment. (TEST)'),
                         ])
                       else if (session?.qrImage != null)
                         _qr(session!.qrImage!),
@@ -449,7 +450,7 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
             FilledButton(
                 onPressed:
                     _busy ? null : () => _openSimulation(session!.testUrl!),
-                child: const Text('Open test payment page')),
+                child: const Text('Open payment page (TEST)')),
           if (widget.demo && session?.isActive == true) ...[
             FilledButton(
                 onPressed: () => _demoOutcome('succeeded'),

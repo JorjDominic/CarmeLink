@@ -179,6 +179,13 @@ class Payment {
   final String? reviewedBy;
   final DateTime? reviewedAt;
   final String? reviewNotes;
+  String? get displayReviewNotes {
+    const prefix = 'DEMO TEST PAYMENT - no real money received. ';
+    final value = reviewNotes;
+    if (value == null || !value.startsWith(prefix)) return value;
+    return '${value.substring(prefix.length).trim()} (TEST)';
+  }
+
   final DateTime createdAt;
   final String? contractId;
   final double? remainingBalance;

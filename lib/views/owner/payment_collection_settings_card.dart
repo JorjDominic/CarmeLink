@@ -155,7 +155,7 @@ class _PaymentCollectionSettingsCardState
             if (settings?.paymongoReady == true &&
                 settings?.environment == 'test')
               const Text(
-                  'Sandbox connected: simulations update registered sample bills in the testing environment only. No real money is received.'),
+                  'Sandbox connected; no real money is received. (TEST)'),
             TextButton.icon(
               onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(

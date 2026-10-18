@@ -109,7 +109,7 @@ class _PaymongoSessionsSectionState extends State<PaymongoSessionsSection> {
                     if (widget.staff && s.tenantName != null)
                       Text(s.tenantName!),
                     Text(
-                        '${s.isTest ? 'Test' : 'Live'} • ${s.status.replaceAll('_', ' ')}'),
+                        '${s.status.replaceAll('_', ' ')}${s.isTest ? ' (TEST)' : ''}'),
                     if (s.issue != null) Text(s.issue!),
                     if (s.billBreakdown.isNotEmpty)
                       ExpansionTile(

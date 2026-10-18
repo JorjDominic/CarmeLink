@@ -81,7 +81,7 @@ void main() {
       (tester) async {
     final gateway = Gateway(), printer = Printer();
     await open(tester, gateway, printer);
-    expect(find.text('Test payment confirmed'), findsOneWidget);
+    expect(find.text('Payment confirmed (TEST)'), findsOneWidget);
     expect(find.textContaining(PaymentReceipt.testNotice), findsOneWidget);
     expect(printer.builds, 1);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -98,7 +98,7 @@ void main() {
       final gateway = Gateway()..failRead = !failedRendering;
       final printer = Printer()..failBuild = failedRendering;
       await open(tester, gateway, printer);
-      expect(find.text('Test payment confirmed'), findsOneWidget);
+      expect(find.text('Payment confirmed (TEST)'), findsOneWidget);
       expect(find.textContaining('Payment remains confirmed.'), findsOneWidget);
       expect(find.text('Generate payment request'), findsNothing);
       gateway.failRead = false;

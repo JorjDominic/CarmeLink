@@ -36,8 +36,7 @@ class PaymentReceipt {
   final double amount, balanceAfter;
   final DateTime verifiedAt, receivedAt;
   bool get isTest => environment == 'test';
-  static const testNotice =
-      'TEST TRANSACTION - NOT VALID FOR OFFICIAL COLLECTION';
+  static const testNotice = 'Payment receipt (TEST)';
   factory PaymentReceipt.fromJson(Map<String, dynamic> row) => PaymentReceipt(
       id: row['id'] as String,
       number: row['receipt_number'] as String,
@@ -156,10 +155,9 @@ class ReceiptPrintService {
       build: (_) => [
         pw.Text("Carmelita's Dormitory",
             style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-        pw.Text('PAYMENT RECEIPT'),
-        if (isTest ?? payment.paymentMethod?.contains('Demo Test') == true)
-          pw.Text(PaymentReceipt.testNotice,
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        pw.Text((isTest ?? payment.paymentMethod?.contains('Demo Test') == true)
+            ? 'PAYMENT RECEIPT (TEST)'
+            : 'PAYMENT RECEIPT'),
         pw.Divider(),
         pw.Text('Receipt: ${receiptNumber ?? reference}'),
         if (recoveredDetails)

@@ -3883,7 +3883,7 @@ class _PaymentReviewCard extends StatelessWidget {
             const Text('Verified by staff'),
           if (payment.testVerifiedAmount > 0)
             const Text(
-                'Includes TEST TRANSACTION credits - excluded from actual collections'),
+                'Includes sample credits, excluded from actual collections. (TEST)'),
           Text('Submitted: ${_dateOrNone(payment.paidAt)}'),
           Text(
               'Bill total: ${money(payment.amount)} • Remaining: ${money(payment.outstandingAmount)}'),
@@ -4002,7 +4002,7 @@ class _PaymentReviewCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${payment.isProofRejected ? 'Rejection reason' : 'Review notes'}: ${payment.reviewNotes}',
+                      '${payment.isProofRejected ? 'Rejection reason' : 'Review notes'}: ${payment.displayReviewNotes}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.error,
                         fontWeight: FontWeight.w600,

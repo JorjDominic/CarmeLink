@@ -198,7 +198,7 @@ void main() {
                 collectionSettingsService: _AutomaticSettings()))));
     await tester.pumpAndSettle();
     expect(find.byType(PaymongoPaymentPage), findsOneWidget);
-    expect(find.text('Pay with PayMongo QR Ph'), findsOneWidget);
+    expect(find.text('Pay with PayMongo QR Ph (TEST)'), findsOneWidget);
     expect(find.text('Upload receipt'), findsNothing);
   });
   Future<void> tap(WidgetTester tester, String label) async {
@@ -220,12 +220,13 @@ void main() {
       (tester) async {
     final service = _NeverCalledGateway();
     await demo(tester, service);
-    expect(find.textContaining('DEMO ONLY'), findsOneWidget);
+    expect(find.text('Payment preview; bills remain unchanged. (TEST)'),
+        findsOneWidget);
     await tap(tester, 'Start demo payment');
-    expect(find.text('Awaiting payment'), findsOneWidget);
+    expect(find.text('Awaiting payment (TEST)'), findsOneWidget);
     expect(find.byKey(const Key('demo-payment-qr')), findsOneWidget);
     await tap(tester, 'Simulate successful payment');
-    expect(find.text('Test payment confirmed'), findsOneWidget);
+    expect(find.text('Payment confirmed (TEST)'), findsOneWidget);
     expect(find.textContaining('Actual balances unchanged.'), findsOneWidget);
     expect(service.calls, 0);
   });
@@ -235,13 +236,13 @@ void main() {
     await demo(tester, service);
     await tap(tester, 'Start demo payment');
     await tap(tester, 'Simulate failed payment');
-    expect(find.text('Payment failed'), findsOneWidget);
+    expect(find.text('Payment failed (TEST)'), findsOneWidget);
     await tap(tester, 'Start demo payment');
     await tap(tester, 'Simulate expired QR');
-    expect(find.text('QR expired'), findsOneWidget);
+    expect(find.text('QR expired (TEST)'), findsOneWidget);
     await tap(tester, 'Start demo payment');
     await tap(tester, 'Cancel payment request');
-    expect(find.text('Payment cancelled'), findsOneWidget);
+    expect(find.text('Payment cancelled (TEST)'), findsOneWidget);
     expect(service.calls, 0);
   });
   testWidgets('sandbox displays a nonpayment demo QR and simulation link',
@@ -263,11 +264,9 @@ void main() {
     final qr =
         tester.widget<QrImageView>(find.byKey(const Key('demo-payment-qr')));
     expect(qr.semanticsLabel, 'Demo QR code. Cannot collect payment.');
-    expect(find.text('DEMO QR - no real payment'), findsOneWidget);
-    expect(find.text('Open test payment page'), findsOneWidget);
-    expect(
-        find.textContaining(
-            'Successful simulations can update registered sample bills'),
+    expect(find.text('Payment QR (TEST)'), findsOneWidget);
+    expect(find.text('Open payment page (TEST)'), findsOneWidget);
+    expect(find.textContaining('No real money is received. (TEST)'),
         findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });

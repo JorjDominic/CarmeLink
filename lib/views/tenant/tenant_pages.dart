@@ -2312,7 +2312,7 @@ class _TenantPaymentCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          payment.reviewNotes!,
+                          payment.displayReviewNotes!,
                           style: TextStyle(
                             fontSize: 12,
                             color: payment.isRejected

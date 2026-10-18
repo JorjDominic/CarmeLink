@@ -4,6 +4,19 @@ import 'package:carmelitas_dormitory_system/controllers/tenant_controller.dart';
 
 void main() {
   group('Payment Model', () {
+    test(
+        'legacy sandbox review text displays a suffix without changing ledger notes',
+        () {
+      const raw =
+          'DEMO TEST PAYMENT - no real money received. Payment confirmed.';
+      final payment = Payment.fromJson({'review_notes': raw});
+      expect(payment.displayReviewNotes, 'Payment confirmed. (TEST)');
+      expect(payment.reviewNotes, raw);
+      expect(
+          Payment.fromJson({'review_notes': 'Receipt checked by staff.'})
+              .displayReviewNotes,
+          'Receipt checked by staff.');
+    });
     test('deposit credits remain visible when a bill is copied or serialized',
         () {
       final payment = Payment.fromJson({
