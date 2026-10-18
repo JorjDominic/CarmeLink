@@ -1,3 +1,4 @@
+import '../shared/repeat_violation_tenants_page.dart';
 import '../shared/system_maintenance_page.dart';
 import '../../core/widgets/chat_workspace.dart';
 import '../../core/widgets/workspace_columns.dart';
@@ -2211,6 +2212,11 @@ const _operationCategories = [
           'Maintenance and confidential reports',
           Icons.assignment_outlined,
           ReportManagementPage()),
+      _OperationItem(
+          'Repeated violations',
+          'Review tenants with repeated or continuous confirmed incidents',
+          Icons.warning_amber_outlined,
+          RepeatViolationTenantsPage()),
       _OperationItem(
           'Conduct & cases',
           'Review incidents, responses, warnings and appeals',

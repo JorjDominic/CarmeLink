@@ -64,9 +64,11 @@ List<ConductCaseRecord> _visibleCases(
 }
 
 class StaffConductCasesPage extends StatefulWidget {
-  const StaffConductCasesPage({super.key, this.initialCaseId});
+  const StaffConductCasesPage(
+      {super.key, this.initialCaseId, this.initialTenantId});
 
   final String? initialCaseId;
+  final String? initialTenantId;
 
   @override
   State<StaffConductCasesPage> createState() => _StaffConductCasesPageState();
@@ -82,6 +84,7 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
   bool repeatOnly = false;
   bool repeatStatusAvailable = false;
   bool preparingCase = false;
+  bool initialTenantScopeChosen = false;
   int loadGeneration = 0;
   bool loading = true;
   String? errorMessage;
@@ -129,7 +132,18 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
       if (!mounted || generation != loadGeneration) return;
       setState(() {
         tenants = latest.tenants;
-        cases = latest.cases;
+        cases = latest.cases
+            .where((record) =>
+                widget.initialTenantId == null ||
+                record.tenantId == widget.initialTenantId)
+            .toList();
+        if (!initialTenantScopeChosen && widget.initialTenantId != null) {
+          if (cases.isNotEmpty &&
+              cases.every((record) => conductCaseIsClosed(record.status))) {
+            scope = RecordListScope.history;
+          }
+          initialTenantScopeChosen = true;
+        }
         tenantStatuses = latest.statuses ?? const {};
         repeatStatusAvailable = latest.statuses != null;
         if (!repeatStatusAvailable) repeatOnly = false;

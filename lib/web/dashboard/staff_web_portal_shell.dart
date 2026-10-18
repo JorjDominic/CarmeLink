@@ -1,3 +1,4 @@
+import '../../views/shared/repeat_violation_tenants_page.dart';
 import '../../views/shared/system_maintenance_page.dart';
 import '../../views/shared/notification_destination.dart';
 import 'dart:async';
@@ -102,6 +103,14 @@ abstract final class StaffWebDestinations {
         webGroup: 'Access & Safety',
         webDescription: 'Employment-based curfew profiles',
       ),
+      const AppDestination(
+          label: 'Repeated violations',
+          icon: Icons.warning_amber_outlined,
+          selectedIcon: Icons.warning_amber,
+          page: RepeatViolationTenantsPage(),
+          webGroup: 'Access & Safety',
+          webDescription:
+              'Tenants with repeated or continuous confirmed incidents'),
       const AppDestination(
         label: 'Conduct & Cases',
         icon: Icons.gavel_outlined,
