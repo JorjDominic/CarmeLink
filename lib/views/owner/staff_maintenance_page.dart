@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/owner_controller.dart';
@@ -252,19 +253,23 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.apartment,
-                                  color: AppColors.brown, size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Dormitory Floor Plan Monitoring',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
+                          const Expanded(
+                            child: Row(
+                              children: [
+                                Icon(Icons.apartment,
+                                    color: AppColors.brown, size: 20),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Dormitory Floor Plan Monitoring',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                           IconButton(
                             icon: const Icon(Icons.close, size: 18),
@@ -323,30 +328,19 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
               ),
               const SizedBox(height: 12),
 
-              // Filter Chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildFilterChip(context, 'All', 'all', allReports.length),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                        context, 'Pending', 'pending', pendingCount),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                        context, 'Assigned', 'assigned', assignedCount),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                        context, 'In Progress', 'in_progress', inProgressCount),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                        context, 'Resolved', 'resolved', resolvedCount),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                        context, 'Cancelled', 'cancelled', cancelledCount),
-                  ],
-                ),
-              ),
+              // Keep all existing filters visible without horizontal scrolling.
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                _buildFilterChip(context, 'All', 'all', allReports.length),
+                _buildFilterChip(context, 'Pending', 'pending', pendingCount),
+                _buildFilterChip(
+                    context, 'Assigned', 'assigned', assignedCount),
+                _buildFilterChip(
+                    context, 'In Progress', 'in_progress', inProgressCount),
+                _buildFilterChip(
+                    context, 'Resolved', 'resolved', resolvedCount),
+                _buildFilterChip(
+                    context, 'Cancelled', 'cancelled', cancelledCount),
+              ]),
               const SizedBox(height: 16),
 
               // Content Body
@@ -458,92 +452,42 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Top Bar: Category, Location, Status, Urgency
                           Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: urgencyCol.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(categoryIcon,
-                                    size: 20, color: urgencyCol),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Report Type',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.w700)),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      report.category,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                        color: scheme.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.room_outlined,
-                                            size: 13, color: AppColors.taupe),
-                                        const SizedBox(width: 3),
-                                        Expanded(
-                                          child: Text(
-                                            report.location,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              color: AppColors.taupe,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  StatusPill(report.statusLabel),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: urgencyCol.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                          color: urgencyCol.withValues(
-                                              alpha: 0.3)),
-                                    ),
-                                    child: Text(
-                                      '${report.urgency[0].toUpperCase()}${report.urgency.substring(1).toLowerCase()} Priority',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: urgencyCol,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CircleAvatar(
+                                    backgroundColor:
+                                        urgencyCol.withValues(alpha: .12),
+                                    child:
+                                        Icon(categoryIcon, color: urgencyCol)),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                    child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                      Text('Report Type',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelSmall),
+                                      Text(report.category,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                  fontWeight: FontWeight.w700)),
+                                      const SizedBox(height: 6),
+                                      Wrap(
+                                          spacing: 8,
+                                          runSpacing: 6,
+                                          children: [
+                                            StatusPill(report.statusLabel),
+                                            StatusPill(
+                                                report.urgency + ' Priority')
+                                          ]),
+                                    ])),
+                              ]),
+                          const SizedBox(height: 14),
                           // Description
                           const SectionTitle('Report Details'),
                           const SizedBox(height: 8),
@@ -561,73 +505,25 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                           const Divider(height: 1),
                           const SizedBox(height: 8),
 
-                          // Footer Row: Tenant, Date, Photo Badge, Chevron
-                          Row(
-                            children: [
-                              const Icon(Icons.person_outline,
-                                  size: 14, color: AppColors.taupe),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  report.tenantName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.brown,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '• ${_formatDate(report.createdAt)}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.taupe,
-                                ),
-                              ),
-                              if (report.photoPath != null &&
-                                  report.photoPath!.isNotEmpty) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 5, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.cream,
-                                    borderRadius: BorderRadius.circular(5),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.photo_camera_back_outlined,
-                                          size: 11, color: AppColors.brown),
-                                      SizedBox(width: 2),
-                                      Text(
-                                        'Photo',
-                                        style: TextStyle(
-                                          fontSize: 10.5,
-                                          color: AppColors.brown,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                              const Spacer(),
-                              const Text(
-                                'Triage',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.brown,
-                                ),
-                              ),
-                              const Icon(Icons.chevron_right,
-                                  size: 16, color: AppColors.brown),
-                            ],
-                          ),
+                          RecordFacts(items: [
+                            ('Reported by', report.tenantName),
+                            ('Location', report.location),
+                            ('Submitted', _formatDate(report.createdAt))
+                          ]),
+                          const SizedBox(height: 10),
+                          Row(children: [
+                            if (report.photoPath != null &&
+                                report.photoPath!.isNotEmpty)
+                              const Icon(Icons.photo_camera_back_outlined,
+                                  size: 16),
+                            if (report.photoPath != null &&
+                                report.photoPath!.isNotEmpty)
+                              const Text(' Photo'),
+                            const Spacer(),
+                            const Text('Triage',
+                                style: TextStyle(fontWeight: FontWeight.w700)),
+                            const Icon(Icons.chevron_right, size: 18),
+                          ]),
                         ],
                       ),
                     );
@@ -899,110 +795,44 @@ class StaffMaintenanceDetailsPageState
                                 'Responsible staff: ${report.responsibleStaff}'),
                           ],
                           const SizedBox(height: 8),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  report.category,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: scheme.onSurface,
-                                      ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              StatusPill(
-                                report.statusLabel,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              const Icon(Icons.meeting_room_outlined,
-                                  size: 16, color: AppColors.brown),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  report.location,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.brown,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
+                          Wrap(spacing: 8, runSpacing: 6, children: [
+                            StatusPill(report.statusLabel),
+                            Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
+                                    horizontal: 8, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: report.isHighUrgency
-                                      ? AppColors.danger.withValues(alpha: 0.1)
-                                      : AppColors.warning
-                                          .withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
+                                    color: (report.isHighUrgency
+                                            ? AppColors.danger
+                                            : AppColors.warning)
+                                        .withValues(alpha: .1),
+                                    borderRadius: BorderRadius.circular(8)),
                                 child: Text(
-                                  '${report.urgency[0].toUpperCase()}${report.urgency.substring(1).toLowerCase()} Urgency',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: report.isHighUrgency
-                                        ? AppColors.danger
-                                        : AppColors.warning,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                                    report.urgency[0].toUpperCase() +
+                                        report.urgency
+                                            .substring(1)
+                                            .toLowerCase() +
+                                        ' Urgency',
+                                    style: TextStyle(
+                                        color: report.isHighUrgency
+                                            ? AppColors.danger
+                                            : AppColors.warning,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11)))
+                          ]),
                           const SizedBox(height: 12),
-                          const Divider(height: 1),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              const CircleAvatar(
-                                radius: 14,
-                                backgroundColor: AppColors.cream,
-                                child: Icon(Icons.person,
-                                    size: 16, color: AppColors.brown),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      report.tenantName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Submitted: ${report.createdAt.month}/${report.createdAt.day}/${report.createdAt.year} at ${report.createdAt.hour}:${report.createdAt.minute.toString().padLeft(2, '0')}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 11.5,
-                                        color: AppColors.taupe,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                          RecordFacts(items: [
+                            ('Category', report.category),
+                            ('Location', report.location),
+                            ('Reported by', report.tenantName),
+                            (
+                              'Submitted',
+                              shortDate(report.createdAt) +
+                                  ' ' +
+                                  MaterialLocalizations.of(context)
+                                      .formatTimeOfDay(TimeOfDay.fromDateTime(
+                                          report.createdAt))
+                            )
+                          ]),
                         ],
                       ),
                     ),
@@ -1387,84 +1217,28 @@ class StaffMaintenanceDetailsPageState
                                         entry['created_at'] as String)
                                     .toLocal();
 
-                                return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Padding(
-                                      padding: EdgeInsets.only(top: 2),
-                                      child: Icon(
-                                        Icons.check_circle,
-                                        size: 16,
-                                        color: AppColors.brown,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Flexible(
-                                                child: Container(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 6,
-                                                      vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: AppColors.cream,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            4),
-                                                  ),
-                                                  child: Text(
-                                                    '$prevLabel → $nextLabel',
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: AppColors.brown,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                '${dt.month}/${dt.day} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}',
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: AppColors.taupe,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Updated by $actor',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: scheme.onSurface,
-                                            ),
-                                          ),
-                                          if (notes.isNotEmpty) ...[
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              notes,
-                                              style: const TextStyle(
-                                                fontSize: 12.5,
-                                                color: AppColors.charcoal,
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                return RecordSection(
+                                  title: prevLabel.toString() +
+                                      ' \u2192 ' +
+                                      nextLabel.toString(),
+                                  icon: Icons.history_outlined,
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        RecordFacts(items: [
+                                          ('Updated by', actor.toString()),
+                                          (
+                                            'Recorded',
+                                            shortDate(dt) + ' ' + timeText(dt)
+                                          )
+                                        ]),
+                                        if (notes.isNotEmpty)
+                                          Text(notes,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium),
+                                      ]),
                                 );
                               },
                             ),

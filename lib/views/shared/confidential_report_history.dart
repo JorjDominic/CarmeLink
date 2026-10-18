@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/common_widgets.dart';
@@ -91,13 +92,36 @@ class _ConfidentialReportHistoryState extends State<ConfidentialReportHistory> {
                 const Text('No administrative history recorded.')
               else
                 for (final row in history!)
-                  ListTile(
-                    title: Text(row['action'] == 'internal_note'
-                        ? 'Internal administrative note'
-                        : '${row['previous_status']} → ${row['new_status']}'),
-                    subtitle: Text(
-                        '${row['actor_name']} • ${DateTime.parse(row['created_at'] as String).toLocal()}\n${row['notes'] ?? ''}'),
-                  ),
+                  Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: RecordSection(
+                        title: row['action'] == 'internal_note'
+                            ? 'Internal administrative note'
+                            : row['previous_status'].toString() +
+                                ' \u2192 ' +
+                                row['new_status'].toString(),
+                        icon: row['action'] == 'internal_note'
+                            ? Icons.lock_outline
+                            : Icons.history_outlined,
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              RecordFacts(items: [
+                                ('Recorded by', row['actor_name'].toString()),
+                                (
+                                  'Recorded',
+                                  shortDate(DateTime.parse(
+                                              row['created_at'] as String)
+                                          .toLocal()) +
+                                      ' ' +
+                                      timeText(DateTime.parse(
+                                              row['created_at'] as String)
+                                          .toLocal())
+                                ),
+                              ]),
+                              Text((row['notes'] ?? '').toString()),
+                            ]),
+                      )),
             ]),
       ]);
 }

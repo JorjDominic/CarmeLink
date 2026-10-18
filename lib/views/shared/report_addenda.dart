@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/common_widgets.dart';
@@ -205,14 +206,27 @@ class _ReportAddendaState extends State<ReportAddenda> {
             return Column(
               children: [
                 for (final entry in entries)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.history_edu_outlined),
-                    title: SelectableText(entry.body),
-                    subtitle: Text(
-                      '${entry.authorName} • ${entry.authorRole} • ${shortDate(entry.createdAt)} ${timeText(entry.createdAt)}',
-                    ),
-                  ),
+                  Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: RecordSection(
+                        title: 'Correction / addendum',
+                        icon: Icons.history_edu_outlined,
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              RecordFacts(items: [
+                                ('Author', entry.authorName),
+                                ('Role', entry.authorRole),
+                                (
+                                  'Recorded',
+                                  shortDate(entry.createdAt) +
+                                      ' ' +
+                                      timeText(entry.createdAt)
+                                )
+                              ]),
+                              SelectableText(entry.body),
+                            ]),
+                      )),
               ],
             );
           },

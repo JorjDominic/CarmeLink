@@ -8483,9 +8483,10 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                     report.id == widget.initialReportId)
                 .toList();
             if (reports.isEmpty) {
-              return const Center(
-                child: Text('No confidential reports have been submitted.'),
-              );
+              return const EmptyState(
+                  icon: Icons.shield_outlined,
+                  title: 'No confidential reports',
+                  message: 'No confidential reports have been submitted.');
             }
             return Column(
               children: reports
@@ -8496,25 +8497,26 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SectionTitle('Report Type'),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    report.category,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                                StatusPill(report.status),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(report.tenantName,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700)),
+                            RecordSection(
+                                title: 'Confidential report',
+                                icon: Icons.shield_outlined,
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: StatusPill(report.status)),
+                                      const SizedBox(height: 10),
+                                      RecordFacts(items: [
+                                        ('Report Type', report.category),
+                                        ('Reported by', report.tenantName),
+                                        (
+                                          'Submitted',
+                                          shortDate(report.createdAt)
+                                        )
+                                      ]),
+                                    ])),
                             const SizedBox(height: 16),
                             const SectionTitle('Report Details'),
                             const SizedBox(height: 8),
@@ -8533,14 +8535,12 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                               isResolved: report.isResolved,
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              shortDate(report.createdAt),
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
                             if (report.responseNotes.isNotEmpty) ...[
                               const SizedBox(height: 8),
-                              Text(
-                                  'Tenant-visible review response: ${report.responseNotes}'),
+                              RecordSection(
+                                  title: 'Tenant-visible review response',
+                                  icon: Icons.mark_chat_read_outlined,
+                                  child: SelectableText(report.responseNotes)),
                             ],
                             const SizedBox(height: 12),
                             if (!report.isFinalized)
@@ -10095,45 +10095,52 @@ class _ReportExportCard extends StatelessWidget {
   final VoidCallback onExport;
 
   @override
-  Widget build(BuildContext context) =>
-      CarmelitaCard(child: LayoutBuilder(builder: (context, constraints) {
-        final details = Row(children: [
-          CircleAvatar(
-              radius: 20,
-              backgroundColor: color.withValues(alpha: .12),
-              foregroundColor: color,
-              child: Icon(icon, size: 20)),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 3),
-                Text(description, style: Theme.of(context).textTheme.bodySmall),
-              ])),
-        ]);
-        final export = OutlinedButton.icon(
-            onPressed: onExport,
-            icon: Icon(Icons.picture_as_pdf_outlined, color: color),
-            label: const Text('Print / Download PDF',
-                textAlign: TextAlign.center));
-        final stacked = constraints.maxWidth < 600 ||
-            MediaQuery.textScalerOf(context).scale(14) > 18;
-        return Padding(
-            padding: const EdgeInsets.all(12),
-            child: stacked
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [details, const SizedBox(height: 12), export])
-                : Row(children: [
-                    Expanded(child: details),
-                    const SizedBox(width: 12),
-                    export
-                  ]));
-      }));
+  Widget build(BuildContext context) => CarmelitaCard(
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                    color: color.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(14)),
+                child: Icon(icon, color: color)),
+            const SizedBox(width: 14),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(title,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  Text(description,
+                      style: Theme.of(context).textTheme.bodySmall),
+                ])),
+          ]),
+          const Divider(height: 28),
+          LayoutBuilder(builder: (context, constraints) {
+            final action = OutlinedButton.icon(
+                onPressed: onExport,
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+                label: const Text('Print / Download PDF',
+                    textAlign: TextAlign.center));
+            final format = Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.description_outlined, size: 16, color: color),
+              const SizedBox(width: 6),
+              Text('PDF report', style: Theme.of(context).textTheme.labelMedium)
+            ]);
+            if (constraints.maxWidth < 600 ||
+                MediaQuery.textScalerOf(context).scale(1) > 1.3)
+              return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [format, const SizedBox(height: 10), action]);
+            return Row(children: [format, const Spacer(), action]);
+          }),
+        ]),
+      );
 }
 
 class ExpenseIncomeSummaryPage extends StatelessWidget {
@@ -10212,40 +10219,16 @@ class ExpenseIncomeSummaryPage extends StatelessWidget {
                             fontSize: 13,
                             letterSpacing: 0.5)),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Rent Collections',
-                                  style: TextStyle(
-                                      color: Colors.grey, fontSize: 12)),
-                              const SizedBox(height: 4),
-                              Text('₱${rentPaid.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16)),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Utility Collections',
-                                  style: TextStyle(
-                                      color: Colors.grey, fontSize: 12)),
-                              const SizedBox(height: 4),
-                              Text('₱${utilityPaid.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                    RecordFacts(items: [
+                      (
+                        'Rent Collections',
+                        '\u20b1' + rentPaid.toStringAsFixed(2)
+                      ),
+                      (
+                        'Utility Collections',
+                        '\u20b1' + utilityPaid.toStringAsFixed(2)
+                      )
+                    ]),
                   ],
                 ),
               ),
@@ -10384,94 +10367,94 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
               ),
               const SizedBox(height: 10),
 
-              // Report 1: Financial & Rent Statement
-              _buildReportCard(
-                context: context,
-                title: 'Financial & Rent Collection Statement',
-                description:
-                    'Complete breakdown of rent, utility billing, verified receipts, and outstanding dues.',
-                icon: Icons.account_balance_wallet_outlined,
-                color: Colors.teal,
-                fileName:
-                    'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                documentBuilder: () =>
-                    _reportService.generateFinancialReportPdf(),
-              ),
-              const SizedBox(height: 10),
-
-              // Report 2: Occupancy & Tenant Roster
-              _buildReportCard(
-                context: context,
-                title: 'Dormitory Occupancy & Tenant Roster',
-                description:
-                    'Live room-by-room census, current vacancy breakdown, and active resident directory.',
-                icon: Icons.meeting_room_outlined,
-                color: Colors.indigo,
-                fileName:
-                    'carmelitas_occupancy_roster_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                documentBuilder: () =>
-                    _reportService.generateOccupancyRosterPdf(),
-              ),
-              const SizedBox(height: 10),
-
-              // Report 3: Maintenance & Work Orders
-              _buildReportCard(
-                context: context,
-                title: 'Facility Maintenance & Work Orders Log',
-                description:
-                    'Live database-backed repair log with tenant, category, location, urgency, status, staff notes, and resolutions.',
-                icon: Icons.handyman_outlined,
-                color: Colors.orange,
-                fileName:
-                    'carmelitas_maintenance_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                documentBuilder: () =>
-                    _reportService.generateMaintenanceReportPdf(),
-              ),
-              const SizedBox(height: 10),
-
-              // Report 4: Conduct & Violation Cases
-              _buildReportCard(
-                context: context,
-                title: 'Resident Conduct & Violation Cases',
-                description:
-                    'Live disciplinary case register with investigation status, evidence, warnings, and recorded outcomes.',
-                icon: Icons.gavel_outlined,
-                color: Colors.redAccent,
-                fileName:
-                    'carmelitas_conduct_violation_cases_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                documentBuilder: () =>
-                    _reportService.generateConductViolationReportPdf(),
-              ),
-              const SizedBox(height: 10),
-
-              // Report 5: Curfew & Security Log
-              _buildReportCard(
-                context: context,
-                title: 'Security, Gate & Curfew Audit Log',
-                description:
-                    'Gate crossings, geofence tripwire logs, curfew flags, and approved overnight passes.',
-                icon: Icons.schedule_outlined,
-                color: Colors.purple,
-                fileName:
-                    'carmelitas_curfew_security_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                documentBuilder: () =>
-                    _reportService.generateCurfewGateReportPdf(),
-              ),
-              const SizedBox(height: 10),
-
-              // Report 6: Executive Consolidated Report
-              _buildReportCard(
-                context: context,
-                title: 'Consolidated Executive Overview',
-                description:
-                    'Comprehensive high-level summary combining finance, occupancy, security, and repairs.',
-                icon: Icons.analytics_outlined,
-                color: const Color(0xFF6B1D2F),
-                fileName:
-                    'carmelitas_executive_summary_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                documentBuilder: () =>
-                    _reportService.generateExecutiveOverviewPdf(),
-              ),
+              LayoutBuilder(builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 860 &&
+                        MediaQuery.textScalerOf(context).scale(1) <= 1.3
+                    ? 2
+                    : 1;
+                final width =
+                    (constraints.maxWidth - (columns - 1) * 12) / columns;
+                final cards = <Widget>[
+                  _buildReportCard(
+                    context: context,
+                    title: 'Financial & Rent Collection Statement',
+                    description:
+                        'Complete breakdown of rent, utility billing, verified receipts, and outstanding dues.',
+                    icon: Icons.account_balance_wallet_outlined,
+                    color: Colors.teal,
+                    fileName:
+                        'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                    documentBuilder: () =>
+                        _reportService.generateFinancialReportPdf(),
+                  ),
+                  _buildReportCard(
+                    context: context,
+                    title: 'Dormitory Occupancy & Tenant Roster',
+                    description:
+                        'Live room-by-room census, current vacancy breakdown, and active resident directory.',
+                    icon: Icons.meeting_room_outlined,
+                    color: Colors.indigo,
+                    fileName:
+                        'carmelitas_occupancy_roster_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                    documentBuilder: () =>
+                        _reportService.generateOccupancyRosterPdf(),
+                  ),
+                  _buildReportCard(
+                    context: context,
+                    title: 'Facility Maintenance & Work Orders Log',
+                    description:
+                        'Live database-backed repair log with tenant, category, location, urgency, status, staff notes, and resolutions.',
+                    icon: Icons.handyman_outlined,
+                    color: Colors.orange,
+                    fileName:
+                        'carmelitas_maintenance_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                    documentBuilder: () =>
+                        _reportService.generateMaintenanceReportPdf(),
+                  ),
+                  _buildReportCard(
+                    context: context,
+                    title: 'Resident Conduct & Violation Cases',
+                    description:
+                        'Live disciplinary case register with investigation status, evidence, warnings, and recorded outcomes.',
+                    icon: Icons.gavel_outlined,
+                    color: Colors.redAccent,
+                    fileName:
+                        'carmelitas_conduct_violation_cases_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                    documentBuilder: () =>
+                        _reportService.generateConductViolationReportPdf(),
+                  ),
+                  _buildReportCard(
+                    context: context,
+                    title: 'Security, Gate & Curfew Audit Log',
+                    description:
+                        'Gate crossings, geofence tripwire logs, curfew flags, and approved overnight passes.',
+                    icon: Icons.schedule_outlined,
+                    color: Colors.purple,
+                    fileName:
+                        'carmelitas_curfew_security_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                    documentBuilder: () =>
+                        _reportService.generateCurfewGateReportPdf(),
+                  ),
+                  _buildReportCard(
+                    context: context,
+                    title: 'Consolidated Executive Overview',
+                    description:
+                        'Comprehensive high-level summary combining finance, occupancy, security, and repairs.',
+                    icon: Icons.analytics_outlined,
+                    color: const Color(0xFF6B1D2F),
+                    fileName:
+                        'carmelitas_executive_summary_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                    documentBuilder: () =>
+                        _reportService.generateExecutiveOverviewPdf(),
+                  ),
+                ];
+                return Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: cards
+                        .map((card) => SizedBox(width: width, child: card))
+                        .toList());
+              }),
               const SizedBox(height: 20),
             ],
           ),
