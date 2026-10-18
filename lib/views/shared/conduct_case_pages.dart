@@ -1,3 +1,4 @@
+import '../../services/staff_conduct_queue_service.dart';
 import '../../models/tenant_conduct_status.dart';
 import 'tenant_conduct_evidence.dart';
 import 'conduct_investigation_panel.dart';
@@ -79,6 +80,8 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
   List<StaffTenantOption> tenants = const [];
   Map<String, TenantConductStatus> tenantStatuses = const {};
   bool repeatOnly = false;
+  bool repeatStatusAvailable = false;
+  bool preparingCase = false;
   int loadGeneration = 0;
   bool loading = true;
   String? errorMessage;
@@ -120,21 +123,26 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
     }
 
     try {
-      final latestTenants = await tenantPickerService.listTenantOptions();
-      final latestCases = await service.listStaffCases();
-      final latestStatuses = await service.tenantStatuses();
+      final latest = await StaffConductQueueService(
+              cases: service, tenants: tenantPickerService)
+          .load();
       if (!mounted || generation != loadGeneration) return;
       setState(() {
-        tenants = latestTenants;
-        cases = latestCases;
-        tenantStatuses = latestStatuses;
+        tenants = latest.tenants;
+        cases = latest.cases;
+        tenantStatuses = latest.statuses ?? const {};
+        repeatStatusAvailable = latest.statuses != null;
+        if (!repeatStatusAvailable) repeatOnly = false;
         loading = false;
         errorMessage = null;
       });
     } catch (error) {
       if (!mounted || generation != loadGeneration) return;
       cases = const [];
+      tenants = const [];
       tenantStatuses = const {};
+      repeatStatusAvailable = false;
+      repeatOnly = false;
       setState(() {
         loading = false;
         errorMessage = conductCaseError(error);
@@ -149,24 +157,35 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
   }
 
   Future<void> _create() async {
-    final activeTenants =
-        tenants.where((tenant) => tenant.isActiveResident).toList();
-    if (activeTenants.isEmpty) {
-      showAppSnackBar(context, 'No active tenant accounts are available.');
-      return;
-    }
-
-    final created = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => ConductCaseCreateDialog(
-        service: service,
-        tenants: activeTenants,
-      ),
-    );
-
-    if (created == true && mounted) {
-      await _load(showSpinner: false);
+    if (preparingCase) return;
+    setState(() => preparingCase = true);
+    try {
+      // Creation must not depend on a previous queue or optional status read.
+      final latestTenants = await tenantPickerService.listTenantOptions();
+      if (!mounted) return;
+      final activeTenants =
+          latestTenants.where((tenant) => tenant.isActiveResident).toList();
+      if (activeTenants.isEmpty) {
+        showAppSnackBar(
+            context,
+            latestTenants.isEmpty
+                ? 'No tenant accounts are available to your staff account.'
+                : 'All available tenant accounts are inactive.');
+        return;
+      }
+      final created = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) =>
+            ConductCaseCreateDialog(service: service, tenants: activeTenants),
+      );
+      if (created == true && mounted) await _load(showSpinner: false);
+    } catch (_) {
+      if (mounted)
+        showAppSnackBar(context,
+            'Unable to load tenants. Check your connection and staff access, then try again.');
+    } finally {
+      if (mounted) setState(() => preparingCase = false);
     }
   }
 
@@ -218,7 +237,7 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
         ),
       ],
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _create,
+        onPressed: preparingCase ? null : _create,
         icon: const Icon(Icons.add_outlined),
         label: const Text('New case'),
       ),
@@ -241,12 +260,16 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
                   CarmelitaCard(child: Text(errorMessage!)),
                 ],
                 const SizedBox(height: 14),
-                FilterChip(
-                  label: Text(
-                      'Repeated / continuous violations (${tenantStatuses.values.where((s) => s.needsReview).length} tenants)'),
-                  selected: repeatOnly,
-                  onSelected: (value) => setState(() => repeatOnly = value),
-                ),
+                if (!repeatStatusAvailable && errorMessage == null)
+                  const Text(
+                      'Repeat-violation tracking is unavailable. Existing case actions remain available.'),
+                if (repeatStatusAvailable)
+                  FilterChip(
+                    label: Text(
+                        'Repeated / continuous violations (${tenantStatuses.values.where((s) => s.needsReview).length} tenants)'),
+                    selected: repeatOnly,
+                    onSelected: (value) => setState(() => repeatOnly = value),
+                  ),
                 const Text(
                     'Repeated: 2+ confirmed incidents. Continuous: 3+ within 90 days. Closed cases remain in History.'),
                 RecordListToolbar(
