@@ -30,7 +30,6 @@ class _SystemMaintenanceGateState extends State<SystemMaintenanceGate>
   String? userId;
   UserRole? userRole;
   Map<String, dynamic>? settings;
-  bool failed = false;
   int generation = 0;
   @override
   void initState() {
@@ -47,7 +46,6 @@ class _SystemMaintenanceGateState extends State<SystemMaintenanceGate>
     userId = id;
     userRole = user?.role;
     settings = null;
-    failed = false;
     refresh();
     if (mounted) setState(() {});
   }
@@ -61,14 +59,10 @@ class _SystemMaintenanceGateState extends State<SystemMaintenanceGate>
       if (mounted && request == generation)
         setState(() {
           settings = result;
-          failed = false;
         });
     } catch (_) {
-      if (mounted && request == generation)
-        setState(() {
-          settings = null;
-          failed = true;
-        });
+      // Missing migrations, network failures and unavailable settings must not
+      // lock residents out. Retain only the last successfully confirmed state.
     }
   }
 
@@ -90,26 +84,18 @@ class _SystemMaintenanceGateState extends State<SystemMaintenanceGate>
     final role = user?.role;
     if (role != UserRole.tenant && role != UserRole.guardian)
       return widget.child;
-    if (settings?['enabled'] == false) return widget.child;
+    if (settings?['enabled'] != true) return widget.child;
     return Scaffold(
         body: SafeArea(
             child: Center(
                 child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      if (settings == null && !failed)
-                        const CircularProgressIndicator(),
-                      Text(
-                          failed
-                              ? 'Unable to check system availability'
-                              : settings == null
-                                  ? 'Checking system availability'
-                                  : 'System maintenance',
+                      Text('System maintenance',
                           style: Theme.of(context).textTheme.titleLarge,
                           textAlign: TextAlign.center),
-                      if (settings != null)
-                        Text(settings!['message'] as String,
-                            textAlign: TextAlign.center),
+                      Text(settings!['message'] as String,
+                          textAlign: TextAlign.center),
                       TextButton(
                           onPressed: refresh, child: const Text('Check again')),
                       TextButton(

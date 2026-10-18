@@ -67,25 +67,53 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     session.dispose();
   });
-  testWidgets(
-      'guardian availability failure shows retry without exposing workspace',
+  for (final role in [UserRole.tenant, UserRole.guardian]) {
+    testWidgets(
+        '$role retains access when availability check fails and polls recover',
+        (tester) async {
+      final session = ValueNotifier<AppUser?>(user('resident', role));
+      final service = Availability()..fail = true;
+      await tester.pumpWidget(MaterialApp(
+          home: SystemMaintenanceGate(
+              session: session,
+              service: service,
+              child: const Text('Resident workspace'))));
+      await tester.pumpAndSettle();
+      expect(find.text('Resident workspace'), findsOneWidget);
+      expect(find.text('Unable to check system availability'), findsNothing);
+      service.fail = false;
+      service.enabled = true;
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+      expect(find.text('Scheduled system update'), findsOneWidget);
+      expect(find.text('Resident workspace'), findsNothing);
+      service.fail = true;
+      await tester.tap(find.text('Check again'));
+      await tester.pumpAndSettle();
+      expect(find.text('Scheduled system update'), findsOneWidget);
+      service.fail = false;
+      service.enabled = false;
+      await tester.tap(find.text('Check again'));
+      await tester.pumpAndSettle();
+      expect(find.text('Resident workspace'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      session.dispose();
+    });
+  }
+  testWidgets('pending availability check does not interrupt tenant access',
       (tester) async {
-    final session =
-        ValueNotifier<AppUser?>(user('guardian', UserRole.guardian));
-    final service = Availability()..fail = true;
+    final session = ValueNotifier<AppUser?>(user('tenant', UserRole.tenant));
+    final service = Availability()..pending = Completer<Map<String, dynamic>>();
     await tester.pumpWidget(MaterialApp(
         home: SystemMaintenanceGate(
             session: session,
             service: service,
-            child: const Text('Guardian workspace'))));
+            child: const Text('Resident workspace'))));
+    await tester.pump();
+    expect(find.text('Resident workspace'), findsOneWidget);
+    service.pending!.completeError(StateError('Settings table unavailable'));
     await tester.pumpAndSettle();
-    expect(find.text('Unable to check system availability'), findsOneWidget);
-    expect(find.text('Guardian workspace'), findsNothing);
-    service.fail = false;
-    service.enabled = false;
-    await tester.tap(find.text('Check again'));
-    await tester.pumpAndSettle();
-    expect(find.text('Guardian workspace'), findsOneWidget);
+    expect(find.text('Resident workspace'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     session.dispose();
   });

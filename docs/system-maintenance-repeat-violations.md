@@ -34,7 +34,10 @@ maintenance-mode changes and backup/restore are enforced by backend permissions.
 Maintenance mode pauses tenant/guardian access across the updated mobile app's
 Navigator, including open routes. Staff can still sign in and end maintenance.
 Availability is checked on login, resume, manual retry and every 30 seconds.
-Failed checks show a retry screen. This is an app availability gate, not a
+Pending or failed initial checks leave the workspace available, including when
+the settings migration is absent. Subsequent failures retain the last successfully
+confirmed state; background polling continues. Only a confirmed enabled setting
+shows the maintenance screen. This is an app availability gate, not a
 database/API shutdown; older clients, integrations and background services are
 not suspended. The web portal is staff-only and remains available.
 
@@ -68,3 +71,10 @@ releasing the updated client. Both are additive; historical outcomes are retaine
 - Full Supabase migration-chain replay, actual file export, authenticated
   configuration restore using production option triggers, staff screen walkthrough
   and physical-device verification remain integration checks before release.
+
+
+October 19 availability fix: the initial fail-closed gate could lock tenant and
+guardian accounts out when the settings table was absent or unreachable. It now
+leaves access available until maintenance is positively confirmed. Six focused
+widget tests cover both roles, failed/pending checks, polling recovery, confirmed
+maintenance retention and staff/session isolation.
