@@ -1,3 +1,4 @@
+import 'dart:convert';
 import '../core/config/supabase_config.dart';
 import 'payment_collection_settings_service.dart';
 import 'receipt_print_service.dart';
@@ -94,9 +95,12 @@ class PaymongoPaymentService {
     final rows = await SupabaseConfig.client
         .from('paymongo_payment_sessions')
         .select()
-        .contains('bill_breakdown', [
-      {'charge_id': chargeId}
-    ]).inFilter('status', ['creating', 'pending', 'needs_review']).order(
+        .contains(
+            'bill_breakdown',
+            jsonEncode([
+              {'charge_id': chargeId}
+            ]))
+        .inFilter('status', ['creating', 'pending', 'needs_review']).order(
             'created_at',
             ascending: false);
     for (final row in rows) {
@@ -112,9 +116,11 @@ class PaymongoPaymentService {
     final rows = await SupabaseConfig.client
         .from('paymongo_payment_sessions')
         .select()
-        .contains('bill_breakdown', [
-          {'charge_id': chargeId}
-        ])
+        .contains(
+            'bill_breakdown',
+            jsonEncode([
+              {'charge_id': chargeId}
+            ]))
         .order('created_at', ascending: false)
         .limit(1);
     return rows.isEmpty ? null : PaymongoPaymentSession.fromJson(rows.first);
@@ -136,9 +142,11 @@ class PaymongoPaymentService {
     final rows = await SupabaseConfig.client
         .from('paymongo_payment_sessions')
         .select()
-        .contains('bill_breakdown', [
-          {'charge_id': chargeId}
-        ])
+        .contains(
+            'bill_breakdown',
+            jsonEncode([
+              {'charge_id': chargeId}
+            ]))
         .eq('status', 'succeeded')
         .not('credited_transaction_id', 'is', null)
         .order('settled_at', ascending: false)
