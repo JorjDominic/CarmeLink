@@ -9274,22 +9274,8 @@ class _AnnouncementsManagementPageState
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        item.title,
-                        style: const TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        item.body,
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          height: 1.38,
-                          color: Colors.black87,
-                        ),
-                      ),
+                      NoticeContent(
+                          title: item.title, body: item.body, color: color),
                       const SizedBox(height: 10),
                       Wrap(
                         spacing: 12,

@@ -1,3 +1,4 @@
+import '../../core/widgets/notice_content.dart';
 import '../../core/widgets/record_details.dart';
 import '../shared/pending_room_transfer_notice.dart';
 import '../shared/payment_receipt_history.dart';
@@ -5312,22 +5313,8 @@ class _TenantAnnouncementsPageState extends State<TenantAnnouncementsPage> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        item.title,
-                        style: const TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        item.body,
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          height: 1.38,
-                          color: Colors.black87,
-                        ),
-                      ),
+                      NoticeContent(
+                          title: item.title, body: item.body, color: color),
                       const SizedBox(height: 10),
                       Wrap(
                         spacing: 12,

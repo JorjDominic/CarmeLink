@@ -354,100 +354,108 @@ class _NotificationsPageState extends State<NotificationsPage> {
           ? theme.colorScheme.primaryContainer.withValues(alpha: .18)
           : theme.colorScheme.surface,
       borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () async {
-          if (!item.isRead) {
-            unawaited(_markRead(item));
-          }
-          if (widget.onOpenNotification != null) {
-            await widget.onOpenNotification?.call(item);
-          } else {
-            final role = SessionController.instance.currentUser?.role;
-            if (role != null && context.mounted) {
-              await Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => notificationDestination(item, role),
-              ));
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: unread
+                  ? iconColor.withValues(alpha: .35)
+                  : theme.colorScheme.outlineVariant),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () async {
+            if (!item.isRead) {
+              unawaited(_markRead(item));
             }
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 21,
-                backgroundColor: iconColor.withValues(alpha: .12),
-                foregroundColor: iconColor,
-                child: Icon(_iconForType(item.notificationType), size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight:
-                                  unread ? FontWeight.w800 : FontWeight.w600,
+            if (widget.onOpenNotification != null) {
+              await widget.onOpenNotification?.call(item);
+            } else {
+              final role = SessionController.instance.currentUser?.role;
+              if (role != null && context.mounted) {
+                await Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => notificationDestination(item, role),
+                ));
+              }
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 21,
+                  backgroundColor: iconColor.withValues(alpha: .12),
+                  foregroundColor: iconColor,
+                  child: Icon(_iconForType(item.notificationType), size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.title,
+                              softWrap: true,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight:
+                                    unread ? FontWeight.w800 : FontWeight.w600,
+                              ),
                             ),
+                          ),
+                          if (unread) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              width: 8,
+                              height: 8,
+                              margin: const EdgeInsets.only(top: 5),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (item.body.trim().isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          item.body,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            height: 1.35,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
-                        if (unread) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            width: 8,
-                            height: 8,
-                            margin: const EdgeInsets.only(top: 5),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                        ],
                       ],
-                    ),
-                    if (item.body.trim().isNotEmpty) ...[
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 5),
                       Text(
-                        item.body,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          height: 1.35,
-                          color: theme.colorScheme.onSurfaceVariant,
+                        _relativeTime(item.createdAt),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: unread
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 5),
-                    Text(
-                      _relativeTime(item.createdAt),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: unread
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              if (widget.onOpenNotification != null) ...[
-                const SizedBox(width: 6),
-                const Padding(
-                  padding: EdgeInsets.only(top: 12),
-                  child: Icon(Icons.chevron_right_rounded, size: 20),
-                ),
+                if (widget.onOpenNotification != null) ...[
+                  const SizedBox(width: 6),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: Icon(Icons.chevron_right_rounded, size: 20),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

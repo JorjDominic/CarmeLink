@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/record_details.dart';
 import '../../models/models.dart';
 import '../../services/app_notification_service.dart';
 import '../../services/room_inspection_service.dart';
@@ -205,6 +206,23 @@ class NotificationDetailsPage extends StatelessWidget {
   Widget build(BuildContext context) => PageFrame(
         title: 'Notification',
         subtitle: notification.title,
-        child: SelectableText(notification.body),
+        maxWidth: 1000,
+        child: CarmelitaCard(
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+              Text(notification.title,
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              RecordFacts(items: [
+                (
+                  'Date',
+                  '${shortDate(notification.createdAt)} ${timeText(notification.createdAt)}'
+                ),
+                ('Status', notification.isRead ? 'Read' : 'Unread'),
+              ]),
+              const Divider(height: 24),
+              SelectableText(notification.body),
+            ])),
       );
 }
