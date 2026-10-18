@@ -822,100 +822,89 @@ class MutedDashboardGrid extends StatelessWidget {
                 : constraints.maxWidth < 600
                     ? (constraints.maxWidth < 320 ? 1 : 2)
                     : items.length.clamp(2, 4);
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: items.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            mainAxisExtent: compact
-                ? (prominentCompactText ? 99 : 100) +
-                    ((textScale - 1).clamp(0, 1) * 72)
-                : null,
-            childAspectRatio: compact
-                ? (scaledText ? 1.05 : 1.25)
-                : denseFourColumn && constraints.maxWidth < 500
-                    ? (scaledText ? .54 : .65)
-                    : constraints.maxWidth < 500
-                        ? (scaledText ? .86 : 1.05)
-                        : (scaledText ? .96 : 1.15),
-          ),
-          itemBuilder: (context, index) {
-            final item = items[index];
-            return InkWell(
-              onTap: item.onTap,
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: EdgeInsets.all(
-                  prominentCompactText
-                      ? 6
-                      : (compactTriple ? 6 : (compact ? 7 : 10)),
-                ),
-                decoration: BoxDecoration(
-                  color: item.color.withValues(alpha: .035),
-                  border: Border.all(color: item.color.withValues(alpha: .10)),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                          padding: EdgeInsets.all(
-                              compactTriple ? 3 : (compact ? 4 : 7)),
-                          decoration: BoxDecoration(
-                              color: item.color.withValues(alpha: .09),
-                              borderRadius: BorderRadius.circular(9)),
-                          child: Icon(item.icon,
-                              color: item.color,
-                              size: prominentCompactText
-                                  ? 18
-                                  : (compactTriple
-                                      ? 15
-                                      : (compact ? 17 : 19)))),
-                      const Spacer(),
-                      Text(item.value,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  color: item.color,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: prominentCompactText
-                                      ? 20
-                                      : compactTriple
-                                          ? 17
-                                          : (compact ? 19 : 17))),
-                      const SizedBox(height: 2),
-                      Text(item.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.copyWith(
-                                  fontSize: prominentCompactText
-                                      ? 12
-                                      : (compactTriple
-                                          ? 10
-                                          : (compact ? 12 : 10)),
-                                  fontWeight: FontWeight.w800)),
-                      Text(item.detail,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontSize: prominentCompactText
-                                      ? 10.5
-                                      : compactTriple
-                                          ? 8.5
-                                          : (compact ? 11 : 9))),
-                    ]),
-              ),
-            );
-          },
-        );
+        final displayColumns = scaledText
+            ? 1
+            : columns == 3 && constraints.maxWidth < 450
+                ? 2
+                : columns;
+        return Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(items.length, (index) {
+              final item = items[index];
+              return SizedBox(
+                  width: (constraints.maxWidth - 8 * (displayColumns - 1)) /
+                      displayColumns,
+                  child: InkWell(
+                    onTap: item.onTap,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: EdgeInsets.all(
+                        prominentCompactText
+                            ? 6
+                            : (compactTriple ? 6 : (compact ? 7 : 10)),
+                      ),
+                      decoration: BoxDecoration(
+                        color: item.color.withValues(alpha: .035),
+                        border: Border.all(
+                            color: item.color.withValues(alpha: .10)),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                                padding: EdgeInsets.all(
+                                    compactTriple ? 3 : (compact ? 4 : 7)),
+                                decoration: BoxDecoration(
+                                    color: item.color.withValues(alpha: .09),
+                                    borderRadius: BorderRadius.circular(9)),
+                                child: Icon(item.icon,
+                                    color: item.color,
+                                    size: prominentCompactText
+                                        ? 18
+                                        : (compactTriple
+                                            ? 15
+                                            : (compact ? 17 : 19)))),
+                            const SizedBox(height: 10),
+                            Text(item.value,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                        color: item.color,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: prominentCompactText
+                                            ? 20
+                                            : compactTriple
+                                                ? 17
+                                                : (compact ? 19 : 17))),
+                            const SizedBox(height: 2),
+                            Text(item.label,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                        fontSize: prominentCompactText
+                                            ? 12
+                                            : (compactTriple
+                                                ? 10
+                                                : (compact ? 12 : 10)),
+                                        fontWeight: FontWeight.w800)),
+                            Text(item.detail,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                        fontSize: prominentCompactText
+                                            ? 10.5
+                                            : compactTriple
+                                                ? 8.5
+                                                : (compact ? 11 : 9))),
+                          ]),
+                    ),
+                  ));
+            }));
       });
 }
 

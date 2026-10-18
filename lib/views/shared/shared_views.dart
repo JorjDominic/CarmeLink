@@ -727,31 +727,35 @@ class ProfilePage extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         CarmelitaCard(
-          child: Column(
-            children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.swap_horiz),
-                title: const Text('Room transfers & amendments'),
-                subtitle: const Text(
-                    'Review notices, signatures, and transfer history'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (_) => const RoomTransferPage())),
-              ),
-              const Divider(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.gavel_outlined),
-                title: const Text('Eviction & departure notices'),
-                subtitle: const Text(
-                    'Owner decisions, notices, responses and closure history'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (_) => const EvictionPage())),
-              ),
-            ],
-          ),
+          child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.swap_horiz),
+                    title: const Text('Room transfers & amendments'),
+                    subtitle: const Text(
+                        'Review notices, signatures, and transfer history'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                            builder: (_) => const RoomTransferPage())),
+                  ),
+                  const Divider(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.gavel_outlined),
+                    title: const Text('Eviction & departure notices'),
+                    subtitle: const Text(
+                        'Owner decisions, notices, responses and closure history'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                            builder: (_) => const EvictionPage())),
+                  ),
+                ],
+              )),
         ),
       ]),
     );
@@ -1824,23 +1828,25 @@ class SettingsPage extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             CarmelitaCard(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.manage_accounts_outlined),
-                title: const Text(
-                  'Edit profile',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                subtitle: const Text(
-                  'Update your name, phone, and role-appropriate profile details.',
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const ProfileEditPage(),
-                  ),
-                ),
-              ),
+              child: Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.manage_accounts_outlined),
+                    title: const Text(
+                      'Edit profile',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: const Text(
+                      'Update your name, phone, and role-appropriate profile details.',
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ProfileEditPage(),
+                      ),
+                    ),
+                  )),
             ),
             const SizedBox(height: 22),
             const SectionTitle(
@@ -1850,115 +1856,119 @@ class SettingsPage extends StatelessWidget {
             const SizedBox(height: 10),
             CarmelitaCard(
               emphasis: true,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _ThemeModeSelector(
-                    value: controller.themeMode,
-                    onChanged: controller.setThemeMode,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    controller.themeMode == ThemeMode.system
-                        ? 'Following your device appearance.'
-                        : controller.themeMode == ThemeMode.light
-                            ? 'Light appearance is active.'
-                            : 'Dark appearance is active.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
+              child: Material(
+                  type: MaterialType.transparency,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _ThemeModeSelector(
+                        value: controller.themeMode,
+                        onChanged: controller.setThemeMode,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        controller.themeMode == ThemeMode.system
+                            ? 'Following your device appearance.'
+                            : controller.themeMode == ThemeMode.light
+                                ? 'Light appearance is active.'
+                                : 'Dark appearance is active.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  )),
             ),
             const SizedBox(height: 22),
             const SectionTitle('Notifications & privacy'),
             const SizedBox(height: 10),
             CarmelitaCard(
-              child: Column(
-                children: [
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.notifications_outlined),
-                    title: const Text(
-                      'Notification preferences',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Payment, geofence presence, maintenance, and announcement alerts.',
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const NotificationPreferencesPage(),
-                      ),
-                    ),
-                  ),
-                  const Divider(),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.privacy_tip_outlined),
-                    title: const Text(
-                      'Privacy and permissions',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Camera, location, storage, and notification permissions.',
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const PrivacyPermissionsPage(),
-                      ),
-                    ),
-                  ),
-                  if (SessionController.instance.currentUser?.role ==
-                          UserRole.owner ||
-                      SessionController.instance.currentUser?.role ==
-                          UserRole.caretaker) ...[
-                    const Divider(),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.security_outlined),
-                      title: const Text(
-                        'Security & retention',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      subtitle: const Text(
-                        'Configure sensitive-record retention for client and privacy review.',
-                      ),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const RetentionSettingsPage(),
+              child: Material(
+                  type: MaterialType.transparency,
+                  child: Column(
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.notifications_outlined),
+                        title: const Text(
+                          'Notification preferences',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Payment, geofence presence, maintenance, and announcement alerts.',
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationPreferencesPage(),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                  const Divider(),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.password_outlined),
-                    title: const Text(
-                      'Change password',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
+                      const Divider(),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.privacy_tip_outlined),
+                        title: const Text(
+                          'Privacy and permissions',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Camera, location, storage, and notification permissions.',
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const PrivacyPermissionsPage(),
+                          ),
+                        ),
                       ),
-                    ),
-                    subtitle: const Text(
-                      'Update your password securely through Supabase Auth.',
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ChangePasswordPage(),
+                      if (SessionController.instance.currentUser?.role ==
+                              UserRole.owner ||
+                          SessionController.instance.currentUser?.role ==
+                              UserRole.caretaker) ...[
+                        const Divider(),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.security_outlined),
+                          title: const Text(
+                            'Security & retention',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: const Text(
+                            'Configure sensitive-record retention for client and privacy review.',
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const RetentionSettingsPage(),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const Divider(),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.password_outlined),
+                        title: const Text(
+                          'Change password',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Update your password securely through Supabase Auth.',
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ChangePasswordPage(),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
+                    ],
+                  )),
             ),
             const SizedBox(height: 22),
             const SectionTitle(
@@ -1967,21 +1977,23 @@ class SettingsPage extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             CarmelitaCard(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.rate_review_outlined),
-                title: const Text(
-                  'Send feedback',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                subtitle: const Text(
-                  'Share an idea, report an app issue, or rate your experience.',
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const FeedbackPage()),
-                ),
-              ),
+              child: Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.rate_review_outlined),
+                    title: const Text(
+                      'Send feedback',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: const Text(
+                      'Share an idea, report an app issue, or rate your experience.',
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const FeedbackPage()),
+                    ),
+                  )),
             ),
           ],
         ),
