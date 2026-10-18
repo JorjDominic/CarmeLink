@@ -10366,132 +10366,145 @@ class _ReportsAnalyticsPageState extends State<ReportsAnalyticsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Live Operational Metrics
-              AdaptiveGrid(children: [
-                MetricCard(
-                  label: 'Bed Occupancy',
-                  value: '${occupancyRate.toStringAsFixed(0)}%',
-                  detail: '$totalOccupied of $totalCapacity beds filled',
-                  icon: Icons.bed_outlined,
-                ),
-                MetricCard(
-                  label: 'Payment Compliance',
-                  value: '${paymentCompliance.toStringAsFixed(0)}%',
-                  detail:
-                      '$verifiedCount of ${financial.eligibleBillCount} current bills settled',
-                  icon: Icons.payments_outlined,
-                ),
-                MetricCard(
-                  label: 'Open Maintenance',
-                  value: '$openMaintenance',
-                  detail: '$highPriority high priority',
-                  icon: Icons.build_outlined,
-                ),
-                MetricCard(
-                  label: 'Curfew & Gate Security',
-                  value: '${gateEvents.length}',
-                  detail: '$flaggedCurfew flagged after-hours',
-                  icon: Icons.security_outlined,
-                ),
-              ]),
-              const SizedBox(height: 20),
+              WorkspaceColumns(
+                asideWidth: 320,
+                aside: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SectionTitle('Operational snapshot'),
+                      const SizedBox(height: 12),
+                      FinancialSummary(items: [
+                        (
+                          'Bed Occupancy',
+                          '${occupancyRate.toStringAsFixed(0)}%',
+                          Icons.bed_outlined,
+                          '$totalOccupied of $totalCapacity beds filled'
+                        ),
+                        (
+                          'Payment Compliance',
+                          '${paymentCompliance.toStringAsFixed(0)}%',
+                          Icons.payments_outlined,
+                          '$verifiedCount of ${financial.eligibleBillCount} current bills settled'
+                        ),
+                        (
+                          'Open Maintenance',
+                          '$openMaintenance',
+                          Icons.build_outlined,
+                          '$highPriority high priority'
+                        ),
+                        (
+                          'Curfew & Gate Security',
+                          '${gateEvents.length}',
+                          Icons.security_outlined,
+                          '$flaggedCurfew flagged after-hours'
+                        ),
+                      ]),
+                      const SizedBox(height: 20),
+                    ]),
+                content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Exportable Reports Hub Section Header
+                      const SectionTitle('Official PDF Reports & Data Exports'),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Open a PDF preview to print, download, or share where supported.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 10),
 
-              // Exportable Reports Hub Section Header
-              const SectionTitle('Official PDF Reports & Data Exports'),
-              const SizedBox(height: 4),
-              Text(
-                'Open a PDF preview to print, download, or share where supported.',
-                style: Theme.of(context).textTheme.bodySmall,
+                      LayoutBuilder(builder: (context, constraints) {
+                        final columns = constraints.maxWidth >= 860 &&
+                                MediaQuery.textScalerOf(context).scale(1) <= 1.3
+                            ? 2
+                            : 1;
+                        final width =
+                            (constraints.maxWidth - (columns - 1) * 12) /
+                                columns;
+                        final cards = <Widget>[
+                          _buildReportCard(
+                            context: context,
+                            title: 'Financial & Rent Collection Statement',
+                            description:
+                                'Complete breakdown of rent, utility billing, verified receipts, and outstanding dues.',
+                            icon: Icons.account_balance_wallet_outlined,
+                            color: Colors.teal,
+                            fileName:
+                                'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                            documentBuilder: () =>
+                                _reportService.generateFinancialReportPdf(),
+                          ),
+                          _buildReportCard(
+                            context: context,
+                            title: 'Dormitory Occupancy & Tenant Roster',
+                            description:
+                                'Live room-by-room census, current vacancy breakdown, and active resident directory.',
+                            icon: Icons.meeting_room_outlined,
+                            color: Colors.indigo,
+                            fileName:
+                                'carmelitas_occupancy_roster_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                            documentBuilder: () =>
+                                _reportService.generateOccupancyRosterPdf(),
+                          ),
+                          _buildReportCard(
+                            context: context,
+                            title: 'Facility Maintenance & Work Orders Log',
+                            description:
+                                'Live database-backed repair log with tenant, category, location, urgency, status, staff notes, and resolutions.',
+                            icon: Icons.handyman_outlined,
+                            color: Colors.orange,
+                            fileName:
+                                'carmelitas_maintenance_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                            documentBuilder: () =>
+                                _reportService.generateMaintenanceReportPdf(),
+                          ),
+                          _buildReportCard(
+                            context: context,
+                            title: 'Resident Conduct & Violation Cases',
+                            description:
+                                'Live disciplinary case register with investigation status, evidence, warnings, and recorded outcomes.',
+                            icon: Icons.gavel_outlined,
+                            color: Colors.redAccent,
+                            fileName:
+                                'carmelitas_conduct_violation_cases_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                            documentBuilder: () => _reportService
+                                .generateConductViolationReportPdf(),
+                          ),
+                          _buildReportCard(
+                            context: context,
+                            title: 'Security, Gate & Curfew Audit Log',
+                            description:
+                                'Gate crossings, geofence tripwire logs, curfew flags, and approved overnight passes.',
+                            icon: Icons.schedule_outlined,
+                            color: Colors.purple,
+                            fileName:
+                                'carmelitas_curfew_security_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                            documentBuilder: () =>
+                                _reportService.generateCurfewGateReportPdf(),
+                          ),
+                          _buildReportCard(
+                            context: context,
+                            title: 'Consolidated Executive Overview',
+                            description:
+                                'Comprehensive high-level summary combining finance, occupancy, security, and repairs.',
+                            icon: Icons.analytics_outlined,
+                            color: const Color(0xFF6B1D2F),
+                            fileName:
+                                'carmelitas_executive_summary_${DateTime.now().year}_${DateTime.now().month}.pdf',
+                            documentBuilder: () =>
+                                _reportService.generateExecutiveOverviewPdf(),
+                          ),
+                        ];
+                        return Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: cards
+                                .map((card) =>
+                                    SizedBox(width: width, child: card))
+                                .toList());
+                      }),
+                    ]),
               ),
-              const SizedBox(height: 10),
-
-              LayoutBuilder(builder: (context, constraints) {
-                final columns = constraints.maxWidth >= 860 &&
-                        MediaQuery.textScalerOf(context).scale(1) <= 1.3
-                    ? 2
-                    : 1;
-                final width =
-                    (constraints.maxWidth - (columns - 1) * 12) / columns;
-                final cards = <Widget>[
-                  _buildReportCard(
-                    context: context,
-                    title: 'Financial & Rent Collection Statement',
-                    description:
-                        'Complete breakdown of rent, utility billing, verified receipts, and outstanding dues.',
-                    icon: Icons.account_balance_wallet_outlined,
-                    color: Colors.teal,
-                    fileName:
-                        'carmelitas_financial_statement_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                    documentBuilder: () =>
-                        _reportService.generateFinancialReportPdf(),
-                  ),
-                  _buildReportCard(
-                    context: context,
-                    title: 'Dormitory Occupancy & Tenant Roster',
-                    description:
-                        'Live room-by-room census, current vacancy breakdown, and active resident directory.',
-                    icon: Icons.meeting_room_outlined,
-                    color: Colors.indigo,
-                    fileName:
-                        'carmelitas_occupancy_roster_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                    documentBuilder: () =>
-                        _reportService.generateOccupancyRosterPdf(),
-                  ),
-                  _buildReportCard(
-                    context: context,
-                    title: 'Facility Maintenance & Work Orders Log',
-                    description:
-                        'Live database-backed repair log with tenant, category, location, urgency, status, staff notes, and resolutions.',
-                    icon: Icons.handyman_outlined,
-                    color: Colors.orange,
-                    fileName:
-                        'carmelitas_maintenance_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                    documentBuilder: () =>
-                        _reportService.generateMaintenanceReportPdf(),
-                  ),
-                  _buildReportCard(
-                    context: context,
-                    title: 'Resident Conduct & Violation Cases',
-                    description:
-                        'Live disciplinary case register with investigation status, evidence, warnings, and recorded outcomes.',
-                    icon: Icons.gavel_outlined,
-                    color: Colors.redAccent,
-                    fileName:
-                        'carmelitas_conduct_violation_cases_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                    documentBuilder: () =>
-                        _reportService.generateConductViolationReportPdf(),
-                  ),
-                  _buildReportCard(
-                    context: context,
-                    title: 'Security, Gate & Curfew Audit Log',
-                    description:
-                        'Gate crossings, geofence tripwire logs, curfew flags, and approved overnight passes.',
-                    icon: Icons.schedule_outlined,
-                    color: Colors.purple,
-                    fileName:
-                        'carmelitas_curfew_security_log_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                    documentBuilder: () =>
-                        _reportService.generateCurfewGateReportPdf(),
-                  ),
-                  _buildReportCard(
-                    context: context,
-                    title: 'Consolidated Executive Overview',
-                    description:
-                        'Comprehensive high-level summary combining finance, occupancy, security, and repairs.',
-                    icon: Icons.analytics_outlined,
-                    color: const Color(0xFF6B1D2F),
-                    fileName:
-                        'carmelitas_executive_summary_${DateTime.now().year}_${DateTime.now().month}.pdf',
-                    documentBuilder: () =>
-                        _reportService.generateExecutiveOverviewPdf(),
-                  ),
-                ];
-                return Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: cards
-                        .map((card) => SizedBox(width: width, child: card))
-                        .toList());
-              }),
               const SizedBox(height: 20),
             ],
           ),

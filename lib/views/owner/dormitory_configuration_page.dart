@@ -1,3 +1,5 @@
+import '../../core/widgets/workspace_columns.dart';
+import '../../core/widgets/record_details.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/common_widgets.dart';
@@ -265,53 +267,62 @@ class _DormitoryConfigurationPageState
             tooltip: 'Add choice',
           ),
         ],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DropdownButtonFormField<String>(
-              initialValue: _groupKey,
-              decoration:
-                  const InputDecoration(labelText: 'Configuration group'),
-              items: [
-                for (final entry in groupEntries)
-                  DropdownMenuItem(
-                    value: entry.key,
-                    child: Text(entry.value),
+        child: WorkspaceColumns(
+          asideWidth: 300,
+          aside: RecordSection(
+            title: 'Configuration choices',
+            icon: Icons.tune_outlined,
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: _groupKey,
+                    decoration:
+                        const InputDecoration(labelText: 'Configuration group'),
+                    items: [
+                      for (final entry in groupEntries)
+                        DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null || value == _groupKey) return;
+                      setState(() {
+                        _groupKey = value;
+                        _query = '';
+                        _visibility = 'active';
+                        _resetPage();
+                      });
+                      _load();
+                    },
                   ),
-              ],
-              onChanged: (value) {
-                if (value == null || value == _groupKey) return;
-                setState(() {
-                  _groupKey = value;
-                  _query = '';
-                  _visibility = 'active';
-                  _resetPage();
-                });
-                _load();
-              },
-            ),
-            const SizedBox(height: 12),
-            ChoiceSearchField(
-              key: ValueKey(_groupKey),
-              hintText: 'Search choices by name',
-              onChanged: (value) => setState(() {
-                _query = value;
-                _resetPage();
-              }),
-            ),
-            const SizedBox(height: 12),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'active', label: Text('Active')),
-                ButtonSegment(value: 'archived', label: Text('Archived')),
-                ButtonSegment(value: 'all', label: Text('All')),
-              ],
-              selected: {_visibility},
-              onSelectionChanged: (values) => setState(() {
-                _visibility = values.first;
-                _resetPage();
-              }),
-            ),
+                  const SizedBox(height: 12),
+                  ChoiceSearchField(
+                    key: ValueKey(_groupKey),
+                    hintText: 'Search choices by name',
+                    onChanged: (value) => setState(() {
+                      _query = value;
+                      _resetPage();
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'active', label: Text('Active')),
+                      ButtonSegment(value: 'archived', label: Text('Archived')),
+                      ButtonSegment(value: 'all', label: Text('All')),
+                    ],
+                    selected: {_visibility},
+                    onSelectionChanged: (values) => setState(() {
+                      _visibility = values.first;
+                      _resetPage();
+                    }),
+                  ),
+                ]),
+          ),
+          content:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             if (_loading) const LinearProgressIndicator(),
             if (_error != null)
               ListTile(
@@ -351,7 +362,7 @@ class _DormitoryConfigurationPageState
               itemLabel: 'choices',
               onPageChanged: (page) => setState(() => _page = page),
             ),
-          ],
+          ]),
         ),
       ),
     );
