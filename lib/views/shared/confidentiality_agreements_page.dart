@@ -1,3 +1,4 @@
+import '../../core/widgets/numbered_pagination.dart';
 import 'package:flutter/material.dart';
 import '../../controllers/session_controller.dart';
 import '../../models/models.dart';
@@ -185,12 +186,15 @@ class _ConfidentialityAgreementsPageState
         subtitle: 'Approved versions and recorded acceptance',
         maxWidth: 1000,
         onRefresh: load,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (owner)
-            FilledButton.icon(
-                onPressed: publish,
-                icon: const Icon(Icons.publish_outlined),
-                label: const Text('Publish approved version')),
+            Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.icon(
+                    onPressed: publish,
+                    icon: const Icon(Icons.publish_outlined),
+                    label: const Text('Publish approved version'))),
           const SizedBox(height: 12),
           if (loading)
             const LinearProgressIndicator()
@@ -202,46 +206,231 @@ class _ConfidentialityAgreementsPageState
               const CarmelitaCard(
                   child: Text(
                       'No approved agreement has been published. This module stays locked until an owner publishes an agreement and you accept it. Other modules remain available.')),
-            for (final v in versions)
-              Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: CarmelitaCard(
-                      child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('${v['audience']} · Version ${v['version']}'),
-                    subtitle: Text(
-                        '${currentIds.contains(v['id']) ? 'Current' : 'Historical'} · Published ${DateTime.parse(v['published_at'] as String).toLocal()}'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => open(v, currentIds.contains(v['id'])),
-                  ))),
+            const SizedBox(height: 8),
+            AgreementRecordPages<Map<String, dynamic>>(
+              key: ValueKey('${widget.service.module.key}-versions'),
+              items: versions,
+              itemLabel: 'versions',
+              itemBuilder: (v) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: AgreementVersionCard(
+                    version: v,
+                    current: currentIds.contains(v['id']),
+                    onTap: () => open(v, currentIds.contains(v['id']))),
+              ),
+            ),
             if (owner) ...[
               const SectionTitle('Acceptance verification'),
               const Text(
                   'Current version status is shown separately from historical acceptances. Caretaker access requires a separate permission decision.'),
-              for (final user in accounts)
-                Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: CarmelitaCard(
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                          Text(
-                              '${user['full_name'] ?? 'Account'} · ${user['role']}',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w700)),
-                          for (final v in versions
-                              .where((v) => v['audience'] == user['role']))
-                            Text(
-                                'Version ${v['version']}${currentIds.contains(v['id']) ? ' (current)' : ''}: ${acceptances.where((a) => a['user_id'] == user['id'] && a['agreement_id'] == v['id']).map((a) => 'Accepted ${DateTime.parse(a['accepted_at'] as String).toLocal()}').firstOrNull ?? 'No acceptance recorded'}'),
-                        ]))),
+              const SizedBox(height: 14),
+              AgreementRecordPages<Map<String, dynamic>>(
+                key: ValueKey('${widget.service.module.key}-accounts'),
+                items: accounts,
+                itemLabel: 'accounts',
+                itemBuilder: (user) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: AgreementAcceptanceCard(
+                    user: user,
+                    versions: versions
+                        .where((v) => v['audience'] == user['role'])
+                        .toList(),
+                    acceptances: acceptances,
+                    currentIds: currentIds,
+                  ),
+                ),
+              ),
             ] else ...[
               const SectionTitle('Your acceptance history'),
-              for (final a in acceptances)
-                Text(
-                    'Version ${versions.where((v) => v['id'] == a['agreement_id']).firstOrNull?['version'] ?? a['agreement_id']} · Accepted ${DateTime.parse(a['accepted_at'] as String).toLocal()}'),
+              AgreementRecordPages<Map<String, dynamic>>(
+                key: ValueKey('${widget.service.module.key}-history'),
+                items: acceptances,
+                itemLabel: 'acceptances',
+                itemBuilder: (a) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                      'Version ${versions.where((v) => v['id'] == a['agreement_id']).firstOrNull?['version'] ?? a['agreement_id']} - Accepted ${_agreementDate(context, a['accepted_at'] as String)}'),
+                ),
+              ),
             ],
           ],
         ]));
+  }
+}
+
+/// Client-side presentation only. The complete lists still determine current
+/// versions and acceptance matching; each section keeps its own page selection.
+class AgreementRecordPages<T> extends StatefulWidget {
+  const AgreementRecordPages(
+      {required this.items,
+      required this.itemBuilder,
+      required this.itemLabel,
+      super.key});
+  final List<T> items;
+  final Widget Function(T) itemBuilder;
+  final String itemLabel;
+  @override
+  State<AgreementRecordPages<T>> createState() =>
+      _AgreementRecordPagesState<T>();
+}
+
+class _AgreementRecordPagesState<T> extends State<AgreementRecordPages<T>> {
+  static const pageSize = 6;
+  int page = 1;
+  @override
+  void didUpdateWidget(covariant AgreementRecordPages<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.items.length != widget.items.length) page = 1;
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ...widget.items
+              .skip((page - 1) * pageSize)
+              .take(pageSize)
+              .map(widget.itemBuilder),
+          NumberedPaginationBar(
+              currentPage: page,
+              totalItems: widget.items.length,
+              pageSize: pageSize,
+              itemLabel: widget.itemLabel,
+              onPageChanged: (value) => setState(() => page = value)),
+        ],
+      );
+}
+
+// Read-only presentation shared by confidentiality and geofencing agreements.
+String _agreementDate(BuildContext context, String value) {
+  final date = DateTime.tryParse(value)?.toLocal();
+  if (date == null) return value;
+  final local = MaterialLocalizations.of(context);
+  return '${local.formatMediumDate(date)} at ${local.formatTimeOfDay(TimeOfDay.fromDateTime(date))}';
+}
+
+class AgreementVersionCard extends StatelessWidget {
+  const AgreementVersionCard(
+      {required this.version,
+      required this.current,
+      required this.onTap,
+      super.key});
+  final Map<String, dynamic> version;
+  final bool current;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return CarmelitaCard(
+      onTap: onTap,
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        CircleAvatar(
+            backgroundColor: colors.primary.withValues(alpha: .08),
+            foregroundColor: colors.primary,
+            child: const Icon(Icons.description_outlined)),
+        const SizedBox(width: 12),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Wrap(
+              spacing: 10,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text('Version ${version['version']}',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                StatusPill(current ? 'Current' : 'Historical'),
+              ]),
+          const SizedBox(height: 5),
+          Text('${version['audience']}'.toUpperCase(),
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(letterSpacing: .8, color: colors.primary)),
+          const SizedBox(height: 8),
+          Text(
+              'Published ${_agreementDate(context, version['published_at'] as String)}',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: colors.onSurfaceVariant)),
+        ])),
+        const SizedBox(width: 8),
+        const Icon(Icons.chevron_right),
+      ]),
+    );
+  }
+}
+
+class AgreementAcceptanceCard extends StatelessWidget {
+  const AgreementAcceptanceCard(
+      {required this.user,
+      required this.versions,
+      required this.acceptances,
+      required this.currentIds,
+      super.key});
+  final Map<String, dynamic> user;
+  final List<Map<String, dynamic>> versions, acceptances;
+  final Set<String> currentIds;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return CarmelitaCard(
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        CircleAvatar(
+            radius: 18,
+            backgroundColor: colors.surfaceContainerLow,
+            foregroundColor: colors.primary,
+            child: const Icon(Icons.person_outline, size: 20)),
+        const SizedBox(width: 10),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${user['full_name'] ?? 'Account'}',
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 3),
+          Text('${user['role']}'.toUpperCase(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                  color: colors.onSurfaceVariant, letterSpacing: .7)),
+        ])),
+      ]),
+      for (final version in versions) ...[
+        const Divider(height: 24),
+        Builder(builder: (context) {
+          final acceptance = acceptances
+              .where((a) =>
+                  a['user_id'] == user['id'] &&
+                  a['agreement_id'] == version['id'])
+              .firstOrNull;
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text('Version ${version['version']}',
+                          style: theme.textTheme.labelLarge),
+                      if (currentIds.contains(version['id']))
+                        const StatusPill('Current'),
+                      StatusPill(acceptance != null
+                          ? 'Accepted'
+                          : 'No acceptance recorded'),
+                    ]),
+                if (acceptance != null)
+                  Padding(
+                      padding: const EdgeInsets.only(top: 7),
+                      child: Text(
+                          'Accepted ${_agreementDate(context, acceptance['accepted_at'] as String)}',
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: colors.onSurfaceVariant))),
+              ]);
+        }),
+      ],
+    ]));
   }
 }
 
