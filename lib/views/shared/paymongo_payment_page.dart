@@ -32,7 +32,8 @@ class PaymongoPaymentPage extends StatefulWidget {
   State<PaymongoPaymentPage> createState() => _PaymongoPaymentPageState();
 }
 
-class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
+class _PaymongoPaymentPageState extends State<PaymongoPaymentPage>
+    with WidgetsBindingObserver {
   Payment? _payment;
   PaymongoPaymentSession? _session;
   Timer? _poll;
@@ -42,9 +43,11 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
   List<PaymentReceipt> _receipts = [];
   final Map<String, Uint8List> _receiptDocuments = {};
   final Set<String> _selectedRentIds = {};
+  bool _resumeCheckPending = false;
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _payment = widget.payment;
     if (_payment?.isRent == true) _selectedRentIds.add(_payment!.id);
     _session = widget.initialSession;
@@ -67,8 +70,22 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _poll?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed ||
+        widget.demo ||
+        _session == null ||
+        _session!.paid) return;
+    if (_busy) {
+      _resumeCheckPending = true;
+    } else {
+      _refresh();
+    }
   }
 
   Future<void> _resume({bool prepare = true}) async {
@@ -115,7 +132,13 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
             ? error.message
             : 'Could not check this payment. Please try again.');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+        if (_resumeCheckPending) {
+          _resumeCheckPending = false;
+          if (_session != null && !_session!.paid && !widget.demo) _refresh();
+        }
+      }
     }
   }
 
@@ -469,10 +492,15 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
               (session?.expiresAt == null ||
                   session!.expiresAt!.isAfter(DateTime.now())) &&
               session?.status == 'pending')
-            FilledButton(
-                onPressed:
-                    _busy ? null : () => _openSimulation(session!.testUrl!),
-                child: const Text('Open payment page (TEST)')),
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              FilledButton(
+                  onPressed:
+                      _busy ? null : () => _openSimulation(session!.testUrl!),
+                  child: const Text('Open payment page (TEST)')),
+              const SizedBox(height: 8),
+              const Text(
+                  'After finishing on the payment page, return to CarmeLink. Your payment status will be checked automatically.'),
+            ]),
           if (widget.demo && session?.isActive == true) ...[
             FilledButton(
                 onPressed: () => _demoOutcome('succeeded'),

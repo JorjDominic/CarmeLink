@@ -107,6 +107,9 @@ export async function generatePaymentQr(admin: any, client: PayMongoClient, orig
     }
     payload = await client.request(`payment_intents/${session.provider_intent_id}/attach`, 'POST', {
       payment_method: session.provider_method_id, client_key: a.client_key,
+      // This is a navigation hint only. QR simulators/wallet apps may ignore it;
+      // payment confirmation always uses authenticated provider reads/webhooks.
+      return_url: `https://carmelitasdormitory.site/payment/return?session_id=${encodeURIComponent(session.id)}`,
     }, `${session.id}:attach`)
     a = validateIntent(payload, session)
     if (a.status !== 'awaiting_next_action') return await synchronizePayment(admin, client, session)

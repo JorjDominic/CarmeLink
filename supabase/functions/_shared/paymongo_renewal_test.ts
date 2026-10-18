@@ -7,6 +7,7 @@ const initial:Session={id:'old',charge_id:'bill',tenant_id:'tenant',enabled_by:'
 function fixture(options:{provider?:string;cancelResult?:string;cancelFails?:boolean;lookupFails?:boolean;future?:boolean;newCreation?:boolean}={}){
  let stored={...initial,expires_at:options.future?'2099-01-01T00:00:00Z':initial.expires_at}
  let provider=options.provider??'awaiting_next_action',begins=0,created=0,cancels=0,credits=0,reads=0
+ let returnUrl:string|undefined
  const admin={from(){let patch:any={};return{update(p:any){patch=p;return this},eq(){return this},neq(){return this},select(){return this},
  single(){stored={...stored,...patch};return Promise.resolve({data:stored,error:null})}}},
  rpc(name:string){assert(name==='settle_paymongo_payment');credits++;stored={...stored,status:'succeeded'};return Promise.resolve({data:stored,error:null})}}
@@ -18,7 +19,10 @@ function fixture(options:{provider?:string;cancelResult?:string;cancelFails?:boo
     return Response.json({data:{id:'pi_New',type:'payment_intent',attributes:{status:provider,amount:10000,currency:'PHP',livemode:false,
       client_key:'client-key',metadata:{gateway_session_id:stored.id,charge_id:'bill',tenant_id:'tenant'}}}})
   }
-  if(url.endsWith('/attach'))provider='awaiting_next_action'
+  if(url.endsWith('/attach')){
+    provider='awaiting_next_action'
+    returnUrl=JSON.parse(init.body).data.attributes.return_url
+  }
   if(url.endsWith('/cancel')){cancels++;if(options.cancelFails)throw Error('Cancel response lost');provider=options.cancelResult??'cancelled';return Response.json({})}
   reads++;if(options.lookupFails&&reads>1)throw Error('Provider unavailable')
   return Response.json({data:{id:stored.provider_intent_id,type:'payment_intent',attributes:{status:provider,
@@ -41,7 +45,7 @@ function fixture(options:{provider?:string;cancelResult?:string;cancelFails?:boo
   if(name==='claim_paymongo_creation')return Promise.resolve({data:null,error:null})
   return admin.rpc(name,...args as [])
  }}
- return {admin,client,begin,creatorAdmin,get stored(){return stored},get begins(){return begins},get created(){return created},get cancels(){return cancels},get credits(){return credits}}
+ return {admin,client,begin,creatorAdmin,get stored(){return stored},get begins(){return begins},get created(){return created},get cancels(){return cancels},get credits(){return credits},get returnUrl(){return returnUrl}}
 }
 Deno.test('expired waiting QR is retired at provider before a new atomic request begins',async()=>{
  const f=fixture();const result=await createOrResumePayment(f.creatorAdmin,f.client,f.begin)
@@ -55,6 +59,7 @@ Deno.test('renewal generates a fresh provider intent, method and usable QR in th
  const f=fixture({newCreation:true});const result=await createOrResumePayment(f.creatorAdmin,f.client,f.begin)
  assert(result.id==='replacement'&&result.provider_intent_id==='pi_New'&&result.provider_method_id==='pm_New')
  assert(result.status==='pending'&&typeof result.qr_image==='string'&&Date.parse(result.expires_at!)>Date.now())
+ assert(f.returnUrl==='https://carmelitasdormitory.site/payment/return?session_id=replacement')
 })
 Deno.test('processing payment never expires from the clock or creates a replacement',async()=>{
  const f=fixture({provider:'processing'});const result=await createOrResumePayment(f.creatorAdmin,f.client,f.begin)

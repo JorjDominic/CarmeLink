@@ -7,6 +7,8 @@ import '../auth/staff_gate.dart';
 import '../landing/landing_page.dart';
 import '../theme/web_theme.dart';
 import 'web_routes.dart';
+import '../../core/utils/payment_return_link.dart';
+import '../payment/payment_return_page.dart';
 
 /// Separate Flutter web application. Does not alter the mobile app's routing.
 class CarmeLinkWebApp extends StatelessWidget {
@@ -33,7 +35,9 @@ class CarmeLinkWebApp extends StatelessWidget {
         themeAnimationCurve: Curves.easeOutCubic,
         initialRoute: SessionController.isPasswordRecoveryUri(Uri.base)
             ? WebRoutes.resetPassword
-            : WebRoutes.home,
+            : PaymentReturnLink.isReturnLocation(Uri.base)
+                ? WebRoutes.paymentReturn
+                : WebRoutes.home,
         routes: {
           WebRoutes.home: (context) => LandingPage(
                 onStaffPortal: () =>
@@ -43,6 +47,8 @@ class CarmeLinkWebApp extends StatelessWidget {
               authReady ? const StaffGate() : const _StaffUnavailablePage(),
           WebRoutes.resetPassword: (context) =>
               authReady ? const StaffGate() : const _StaffUnavailablePage(),
+          WebRoutes.paymentReturn: (context) =>
+              PaymentReturnPage(uri: Uri.base),
         },
         onUnknownRoute: (settings) => MaterialPageRoute<void>(
           settings: settings,

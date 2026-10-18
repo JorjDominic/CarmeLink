@@ -22,6 +22,8 @@ import 'views/owner/owner_shell.dart';
 import 'views/tenant/tenant_shell.dart';
 import 'views/tenant/onboarding_form_page.dart';
 import 'views/shared/shared_views.dart';
+import 'core/utils/payment_return_link.dart';
+import 'views/shared/payment_return_session_page.dart';
 
 class CarmelitaBootstrap extends StatefulWidget {
   const CarmelitaBootstrap({super.key});
@@ -40,6 +42,9 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   StreamSubscription<Map<String, dynamic>>? _notificationSubscription;
   String? _pendingOnboardingToken;
   String? _openedOnboardingToken;
+  String? _pendingPaymentSessionId;
+  String? _activePaymentSessionId;
+  bool _paymentOpenScheduled = false;
 
   bool assetsCached = false;
 
@@ -49,6 +54,8 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
 
     sessionController.addListener(_tryOpenPendingOnboarding);
     sessionController.addListener(_tryOpenPendingNotification);
+    sessionController.addListener(_tryOpenPendingPaymentReturn);
+    TenantAccessController.instance.addListener(_tryOpenPendingPaymentReturn);
     TenantAccessController.instance.addListener(_tryOpenPendingNotification);
 
     _listenForLinks();
@@ -146,6 +153,13 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   }
 
   void _handleLink(Uri uri) {
+    final paymentSession = PaymentReturnLink.sessionId(uri);
+    if (paymentSession != null) {
+      if (_activePaymentSessionId == paymentSession) return;
+      _pendingPaymentSessionId = paymentSession;
+      _tryOpenPendingPaymentReturn();
+      return;
+    }
     if (uri.scheme.toLowerCase() != 'carmelink' ||
         uri.host.toLowerCase() != 'onboarding') {
       return;
@@ -160,6 +174,51 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
     _pendingOnboardingToken = token;
 
     _tryOpenPendingOnboarding();
+  }
+
+  void _tryOpenPendingPaymentReturn() {
+    if (_pendingPaymentSessionId == null ||
+        _paymentOpenScheduled ||
+        _activePaymentSessionId != null) return;
+    _paymentOpenScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _paymentOpenScheduled = false;
+      if (!mounted) return;
+      final id = _pendingPaymentSessionId;
+      final user = sessionController.currentUser;
+      final navigator = _navigatorKey.currentState;
+      if (id == null ||
+          user == null ||
+          sessionController.loading ||
+          navigator == null ||
+          user.role != UserRole.tenant ||
+          !TenantAccessController.instance.canAccessCore) return;
+      _pendingPaymentSessionId = null;
+      _activePaymentSessionId = id;
+      try {
+        await navigator.push(MaterialPageRoute<void>(
+            builder: (_) => AnimatedBuilder(
+                animation: Listenable.merge(
+                    [sessionController, TenantAccessController.instance]),
+                builder: (context, _) {
+                  if (sessionController.currentUser?.id != user.id ||
+                      !TenantAccessController.instance.canAccessCore) {
+                    return const Scaffold(
+                        body: SafeArea(
+                            child: Center(
+                                child: Text(
+                                    'Sign in with the tenant account used for this payment, then reopen the return link.'))));
+                  }
+                  return PaymentReturnSessionPage(
+                      key: ValueKey('$id:${user.id}'), sessionId: id);
+                })));
+      } finally {
+        _activePaymentSessionId = null;
+        if (mounted && _pendingPaymentSessionId != null)
+          _tryOpenPendingPaymentReturn();
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void _tryOpenPendingOnboarding() {
@@ -198,6 +257,9 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
   void dispose() {
     sessionController.removeListener(_tryOpenPendingOnboarding);
     sessionController.removeListener(_tryOpenPendingNotification);
+    sessionController.removeListener(_tryOpenPendingPaymentReturn);
+    TenantAccessController.instance
+        .removeListener(_tryOpenPendingPaymentReturn);
     TenantAccessController.instance.removeListener(_tryOpenPendingNotification);
 
     _linkSubscription?.cancel();
@@ -229,6 +291,7 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
       ]),
       builder: (context, _) {
         if (_pendingNotification != null) _tryOpenPendingNotification();
+        if (_pendingPaymentSessionId != null) _tryOpenPendingPaymentReturn();
         return MaterialApp(
           navigatorKey: _navigatorKey,
           title: 'CarmeLink',
