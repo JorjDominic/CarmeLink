@@ -199,7 +199,7 @@ class _VisitorScheduleEditorState extends State<_VisitorScheduleEditor> {
         title: const Text('Change visitor schedule'),
         content: SingleChildScrollView(
           child: SizedBox(
-            width: 460,
+            width: (MediaQuery.sizeOf(context).width - 96).clamp(180.0, 460.0).toDouble(),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -210,6 +210,8 @@ class _VisitorScheduleEditorState extends State<_VisitorScheduleEditor> {
                       : 'Staff will keep the existing approval while recording the revised schedule.',
                 ),
                 const SizedBox(height: 14),
+                Text('Visit schedule', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: saving ? null : _pickDate,
                   icon: const Icon(Icons.calendar_month_outlined),

@@ -108,6 +108,7 @@ class _EmployeeCurfewProfilesPageState
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
           title: Text(
             profile == null
                 ? 'New tenant work curfew profile'
@@ -378,6 +379,7 @@ class _EmployeeCurfewProfilesPageState
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
           title: const Text('Approve tenant work curfew profile'),
           content: SizedBox(
             width: 560,
@@ -451,6 +453,7 @@ class _EmployeeCurfewProfilesPageState
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
           title: const Text('Revoke tenant work curfew profile'),
           content: TextField(
             controller: reason,
@@ -603,26 +606,17 @@ class _EmployeeCurfewProfilesPageState
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CarmelitaCard(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.badge_outlined),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Use this only for a tenant with an approved work schedule that affects regular curfew. Staff records the approved return time, days, effective dates, and basis. Gate/geofence evaluator changes require separate integration review.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
+                const CollapsibleInfoCard(
+                  title: 'About tenant work curfew',
+                  icon: Icons.badge_outlined,
+                  body:
+                      'Use this only for a tenant with an approved work schedule that affects regular curfew. Staff records the approved return time, days, effective dates, and basis. Gate/geofence evaluator changes require separate integration review.',
                 ),
                 if (errorMessage != null) ...[
                   const SizedBox(height: 12),
                   CarmelitaCard(child: Text(errorMessage!)),
                 ],
-                const SizedBox(height: 22),
+                const SizedBox(height: 14),
                 if (profiles.isEmpty)
                   const EmptyState(
                     icon: Icons.badge_outlined,
@@ -639,15 +633,16 @@ class _EmployeeCurfewProfilesPageState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    profile.tenantName ?? 'Tenant',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 17,
-                                    ),
+                                Text(
+                                  profile.tenantName ?? 'Tenant',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 17,
                                   ),
                                 ),
                                 StatusPill(

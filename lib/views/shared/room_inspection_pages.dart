@@ -130,6 +130,7 @@ class _StaffRoomInspectionsPageState extends State<StaffRoomInspectionsPage> {
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
           title: Text(
             isFollowUp ? 'Schedule follow-up' : 'Schedule monthly inspection',
           ),
@@ -364,6 +365,7 @@ class _StaffRoomInspectionsPageState extends State<StaffRoomInspectionsPage> {
                           (inspection) => Padding(
                             padding: const EdgeInsets.only(bottom: 10),
                             child: CarmelitaCard(
+                              padding: const EdgeInsets.all(12),
                               onTap: () => _open(inspection),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -375,23 +377,44 @@ class _StaffRoomInspectionsPageState extends State<StaffRoomInspectionsPage> {
                                           inspectionTypeLabel(
                                             inspection.inspectionType,
                                           ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
                                             fontWeight: FontWeight.w800,
                                             fontSize: 16,
                                           ),
                                         ),
                                       ),
+                                      const SizedBox(width: 8),
                                       StatusPill(
                                         inspectionStatusLabel(
                                             inspection.status),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    _inspectionDateTime(inspection.scheduledAt),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.event_outlined,
+                                        size: 16,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          _inspectionDateTime(
+                                              inspection.scheduledAt),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 8),
                                   Text(
                                     inspection.noticeText,
                                     maxLines: 2,
@@ -501,6 +524,7 @@ class _StaffInspectionDetailPageState extends State<StaffInspectionDetailPage> {
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
           title: const Text('Add inspection finding'),
           content: SizedBox(
             width: 620,
@@ -711,6 +735,7 @@ class _StaffInspectionDetailPageState extends State<StaffInspectionDetailPage> {
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
           title: Text('Update ${finding.locationLabel}'),
           content: SizedBox(
             width: 560,
@@ -806,6 +831,7 @@ class _StaffInspectionDetailPageState extends State<StaffInspectionDetailPage> {
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
           title: const Text('Complete inspection'),
           content: TextField(
             controller: summary,
@@ -878,6 +904,7 @@ class _StaffInspectionDetailPageState extends State<StaffInspectionDetailPage> {
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
           title: const Text('Cancel inspection'),
           content: TextField(
             controller: reason,

@@ -183,21 +183,11 @@ class _CleaningScheduleManagementPageState
                   ],
                 ),
                 const SizedBox(height: 14),
-                CarmelitaCard(
-                  emphasis: true,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.auto_awesome_outlined),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Rotation rule: occupied beds are ordered by bed label and receive one weekly duty day in Monday-to-Sunday round-robin order. Vacant beds are removed automatically. A staff-edited bed becomes a manual override and is preserved during regeneration.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
+                const CollapsibleInfoCard(
+                  title: 'How cleaning rotation works',
+                  icon: Icons.auto_awesome_outlined,
+                  body:
+                      'Rotation rule: occupied beds are ordered by bed label and receive one weekly duty day in Monday-to-Sunday round-robin order. Vacant beds are removed automatically. A staff-edited bed becomes a manual override and is preserved during regeneration.',
                 ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 12),
@@ -268,40 +258,59 @@ class _RoomCleaningRotationCard extends StatelessWidget {
       ..sort((a, b) => compareNaturalLabels(a.label, b.label));
 
     return CarmelitaCard(
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                child: Text(room.number),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Room ${room.number}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      '${occupied.length} of ${room.beds.length} beds occupied',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              StatusPill(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 350;
+              final status = StatusPill(
                 occupied.isEmpty ? 'No duties' : 'Rotation active',
                 icon: occupied.isEmpty
                     ? Icons.hotel_outlined
                     : Icons.autorenew_rounded,
-              ),
-            ],
+              );
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(child: Text(room.number)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Room ${room.number}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              '${occupied.length} of ${room.beds.length} beds occupied',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (!narrow) ...[
+                        const SizedBox(width: 8),
+                        status,
+                      ],
+                    ],
+                  ),
+                  if (narrow) ...[
+                    const SizedBox(height: 8),
+                    status,
+                  ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           if (occupied.isEmpty)

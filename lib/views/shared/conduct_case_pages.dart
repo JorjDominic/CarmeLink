@@ -228,7 +228,7 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
                   const SizedBox(height: 12),
                   CarmelitaCard(child: Text(errorMessage!)),
                 ],
-                const SizedBox(height: 22),
+                const SizedBox(height: 14),
                 RecordListToolbar(
                   scope: scope,
                   sort: sort,
@@ -260,15 +260,17 @@ class _StaffConductCasesPageState extends State<StaffConductCasesPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
+                                  Wrap(
+                                    spacing: 10,
+                                    runSpacing: 6,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
                                     children: [
-                                      Expanded(
-                                        child: Text(
-                                          record.title,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 17,
-                                          ),
+                                      Text(
+                                        record.title,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 17,
                                         ),
                                       ),
                                       StatusPill(
@@ -554,6 +556,7 @@ class _StaffConductCaseDetailPageState
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
           title: const Text('Recommend termination review'),
           content: SizedBox(
             width: 560,

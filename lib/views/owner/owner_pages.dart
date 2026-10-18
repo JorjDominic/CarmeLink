@@ -8143,24 +8143,12 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
 
           return Column(
             children: [
-              CarmelitaCard(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.rule_outlined,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Visitor policy: requests are filed at least one calendar day in advance, '
-                        'visiting hours are 9:00 AM–9:00 PM, and visitors leave the same day. '
-                        'Arrival can only be recorded after staff approval.',
-                      ),
-                    ),
-                  ],
-                ),
+              const CollapsibleInfoCard(
+                title: 'Visitor policy',
+                icon: Icons.rule_outlined,
+                body: 'Visitor policy: requests are filed at least one calendar day in advance, '
+                    'visiting hours are 9:00 AM–9:00 PM, and visitors leave the same day. '
+                    'Arrival can only be recorded after staff approval.',
               ),
               const SizedBox(height: 12),
               RecordListToolbar(
@@ -8192,15 +8180,16 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 6,
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
-                                  Expanded(
-                                    child: Text(
-                                      visitor.visitorName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 17,
-                                      ),
+                                  Text(
+                                    visitor.visitorName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 17,
                                     ),
                                   ),
                                   StatusPill(visitor.statusLabel),

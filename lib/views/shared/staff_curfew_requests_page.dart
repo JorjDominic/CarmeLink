@@ -114,6 +114,7 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: Text(accept ? 'Acknowledge request?' : 'Decline request?'),
         content: Text(
           '${request.requestTypeLabel} for ${request.tenantName ?? 'tenant'}'
@@ -206,6 +207,7 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: Text(request.actualReturnTime == null
             ? 'Confirm actual return?'
             : 'Correct recorded return?'),
@@ -261,6 +263,7 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: const Text('Update expected return?'),
         content: Text('Change the late-return deadline to ${_dateTime(time)}? '
             'The tenant and linked guardian will be notified. '
@@ -315,15 +318,16 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Text(
-                  '${request.tenantName ?? 'Tenant'} • ${request.requestTypeLabel}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
+              Text(
+                '${request.tenantName ?? 'Tenant'} • ${request.requestTypeLabel}',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
               ),
               StatusPill(request.isOverdue ? 'Overdue' : request.statusLabel),
             ],
@@ -486,10 +490,13 @@ class _StaffCurfewRequestsPageState extends State<StaffCurfewRequestsPage> {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Staff acknowledges late returns. A linked guardian acknowledges overnight leave; staff acts as the fallback when no guardian is linked.',
+                  const CollapsibleInfoCard(
+                    title: 'How curfew approvals work',
+                    icon: Icons.info_outline_rounded,
+                    body:
+                        'Staff acknowledges late returns. A linked guardian acknowledges overnight leave; staff acts as the fallback when no guardian is linked.',
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
