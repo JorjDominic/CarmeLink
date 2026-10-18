@@ -58,3 +58,17 @@ Validation:
 - Existing agreement, reporting, geofence, web navigation and notification route
   tests verify integration. Android Kotlin compiles locally. iOS requires a macOS
   build and device checks for background/foreground permission behavior.
+
+## Deployment repair — 2026-10-18
+
+Both module gates displayed retry errors because migration 202610180002 had
+not been applied: the live database lacked `module_agreement_status`,
+`publish_module_agreement`, and the agreement `module` column. The migration
+has now been applied and the REST schema cache refreshed.
+
+Live transactional checks verified owner publication and tenant/guardian
+acceptance/unlock for both modules. All diagnostic versions and acceptances
+were rolled back. The project still has no published agreement content; the
+owner must publish the approved versions through Administration before
+participants can accept and enter the modules. This is an intentional empty
+state, separate from a failed connection or missing endpoint.
