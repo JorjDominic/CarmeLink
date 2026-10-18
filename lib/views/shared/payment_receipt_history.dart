@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/receipt_print_service.dart';
+import '../../core/config/supabase_config.dart';
+import 'issued_receipt_register.dart';
 
 class PaymentReceiptHistoryDialog extends StatefulWidget {
   const PaymentReceiptHistoryDialog(
@@ -95,6 +97,10 @@ class _PaymentReceiptHistoryDialogState
                                         label: Text(printing == receipt.id
                                             ? 'Printing...'
                                             : 'Print receipt')),
+                                    if (SupabaseConfig.isInitialized)
+                                      IssuedReceiptRegister(
+                                          key: ValueKey(receipt.id),
+                                          receipt: receipt),
                                   ])),
                       ]);
                 })),

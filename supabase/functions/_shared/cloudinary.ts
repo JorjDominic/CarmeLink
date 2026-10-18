@@ -64,7 +64,10 @@ export async function canReadReference(caller: SupabaseClient, reference: string
   if (!maintenance.error && (maintenance.data?.length ?? 0) > 0) return true
   const payments = await caller
     .from('payment_transactions').select('id').eq('receipt_path', reference).limit(1)
-  return !payments.error && (payments.data?.length ?? 0) > 0
+  if (!payments.error && (payments.data?.length ?? 0) > 0) return true
+  const issued = await caller
+    .from('issued_payment_receipts').select('id').eq('photo_path', reference).limit(1)
+  return !issued.error && (issued.data?.length ?? 0) > 0
 }
 
 /// Cleanup is limited to detached uploads. Folder ownership alone must not let
@@ -74,6 +77,7 @@ export async function canDeleteReference(admin: Pick<SupabaseClient, 'from'>, re
   for (const [table, column] of [
     ['payment_transactions', 'receipt_path'],
     ['maintenance_reports', 'photo_path'],
+    ['issued_payment_receipts', 'photo_path'],
   ]) {
     const result = await admin.from(table).select('id').eq(column, reference).limit(1)
     if (result.error || !Array.isArray(result.data) || result.data.length > 0) return false

@@ -20,13 +20,17 @@ function fixture(rows: Record<string, Result>) {
 }
 const empty: Result = { data: [], error: null }
 const attached: Result = { data: [{ id: 'committed-record' }], error: null }
+Deno.test('issued receipt photos remain protected, including voided receipt history', async () => {
+  const f = fixture({ payment_transactions: empty, maintenance_reports: empty, issued_payment_receipts: attached })
+  assert(!(await canDeleteReference(f.admin, reference)))
+})
 Deno.test('detached uploads remain eligible for authorized cleanup', async () => {
-  const f = fixture({ payment_transactions: empty, maintenance_reports: empty })
+  const f = fixture({ payment_transactions: empty, maintenance_reports: empty, issued_payment_receipts: empty })
   assert(await canDeleteReference(f.admin, reference))
-  assert(f.reads.length === 2)
+  assert(f.reads.length === 3)
 })
 Deno.test('a saved payment reference prevents deletion even after a lost submission reply', async () => {
-  const f = fixture({ payment_transactions: attached, maintenance_reports: empty })
+  const f = fixture({ payment_transactions: attached, maintenance_reports: empty, issued_payment_receipts: empty })
   assert(!(await canDeleteReference(f.admin, reference)))
 })
 Deno.test('a saved maintenance photo prevents deletion until detached', async () => {
@@ -34,12 +38,12 @@ Deno.test('a saved maintenance photo prevents deletion until detached', async ()
   assert(!(await canDeleteReference(f.admin, reference)))
 })
 Deno.test('an incomplete database response cannot authorize evidence deletion', async () => {
-  const f = fixture({ payment_transactions: { data: null, error: null }, maintenance_reports: empty })
+  const f = fixture({ payment_transactions: { data: null, error: null }, maintenance_reports: empty, issued_payment_receipts: empty })
   assert(!(await canDeleteReference(f.admin, reference)))
 })
-for (const table of ['payment_transactions', 'maintenance_reports']) {
+for (const table of ['payment_transactions', 'maintenance_reports', 'issued_payment_receipts']) {
   Deno.test(`unavailable ${table} lookup fails closed instead of deleting evidence`, async () => {
-    const f = fixture({ payment_transactions: empty, maintenance_reports: empty,
+    const f = fixture({ payment_transactions: empty, maintenance_reports: empty, issued_payment_receipts: empty,
       [table]: { data: null, error: { message: 'Database unavailable' } } })
     assert(!(await canDeleteReference(f.admin, reference)))
   })

@@ -1,4 +1,5 @@
 import '../shared/notification_destination.dart';
+import '../shared/payment_receipt_history.dart';
 import '../shared/module_agreement_gate.dart';
 import '../../services/confidentiality_agreement_service.dart';
 import '../shared/staff_message_contacts.dart';
@@ -2250,7 +2251,17 @@ class GuardianPaymentStatusPage extends StatelessWidget {
                             title: payment.label,
                             subtitle: '${money(payment.amount)} • Due '
                                 '${shortDate(payment.dueDate)}',
-                            trailing: StatusPill(payment.status),
+                            trailing: Wrap(children: [
+                              StatusPill(payment.status),
+                              IconButton(
+                                tooltip: 'Payment receipts',
+                                icon: const Icon(Icons.receipt_long_outlined),
+                                onPressed: () => showDialog<void>(
+                                    context: context,
+                                    builder: (_) => PaymentReceiptHistoryDialog(
+                                        chargeId: payment.id)),
+                              ),
+                            ]),
                           ),
                         )
                         .toList(),
