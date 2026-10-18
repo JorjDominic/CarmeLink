@@ -1,5 +1,9 @@
 # Shared screens and Standard Shared room transfers
 
+Deployment update, October 19, 2026: migration 202610190005 is now applied to
+the linked sample-data database. A live metadata check confirms that assignment
+history protection is restored. Earlier local repair notes follow.
+
 Local repair and validation: October 19, 2026. No database migration or app
 deployment was performed by this repair.
 

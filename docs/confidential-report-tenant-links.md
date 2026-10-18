@@ -1,5 +1,9 @@
 # Tenant links in confidential concerns
 
+Deployment update, October 19, 2026: migration 202610190004 is now applied to
+the linked sample-data database. The updated client is required for the selector
+and revised confidential-source picker. Historical implementation notes follow.
+
 Implemented locally October 19, 2026. One optional tenant per report, as requested.
 
 Tenant concern forms offer an optional name search. The report author remains

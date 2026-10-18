@@ -1,5 +1,12 @@
 # System maintenance and repeated violations
 
+Deployment update, October 19, 2026: migrations 202610190002–202610190005 are
+now applied to the linked sample-data database. Twenty-two rollback-only live
+role checks passed. A dedicated staff tenant register, independent maintenance
+message saving and the current agreement scope are implemented. See
+[current system scope](current-system-scope.md) for the current status; the
+implementation/validation history below records earlier local-only work.
+
 Implemented locally on October 19, 2026. No live migrations or deployment performed.
 
 ## Tenant conduct status
