@@ -338,40 +338,12 @@ class _DormitoryConfigurationPageState
                 message: 'Try another name or clear your search.',
               ),
             for (final option in pagedOptions)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(option.label),
-                subtitle: Text(
-                  option.isSystem
-                      ? 'Protected system choice'
-                      : option.isActive
-                          ? 'Active'
-                          : 'Archived',
-                ),
-                trailing: option.isSystem
-                    ? const Icon(Icons.lock_outline)
-                    : Wrap(
-                        spacing: 4,
-                        children: [
-                          IconButton(
-                            onPressed: () => _edit(option),
-                            icon: const Icon(Icons.edit_outlined),
-                            tooltip: 'Edit',
-                          ),
-                          IconButton(
-                            tooltip: option.isActive
-                                ? 'Archive choice'
-                                : 'Restore choice',
-                            icon: Icon(
-                              option.isActive
-                                  ? Icons.archive_outlined
-                                  : Icons.restore,
-                            ),
-                            onPressed: () => _toggle(option),
-                          ),
-                        ],
-                      ),
-              ),
+              Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: ConfigurationChoiceCard(
+                      option: option,
+                      onEdit: () => _edit(option),
+                      onToggle: () => _toggle(option))),
             NumberedPaginationBar(
               currentPage: safePage,
               totalItems: visibleOptions.length,
@@ -384,4 +356,63 @@ class _DormitoryConfigurationPageState
       ),
     );
   }
+}
+
+class ConfigurationChoiceCard extends StatelessWidget {
+  const ConfigurationChoiceCard(
+      {required this.option,
+      required this.onEdit,
+      required this.onToggle,
+      super.key});
+  final DormitoryOption option;
+  final VoidCallback onEdit, onToggle;
+  @override
+  Widget build(BuildContext context) => CarmelitaCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(10)),
+            child: Icon(
+                option.isSystem ? Icons.lock_outline : Icons.tune_outlined,
+                size: 20,
+                color: Theme.of(context).colorScheme.primary)),
+        const SizedBox(width: 12),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(option.label,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 5),
+          Text(
+              option.isSystem
+                  ? 'Protected system choice'
+                  : option.isActive
+                      ? 'Active'
+                      : 'Archived',
+              style: Theme.of(context).textTheme.bodySmall),
+        ])),
+        if (!option.isSystem) ...[
+          const SizedBox(width: 6),
+          Wrap(spacing: 4, children: [
+            IconButton(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Edit'),
+            IconButton(
+                onPressed: onToggle,
+                icon: Icon(
+                    option.isActive ? Icons.archive_outlined : Icons.restore),
+                tooltip: option.isActive ? 'Archive choice' : 'Restore choice'),
+          ]),
+        ],
+      ]));
 }

@@ -1,3 +1,5 @@
+import '../../core/widgets/management_record_list.dart';
+import '../../core/widgets/record_details.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/utils/retention_policy.dart';
@@ -335,71 +337,70 @@ class _RetentionSettingsPageState extends State<RetentionSettingsPage> {
                           'configuration is deployed.',
                     )
                   else
-                    ...settings.map(
-                      (setting) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: CarmelitaCard(
-                          onTap: () => _edit(setting),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      setting.displayName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  StatusPill(
-                                    retentionReviewStatusLabel(
-                                      setting.reviewStatus,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(setting.description),
-                              const SizedBox(height: 10),
-                              InfoRow(
-                                label: 'Proposed retention',
-                                value: setting.proposedRetentionDays == null
-                                    ? 'Not set'
-                                    : '${setting.proposedRetentionDays} days',
-                                icon: Icons.calendar_month_outlined,
-                              ),
-                              const InfoRow(
-                                label: 'Automated enforcement',
-                                value: 'Disabled',
-                                icon: Icons.lock_outline,
-                              ),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                children: [
-                                  OutlinedButton.icon(
-                                    onPressed: () => _edit(setting),
-                                    icon: const Icon(Icons.edit_outlined),
-                                    label: const Text('Configure'),
-                                  ),
-                                  TextButton.icon(
-                                    onPressed: () => _history(setting),
-                                    icon: const Icon(Icons.history_outlined),
-                                    label: const Text('History'),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                    ManagementRecordList<RetentionPolicySetting>(
+                        items: settings,
+                        itemLabel: 'record groups',
+                        itemBuilder: (setting) => RetentionSettingCard(
+                            setting: setting,
+                            onConfigure: () => _edit(setting),
+                            onHistory: () => _history(setting))),
                 ],
               ),
       ),
     );
   }
+}
+
+class RetentionSettingCard extends StatelessWidget {
+  const RetentionSettingCard(
+      {required this.setting,
+      required this.onConfigure,
+      required this.onHistory,
+      super.key});
+  final RetentionPolicySetting setting;
+  final VoidCallback onConfigure, onHistory;
+  @override
+  Widget build(BuildContext context) => CarmelitaCard(
+      onTap: onConfigure,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(Icons.shield_outlined,
+              color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(setting.displayName,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700))),
+        ]),
+        const SizedBox(height: 8),
+        Align(
+            alignment: Alignment.centerLeft,
+            child:
+                StatusPill(retentionReviewStatusLabel(setting.reviewStatus))),
+        const SizedBox(height: 10),
+        Text(setting.description, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 12),
+        RecordFacts(items: [
+          (
+            'Proposed retention',
+            setting.proposedRetentionDays == null
+                ? 'Not set'
+                : setting.proposedRetentionDays.toString() + ' days'
+          ),
+          ('Automated enforcement', 'Disabled')
+        ]),
+        const Divider(height: 20),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          OutlinedButton.icon(
+              onPressed: onConfigure,
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Configure')),
+          TextButton.icon(
+              onPressed: onHistory,
+              icon: const Icon(Icons.history_outlined),
+              label: const Text('History')),
+        ]),
+      ]));
 }
