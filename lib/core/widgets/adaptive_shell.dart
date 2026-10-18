@@ -1463,7 +1463,8 @@ class _WebStaffSidebar extends StatelessWidget {
         child: ListTile(
           key: Key('web-staff-destination-$itemIndex'),
           dense: true,
-          minTileHeight: 46,
+          minTileHeight: 48,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -1485,7 +1486,7 @@ class _WebStaffSidebar extends StatelessWidget {
                   item.webDescription!,
                   maxLines: 2,
                   softWrap: true,
-                  style: const TextStyle(fontSize: 10.5),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
           trailing: item.isWorkInProgress ? const _WipBadge() : null,
           onTap: () => onSelected(itemIndex),

@@ -54,4 +54,29 @@ void main() {
     expect(find.text('Showing 25-30 of 60 rooms'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('all pagination actions remain reachable at 320px',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    var targetPage = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: NumberedPaginationBar(
+          currentPage: 5,
+          totalItems: 60,
+          pageSize: 6,
+          onPageChanged: (page) => targetPage = page,
+        ),
+      ),
+    ));
+
+    final lastPage = find.byTooltip('Last page');
+    expect(lastPage, findsOneWidget);
+    expect(tester.getTopLeft(lastPage).dx, greaterThanOrEqualTo(0));
+    expect(tester.getBottomRight(lastPage).dx, lessThanOrEqualTo(320));
+    await tester.tap(lastPage);
+    expect(targetPage, 10);
+    expect(tester.takeException(), isNull);
+  });
 }

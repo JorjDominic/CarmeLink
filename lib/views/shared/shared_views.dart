@@ -705,28 +705,43 @@ class ProfilePage extends StatelessWidget {
       subtitle: 'Personal and contact information',
       maxWidth: 720,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        ListTile(
-          leading: const Icon(Icons.swap_horiz),
-          title: const Text('Room transfers & amendments'),
-          subtitle:
-              const Text('Review notices, signatures, and transfer history'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => const RoomTransferPage())),
-        ),
         user.role == UserRole.tenant
             ? _TenantProfileContent(user: user)
             : user.role == UserRole.guardian
                 ? _GuardianProfileContent(user: user)
                 : _OwnerProfileContent(user: user),
-        ListTile(
-          leading: const Icon(Icons.gavel_outlined),
-          title: const Text('Eviction & departure notices'),
-          subtitle: const Text(
-              'Owner decisions, notices, responses and closure history'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const EvictionPage())),
+        const SizedBox(height: 20),
+        const SectionTitle(
+          'Related operations',
+          subtitle: 'Existing transfer and departure workflows',
+        ),
+        const SizedBox(height: 10),
+        CarmelitaCard(
+          child: Column(
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.swap_horiz),
+                title: const Text('Room transfers & amendments'),
+                subtitle: const Text(
+                    'Review notices, signatures, and transfer history'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => const RoomTransferPage())),
+              ),
+              const Divider(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.gavel_outlined),
+                title: const Text('Eviction & departure notices'),
+                subtitle: const Text(
+                    'Owner decisions, notices, responses and closure history'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => const EvictionPage())),
+              ),
+            ],
+          ),
         ),
       ]),
     );
@@ -1752,9 +1767,9 @@ class SettingsPage extends StatelessWidget {
           children: [
             const ElegantHeader(
               eyebrow: 'Preferences',
-              title: 'Make the app feel right for you.',
+              title: 'Your settings',
               subtitle:
-                  'Choose how Carmelita looks on this device. System mode follows your iPhone or Android setting automatically.',
+                  'Manage appearance, notifications, privacy, and security. System appearance follows your device settings.',
             ),
             const SizedBox(height: 22),
             const SectionTitle(

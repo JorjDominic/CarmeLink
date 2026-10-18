@@ -123,19 +123,13 @@ class NumberedPaginationBar extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 8),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: controls
-                      .map(
-                        (control) => Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: control,
-                        ),
-                      )
-                      .toList(growable: false),
-                ),
+              // Show every existing action without hiding last/next behind
+              // horizontal scrolling on narrow Android/iOS screens.
+              Wrap(
+                spacing: 4,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: controls,
               ),
             ],
           ),

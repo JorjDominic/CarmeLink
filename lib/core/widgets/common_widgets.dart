@@ -1416,12 +1416,12 @@ class ElegantHeader extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _copy(context),
+              const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerLeft,
                 child: trailing!,
               ),
-              const SizedBox(height: 12),
-              _copy(context),
             ],
           );
         }
@@ -1456,37 +1456,42 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stack = MediaQuery.sizeOf(context).width < 370 ||
-        MediaQuery.textScalerOf(context).scale(1) > 1.3;
     final copy = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: Theme.of(context).textTheme.titleLarge),
         if (subtitle != null) ...[
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
         ],
       ],
     );
 
     if (trailing == null) return copy;
-    if (stack) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          copy,
-          const SizedBox(height: 6),
-          trailing!,
-        ],
-      );
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stack = constraints.maxWidth < 440 ||
+            MediaQuery.textScalerOf(context).scale(1) > 1.3;
+        if (stack) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              copy,
+              const SizedBox(height: 10),
+              trailing!,
+            ],
+          );
+        }
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(child: copy),
-        trailing!,
-      ],
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(child: copy),
+            const SizedBox(width: 12),
+            trailing!,
+          ],
+        );
+      },
     );
   }
 }
