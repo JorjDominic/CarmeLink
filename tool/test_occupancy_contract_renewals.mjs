@@ -57,6 +57,9 @@ try {
     create trigger renewal_deposit_transfer after update of status on tenant_contracts for each row execute function transfer_renewal_deposit();
     create unique index tenant_contracts_one_live_renewal on tenant_contracts(previous_contract_id) where previous_contract_id is not null and status<>'terminated';`);
   await db.exec(source('202610190006_occupancy_contract_renewals.sql'));
+  await db.exec(`alter table room_transfers add primary key(id),add column completed_at timestamptz;`);
+  await db.exec(source('202610190005_preserve_standard_shared_transfer_guards.sql'));
+  await db.exec(source('202610190007_preserve_solo_occupancy_on_transfer.sql'));
 
   for (const mode of ['solo', 'standard_shared']) {
     await check(`${mode}: same-bed renewal preserves history, signatures, billing and deposit carryover`, async () => {

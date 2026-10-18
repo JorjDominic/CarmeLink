@@ -77,9 +77,12 @@ try{
   await db.exec(source('202610180006_room_transfer_notice_acknowledgment.sql'));
   await db.query("insert into profiles values($1,'Owner','owner'),($2,'Caretaker','caretaker'),($3,'Stranger','tenant'),($4,'Guardian','guardian')",[owner,caretaker,stranger,guardian]);
   // Include real occupancy guards in the signed-amendment lifecycle fixture.
-  await db.exec(`alter table tenant_contracts add column occupancy_id uuid;
+  await db.exec(`alter table tenant_contracts add column occupancy_id uuid,add column occupancy_snapshot jsonb,add column notes text;
+    alter table tenant_contracts alter column id set default gen_random_uuid();
+    alter table tenant_contracts alter column contract_number set default ('CTR-'||gen_random_uuid());
     alter table bed_spaces add column retired_at timestamptz;
-    create table contract_occupancy_arrangements(id uuid primary key,room_id uuid,snapshot jsonb,released boolean default false);`);
+    create table contract_occupancy_arrangements(id uuid primary key,room_id uuid,snapshot jsonb,
+      deposit_terms jsonb default '{}',released boolean default false,created_at timestamptz default now());`);
   const locks=source('202610130002_contract_occupancy_stabilization.sql');
   const lockStart=locks.indexOf('create function public.lock_contract_occupancy_room(');
   await db.exec(locks.slice(lockStart,locks.indexOf('end $$;',lockStart)+8));
@@ -241,7 +244,16 @@ try{
     const solo=await fixture();
     await db.query("insert into contract_occupancy_arrangements(id,room_id,snapshot) values($1,$2,jsonb_build_object('mode','solo','members',jsonb_build_array(jsonb_build_object('tenant_id',$3::text,'bed_id',$4::text))))",
       [solo.contract,solo.r1,solo.tenant,solo.sourceBed]);
-    await db.query('update tenant_contracts set occupancy_id=$1 where id=$1',[solo.contract]);
+    await db.query(`update contract_occupancy_arrangements g set
+      snapshot=g.snapshot||jsonb_build_object('room_id',g.room_id,'room_number',r.room_number,'capacity',r.capacity,
+        'starts_on',c.starts_on,'ends_on',c.ends_on,'total_rent_cents',c.monthly_rent*100,
+        'members',jsonb_build_array(jsonb_build_object('tenant_id',c.tenant_id,'name','Fixture tenant',
+          'bed_id',b.id,'bed_label',b.label,'rent_cents',c.monthly_rent*100))),
+      deposit_terms=jsonb_build_object(c.tenant_id::text,c.security_deposit)
+      from tenant_contracts c,bed_spaces b,rooms r
+      where g.id=$1 and c.id=$1 and b.id=$2 and r.id=g.room_id`,[solo.contract,solo.sourceBed]);
+    await db.query('update tenant_contracts set occupancy_id=$1,occupancy_snapshot=(select snapshot from contract_occupancy_arrangements where id=$1) where id=$1',[solo.contract]);
+    const signedOriginal=(await row('select to_jsonb(c) data from tenant_contracts c where id=$1',[solo.contract])).data;
     const amendment=await propose(solo);await publish(amendment);
     assert.equal((await row('select status from tenant_assignments where id=$1',[solo.assignment])).status,'active');
     await assert.rejects(db.query('select complete_room_transfer($1)',[amendment]),/Every required/);
@@ -252,6 +264,66 @@ try{
     await actor(owner,'owner');await db.query('select complete_room_transfer($1)',[amendment]);
     assert.equal((await row("select bed_space_id from tenant_assignments where tenant_id=$1 and status='active'",[solo.tenant])).bed_space_id,solo.destination);
     assert.equal((await transfer(amendment)).status,'completed');
+    // Reproduce a completed move from before the corrective migration.
+    assert.equal((await row('select room_id from contract_occupancy_arrangements where id=$1',[solo.contract])).room_id,solo.r1);
+    const renewalSql=source('202610190006_occupancy_contract_renewals.sql');
+    const helperStart=renewalSql.indexOf('create or replace function public.renewal_occupancy_snapshot(');
+    await db.exec(renewalSql.slice(helperStart,renewalSql.indexOf('$$;',helperStart)+3));
+    await db.exec(source('202610190007_preserve_solo_occupancy_on_transfer.sql'));
+    await db.exec('create trigger aa_contract_occupancy_terms before insert or update or delete on tenant_contracts for each row execute function guard_contract_occupancy_terms()');
+    for(const name of ['guard_occupancy_bed_metadata','guard_occupancy_room_metadata']) {
+      const metadataSql=source(name==='guard_occupancy_bed_metadata' ? '202610130002_contract_occupancy_stabilization.sql' : '202610130001_contract_room_occupancy.sql');
+      const start=metadataSql.indexOf(`create ${name==='guard_occupancy_bed_metadata' ? 'or replace ' : ''}function public.${name}(`);
+      await db.exec(metadataSql.slice(start,metadataSql.indexOf('end $$;',start)+8));
+    }
+    await db.exec(`create trigger contract_occupancy_bed_metadata before update or delete on bed_spaces for each row execute function guard_occupancy_bed_metadata();
+      create trigger contract_occupancy_room_metadata before update on rooms for each row execute function guard_occupancy_room_metadata();`);
+    assert.deepEqual((await row('select to_jsonb(c) data from tenant_contracts c where id=$1',[solo.contract])).data,signedOriginal);
+    const moved=await row('select * from contract_occupancy_arrangements where id=$1',[solo.contract]);
+    assert.equal(moved.room_id,solo.r2);
+    assert.equal(moved.snapshot.mode,'solo');
+    assert.equal(moved.snapshot.members[0].bed_id,solo.destination);
+    assert.deepEqual((await row('select get_room_contract_occupancies($1) groups',[solo.r1])).groups,[]);
+    const history=(await row('select get_room_contract_occupancies($1,true) groups',[solo.r1])).groups;
+    assert.equal(history[0].released,true);
+    assert.equal(history[0].members[0].status,'transferred');
+    assert.equal((await row('select get_room_contract_occupancies($1) groups',[solo.r2])).groups[0].mode,'solo');
+    await assert.rejects(db.query('insert into tenant_assignments(tenant_id,bed_space_id) values($1,$2)',[stranger,solo.destination]),/reserved|Conflicting|unique|signed/i);
+    await db.query('select complete_room_transfer($1)',[amendment]);
+    assert.equal((await row('select count(*)::int n from solo_occupancy_relocations')).n,1);
+    await db.query("update tenant_contracts set notes='Signed history retained' where id=$1",[solo.contract]);
+
+    // A later move updates both room cards in the same transaction.
+    const thirdRoom=id(sequence++),thirdBed=id(sequence++);
+    await db.query("insert into rooms(id,room_number,floor,capacity) values($1::uuid,$1::text,'3',4)",[thirdRoom]);
+    await db.query("insert into bed_spaces(id,room_id,label) values($1,$2,'Bed C')",[thirdBed,thirdRoom]);
+    const second=await propose({...solo,destination:thirdBed});await publish(second);
+    assert.equal((await row('select room_id from contract_occupancy_arrangements where id=$1',[solo.contract])).room_id,solo.r2);
+    await actor(solo.tenant,'tenant');await sign(second,'tenant');
+    await actor(owner,'owner');await verify(second);await sign(second,'lessor');
+    await db.query('select complete_room_transfer($1)',[second]);
+    assert.equal((await row('select room_id from contract_occupancy_arrangements where id=$1',[solo.contract])).room_id,thirdRoom);
+    assert.deepEqual((await row('select get_room_contract_occupancies($1) groups',[solo.r2])).groups,[]);
+    assert.equal((await row('select count(*)::int n from solo_occupancy_relocations')).n,2);
+    assert.deepEqual((await row('select occupancy_snapshot from tenant_contracts where id=$1',[solo.contract])).occupancy_snapshot,signedOriginal.occupancy_snapshot);
+    await actor(caretaker,'caretaker');
+    const redacted=(await row('select get_room_contract_occupancies($1) groups',[thirdRoom])).groups[0];
+    assert.equal(redacted.total_rent_cents,undefined);
+    assert.equal(redacted.members[0].rent_cents,undefined);
+    await db.exec('set role authenticated');
+    await assert.rejects(db.query('select relocate_completed_solo_occupancy($1)',[second]),/permission denied/);
+    await assert.rejects(db.query('select * from solo_occupancy_relocations'),/permission denied/);
+    await db.exec('reset role');await actor(owner,'owner');
+    const occupiedRoom=id(sequence++),occupiedBed=id(sequence++),availableBed=id(sequence++);
+    await db.query("insert into rooms(id,room_number,floor,capacity) values($1::uuid,$1::text,'4',4)",[occupiedRoom]);
+    await db.query("insert into bed_spaces(id,room_id,label) values($1,$3,'Bed A'),($2,$3,'Bed B')",[occupiedBed,availableBed,occupiedRoom]);
+    await db.query('insert into tenant_assignments(tenant_id,bed_space_id) values($1,$2)',[stranger,occupiedBed]);
+    await assert.rejects(propose({...solo,destination:availableBed}),/empty destination room/);
+    assert.equal((await row('select status from bed_spaces where id=$1',[availableBed])).status,'available');
+    const next=(await row('select renew_tenant_contract($1,(select ends_on+1 from tenant_contracts where id=$1),(select ends_on+366 from tenant_contracts where id=$1),3200,null) id',[solo.contract])).id;
+    const renewal=await row('select * from tenant_contracts where id=$1',[next]);
+    assert.equal(renewal.occupancy_snapshot.room_id,thirdRoom);
+    assert.equal(renewal.occupancy_snapshot.members[0].bed_id,thirdBed);
   });
   console.log(`${passed} room transfer PostgreSQL checks passed.`);
 }catch(e){console.error(e.message,e.where??'',e.query??'');process.exitCode=1;}
