@@ -783,10 +783,10 @@ class _OwnerProfileContent extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           CarmelitaCard(
-            padding: const EdgeInsets.all(22),
+            padding: const EdgeInsets.all(14),
             child: Row(children: [
               CircleAvatar(
-                radius: 32,
+                radius: 27,
                 backgroundColor: const Color(0xFF627FA8).withValues(alpha: .10),
                 foregroundColor: const Color(0xFF627FA8),
                 child: Text(user.name.substring(0, 1),
@@ -2455,7 +2455,7 @@ class _PrivacyPermissionsPageState extends State<PrivacyPermissionsPage> {
     };
 
     return PageFrame(
-      title: 'Privacy',
+      title: 'Privacy and permissions',
       subtitle: 'Control access used by CarmeLink',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
