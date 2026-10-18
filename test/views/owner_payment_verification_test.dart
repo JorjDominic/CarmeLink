@@ -4,6 +4,7 @@ import 'package:carmelitas_dormitory_system/controllers/owner_controller.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/views/owner/owner_pages.dart';
 import 'package:carmelitas_dormitory_system/views/shared/notification_destination.dart';
+import 'package:carmelitas_dormitory_system/views/shared/payment_receipt_history.dart';
 
 void main() {
   final controller = OwnerController.instance;
@@ -132,12 +133,24 @@ void main() {
     await tester.tap(find.text('Verified (1)'));
     await tester.pumpAndSettle();
     expect(find.text('Reviewed payment'), findsOneWidget);
-    expect(find.text('Print receipt'), findsOneWidget);
+    expect(find.text('View receipts'), findsOneWidget);
+    await tester.ensureVisible(find.text('View receipts'));
+    await tester.tap(find.text('View receipts'));
+    await tester.pumpAndSettle();
+    expect(
+        tester
+            .widget<PaymentReceiptHistoryDialog>(
+                find.byType(PaymentReceiptHistoryDialog))
+            .chargeId,
+        'verified');
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Rejected (1)'));
     await tester.tap(find.text('Rejected (1)'));
     await tester.pumpAndSettle();
     expect(find.text('Rejected partial proof'), findsOneWidget);
     expect(find.text('Rejection reason: Blurry receipt'), findsOneWidget);
-    expect(find.text('Print receipt'), findsOneWidget);
+    expect(find.text('View receipts'), findsOneWidget);
     expect(find.text('Confirm payment'), findsNothing);
   });
   testWidgets(

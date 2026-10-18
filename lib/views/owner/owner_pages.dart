@@ -3998,8 +3998,8 @@ class _PaymentReviewCard extends StatelessWidget {
             Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  icon: const Icon(Icons.print_outlined),
-                  label: const Text('Print receipt'),
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: const Text('View receipts'),
                   onPressed: () => showDialog<void>(
                       context: context,
                       builder: (_) =>

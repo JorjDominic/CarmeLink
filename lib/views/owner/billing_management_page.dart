@@ -21,6 +21,7 @@ import '../shared/staff_security_deposits_section.dart';
 import 'utility_charge_cart_dialog.dart';
 import 'payment_collection_settings_card.dart';
 import '../shared/paymongo_sessions_section.dart';
+import '../shared/payment_receipt_history.dart';
 
 class BillingManagementPage extends StatefulWidget {
   const BillingManagementPage({super.key});
@@ -558,6 +559,8 @@ class _BillingChargeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final deposit = payment.isDeposit;
+    final canViewReceipts = !deposit &&
+        (payment.collectedAmount > 0 || payment.testVerifiedAmount > 0);
     final period = payment.periodStart != null && payment.periodEnd != null
         ? '${shortDate(payment.periodStart!)} – ${shortDate(payment.periodEnd!)}'
         : null;
@@ -675,12 +678,22 @@ class _BillingChargeCard extends StatelessWidget {
                 'Covered by security deposit: ₱${payment.depositAppliedAmount.toStringAsFixed(2)}',
                 style: theme.textTheme.bodySmall),
           ],
-          if (onReviewPayment != null || canManage) ...[
+          if (onReviewPayment != null || canManage || canViewReceipts) ...[
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
+                if (canViewReceipts)
+                  OutlinedButton.icon(
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (_) =>
+                          PaymentReceiptHistoryDialog(chargeId: payment.id),
+                    ),
+                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                    label: const Text('View receipts'),
+                  ),
                 if (onReviewPayment != null)
                   FilledButton.tonalIcon(
                     onPressed: onReviewPayment,
