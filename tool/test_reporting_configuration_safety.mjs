@@ -1,3 +1,4 @@
+import {checkReportSubjects} from './confidential_report_subject_checks.mjs';
 // Disposable in-memory PostgreSQL only. No network, keys or Supabase project.
 // npm install --prefix build/phase2_sql_tests --no-audit --no-fund --ignore-scripts @electric-sql/pglite
 // node tool/test_reporting_configuration_safety.mjs
@@ -205,6 +206,7 @@ try {
     const match=await db.query("select label from dormitory_options where group_key='maintenance_category' and label ilike $1",[String.raw`100\% repair\_type\\name`]);
     assert.deepEqual(match.rows.map(r=>r.label),[String.raw`100% repair_type\name`]);
   });
+  await checkReportSubjects({db,ids,actor,check});
   console.log(`${passed} reporting configuration PostgreSQL checks passed.`);
 } catch(error) { console.error(error); process.exitCode=1; }
 finally { await db.close(); }
