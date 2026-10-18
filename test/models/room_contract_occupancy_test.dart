@@ -4,6 +4,8 @@ import 'package:carmelitas_dormitory_system/services/room_service.dart';
 import 'package:carmelitas_dormitory_system/views/owner/room_monitoring_page.dart';
 import 'package:carmelitas_dormitory_system/views/owner/room_occupancy_widgets.dart';
 import 'package:carmelitas_dormitory_system/views/owner/floor_plan_page.dart';
+import 'package:carmelitas_dormitory_system/views/shared/room_transfer_page.dart';
+import 'package:carmelitas_dormitory_system/core/config/app_features.dart';
 
 RoomContractOccupancy group(int count,
         {String status = 'active',
@@ -81,6 +83,64 @@ class _Rooms extends RoomService {
 }
 
 void main() {
+  testWidgets(
+      'current room display excludes expired contracts but keeps history',
+      (tester) async {
+    final members = [
+      for (final status in ['active', 'draft', 'expired', 'terminated'])
+        RoomContractMember(
+            tenantId: status,
+            name: '$status tenant',
+            bedId: 'bed-$status',
+            bedLabel: 'Bed $status',
+            status: status),
+    ];
+    final arrangement = RoomContractOccupancy(
+        id: 'arrangement',
+        roomId: 'room',
+        mode: 'standard_shared',
+        released: false,
+        members: members);
+    final record = room(occupancy: arrangement);
+    expect(record.contractMembers, hasLength(2));
+    expect(record.contractuallyReservedBeds, 2);
+    expect(record.occupancy!.members, hasLength(4));
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: RoomOccupancySummary(room: record)))));
+    expect(find.text('active tenant'), findsOneWidget);
+    expect(find.text('draft tenant'), findsOneWidget);
+    expect(find.text('expired tenant'), findsNothing);
+    expect(find.text('terminated tenant'), findsNothing);
+    final heading = find
+        .ancestor(
+            of: find.text('Contracted occupants'), matching: find.byType(Row))
+        .first;
+    expect(
+        find.descendant(of: heading, matching: find.text('2')), findsOneWidget);
+  });
+  testWidgets(
+      'solo tenant move opens a transfer proposal instead of immediate assignment',
+      (tester) async {
+    final record = room(count: 1, occupancy: group(1));
+    final service = _Rooms([record]);
+    await tester.pumpWidget(MaterialApp(
+        home: RoomDetailPage(initialRoom: record, service: service)));
+    await tester.pumpAndSettle();
+    final bed = find.text('Bed 0').last;
+    await tester.ensureVisible(bed);
+    await tester.tap(bed);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Propose room transfer'));
+    await tester.pumpAndSettle();
+    final page = tester.widget<RoomTransferPage>(find.byType(RoomTransferPage));
+    expect(page.tenantId, 'tenant-0');
+    expect(page.openProposal, isTrue);
+    expect(record.beds.first.occupied, isTrue);
+    expect(find.textContaining('workflow remains blocked'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   test(
       'vacant full archived and uncontracted shared states preserve physical capacity',
       () {
@@ -299,7 +359,7 @@ void main() {
     expect(find.text('Exclusive Shared – Fully Reserved'), findsOneWidget);
     expect(find.text('No beds currently available'), findsOneWidget);
     expect(tester.takeException(), isNull);
-  });
+  }, skip: !AppFeatures.floorPlanEnabled);
   testWidgets(
       'history loads original assignments and released arrangements on demand',
       (tester) async {

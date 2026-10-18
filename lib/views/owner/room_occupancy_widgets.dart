@@ -100,7 +100,7 @@ class RoomOccupancySummary extends StatelessWidget {
                       ?.copyWith(color: colors.onSurfaceVariant))),
         ]),
       ],
-      if (room.contractGroups.isNotEmpty) ...[
+      if (room.contractMembers.isNotEmpty) ...[
         if (showFinancial && group?.totalRentCents != null) ...[
           const SizedBox(height: 14),
           Container(

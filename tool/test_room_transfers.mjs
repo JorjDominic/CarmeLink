@@ -236,6 +236,23 @@ try{
       await assert.rejects(propose(group),/Group occupancy room changes/);
     }
   });
+  await check('solo occupancy moves require notice acknowledgment and verified signatures before changing beds',async()=>{
+    await actor(owner,'owner');
+    const solo=await fixture();
+    await db.query("insert into contract_occupancy_arrangements(id,room_id,snapshot) values($1,$2,jsonb_build_object('mode','solo','members',jsonb_build_array(jsonb_build_object('tenant_id',$3::text,'bed_id',$4::text))))",
+      [solo.contract,solo.r1,solo.tenant,solo.sourceBed]);
+    await db.query('update tenant_contracts set occupancy_id=$1 where id=$1',[solo.contract]);
+    const amendment=await propose(solo);await publish(amendment);
+    assert.equal((await row('select status from tenant_assignments where id=$1',[solo.assignment])).status,'active');
+    await assert.rejects(db.query('select complete_room_transfer($1)',[amendment]),/Every required/);
+    await actor(solo.tenant,'tenant');await sign(amendment,'tenant',null,false);
+    await actor(owner,'owner');await verify(amendment);await sign(amendment,'lessor');
+    await assert.rejects(db.query('select complete_room_transfer($1)',[amendment]),/must review and acknowledge/);
+    await actor(solo.tenant,'tenant');await db.query('select acknowledge_room_transfer_notice($1,$2)',[amendment,hash]);
+    await actor(owner,'owner');await db.query('select complete_room_transfer($1)',[amendment]);
+    assert.equal((await row("select bed_space_id from tenant_assignments where tenant_id=$1 and status='active'",[solo.tenant])).bed_space_id,solo.destination);
+    assert.equal((await transfer(amendment)).status,'completed');
+  });
   console.log(`${passed} room transfer PostgreSQL checks passed.`);
 }catch(e){console.error(e.message,e.where??'',e.query??'');process.exitCode=1;}
 finally{await db.close();}

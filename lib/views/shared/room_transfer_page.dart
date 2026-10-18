@@ -13,8 +13,12 @@ import 'signature_pad_dialog.dart';
 
 class RoomTransferPage extends StatefulWidget {
   const RoomTransferPage(
-      {super.key, this.tenantId, this.service = const RoomTransferService()});
+      {super.key,
+      this.tenantId,
+      this.openProposal = false,
+      this.service = const RoomTransferService()});
   final String? tenantId;
+  final bool openProposal;
   final RoomTransferService service;
   @override
   State<RoomTransferPage> createState() => _RoomTransferPageState();
@@ -32,7 +36,15 @@ class _RoomTransferPageState extends State<RoomTransferPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _load().then((_) {
+      if (mounted &&
+          widget.openProposal &&
+          _owner &&
+          _error == null &&
+          !_items.any((transfer) => transfer.pending)) {
+        _propose();
+      }
+    });
     _subscription = TableRefreshSubscription(
         'room-transfers',
         [

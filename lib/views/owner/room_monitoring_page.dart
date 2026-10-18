@@ -11,8 +11,6 @@ import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/numbered_pagination.dart';
 import '../../services/room_service.dart';
 import '../../services/table_refresh_subscription.dart';
-import '../../services/tenant_service.dart';
-import '../../services/contract_service.dart';
 import '../shared/room_transfer_page.dart';
 import '../shared/staff_quick_panel.dart';
 import '../shared/room_cleaning_pages.dart';
@@ -1013,83 +1011,23 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   Future<void> _moveTenant(BedRecord bed) async {
-    if (room.hasReservation) {
-      showAppSnackBar(context,
-          'Contract occupancy moves require an approved group amendment. This workflow remains blocked.');
-      return;
-    }
     if (bed.tenantId == null) {
       showAppSnackBar(context, 'No tenant assigned to this bed space.');
       return;
     }
-    final tenantName = bed.tenantName ?? 'Tenant';
-
-    try {
-      final contracts = await const ContractService().listContracts();
-      if (!mounted) return;
-      if (contracts.any((contract) =>
-          contract.tenantId == bed.tenantId && contract.isActive)) {
-        await Navigator.of(context).push(MaterialPageRoute<void>(
-            builder: (_) => RoomTransferPage(tenantId: bed.tenantId)));
-        if (mounted) await _refreshRoom();
-        return;
-      }
-      final availableRooms =
-          await const TenantService().loadAvailableBedsGroupedByRoom();
-      if (!mounted) return;
-
-      if (availableRooms.isEmpty) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('No available beds'),
-            content: const Text(
-              'All other beds are currently occupied or unavailable. Please add or free up a bed before moving this tenant.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-        return;
-      }
-
-      final selected = await showModalBottomSheet<AvailableBed>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        builder: (context) => RoomBedSelectorSheet(
-          rooms: availableRooms,
-          tenantName: tenantName,
-        ),
-      );
-
-      if (selected == null || !mounted) return;
-
-      await widget.service.reassignTenantBed(
-        tenantId: bed.tenantId!,
-        newBedId: selected.id,
-      );
-
-      if (mounted) {
-        showAppSnackBar(
-          context,
-          'Moved $tenantName to Room ${selected.room} • ${selected.label}',
-        );
-        await _refreshRoom();
-      }
-    } catch (error) {
-      if (mounted) {
-        showAppSnackBar(context, tenantAssignmentError(error));
-      }
+    if (room.contractGroups.any((group) =>
+        const ['shared', 'exclusive_shared'].contains(group.mode) &&
+        group.members.any((member) =>
+            member.tenantId == bed.tenantId &&
+            (member.status == 'active' || member.status == 'draft')))) {
+      showAppSnackBar(context,
+          'Exclusive Shared room changes require a group amendment because the occupants share the room rent.');
+      return;
     }
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) =>
+            RoomTransferPage(tenantId: bed.tenantId, openProposal: true)));
+    if (mounted) await _refreshRoom();
   }
 
   Future<void> _endAssignment(BedRecord bed) async {
@@ -1140,6 +1078,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
@@ -1203,11 +1142,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                 child: Icon(Icons.swap_horiz_rounded),
               ),
               title: const Text(
-                'Move to another bed',
+                'Propose room transfer',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
               subtitle: const Text(
-                  'Active contracts require a signed room amendment before moving'),
+                  'Send notice and complete the signed amendment before moving'),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

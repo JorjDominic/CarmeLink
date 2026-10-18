@@ -387,8 +387,10 @@ class RoomRecord {
           : [if (occupancy != null) occupancy!])
       .where((g) => !g.released)
       .toList();
-  List<RoomContractMember> get contractMembers =>
-      contractGroups.expand((g) => g.members).toList();
+  List<RoomContractMember> get contractMembers => contractGroups
+      .expand((g) => g.members)
+      .where((m) => m.status == 'active' || m.status == 'draft')
+      .toList();
   bool get hasReservation =>
       reserved || contractGroups.any((g) => g.mode != 'standard_shared');
   int get occupied => beds.where((bed) => bed.occupied).length;

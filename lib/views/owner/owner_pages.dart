@@ -6,6 +6,7 @@ import '../../core/widgets/notice_content.dart';
 import '../../core/widgets/financial_summary.dart';
 import '../../core/widgets/record_details.dart';
 import '../shared/payment_receipt_history.dart';
+import '../shared/room_transfer_page.dart';
 import '../shared/confidentiality_agreements_page.dart';
 import '../../services/confidentiality_agreement_service.dart';
 import '../../services/dormitory_configuration_service.dart';
@@ -1358,6 +1359,12 @@ class _TenantAssignmentManagerState extends State<_TenantAssignmentManager> {
   bool saving = false;
 
   Future<void> _assign() async {
+    if (widget.tenant.assignmentId != null) {
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => RoomTransferPage(
+              tenantId: widget.tenant.id, openProposal: true)));
+      return;
+    }
     setState(() => saving = true);
     try {
       final bedRooms = await service.loadAvailableBedsGroupedByRoom();
@@ -1454,7 +1461,12 @@ class _TenantAssignmentManagerState extends State<_TenantAssignmentManager> {
                   : const Icon(Icons.bed_outlined),
               label: Text(widget.tenant.assignmentId == null
                   ? 'Assign bed'
-                  : 'Move to another bed')),
+                  : 'Propose room transfer')),
+          if (widget.tenant.assignmentId != null) ...[
+            const SizedBox(height: 8),
+            const Text(
+                'Send a transfer notice and complete the signed amendment before changing the room or bed.'),
+          ],
           if (widget.tenant.assignmentId != null)
             TextButton(
                 onPressed: saving ? null : _end,
