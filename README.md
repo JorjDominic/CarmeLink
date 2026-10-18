@@ -1,6 +1,6 @@
 # CarmeLink
 
-> Documentation refreshed September 30, 2026. Use `STATUS.md` for current
+> Documentation refreshed October 18, 2026. Use `STATUS.md` for current
 > readiness and open release gates, and `GEOFENCING_IMPLEMENTATION.md` for the
 > implemented mobile geofencing design and physical-device test matrix.
 
@@ -28,6 +28,15 @@ Current completion, assignments, and release gaps are tracked in
 > See the current priorities in [`STATUS.md`](STATUS.md) and the complete
 > requirements in
 > [`CARMELINK_FULL_SYSTEM_PLAN.md`](CARMELINK_FULL_SYSTEM_PLAN.md).
+
+## October 18 session update
+
+Tenant response/appeal photo evidence, mandatory room-transfer acknowledgment,
+issued receipt records, agreement gates and payment notification/test-label fixes
+are documented in the [session update record](docs/session-updates-2026-10-18.md).
+Specific backend changes are deployed to the sample-data project; updated client
+builds and physical-device acceptance remain. Contract-version deletion and the
+proposed activation checklist have not been implemented in this session.
 
 ## Contents
 

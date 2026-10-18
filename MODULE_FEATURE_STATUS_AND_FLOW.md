@@ -1,5 +1,23 @@
 # CarmeLink Module and Feature Status
 
+## October 18, 2026 module updates
+
+This dated update takes precedence over older module descriptions below for the
+listed features. See [session evidence and deployment limits](docs/session-updates-2026-10-18.md).
+
+| Module | Current session result |
+| --- | --- |
+| Payments | Demo request failures repaired; notification delivery restored; `(TEST)` labels and actual/test collection separation retained. |
+| Receipts | Actual issued number/date/photo register, duplicate protection and void/replacement history; tenant/linked-guardian viewing. |
+| Confidential reports / geofencing | Independent versioned acceptance gates; live retry error fixed. Approved agreement publication still required. |
+| Conduct responses / appeals | Tenant photo attachments implemented in a private bucket; staff-only evidence remains private. |
+| Room transfers | Persistent notices plus tenant-only, exact-amendment acknowledgment required before completion; verified signatures remain required. |
+| Contract versions / activation | Proposed only; current behavior and dependencies still require inspection before changes. |
+
+Client builds and physical-device verification remain outstanding. Historical
+assessment percentages and test counts below have not been recomputed.
+
+
 > October 3, 2026 branch update: September 30 geofencing is retained with
 > selectively restored guardian requests, UI improvements and separate
 > location-off alerts. See [branch changes and validation](OCTOBER_ADDITIONS_ON_SEPTEMBER_BASELINE.md).

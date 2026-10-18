@@ -24,3 +24,9 @@ Attached photos remain protected even when their receipt is voided.
 
 Validation: `node tool/test_issued_payment_receipts.mjs`, Flutter receipt register
 and history widget tests, and `_shared/cloudinary_test.ts` Deno tests.
+
+Deployment update - October 18, 2026: migration `202610180004` was applied to the
+connected sample-data project, and both media functions were redeployed. Live
+receipt issuance/voiding validation was rolled back, leaving no diagnostic receipt
+records. Source was pushed in `9ef871c`; client builds and physical-device photo/
+printing checks remain. See [the session record](session-updates-2026-10-18.md).

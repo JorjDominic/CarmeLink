@@ -1,5 +1,14 @@
 # Conduct investigation and confidentiality validation
 
+> October 18 follow-up: this report retains its October 16 scope and results.
+> Tenant photo attachments have since been implemented for responses and appeals;
+> see [tenant evidence](tenant-conduct-evidence.md). Agreement access now uses
+> mandatory module gates; see [agreement workflow](module-agreement-workflow.md).
+> The earlier tenant-attachment and optional-access limitations below describe
+> the historical implementation, not the current source. Physical-device checks
+> and approved agreement wording remain outstanding.
+
+
 Date: 2026-10-16. Branch: `main`. Implementation and database validation were local only. Changes are committed separately at the client's subsequent request; no pushes, deployment, linked-project resets or production writes performed for this work. Three existing room/contract commits were already ahead of `origin/main` before these commits.
 
 ## Task status
@@ -20,7 +29,7 @@ Date: 2026-10-16. Branch: `main`. Implementation and database validation were lo
 | 12. Database/migrations | COMPLETED AND TESTED | Two additive migrations tested in disposable PGlite and standalone PostgreSQL. Legacy cases/history/evidence retained; no inferred historical confirmations. Full Supabase migration-chain and Storage service compatibility require staging validation. |
 | 13. Regression | COMPLETED AND TESTED | Formatting, analyzer, relevant Flutter tests, isolated SQL tests and independent PostgreSQL concurrency tests run. Exact commands and limits below. |
 
-Tenant image attachments are **NOT IMPLEMENTED**: the existing tenant explanation and appeal workflows support text/supporting information. The existing evidence bucket is staff-only. It was not opened to tenants or guardians; a separately approved upload/access design is needed before adding tenant files.
+At the October 16 assessment, tenant image attachments were **NOT IMPLEMENTED**: the existing tenant explanation and appeal workflows support text/supporting information. The existing evidence bucket is staff-only. It was not opened to tenants or guardians; a separately approved upload/access design is needed before adding tenant files.
 
 ## Existing implementation and permission audit
 

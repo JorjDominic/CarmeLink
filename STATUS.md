@@ -1,9 +1,38 @@
 # CarmeLink Living Status and Gap Tracker
 
-> **Authoritative project status — October 9, 2026.** Historical progress,
+> **Authoritative project status — October 18, 2026.** Historical progress,
 > completion-audit, and Markdown-reconciliation trackers were consolidated here
 > to prevent contradictory readiness claims. Repository implementation is not
 > equivalent to deployed-backend or physical-device proof.
+
+## October 18, 2026 session updates
+
+- See [the session update record](docs/session-updates-2026-10-18.md) for completed
+  changes, pushed commits, specific live deployments and validation limits.
+- Payment request loading/check failures were repaired for the sample-only demo
+  environment. Manual-payment notification delivery was restored; historical
+  pushes stayed suppressed while inbox records were retained. Payment test labels
+  now use `(TEST)` and sandbox credits remain excluded from actual collections.
+- Agreement gates for confidential reports and geofencing are deployed. The owner
+  must publish approved wording for tenants/guardians before participants can accept.
+- [Issued receipts](docs/issued-payment-receipts.md) support actual receipt numbers,
+  optional photos, duplicates prevention and void/replacement history.
+- [Tenant evidence](docs/tenant-conduct-evidence.md) is implemented for responses
+  and appeals: private photos, captions, atomic submission and immutable history.
+- [Room transfer notices](docs/mandatory-room-transfer-notice.md) remain visible
+  on Home/My Room; the moving tenant's version-bound acknowledgment is mandatory
+  before completion, alongside the existing verified signatures and other checks.
+- Migrations `202610180001` through `202610180006` and the relevant push/media functions
+  are deployed to the sample-data project. Focused SQL, Flutter, PDF and media
+  checks passed; this is not a new full-suite or production acceptance claim.
+- Updated client builds, approved agreement wording, real-device media/signature/
+  notification checks and broader production release gates remain outstanding.
+- Contract-version deletion and document-complete owner activation were discussed
+  only; no implementation or contract-code audit was performed for those proposals.
+
+Earlier dated sections below describe their historical assessment state. The
+October 9 report-push and PayMongo test-configuration blockers were subsequently
+addressed as described above; physical-device and production gates remain.
 
 ## October 9, 2026 full-system QA
 

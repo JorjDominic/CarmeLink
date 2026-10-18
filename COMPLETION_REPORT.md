@@ -1,5 +1,13 @@
 # CarmeLink completion assessment
 
+> October 18, 2026 update: this document retains its original assessment below.
+> Today's completed features, focused checks, specific backend deployments and
+> pending release work are recorded in the [session update](docs/session-updates-2026-10-18.md)
+> and canonical [status tracker](STATUS.md). No new overall completion percentage
+> or production sign-off was calculated. Contract-version/activation suggestions
+> remain proposed work.
+
+
 Assessment date: October 4, 2026 (Asia/Manila).
 Source baseline: `9d81002`, branch `geofencing-main-new`.
 

@@ -1,5 +1,16 @@
 # Notification coverage audit — 2026-10-07
 
+> October 18 follow-up: payment notification delivery was restored, old queued
+> phone pushes were suppressed while retaining inbox alerts, and test labels now
+> use `(TEST)`. Tenant response evidence reuses the saved-case alert; appeal
+> submissions notify staff transactionally. Room-transfer proposal notices retain
+> their tenant/linked-guardian destinations; the new mandatory acknowledgment is
+> a completion safeguard, not proof of phone delivery. See [session results](docs/session-updates-2026-10-18.md),
+> [payment delivery](docs/manual-payment-notifications.md), [tenant evidence](docs/tenant-conduct-evidence.md)
+> and [transfer notices](docs/mandatory-room-transfer-notice.md). The dated audit
+> below remains historical; device delivery is not assumed.
+
+
 This verifies repository wiring and local regression tests, not live FCM delivery.
 No live notifications were sent. No database or Edge Function was deployed.
 

@@ -17,8 +17,13 @@ Guardian and witness requirements are copied from the original contract.
 A designated linked guardian can sign electronically; the owner can also
 record and verify an actual guardian or witness signed image with their name.
 
-Once every required signature is verified and the agreed date arrives, the
-owner explicitly confirms the physical move. The database ends the old
+The moving tenant must also review the current amendment PDF and explicitly
+acknowledge the notice. This records the tenant, server time and exact PDF hash;
+staff and guardians cannot acknowledge on the tenant's behalf. Pending published
+transfers remain visible on the tenant dashboard and My Room page.
+
+Once the tenant has acknowledged, every required signature is verified and the
+agreed date arrives, the owner explicitly confirms the physical move. The database ends the old
 assignment and creates the new assignment atomically. Confirmation retries
 do not create duplicate assignments. The original signed lease and earlier
 amendments remain available; subsequent transfers use the current assignment.
@@ -48,6 +53,15 @@ leaves a resumable draft with **Generate amendment & send notice** and
 - Owners create, publish, review, cancel and confirm. Caretakers can read;
   tenants and currently linked guardians can read relevant records. Direct
   writes to workflow tables are revoked; authenticated RPCs enforce each role.
+
+## October 18 mandatory notice update
+
+Migration `202610180006_room_transfer_notice_acknowledgment.sql` is deployed to
+the sample-data project. Backend completion now requires the moving tenant's
+version-bound acknowledgment in addition to the existing signature and assignment
+guards. Existing completed transfers remain unchanged. Updated client builds and
+physical-device verification remain. See [the notice workflow](../docs/mandatory-room-transfer-notice.md)
+and [session results](../docs/session-updates-2026-10-18.md).
 
 ## Validation and deployment
 
