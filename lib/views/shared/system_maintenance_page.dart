@@ -138,6 +138,7 @@ class _SystemMaintenancePageState extends State<SystemMaintenancePage> {
               child: SizedBox.shrink())
           : PageFrame(
               title: 'System maintenance',
+              maxWidth: 1120,
               subtitle:
                   'Administration, availability and configuration recovery',
               onRefresh: () async {
@@ -146,7 +147,7 @@ class _SystemMaintenancePageState extends State<SystemMaintenancePage> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(spacing: 8, runSpacing: 8, children: [
+                    Wrap(spacing: 12, runSpacing: 12, children: [
                       OutlinedButton(
                           onPressed: () => open(const AccountManagementPage()),
                           child: const Text('User accounts')),
@@ -167,18 +168,22 @@ class _SystemMaintenancePageState extends State<SystemMaintenancePage> {
                     if (settings != null) ...[
                       Text(
                           'Maintenance mode: ${settings!['enabled'] == true ? 'On' : 'Off'}',
-                          style: Theme.of(context).textTheme.titleMedium),
+                          style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 10),
                       const Text(
                           'Pauses tenant and guardian access in the updated app. Staff retain access. Existing integrations and older app versions are not suspended.'),
+                      const SizedBox(height: 24),
                       TextField(
                           controller: message,
                           readOnly: !owner || busy,
                           maxLength: 500,
                           maxLines: 3,
                           decoration: const InputDecoration(
-                              labelText: 'Maintenance message')),
+                              labelText: 'Maintenance message',
+                              alignLabelWithHint: true)),
+                      const SizedBox(height: 16),
                       if (owner)
-                        Wrap(spacing: 8, runSpacing: 8, children: [
+                        Wrap(spacing: 12, runSpacing: 12, children: [
                           OutlinedButton(
                               onPressed: busy
                                   ? null
@@ -196,11 +201,13 @@ class _SystemMaintenancePageState extends State<SystemMaintenancePage> {
                         ]),
                     ] else if (error == null)
                       const LinearProgressIndicator(),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 32),
                     if (owner) ...[
                       const SectionTitle('Configuration backups'),
+                      const SizedBox(height: 10),
                       const Text(
                           'Saved snapshots cover custom dormitory options only. Restore uses the saved server snapshot; downloaded JSON is an export. Full database, account and file recovery uses the hosting platform backup tools.'),
+                      const SizedBox(height: 16),
                       FilledButton(
                           onPressed: busy
                               ? null
@@ -247,10 +254,12 @@ class _SystemMaintenancePageState extends State<SystemMaintenancePage> {
                                       child: const Text('Restore')),
                                 ])),
                     ],
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 32),
                     const SectionTitle('System maintenance audit'),
+                    const SizedBox(height: 10),
                     const Text(
                         'Latest 100 maintenance and configuration backup actions.'),
+                    const SizedBox(height: 16),
                     if (audit.isEmpty) const Text('No actions recorded.'),
                     for (final event in audit)
                       Padding(

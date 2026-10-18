@@ -9730,7 +9730,9 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
         );
       }
       final deepLinked = _deepLinkedConversation;
-      if (deepLinked != null) {
+      if (deepLinked != null &&
+          (MediaQuery.sizeOf(context).width < 900 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.3)) {
         return OwnerConversationPage(record: deepLinked);
       }
     }
@@ -9764,6 +9766,13 @@ class _OwnerMessagingPageState extends State<OwnerMessagingPage> {
                 const SizedBox(height: 12),
               ],
               ChatWorkspace(
+                initialThread: _deepLinkedConversation == null
+                    ? null
+                    : OwnerConversationPage(
+                        key: ValueKey('inbox-' + _deepLinkedConversation!.id),
+                        record: _deepLinkedConversation,
+                        embedded: true,
+                      ),
                 contactsBuilder: (select, selectedKey) => Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [

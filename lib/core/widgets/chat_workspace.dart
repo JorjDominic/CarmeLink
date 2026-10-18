@@ -6,7 +6,9 @@ import 'common_widgets.dart';
 /// Desktop selection is local UI state. Existing conversation widgets retain
 /// responsibility for opening, sending, subscriptions and disposal.
 class ChatWorkspace extends StatefulWidget {
-  const ChatWorkspace({required this.contactsBuilder, super.key});
+  const ChatWorkspace(
+      {required this.contactsBuilder, this.initialThread, super.key});
+  final Widget? initialThread;
   final Widget Function(ValueChanged<Widget>? select, Key? selectedKey)
       contactsBuilder;
 
@@ -18,6 +20,13 @@ class _ChatWorkspaceState extends State<ChatWorkspace> {
   Widget? _thread;
   Key? _selectedKey;
   bool _switching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _thread = widget.initialThread;
+    _selectedKey = _thread?.key;
+  }
 
   Future<void> _select(Widget thread) async {
     final messaging = MessagingController.instance;
