@@ -46,3 +46,8 @@ targeted analysis. Full app/widget walkthrough remains blocked by existing
 unrelated shared-screen compile errors (missing feedback service and mismatched
 notification parameters). Device verification, full Supabase migration replay
 and authenticated report-to-case walkthrough remain release checks.
+
+October 19 repair follow-up: the unrelated shared-screen errors above have since
+been repaired locally. Full analysis now passes, and the previously blocked
+conduct investigation/agreement widget suite passes as part of a 60-test run.
+See [shared-screen and transfer repair](shared-screen-and-room-transfer-repair.md).

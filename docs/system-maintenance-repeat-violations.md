@@ -78,3 +78,8 @@ guardian accounts out when the settings table was absent or unreachable. It now
 leaves access available until maintenance is positively confirmed. Six focused
 widget tests cover both roles, failed/pending checks, polling recovery, confirmed
 maintenance retention and staff/session isolation.
+
+October 19 shared-screen repair follow-up: the older shared-screen compile
+blocker recorded above is resolved locally. Full analysis and the conduct
+investigation/agreement widget suite now pass. See
+[shared-screen and transfer repair](shared-screen-and-room-transfer-repair.md).
