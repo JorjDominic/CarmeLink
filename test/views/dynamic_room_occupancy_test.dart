@@ -232,8 +232,8 @@ void main() {
       await tester.pumpWidget(MaterialApp(
           home: Scaffold(
               body: RoomOccupancySummary(room: room, showFinancial: true))));
-      expect(find.textContaining('PHP 2000.00'), findsOneWidget);
-      expect(find.textContaining('PHP 3300.00'), findsOneWidget);
+      expect(find.text('\u20b12,000.00/month'), findsOneWidget);
+      expect(find.text('\u20b13,300.00/month'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

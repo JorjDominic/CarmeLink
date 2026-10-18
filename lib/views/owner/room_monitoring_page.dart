@@ -694,6 +694,12 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
         children: [
           Row(
             children: [
+              Icon(
+                Icons.meeting_room_outlined,
+                size: 21,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 9),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -778,8 +784,6 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
                 Flexible(
                   child: Text(
                     _formatOccupancy(room),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: badgeColor,
                       fontWeight: FontWeight.w800,
@@ -790,7 +794,10 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
+          Divider(
+              height: 1, color: Theme.of(context).colorScheme.outlineVariant),
+          const SizedBox(height: 10),
           RoomOccupancySummary(
               room: room,
               compact: true,
@@ -869,16 +876,6 @@ class RoomQuickPreview extends StatelessWidget {
               showFinancial: SessionController.instance.currentUser?.role ==
                   UserRole.owner),
           const SizedBox(height: 16),
-          InfoRow(
-            label: 'Occupied beds',
-            value: '${room.occupied} of ${room.capacity}',
-            icon: Icons.bed_outlined,
-          ),
-          InfoRow(
-            label: 'Available beds',
-            value: '${room.physicallyAvailable}',
-            icon: Icons.event_available_outlined,
-          ),
           if (room.description.trim().isNotEmpty)
             InfoRow(
               label: 'Notes',
@@ -1290,28 +1287,6 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               showFinancial: SessionController.instance.currentUser?.role ==
                   UserRole.owner),
           const SizedBox(height: 14),
-          AdaptiveGrid(
-            children: [
-              MetricCard(
-                label: 'Capacity',
-                value: '${room.capacity}',
-                detail: '${room.beds.length} configured beds',
-                icon: Icons.meeting_room_outlined,
-              ),
-              MetricCard(
-                label: 'Occupied',
-                value: '${room.occupied}',
-                detail: 'Active assignments',
-                icon: Icons.bed_outlined,
-              ),
-              MetricCard(
-                label: 'Available',
-                value: '${room.physicallyAvailable}',
-                detail: 'Ready for tenant',
-                icon: Icons.event_available_outlined,
-              ),
-            ],
-          ),
           if (room.description.isNotEmpty) ...[
             const SizedBox(height: 14),
             CarmelitaCard(
