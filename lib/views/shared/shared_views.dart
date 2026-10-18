@@ -703,7 +703,9 @@ class ProfilePage extends StatelessWidget {
     return PageFrame(
       title: 'Profile',
       subtitle: 'Personal and contact information',
-      maxWidth: 720,
+      maxWidth: user.role == UserRole.owner || user.role == UserRole.caretaker
+          ? 1000
+          : 720,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         user.role == UserRole.tenant
             ? _TenantProfileContent(user: user)
@@ -756,7 +758,7 @@ class _OwnerProfileContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             '${roleLabel.toUpperCase()} PROFILE',
@@ -769,10 +771,10 @@ class _OwnerProfileContent extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           CarmelitaCard(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(22),
             child: Row(children: [
               CircleAvatar(
-                radius: 27,
+                radius: 32,
                 backgroundColor: const Color(0xFF627FA8).withValues(alpha: .10),
                 foregroundColor: const Color(0xFF627FA8),
                 child: Text(user.name.substring(0, 1),
@@ -801,32 +803,68 @@ class _OwnerProfileContent extends StatelessWidget {
           const SizedBox(height: 20),
           const SectionTitle('Account information'),
           const SizedBox(height: 10),
-          _TenantProfileRow(
-              icon: Icons.person_outline,
-              color: const Color(0xFF56886B),
-              label: 'Full name',
-              value: user.name),
-          const SizedBox(height: 8),
-          _TenantProfileRow(
-              icon: Icons.mail_outline,
-              color: const Color(0xFF627FA8),
-              label: 'Email',
-              value: user.email),
-          const SizedBox(height: 8),
-          _TenantProfileRow(
-              icon: Icons.phone_outlined,
-              color: const Color(0xFF7D70A0),
-              label: 'Phone',
-              value: user.phone),
-          const SizedBox(height: 8),
-          _TenantProfileRow(
-              icon: Icons.admin_panel_settings_outlined,
-              color: const Color(0xFFB47A52),
-              label: 'Access level',
-              value: user.role == UserRole.owner
-                  ? 'Full dormitory administration'
-                  : 'Dormitory operations'),
-          const SizedBox(height: 20),
+          CarmelitaCard(
+            child: LayoutBuilder(builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 560 ? 2 : 1;
+              final width =
+                  (constraints.maxWidth - (columns - 1) * 24) / columns;
+              return Wrap(spacing: 24, runSpacing: 20, children: [
+                for (final detail in <(String, String, IconData)>[
+                  ('Full name', user.name, Icons.person_outline),
+                  ('Email', user.email, Icons.mail_outline),
+                  ('Phone', user.phone, Icons.phone_outlined),
+                  (
+                    'Access level',
+                    user.role == UserRole.owner
+                        ? 'Full dormitory administration'
+                        : 'Dormitory operations',
+                    Icons.admin_panel_settings_outlined
+                  ),
+                ])
+                  SizedBox(
+                      width: width,
+                      child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                                padding: const EdgeInsets.all(9),
+                                decoration: BoxDecoration(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary
+                                        .withValues(alpha: .07),
+                                    borderRadius: BorderRadius.circular(10)),
+                                child: Icon(detail.$3,
+                                    size: 20,
+                                    color:
+                                        Theme.of(context).colorScheme.primary)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(detail.$1,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelMedium
+                                          ?.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant)),
+                                  const SizedBox(height: 4),
+                                  Text(detail.$2,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                              fontWeight: FontWeight.w600)),
+                                ])),
+                          ])),
+              ]);
+            }),
+          ),
+          const SizedBox(height: 24),
           const SectionTitle('Tenancy operations'),
           const SizedBox(height: 10),
           CarmelitaCard(
