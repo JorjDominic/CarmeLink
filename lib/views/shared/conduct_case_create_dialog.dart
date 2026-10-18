@@ -36,6 +36,7 @@ class _ConductCaseCreateDialogState extends State<ConductCaseCreateDialog> {
   DateTime _incidentAt = DateTime.now();
   bool _saving = false;
   bool _loadingSources = false;
+  int _sourceRequest = 0;
   String? _sourceError;
   List<ConductSourceOption> _sourceOptions = const [];
 
@@ -63,7 +64,9 @@ class _ConductCaseCreateDialogState extends State<ConductCaseCreateDialog> {
   bool get _sourceCanLink => _source != 'manual' && _source != 'other';
 
   Future<void> _loadSourceOptions() async {
+    final request = ++_sourceRequest;
     final tenantId = _tenantId;
+    final source = _source;
     if (!_sourceCanLink || tenantId == null || tenantId.isEmpty) {
       if (mounted) {
         setState(() {
@@ -84,15 +87,21 @@ class _ConductCaseCreateDialogState extends State<ConductCaseCreateDialog> {
     try {
       final items = await widget.service.listSourceOptions(
         tenantId: tenantId,
-        sourceModule: _source,
+        sourceModule: source,
       );
-      if (!mounted) return;
+      if (!mounted ||
+          request != _sourceRequest ||
+          tenantId != _tenantId ||
+          source != _source) return;
       setState(() {
         _sourceOptions = items;
         _loadingSources = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted ||
+          request != _sourceRequest ||
+          tenantId != _tenantId ||
+          source != _source) return;
       setState(() {
         _loadingSources = false;
         _sourceError = conductCaseError(error);
@@ -351,6 +360,9 @@ class _ConductCaseCreateDialogState extends State<ConductCaseCreateDialog> {
                       ),
                     ),
                   ],
+                  if (_source == 'confidential_report')
+                    const Text(
+                        'Only reports naming this tenant are offered. Reporter identity and the original report stay restricted. Describe the allegation separately for the case.'),
                   if (_sourceCanLink) ...[
                     const SizedBox(height: 10),
                     if (_loadingSources)

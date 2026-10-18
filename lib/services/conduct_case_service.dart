@@ -400,18 +400,14 @@ class ConductCaseService {
 
     switch (sourceModule) {
       case 'confidential_report':
-        final rows = await _client
-            .from('confidential_reports')
-            .select('id, category, summary, status, created_at')
-            .eq('tenant_id', tenantId)
-            .order('created_at', ascending: false)
-            .limit(30);
-        return finish(rows.map<ConductSourceOption>((row) {
-          final summary = row['summary']?.toString().trim() ?? '';
+        final rows = await _client.rpc('list_conduct_confidential_sources',
+            params: {'p_tenant_id': tenantId}) as List;
+        return finish(rows.map<ConductSourceOption>((raw) {
+          final row = Map<String, dynamic>.from(raw as Map);
           return ConductSourceOption(
             id: row['id'] as String,
-            title: 'Confidential report • ${humanize(row['category'])}',
-            subtitle: summary.isEmpty ? humanize(row['status']) : summary,
+            title: 'Confidential report: ${humanize(row['category'])}',
+            subtitle: 'Report concerning the selected tenant',
             occurredAt: parseDate(row['created_at']),
           );
         }).toList());

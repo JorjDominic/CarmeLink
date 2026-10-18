@@ -8404,6 +8404,27 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
     super.dispose();
   }
 
+  Future<void> _openReportedTenant(ConcernReport report) async {
+    try {
+      final tenants = await const TenantService()
+          .loadTenants(forceRefresh: true, includeContractStatus: true);
+      if (!mounted) return;
+      final tenant = tenants
+          .where((tenant) => tenant.id == report.reportedTenantId)
+          .firstOrNull;
+      if (tenant == null) {
+        showAppSnackBar(context, 'This tenant record is unavailable.');
+        return;
+      }
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => TenantDetailsPage(tenant: tenant)));
+    } catch (_) {
+      if (mounted)
+        showAppSnackBar(
+            context, 'Unable to open the tenant record. Please retry.');
+    }
+  }
+
   Future<void> _review(ConcernReport report, String status) async {
     final action = ConfidentialReviewAction.forStatus(status);
     final notes = TextEditingController(text: report.responseNotes);
@@ -8536,12 +8557,26 @@ class _ConfidentialReportsPageState extends State<ConfidentialReportsPage> {
                                         ('Report Type', report.category),
                                         ('Reported by', report.tenantName),
                                         (
+                                          'Tenant involved',
+                                          report.reportedTenantName ??
+                                              'Not specified'
+                                        ),
+                                        (
                                           'Submitted',
                                           shortDate(report.createdAt)
                                         )
                                       ]),
                                     ])),
                             const SizedBox(height: 16),
+                            if (report.reportedTenantId != null)
+                              Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                      onPressed: () =>
+                                          _openReportedTenant(report),
+                                      icon: const Icon(Icons.person_outline),
+                                      label: const Text(
+                                          'Open involved tenant record'))),
                             const SectionTitle('Report Details'),
                             const SizedBox(height: 8),
                             if (report.specificConcern.isNotEmpty) ...[

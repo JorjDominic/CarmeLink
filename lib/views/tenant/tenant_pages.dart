@@ -1,3 +1,5 @@
+import '../shared/report_subject_field.dart';
+import '../../services/report_subject_service.dart';
 import '../../core/widgets/notice_content.dart';
 import '../../core/widgets/record_details.dart';
 import '../shared/pending_room_transfer_notice.dart';
@@ -7485,6 +7487,7 @@ class _ConfidentialConcernContent extends StatefulWidget {
 }
 
 class _ConfidentialConcernPageState extends State<_ConfidentialConcernContent> {
+  ReportSubject? reportedTenant;
   String category = 'Safety concern';
   List<DormitoryOption> reportTypes = [];
   DormitoryOption? selectedType;
@@ -7601,6 +7604,8 @@ class _ConfidentialConcernPageState extends State<_ConfidentialConcernContent> {
                     SelectableText(report.specificConcern),
                     const SizedBox(height: 10),
                   ],
+                  if (report.reportedTenantName != null)
+                    Text('Tenant involved: ${report.reportedTenantName}'),
                   SelectableText(report.summary),
                   ReportAddenda(
                       key: ValueKey(report.id),
@@ -7670,8 +7675,8 @@ class _ConfidentialConcernPageState extends State<_ConfidentialConcernContent> {
                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                 ),
                 subtitle: const Text(
-                  'Your report is stored in a restricted record. In this '
-                  'phase, only you can view your submitted history.',
+                  'Your report is available to you and authorized staff. '
+                  'Selecting another tenant does not give them access to your report.',
                   style: TextStyle(fontSize: 11),
                 ),
               ),
@@ -7715,6 +7720,11 @@ class _ConfidentialConcernPageState extends State<_ConfidentialConcernContent> {
                       hintText: 'Enter the type of concern')),
             ],
             const SizedBox(height: 14),
+            ReportSubjectField(
+                value: reportedTenant,
+                enabled: !saving,
+                onChanged: (value) => setState(() => reportedTenant = value)),
+            const SizedBox(height: 14),
             LabeledField(
               label: 'Details',
               controller: details,
@@ -7754,6 +7764,7 @@ class _ConfidentialConcernPageState extends State<_ConfidentialConcernContent> {
                                 ? specificConcern.text.trim()
                                 : null,
                             summary: summary,
+                            reportedTenantId: reportedTenant?.id,
                           );
                           if (!context.mounted) return;
                           showAppSnackBar(
@@ -7819,6 +7830,9 @@ class _ConfidentialConcernPageState extends State<_ConfidentialConcernContent> {
                                   '${report.specificConcern.isEmpty ? report.summary : '${report.specificConcern}\n${report.summary}'}\n${shortDate(report.createdAt)}',
                               trailing: StatusPill(report.status),
                             ),
+                            if (report.reportedTenantName != null)
+                              Text(
+                                  'Tenant involved: ${report.reportedTenantName}'),
                             ReportAddenda(
                                 key: ValueKey(report.id),
                                 reportId: report.id,

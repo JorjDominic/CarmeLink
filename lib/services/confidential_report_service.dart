@@ -73,6 +73,7 @@ class ConfidentialReportService {
     required String summary,
     String? reportTypeId,
     String? specificConcern,
+    String? reportedTenantId,
   }) async {
     final uid = _requireUserId();
     final row = await _client
@@ -82,6 +83,7 @@ class ConfidentialReportService {
           'category': category.trim().toLowerCase().replaceAll(' ', '_'),
           'summary': summary.trim(),
           if (reportTypeId != null) 'report_type_id': reportTypeId,
+          if (reportedTenantId != null) 'reported_tenant_id': reportedTenantId,
           if (specificConcern != null)
             'specific_concern': specificConcern.trim(),
         })
@@ -132,6 +134,8 @@ class ConfidentialReportService {
     return reviewedConfidentialReport({
       'report_type_label': original.category,
       'specific_concern': original.specificConcern,
+      'reported_tenant_id': original.reportedTenantId,
+      'reported_tenant_name': original.reportedTenantName,
     }, Map<String, dynamic>.from(result as Map));
   }
 

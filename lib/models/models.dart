@@ -793,6 +793,8 @@ class ConcernReport {
     required this.createdAt,
     this.tenantId = '',
     this.tenantName = 'Confidential tenant',
+    this.reportedTenantId,
+    this.reportedTenantName,
     this.responseNotes = '',
     this.specificConcern = '',
     this.reviewedAt,
@@ -806,6 +808,8 @@ class ConcernReport {
   final DateTime createdAt;
   final String tenantId;
   final String tenantName;
+  final String? reportedTenantId;
+  final String? reportedTenantName;
   final String responseNotes;
   final String specificConcern;
   final DateTime? reviewedAt;
@@ -838,6 +842,8 @@ class ConcernReport {
       id: row['id'] as String,
       tenantId: row['tenant_id'] as String? ?? '',
       tenantName: row['tenant_name'] as String? ?? 'Confidential tenant',
+      reportedTenantId: row['reported_tenant_id'] as String?,
+      reportedTenantName: row['reported_tenant_name'] as String?,
       category: category,
       summary: row['summary'] as String? ?? '',
       status: status,
