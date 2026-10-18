@@ -505,11 +505,51 @@ class _StaffMaintenancePageState extends State<StaffMaintenancePage> {
                           const Divider(height: 1),
                           const SizedBox(height: 8),
 
-                          RecordFacts(items: [
-                            ('Reported by', report.tenantName),
-                            ('Location', report.location),
-                            ('Submitted', _formatDate(report.createdAt))
-                          ]),
+                          Table(
+                              columnWidths: const {
+                                0: FlexColumnWidth(1.1),
+                                1: FlexColumnWidth(1.7)
+                              },
+                              defaultVerticalAlignment:
+                                  TableCellVerticalAlignment.top,
+                              children: [
+                                for (final fact in <(String, String)>[
+                                  ('Reported by', report.tenantName),
+                                  ('Location', report.location),
+                                  ('Submitted', _formatDate(report.createdAt))
+                                ])
+                                  TableRow(
+                                      decoration: BoxDecoration(
+                                          border: Border(
+                                              bottom: BorderSide(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .outlineVariant
+                                                      .withValues(alpha: .5)))),
+                                      children: [
+                                        Padding(
+                                            padding: const EdgeInsets.fromLTRB(
+                                                0, 8, 12, 8),
+                                            child: Text(fact.$1,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.copyWith(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurfaceVariant))),
+                                        Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8),
+                                            child: Text(fact.$2,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium
+                                                    ?.copyWith(
+                                                        fontWeight:
+                                                            FontWeight.w600))),
+                                      ]),
+                              ]),
                           const SizedBox(height: 10),
                           Row(children: [
                             if (report.photoPath != null &&

@@ -106,19 +106,67 @@ class _ConfidentialReportHistoryState extends State<ConfidentialReportHistory> {
                         child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              RecordFacts(items: [
-                                ('Recorded by', row['actor_name'].toString()),
-                                (
-                                  'Recorded',
-                                  shortDate(DateTime.parse(
-                                              row['created_at'] as String)
-                                          .toLocal()) +
-                                      ' ' +
-                                      timeText(DateTime.parse(
-                                              row['created_at'] as String)
-                                          .toLocal())
-                                ),
-                              ]),
+                              Table(
+                                  columnWidths: const {
+                                    0: FlexColumnWidth(1.1),
+                                    1: FlexColumnWidth(1.7)
+                                  },
+                                  defaultVerticalAlignment:
+                                      TableCellVerticalAlignment.top,
+                                  children: [
+                                    for (final fact in <(String, String)>[
+                                      (
+                                        'Recorded by',
+                                        row['actor_name'].toString()
+                                      ),
+                                      (
+                                        'Recorded',
+                                        shortDate(DateTime.parse(
+                                                    row['created_at'] as String)
+                                                .toLocal()) +
+                                            ' ' +
+                                            timeText(DateTime.parse(
+                                                    row['created_at'] as String)
+                                                .toLocal())
+                                      ),
+                                    ])
+                                      TableRow(
+                                          decoration: BoxDecoration(
+                                              border: Border(
+                                                  bottom: BorderSide(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .outlineVariant
+                                                          .withValues(
+                                                              alpha: .5)))),
+                                          children: [
+                                            Padding(
+                                                padding:
+                                                    const EdgeInsets.fromLTRB(
+                                                        0, 8, 12, 8),
+                                                child: Text(fact.$1,
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .bodySmall
+                                                        ?.copyWith(
+                                                            color: Theme.of(
+                                                                    context)
+                                                                .colorScheme
+                                                                .onSurfaceVariant))),
+                                            Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        vertical: 8),
+                                                child: Text(fact.$2,
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .bodyMedium
+                                                        ?.copyWith(
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w600))),
+                                          ]),
+                                  ]),
                               Text((row['notes'] ?? '').toString()),
                             ]),
                       )),
