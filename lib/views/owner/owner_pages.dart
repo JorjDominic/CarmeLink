@@ -1,3 +1,4 @@
+import '../../core/widgets/dashboard_greeting_header.dart';
 import '../shared/repeat_violation_tenants_page.dart';
 import '../shared/system_maintenance_page.dart';
 import '../../core/widgets/chat_workspace.dart';
@@ -163,10 +164,9 @@ class OwnerDashboardPage extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ElegantHeader(
+              DashboardGreetingHeader(
                 eyebrow:
                     isCaretaker ? 'Caretaker overview' : 'Dormitory overview',
-                title: 'Good afternoon.',
                 subtitle: controller.roomsLoadedOnce
                     ? '${controller.occupiedBeds} of ${controller.totalCapacity} beds are currently occupied.'
                     : controller.roomsLoading

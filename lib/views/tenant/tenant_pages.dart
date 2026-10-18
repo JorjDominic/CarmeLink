@@ -1,3 +1,4 @@
+import '../../core/widgets/dashboard_greeting_header.dart';
 import '../shared/report_subject_field.dart';
 import '../../services/report_subject_service.dart';
 import '../../core/widgets/notice_content.dart';
@@ -109,9 +110,9 @@ class TenantDashboardPage extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ElegantHeader(
+              DashboardGreetingHeader(
                 eyebrow: 'Welcome home',
-                title: 'Good afternoon, $firstName.',
+                name: firstName,
                 subtitle: roomSubtitle,
                 trailing: StatusPill(
                   presenceLabel,
