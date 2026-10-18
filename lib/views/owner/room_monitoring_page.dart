@@ -678,7 +678,11 @@ class _RoomMonitoringPageState extends State<RoomMonitoringPage> {
   }
 
   Widget roomCard(RoomRecord room) {
-    final percent = room.capacity > 0 ? (room.occupied / room.capacity) : 0.0;
+    final percent = room.hasReservation
+        ? 1.0
+        : room.capacity > 0
+            ? (room.occupied / room.capacity)
+            : 0.0;
     final isFull = room.occupied >= room.capacity && room.capacity > 0;
     final badgeColor = isFull ? AppColors.success : AppColors.info;
 
