@@ -179,13 +179,48 @@ void main() {
                   child: RoomOccupancySummary(
                       room: room(count: 2, occupancy: group(3)),
                       showFinancial: true)))));
-      expect(find.textContaining('Assigned tenants: 2'), findsOneWidget);
-      expect(find.textContaining('3 contracted occupant(s)'), findsOneWidget);
-      expect(
-          find.textContaining(
-              'Tenant 2 • Bed 2 • active • Not currently assigned • PHP 2000.00'),
+      // Facts now render labels and values separately. Keep the value scoped
+      // to its own fact so an unrelated "2" cannot satisfy the assertion.
+      final assignedFact = find
+          .ancestor(
+              of: find.text('Assigned tenants'), matching: find.byType(Column))
+          .first;
+      expect(find.text('Assigned tenants'), findsOneWidget);
+      expect(find.descendant(of: assignedFact, matching: find.text('2')),
           findsOneWidget);
-      expect(find.textContaining('Agreed room rental: PHP 6000.00'),
+      final contractedHeading = find
+          .ancestor(
+              of: find.text('Contracted occupants'), matching: find.byType(Row))
+          .first;
+      expect(find.text('Contracted occupants'), findsOneWidget);
+      expect(find.descendant(of: contractedHeading, matching: find.text('3')),
+          findsOneWidget);
+      expect(find.text('Tenant 0'), findsOneWidget);
+      expect(find.text('Tenant 1'), findsOneWidget);
+      expect(find.text('Tenant 2'), findsOneWidget);
+      final departedOccupant = find
+          .ancestor(of: find.text('Tenant 2'), matching: find.byType(Column))
+          .first;
+      for (final detail in [
+        'Bed 2',
+        'active',
+        'Not currently assigned',
+        '\u20b12,000.00/month',
+      ]) {
+        expect(
+            find.descendant(of: departedOccupant, matching: find.text(detail)),
+            findsOneWidget);
+      }
+      expect(find.text('Not currently assigned'), findsOneWidget);
+      final rental = find
+          .ancestor(
+              of: find.text('AGREED ROOM RENTAL'),
+              matching: find.byType(Column))
+          .first;
+      expect(find.text('AGREED ROOM RENTAL'), findsOneWidget);
+      expect(
+          find.descendant(
+              of: rental, matching: find.text('\u20b16,000.00/month')),
           findsOneWidget);
       expect(tester.takeException(), isNull);
     });
