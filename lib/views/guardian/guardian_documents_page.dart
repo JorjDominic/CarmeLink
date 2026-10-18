@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
@@ -103,11 +104,13 @@ class _GuardianDocumentsPageState extends State<GuardianDocumentsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     CarmelitaCard(
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.assignment_outlined),
-                        title: Text(data.contract!.contractNumber),
-                        subtitle: Text('Status: ${data.contract!.status}'),
+                      child: RecordSection(
+                        title: 'Contract record',
+                        icon: Icons.assignment_outlined,
+                        child: RecordFacts(items: [
+                          ('Contract', data.contract!.contractNumber),
+                          ('Status', data.contract!.status),
+                        ]),
                       ),
                     ),
                     const SizedBox(height: 16),

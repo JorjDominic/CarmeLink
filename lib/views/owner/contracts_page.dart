@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -137,6 +138,7 @@ class _ContractsPageState extends State<ContractsPage> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: DropdownButton<RecordListSort>(
+                    isExpanded: true,
                     value: _sort,
                     underline: const SizedBox.shrink(),
                     borderRadius: BorderRadius.circular(14),
@@ -194,31 +196,31 @@ class _ContractsPageState extends State<ContractsPage> {
                         : constraints.maxWidth >= 650
                             ? 2
                             : 1;
-                    return GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: items.length,
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: columns,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        mainAxisExtent: enlargedText ? 590 : 440,
-                      ),
-                      itemBuilder: (_, index) => _ContractCard(
-                        contract: items[index],
-                        onEdit: () => _openEditor(items[index]),
-                        onDelete: () => _delete(items[index]),
-                        onDocuments: () => _openDocuments(items[index]),
-                        onRenew: _canRenew(items[index], controller.contracts)
-                            ? () => _renew(items[index])
-                            : null,
-                        previousContractNumber: controller.contracts
-                            .where((item) =>
-                                item.id == items[index].previousContractId)
-                            .map((item) => item.contractNumber)
-                            .firstOrNull,
-                      ),
-                    );
+                    final effectiveColumns = enlargedText ? 1 : columns;
+                    final width =
+                        (constraints.maxWidth - 12 * (effectiveColumns - 1)) /
+                            effectiveColumns;
+                    return Wrap(spacing: 12, runSpacing: 12, children: [
+                      for (var index = 0; index < items.length; index++)
+                        SizedBox(
+                            width: width,
+                            child: _ContractCard(
+                              contract: items[index],
+                              onEdit: () => _openEditor(items[index]),
+                              onDelete: () => _delete(items[index]),
+                              onDocuments: () => _openDocuments(items[index]),
+                              onRenew:
+                                  _canRenew(items[index], controller.contracts)
+                                      ? () => _renew(items[index])
+                                      : null,
+                              previousContractNumber: controller.contracts
+                                  .where((item) =>
+                                      item.id ==
+                                      items[index].previousContractId)
+                                  .map((item) => item.contractNumber)
+                                  .firstOrNull,
+                            )),
+                    ]);
                   }),
               ],
             ),
@@ -316,19 +318,30 @@ class _ContractCard extends StatelessWidget {
     String money(double value) => '₱${value.toStringAsFixed(2)}';
     return CarmelitaCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(
-              child: Text(contract.tenantName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w800))),
-          StatusPill(contract.status),
-        ]),
-        Text(contract.contractNumber,
-            style: Theme.of(context).textTheme.bodySmall),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: .06),
+              borderRadius: BorderRadius.circular(12)),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(
+                  child: Text(contract.tenantName,
+                      softWrap: true,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800))),
+              StatusPill(contract.status),
+            ]),
+            Text(contract.contractNumber,
+                style: Theme.of(context).textTheme.bodySmall),
+          ]),
+        ),
+        const SizedBox(height: 10),
         if (contract.isRenewal)
           Text('Renews ${previousContractNumber ?? "previous contract"}',
               style: Theme.of(context).textTheme.bodySmall),
@@ -336,20 +349,29 @@ class _ContractCard extends StatelessWidget {
         InfoRow(
             label: 'Term • rent due ${_ordinal(contract.billingDueDay)}',
             value: '${date(contract.startsOn)} – ${date(contract.endsOn)}'),
-        InfoRow(label: 'Monthly rent', value: money(contract.monthlyRent)),
-        InfoRow(label: 'Deposit', value: money(contract.securityDeposit)),
+        RecordSection(
+          title: 'Rental terms',
+          icon: Icons.account_balance_wallet_outlined,
+          child: RecordFacts(items: [
+            ('Monthly rent', money(contract.monthlyRent)),
+            ('Deposit', money(contract.securityDeposit))
+          ]),
+        ),
         const SizedBox(height: 6),
-        Row(children: [
-          const Icon(Icons.verified_user_outlined, size: 17),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              _signatureLabel(contract.signatureStatus),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-        ]),
-        const Spacer(),
+        Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(children: [
+              const Icon(Icons.verified_user_outlined, size: 17),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  _signatureLabel(contract.signatureStatus),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ])),
+        const Divider(height: 16),
+        const SizedBox(height: 16),
         Wrap(alignment: WrapAlignment.end, spacing: 2, children: [
           if (onRenew != null)
             TextButton.icon(
@@ -1272,8 +1294,7 @@ class _DocumentFileRow extends StatelessWidget {
             ]),
             Text(
               document.originalFilename,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              softWrap: true,
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 3),
