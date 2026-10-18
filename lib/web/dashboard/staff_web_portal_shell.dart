@@ -1,3 +1,4 @@
+import '../../views/shared/system_maintenance_page.dart';
 import '../../views/shared/notification_destination.dart';
 import 'dart:async';
 
@@ -200,6 +201,14 @@ abstract final class StaffWebDestinations {
         webGroup: 'Communication',
         webDescription: 'Important contact information',
       ),
+      const AppDestination(
+          label: 'System maintenance',
+          icon: Icons.settings_applications_outlined,
+          selectedIcon: Icons.settings_applications,
+          page: SystemMaintenancePage(),
+          webGroup: 'Administration',
+          webDescription:
+              'System availability, settings and configuration backups'),
       const AppDestination(
         label: 'Accounts',
         icon: Icons.manage_accounts_outlined,

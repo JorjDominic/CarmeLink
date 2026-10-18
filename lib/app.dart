@@ -1,3 +1,4 @@
+import 'views/shared/system_maintenance_gate.dart';
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
@@ -316,7 +317,8 @@ class _CarmelitaBootstrapState extends State<CarmelitaBootstrap> {
           builder: (context, child) => CarmeLinkSurfaceScope(
             surface: CarmeLinkAppSurface.mobileApp,
             child: ConnectivityBannerHost(
-              child: child ?? const SizedBox.shrink(),
+              child: SystemMaintenanceGate(
+                  child: child ?? const SizedBox.shrink()),
             ),
           ),
 

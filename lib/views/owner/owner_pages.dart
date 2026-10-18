@@ -1,3 +1,4 @@
+import '../shared/system_maintenance_page.dart';
 import '../../core/widgets/chat_workspace.dart';
 import '../../core/widgets/workspace_columns.dart';
 import '../../core/widgets/notice_content.dart';
@@ -2200,6 +2201,11 @@ const _operationCategories = [
     Icons.assignment_outlined,
     Color(0xFF7D70A0),
     [
+      _OperationItem(
+          'System maintenance',
+          'Accounts, settings, maintenance mode and configuration backups',
+          Icons.settings_applications_outlined,
+          SystemMaintenancePage()),
       _OperationItem(
           'Report management',
           'Maintenance and confidential reports',
