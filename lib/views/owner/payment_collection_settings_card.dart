@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/record_details.dart';
 import '../../services/payment_collection_settings_service.dart';
 import '../shared/paymongo_payment_page.dart';
 
@@ -134,16 +135,42 @@ class _PaymentCollectionSettingsCardState
               const LinearProgressIndicator(),
             ],
             const SizedBox(height: 12),
-            const Text(
-              'Manual: tenants submit a receipt photo for owner or caretaker review.',
-            ),
-            const Text(
-              'Switching to Manual automatically cancels unpaid QR requests. '
-              'Payments already received remain recorded or available for staff reconciliation.',
-            ),
-            const Text(
-              'Automatic: PayMongo QR Ph confirms supported wallet and bank app payments.',
-            ),
+            LayoutBuilder(builder: (context, bounds) {
+              final columns = bounds.maxWidth >= 680 &&
+                      MediaQuery.textScalerOf(context).scale(1) <= 1.3
+                  ? 2
+                  : 1;
+              return Wrap(spacing: 12, runSpacing: 12, children: [
+                SizedBox(
+                  width: (bounds.maxWidth - 12 * (columns - 1)) / columns,
+                  child: const RecordSection(
+                    title: 'Receipt review',
+                    icon: Icons.upload_file_outlined,
+                    child: Text(
+                        'Manual: tenants submit a receipt photo for owner or caretaker review.'),
+                  ),
+                ),
+                SizedBox(
+                  width: (bounds.maxWidth - 12 * (columns - 1)) / columns,
+                  child: const RecordSection(
+                    title: 'QR Ph payments',
+                    icon: Icons.qr_code_2,
+                    child: Text(
+                        'Automatic: PayMongo QR Ph confirms supported wallet and bank app payments.'),
+                  ),
+                ),
+              ]);
+            }),
+            const SizedBox(height: 12),
+            const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.info_outline, size: 18),
+              SizedBox(width: 8),
+              Expanded(
+                  child: Text(
+                'Switching to Manual automatically cancels unpaid QR requests. '
+                'Payments already received remain recorded or available for staff reconciliation.',
+              )),
+            ]),
             if (settings != null && !settings.paymongoReady) ...[
               const SizedBox(height: 8),
               const Text(

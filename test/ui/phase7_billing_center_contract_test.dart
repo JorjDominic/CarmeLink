@@ -16,7 +16,7 @@ void main() {
       "Key('phase7-payment-verification')",
       'BillingBucket.utilities',
       'BillingBucket.other',
-      'Load more',
+      'NumberedPaginationBar(',
       'Deposit records are shown for history only',
     ]) {
       expect(source.contains(expected), isTrue, reason: 'Missing $expected');

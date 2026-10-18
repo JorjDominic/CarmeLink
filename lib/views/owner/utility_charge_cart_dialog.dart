@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/owner_controller.dart';
@@ -168,6 +169,7 @@ class _UtilityChargeCartDialogState extends State<UtilityChargeCartDialog> {
     final cartTotal = _cart.fold<double>(0, (sum, item) => sum + item.total);
 
     return AlertDialog(
+      scrollable: true,
       insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
       title: const Text('Utility Charge Cart'),
       content: SizedBox(
@@ -334,9 +336,9 @@ class _UtilityChargeCartDialogState extends State<UtilityChargeCartDialog> {
                       ),
                     );
                   }),
-                  Text('Cart total: ₱${cartTotal.toStringAsFixed(2)}',
-                      textAlign: TextAlign.end,
-                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                  RecordFacts(emphasizeFirst: true, items: [
+                    ('Cart total', '\u20b1' + cartTotal.toStringAsFixed(2))
+                  ]),
                 ],
               ],
             ),

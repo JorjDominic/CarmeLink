@@ -1,3 +1,6 @@
+import '../../core/widgets/numbered_pagination.dart';
+import '../../core/widgets/record_details.dart';
+import '../../core/widgets/financial_summary.dart';
 import '../../services/payment_service.dart';
 import 'dart:async';
 
@@ -31,7 +34,7 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
   final _query = TextEditingController();
   BillingBucket _bucket = BillingBucket.all;
   BillingStatusFilter _status = BillingStatusFilter.all;
-  int _visibleCount = 20;
+  int _chargePage = 1;
   bool _refreshing = false;
   bool _showUpcoming = false;
 
@@ -57,7 +60,7 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
   }
 
   void _resetPage() {
-    if (_visibleCount != 20) setState(() => _visibleCount = 20);
+    if (_chargePage != 1) setState(() => _chargePage = 1);
   }
 
   Future<void> _refresh() async {
@@ -133,7 +136,9 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
                     .where((p) => !BillingManagementPolicy.isFutureUnpaid(p))
                     .toList()
                 : matching;
-            final visible = filtered.take(_visibleCount).toList();
+            final pageCount = ((filtered.length + 19) ~/ 20).clamp(1, 1 << 30);
+            final page = _chargePage.clamp(1, pageCount);
+            final visible = filtered.skip((page - 1) * 20).take(20).toList();
             final outstanding =
                 BillingManagementPolicy.outstandingNow(payments);
             final utilities =
@@ -142,45 +147,57 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
                 BillingManagementPolicy.pendingReviewCount(payments);
             final overdue = BillingManagementPolicy.overdueCount(payments);
 
+            final narrowHeader = MediaQuery.sizeOf(context).width < 600;
+            final billingActions = <Widget>[
+              IconButton(
+                  tooltip: 'Send payment due alerts to staff',
+                  icon: const Icon(Icons.notifications_active_outlined),
+                  onPressed: () async {
+                    final count =
+                        await controller.checkAndNotifyDuePayments(force: true);
+                    if (context.mounted)
+                      showAppSnackBar(
+                          context,
+                          count > 0
+                              ? 'Dispatched due date alerts for $count charge(s).'
+                              : 'No payments currently due or overdue.');
+                  }),
+              FilledButton.icon(
+                onPressed: () => showStaffPaymentReceived(context),
+                icon: const Icon(Icons.add_card_outlined),
+                label: const Text('Record payment received'),
+              ),
+              IconButton(
+                tooltip: 'Refresh billing',
+                onPressed: _refreshing ? null : _refresh,
+                icon: _refreshing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded),
+              ),
+            ];
+
             return PageFrame(
               title: 'Billing',
               subtitle:
                   'Rent, utilities, manually approved charges, balances, and payment review.',
               onRefresh: _refresh,
-              actions: [
-                IconButton(
-                    tooltip: 'Send payment due alerts to staff',
-                    icon: const Icon(Icons.notifications_active_outlined),
-                    onPressed: () async {
-                      final count = await controller.checkAndNotifyDuePayments(
-                          force: true);
-                      if (context.mounted)
-                        showAppSnackBar(
-                            context,
-                            count > 0
-                                ? 'Dispatched due date alerts for $count charge(s).'
-                                : 'No payments currently due or overdue.');
-                    }),
-                FilledButton.icon(
-                  onPressed: () => showStaffPaymentReceived(context),
-                  icon: const Icon(Icons.add_card_outlined),
-                  label: const Text('Record payment received'),
-                ),
-                IconButton(
-                  tooltip: 'Refresh billing',
-                  onPressed: _refreshing ? null : _refresh,
-                  icon: _refreshing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.refresh_rounded),
-                ),
-              ],
+              actions: narrowHeader ? null : billingActions,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (narrowHeader) ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: billingActions,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   _BillingSummaryGrid(
                     outstanding: outstanding,
                     utilityOutstanding: utilities,
@@ -213,13 +230,13 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
                     onBucketChanged: (value) {
                       setState(() {
                         _bucket = value;
-                        _visibleCount = 20;
+                        _chargePage = 1;
                       });
                     },
                     onStatusChanged: (value) {
                       setState(() {
                         _status = value;
-                        _visibleCount = 20;
+                        _chargePage = 1;
                       });
                     },
                   ),
@@ -228,7 +245,7 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
                       key: const Key('staff-billing-upcoming-toggle'),
                       onPressed: () => setState(() {
                         _showUpcoming = !_showUpcoming;
-                        _visibleCount = 20;
+                        _chargePage = 1;
                       }),
                       icon: Icon(_showUpcoming
                           ? Icons.expand_less
@@ -262,7 +279,7 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
                     const _BillingEmptyState()
                   else ...[
                     Text(
-                      'Showing ${visible.length} of ${filtered.length} matching charge${filtered.length == 1 ? '' : 's'}',
+                      '${filtered.length} matching charge${filtered.length == 1 ? '' : 's'}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 10),
@@ -279,17 +296,14 @@ class _BillingManagementPageState extends State<BillingManagementPage> {
                       ),
                       const SizedBox(height: 9),
                     ],
-                    if (visible.length < filtered.length)
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () => setState(() => _visibleCount += 20),
-                          icon: const Icon(Icons.expand_more_rounded),
-                          label: Text(
-                            'Load more (${filtered.length - visible.length} remaining)',
-                          ),
-                        ),
-                      ),
+                    NumberedPaginationBar(
+                      currentPage: page,
+                      totalItems: filtered.length,
+                      pageSize: 20,
+                      itemLabel: 'charges',
+                      onPageChanged: (value) =>
+                          setState(() => _chargePage = value),
+                    ),
                   ],
                 ],
               ),
@@ -315,52 +329,37 @@ class _BillingSummaryGrid extends StatelessWidget {
   String _money(double value) => '₱${value.toStringAsFixed(2)}';
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-        builder: (context, constraints) {
-          final columns = constraints.maxWidth >= 900
-              ? 4
-              : constraints.maxWidth >= 520
-                  ? 2
-                  : 1;
-          const spacing = 10.0;
-          final width =
-              (constraints.maxWidth - spacing * (columns - 1)) / columns;
-          final cards = <Widget>[
-            MetricCard(
-              label: 'Outstanding balance',
-              value: _money(outstanding),
-              detail:
-                  'Excludes deposits and future rent; includes issued charges',
-              icon: Icons.account_balance_wallet_outlined,
-            ),
-            MetricCard(
-              label: 'Utilities outstanding',
-              value: _money(utilityOutstanding),
-              detail: 'Electricity, water, internet, and utility',
-              icon: Icons.bolt_outlined,
-            ),
-            MetricCard(
-              label: 'Pending verification',
-              value: '$pendingReview',
-              detail: 'Submitted payments awaiting staff review',
-              icon: Icons.receipt_long_outlined,
-            ),
-            MetricCard(
-              label: 'Overdue charges',
-              value: '$overdue',
-              detail: 'Tenant-payable charges past their due date',
-              icon: Icons.warning_amber_rounded,
-            ),
-          ];
-          return Wrap(
-            spacing: spacing,
-            runSpacing: spacing,
-            children: cards
-                .map((card) => SizedBox(width: width, child: card))
-                .toList(),
-          );
-        },
-      );
+  Widget build(BuildContext context) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const SectionTitle('Billing overview'),
+        const SizedBox(height: 12),
+        FinancialSummary(items: [
+          (
+            'Outstanding balance',
+            _money(outstanding),
+            Icons.account_balance_wallet_outlined,
+            'Excludes deposits and future rent; includes issued charges'
+          ),
+          (
+            'Utilities outstanding',
+            _money(utilityOutstanding),
+            Icons.bolt_outlined,
+            'Electricity, water, internet, and utility'
+          ),
+          (
+            'Pending verification',
+            '$pendingReview',
+            Icons.receipt_long_outlined,
+            'Submitted payments awaiting staff review'
+          ),
+          (
+            'Overdue charges',
+            '$overdue',
+            Icons.warning_amber_rounded,
+            'Tenant-payable charges past their due date'
+          ),
+        ]),
+      ]);
 }
 
 class _BillingActionsCard extends StatelessWidget {
@@ -613,26 +612,15 @@ class _BillingChargeCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 18,
-            runSpacing: 8,
-            children: [
-              _BillingFact(
-                label: 'Charge',
-                value: _money(payment.amount),
-              ),
-              _BillingFact(
-                label: deposit ? 'Payable balance' : 'Balance',
-                value: deposit ? '₱0.00' : _money(payment.outstandingAmount),
-              ),
-              _BillingFact(
-                label: 'Due',
-                value: shortDate(payment.dueDate),
-              ),
-              if (period != null)
-                _BillingFact(label: 'Billing period', value: period),
-            ],
-          ),
+          RecordFacts(emphasizeFirst: true, items: [
+            ('Charge', _money(payment.amount)),
+            (
+              deposit ? 'Payable balance' : 'Balance',
+              deposit ? '\u20b10.00' : _money(payment.outstandingAmount)
+            ),
+            ('Due', shortDate(payment.dueDate)),
+            if (period != null) ('Billing period', period),
+          ]),
           if (deposit) ...[
             const SizedBox(height: 10),
             Text(
@@ -677,31 +665,6 @@ class _BillingChargeCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _BillingFact extends StatelessWidget {
-  const _BillingFact({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 120),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 2),
-            Text(
-              value,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.w800),
-            ),
-          ],
-        ),
-      );
 }
 
 class _BillingEmptyState extends StatelessWidget {
@@ -852,6 +815,7 @@ class _AdditionalChargeDialogState extends State<AdditionalChargeDialog> {
   Widget build(BuildContext context) {
     final tenants = OwnerController.instance.tenants;
     return AlertDialog(
+      scrollable: true,
       title: const Text('Add other charge'),
       content: SizedBox(
         width: 500,
@@ -1070,6 +1034,7 @@ class _BillingChargeActionDialogState
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+        scrollable: true,
         title: Text('Manage ${widget.payment.label}'),
         content: SizedBox(
           width: 440,
