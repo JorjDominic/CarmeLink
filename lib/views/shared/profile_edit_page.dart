@@ -202,14 +202,15 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                       const SizedBox(height: 20),
                       if ({UserRole.tenant, UserRole.guardian}
                           .contains(user?.role)) ...[
-                        OutlinedButton.icon(
-                            onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        const ConfidentialityAgreementsPage())),
-                            icon: const Icon(Icons.privacy_tip_outlined),
-                            label: const Text('Confidentiality agreements')),
+                        if (user?.role == UserRole.tenant)
+                          OutlinedButton.icon(
+                              onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          const ConfidentialityAgreementsPage())),
+                              icon: const Icon(Icons.privacy_tip_outlined),
+                              label: const Text('Confidentiality agreements')),
                         OutlinedButton.icon(
                             onPressed: () => Navigator.push(
                                 context,

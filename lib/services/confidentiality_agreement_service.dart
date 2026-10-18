@@ -6,6 +6,10 @@ enum AgreementModule {
 
   const AgreementModule(this.key, this.title);
   final String key, title;
+
+  bool includesAudience(String? audience) =>
+      audience == 'tenant' ||
+      (this == AgreementModule.geofencing && audience == 'guardian');
 }
 
 class ModuleAgreementStatus {

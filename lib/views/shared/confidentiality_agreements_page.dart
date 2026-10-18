@@ -22,8 +22,8 @@ class _ConfidentialityAgreementsPageState
   int generation = 0;
   bool get owner =>
       SessionController.instance.currentUser?.role == UserRole.owner;
-  bool get participant => {UserRole.tenant, UserRole.guardian}
-      .contains(SessionController.instance.currentUser?.role);
+  bool get participant => widget.service.module
+      .includesAudience(SessionController.instance.currentUser?.role.name);
   @override
   void initState() {
     super.initState();
@@ -46,9 +46,15 @@ class _ConfidentialityAgreementsPageState
           owner ? await widget.service.accounts() : <Map<String, dynamic>>[];
       if (mounted && request == generation)
         setState(() {
-          versions = v;
+          versions = v
+              .where((row) => widget.service.module
+                  .includesAudience(row['audience'] as String?))
+              .toList();
           acceptances = a;
-          accounts = users;
+          accounts = users
+              .where((row) => widget.service.module
+                  .includesAudience(row['role'] as String?))
+              .toList();
           loading = false;
           error = null;
         });
@@ -83,11 +89,13 @@ class _ConfidentialityAgreementsPageState
                             initialValue: audience,
                             decoration: const InputDecoration(
                                 labelText: 'Agreement for'),
-                            items: const [
-                              DropdownMenuItem(
+                            items: [
+                              const DropdownMenuItem(
                                   value: 'tenant', child: Text('Tenant')),
-                              DropdownMenuItem(
-                                  value: 'guardian', child: Text('Guardian'))
+                              if (widget.service.module
+                                  .includesAudience('guardian'))
+                                DropdownMenuItem(
+                                    value: 'guardian', child: Text('Guardian'))
                             ],
                             onChanged: saving
                                 ? null
