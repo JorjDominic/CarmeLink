@@ -1,3 +1,5 @@
+import '../../core/widgets/numbered_pagination.dart';
+import '../../core/widgets/financial_summary.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/common_widgets.dart';
@@ -19,7 +21,7 @@ class _StaffSecurityDepositsSectionState
   late Future<List<SecurityDepositRecord>> _records;
   late final TableRefreshSubscription _subscription;
   String _query = '';
-  int _visible = 6;
+  int _depositPage = 1;
 
   @override
   void initState() {
@@ -91,6 +93,8 @@ class _StaffSecurityDepositsSectionState
                           .toLowerCase()
                           .contains(_query))
                   .toList();
+              final pageCount = ((matched.length + 5) ~/ 6).clamp(1, 1 << 30);
+              final page = _depositPage.clamp(1, pageCount);
               final received =
                   records.fold<double>(0, (sum, r) => sum + r.receivedAmount);
               final held =
@@ -120,8 +124,27 @@ class _StaffSecurityDepositsSectionState
                     ] else if (snapshot.connectionState !=
                         ConnectionState.waiting) ...[
                       const SizedBox(height: 8),
-                      Text(
-                          '${records.length} contracts · Received ₱${received.toStringAsFixed(2)} · Held ₱${held.toStringAsFixed(2)}'),
+                      FinancialSummary(items: [
+                        (
+                          'Confirmed received',
+                          '\u20b1' + received.toStringAsFixed(2),
+                          Icons.savings_outlined,
+                          ''
+                        ),
+                        (
+                          'Held for settlement',
+                          '\u20b1' + held.toStringAsFixed(2),
+                          Icons.lock_outline,
+                          ''
+                        ),
+                        (
+                          'Contracts',
+                          records.length.toString(),
+                          Icons.description_outlined,
+                          ''
+                        ),
+                      ]),
+                      const SizedBox(height: 10),
                       ExpansionTile(
                         key: const ValueKey('staff-security-deposit-list'),
                         tilePadding: EdgeInsets.zero,
@@ -134,7 +157,7 @@ class _StaffSecurityDepositsSectionState
                                   prefixIcon: Icon(Icons.search)),
                               onChanged: (value) => setState(() {
                                     _query = value.trim().toLowerCase();
-                                    _visible = 6;
+                                    _depositPage = 1;
                                   })),
                           if (matched.isEmpty)
                             Padding(
@@ -142,7 +165,8 @@ class _StaffSecurityDepositsSectionState
                                 child: Text(records.isEmpty
                                     ? 'No contract deposits yet.'
                                     : 'No matching deposits.')),
-                          for (final record in matched.take(_visible))
+                          for (final record
+                              in matched.skip((page - 1) * 6).take(6))
                             ListTile(
                               contentPadding: EdgeInsets.zero,
                               title: Text(record.tenantName.isEmpty
@@ -154,12 +178,14 @@ class _StaffSecurityDepositsSectionState
                               trailing: const Icon(Icons.chevron_right),
                               onTap: () => _open(record),
                             ),
-                          if (matched.length > _visible)
-                            TextButton(
-                              onPressed: () => setState(() => _visible += 6),
-                              child: Text(
-                                  'Show more deposits (${matched.length - _visible} remaining)'),
-                            ),
+                          NumberedPaginationBar(
+                            currentPage: page,
+                            totalItems: matched.length,
+                            pageSize: 6,
+                            itemLabel: 'deposits',
+                            onPageChanged: (value) =>
+                                setState(() => _depositPage = value),
+                          ),
                         ],
                       ),
                     ],

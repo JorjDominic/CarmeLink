@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
@@ -72,6 +73,7 @@ class _SecurityDepositCardState extends State<SecurityDepositCard> {
     final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
+              scrollable: true,
               title: const Text('Link historical deposit receipt?'),
               content: Text(
                   'Confirm this receipt belongs to ${record.contractNumber}. '
@@ -140,35 +142,27 @@ class _SecurityDepositCardState extends State<SecurityDepositCard> {
                 StatusPill(record.status),
                 const SizedBox(height: 8),
               ],
-              InfoRow(
-                  label: 'Contract amount',
-                  value: money(record.requiredAmount)),
-              InfoRow(
-                  label: 'Confirmed received',
-                  value: money(record.receivedAmount)),
-              if (!widget.compact &&
-                  !record.settled &&
-                  record.receivedAmount > 0)
-                InfoRow(
-                    label: 'Held for settlement',
-                    value: money(record.heldAmount)),
-              if (record.receivedOn != null)
-                InfoRow(
-                    label: 'Received on',
-                    value:
-                        record.receivedOn!.toIso8601String().substring(0, 10)),
-              if (record.method.isNotEmpty)
-                InfoRow(label: 'Method', value: record.method),
-              if (record.reference.isNotEmpty)
-                InfoRow(label: 'Reference', value: record.reference),
-              if (record.settled) ...[
-                InfoRow(
-                    label: 'Approved deductions',
-                    value: money(record.deductions)),
-                InfoRow(
-                    label: 'Refund recorded',
-                    value: money(record.refundedAmount)),
-              ],
+              const SizedBox(height: 12),
+              RecordFacts(emphasizeFirst: true, items: [
+                ('Contract amount', money(record.requiredAmount)),
+                ('Confirmed received', money(record.receivedAmount)),
+                if (!widget.compact &&
+                    !record.settled &&
+                    record.receivedAmount > 0)
+                  ('Held for settlement', money(record.heldAmount)),
+                if (record.receivedOn != null)
+                  (
+                    'Received on',
+                    record.receivedOn!.toIso8601String().substring(0, 10)
+                  ),
+                if (record.method.isNotEmpty) ('Method', record.method),
+                if (record.reference.isNotEmpty)
+                  ('Reference', record.reference),
+                if (record.settled) ...[
+                  ('Approved deductions', money(record.deductions)),
+                  ('Refund recorded', money(record.refundedAmount)),
+                ],
+              ]),
               const SizedBox(height: 8),
               Text('Separate from bills; settled at move-out.',
                   style: Theme.of(context).textTheme.bodySmall),
@@ -260,6 +254,7 @@ class _DepositReceiptDialogState extends State<_DepositReceiptDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+        scrollable: true,
         title: const Text('Correct deposit receipt'),
         content: SizedBox(
             width: 420,

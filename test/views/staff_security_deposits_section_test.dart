@@ -22,13 +22,24 @@ void main() {
     ))));
     await tester.pumpAndSettle();
     expect(find.text('Security deposits'), findsOneWidget);
-    expect(find.textContaining('Received ₱16000.00 · Held ₱16000.00'),
-        findsOneWidget);
+    expect(find.text('Confirmed received'), findsOneWidget);
+    expect(find.text('Held for settlement'), findsOneWidget);
+    expect(find.text('\u20b116000.00'), findsNWidgets(2));
     expect(find.text('Tenant 0'), findsNothing);
     await tester.tap(find.text('View security deposits'));
     await tester.pumpAndSettle();
     expect(find.text('Tenant 0'), findsOneWidget);
     expect(find.text('Tenant 6'), findsNothing);
+    await tester.ensureVisible(find.byTooltip('Next page'));
+    await tester.tap(find.byTooltip('Next page'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tenant 6'), findsOneWidget);
+    expect(find.text('Tenant 0'), findsNothing);
+    await tester.ensureVisible(find.byTooltip('Previous page'));
+    await tester.tap(find.byTooltip('Previous page'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tenant 0'), findsOneWidget);
+    await tester.ensureVisible(find.byType(TextField));
     await tester.enterText(find.byType(TextField), 'Tenant 7');
     await tester.pumpAndSettle();
     expect(
@@ -62,8 +73,10 @@ void main() {
                 child: StaffSecurityDepositsSection(
                     loadRecords: () async => records)))));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('View security deposits'));
     await tester.tap(find.text('View security deposits'));
     await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

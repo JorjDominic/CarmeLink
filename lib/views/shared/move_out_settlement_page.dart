@@ -1,3 +1,4 @@
+import '../../core/widgets/record_details.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -473,6 +474,7 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
     await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
+              scrollable: true,
               title: const Text('Security deposit receipt'),
               content: SizedBox(
                   width: 480,
@@ -918,22 +920,20 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
                 : null,
           ),
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 18,
-            runSpacing: 10,
-            children: [
-              _Fact('Contract deposit',
-                  _money(details.caseRecord.contractDepositAmount)),
-              _Fact('Confirmed received', _money(s.depositReceivedAmount)),
-              _Fact('Approved deductions', _money(s.approvedDeductions)),
-              _Fact('Refundable', _money(s.refundableAmount)),
-              _Fact('Shortfall', _money(s.shortfallAmount)),
-              _Fact(
-                'Outcome',
-                refundOverdue ? 'Refund overdue' : _statusLabel(s.refundStatus),
-              ),
-            ],
-          ),
+          RecordFacts(emphasizeFirst: true, items: [
+            (
+              'Contract deposit',
+              _money(details.caseRecord.contractDepositAmount)
+            ),
+            ('Confirmed received', _money(s.depositReceivedAmount)),
+            ('Approved deductions', _money(s.approvedDeductions)),
+            ('Refundable', _money(s.refundableAmount)),
+            ('Shortfall', _money(s.shortfallAmount)),
+            (
+              'Outcome',
+              refundOverdue ? 'Refund overdue' : _statusLabel(s.refundStatus)
+            ),
+          ]),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -960,38 +960,56 @@ class _MoveOutCaseDetailState extends State<_MoveOutCaseDetail> {
                 style: Theme.of(context).textTheme.bodySmall)
           else
             for (final item in details.deductions)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(item.label),
-                subtitle: Text(
-                    '${_categoryLabel(item.category)} · ${item.evidenceNote}'
-                    '${item.billingChargeId == null ? "" : "\nLinked bill: ${item.billingTitle ?? item.label}"}'
-                    '${item.depositAppliedAmount > 0 ? "\nCovered by deposit: ${_money(item.depositAppliedAmount)}" : ""}'
-                    '${item.billingChargeId != null ? "\nBill balance: ${_money(item.outstandingAmount ?? 0)}" : ""}'),
-                leading: Text(
-                  _money(item.amount),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                trailing: item.status == 'proposed' &&
-                        widget.isOwner &&
-                        !settlementFinal
-                    ? Wrap(
-                        spacing: 4,
-                        children: [
-                          IconButton(
-                            tooltip: 'Reject',
-                            onPressed: () => _reviewDeduction(item, false),
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                          IconButton(
-                            tooltip: 'Approve',
-                            onPressed: () => _reviewDeduction(item, true),
-                            icon: const Icon(Icons.check_rounded),
-                          ),
-                        ],
-                      )
-                    : StatusPill(_statusLabel(item.status)),
-              ),
+              Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: RecordSection(
+                      title: item.label,
+                      icon: Icons.receipt_long_outlined,
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            RecordFacts(emphasizeFirst: true, items: [
+                              ('Deduction', _money(item.amount)),
+                              ('Category', _categoryLabel(item.category)),
+                              if (item.billingChargeId != null)
+                                (
+                                  'Linked bill',
+                                  item.billingTitle ?? item.label
+                                ),
+                              if (item.depositAppliedAmount > 0)
+                                (
+                                  'Covered by deposit',
+                                  _money(item.depositAppliedAmount)
+                                ),
+                              if (item.billingChargeId != null)
+                                (
+                                  'Bill balance',
+                                  _money(item.outstandingAmount ?? 0)
+                                ),
+                            ]),
+                            const SizedBox(height: 8),
+                            Text(item.evidenceNote),
+                            const SizedBox(height: 8),
+                            if (item.status == 'proposed' &&
+                                widget.isOwner &&
+                                !settlementFinal)
+                              Wrap(spacing: 8, runSpacing: 8, children: [
+                                OutlinedButton.icon(
+                                    onPressed: () =>
+                                        _reviewDeduction(item, false),
+                                    icon: const Icon(Icons.close_rounded),
+                                    label: const Text('Reject')),
+                                FilledButton.tonalIcon(
+                                    onPressed: () =>
+                                        _reviewDeduction(item, true),
+                                    icon: const Icon(Icons.check_rounded),
+                                    label: const Text('Approve')),
+                              ])
+                            else
+                              Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: StatusPill(_statusLabel(item.status))),
+                          ]))),
           if (widget.isOwner && !settlementFinal) ...[
             const SizedBox(height: 12),
             if (!canFinalize) ...[
@@ -1133,6 +1151,7 @@ class _MoveOutNoticeDialogState extends State<_MoveOutNoticeDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+        scrollable: true,
         title: Text(widget.staffMode
             ? 'Record move-out notice'
             : 'Submit move-out notice'),
@@ -1200,6 +1219,7 @@ class _FinalInspectionDialogState extends State<_FinalInspectionDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+        scrollable: true,
         title: const Text('Schedule final inspection'),
         content: SizedBox(
           width: 440,
@@ -1285,6 +1305,7 @@ class _ClearanceDialogState extends State<_ClearanceDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+        scrollable: true,
         title: Text(widget.item.label),
         content: SizedBox(
             width: 420,
@@ -1346,6 +1367,7 @@ class _DeductionDialogState extends State<MoveOutChargeDeductionDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+        scrollable: true,
         title: const Text('Propose deposit deduction'),
         content: SizedBox(
             width: 440,
@@ -1533,6 +1555,7 @@ class _RefundDialogState extends State<_RefundDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+        scrollable: true,
         title: Text('Record refund · ${_money(widget.amount)}'),
         content: SizedBox(
             width: 440,
@@ -1688,6 +1711,7 @@ Future<String?> _textDialog(BuildContext context,
   final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+              scrollable: true,
               title: Text(title),
               content: TextField(
                   controller: controller,
