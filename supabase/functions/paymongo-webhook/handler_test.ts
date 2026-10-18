@@ -67,7 +67,7 @@ Deno.test('verified test requests never run in an unconfigured production deploy
  const f=fixture();const response=await handleWebhook(await signed(),{...f.dependencies,env:key=>key==='PAYMONGO_DEPLOYMENT_ENVIRONMENT'?'production':secrets[key]})
  assert(response.status===503&&f.reads===0&&f.credits===0)
 })
-for(const [provider,expected] of [['processing','pending'],['cancelled','cancelled'],['awaiting_payment_method','expired'],['awaiting_next_action','pending']] as const){
+for(const [provider,expected] of [['processing','pending'],['cancelled','expired'],['awaiting_payment_method','expired'],['awaiting_next_action','pending']] as const){
  Deno.test(`provider ${provider} is handled without trusting the client or expiry clock alone`,async()=>{
   let result:any
   const admin={from(){return{update(p:unknown){result=p;return this},eq(){return this},neq(){return this},select(){return this},single(){return Promise.resolve({data:{...initial,...result},error:null})}}},rpc(){throw Error('Unexpected settlement')}}

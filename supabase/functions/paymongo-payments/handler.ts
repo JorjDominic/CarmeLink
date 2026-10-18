@@ -1,6 +1,6 @@
 import { authenticatedClients, corsHeaders, json } from '../_shared/cloudinary.ts'
 import { GatewayError, PayMongoClient, gatewayConfig } from '../_shared/paymongo.ts'
-import { cancelUnpaidRequests, generatePaymentQr, synchronizePayment } from '../_shared/paymongo_store.ts'
+import { cancelUnpaidRequests, createOrResumePayment, generatePaymentQr, synchronizePayment } from '../_shared/paymongo_store.ts'
 
 const uuid = (value: unknown) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 export async function handleRequest(request: Request, dependencies: {
@@ -62,16 +62,10 @@ export async function handleRequest(request: Request, dependencies: {
         }
       } else if (!uuid(body.charge_id)) throw new GatewayError('Choose a valid bill')
       if (settings.environment !== config.environment) throw new GatewayError('Payment configuration needs owner attention', 409)
-      const { data, error } = chargeIds !== undefined
+      const begin = async () => chargeIds !== undefined
         ? await caller.rpc('begin_paymongo_advance_payment', { p_charge_ids: chargeIds })
         : await caller.rpc('begin_paymongo_payment', { p_charge_id: body.charge_id })
-      if (error) throw new GatewayError(error.message, 409)
-      let session = data.session
-      if (data.is_new) session = await generatePaymentQr(admin, client, session)
-      else if (session.status === 'creating') {
-        const { data: claimed } = await admin.rpc('claim_paymongo_creation', { p_session_id: session.id })
-        if (claimed) session = await generatePaymentQr(admin, client, claimed)
-      } else session = await synchronizePayment(admin, client, session)
+      const session = await createOrResumePayment(admin, client, begin)
       return json({ session })
     }
     if (!['status', 'cancel'].includes(body.action) || !uuid(body.session_id)) throw new GatewayError('Invalid payment request')

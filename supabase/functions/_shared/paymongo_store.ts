@@ -2,16 +2,17 @@ import { GatewayError, PayMongoClient, Session, confirmedPayment, qrDetails, val
 
 async function updateSession(admin: any, id: string, patch: object) {
   const { data, error } = await admin.from('paymongo_payment_sessions').update(patch)
-    .eq('id', id).neq('status', 'succeeded').select().single()
+    .eq('id', id).neq('status', 'succeeded').neq('status', 'needs_review').select().single()
   if (error) {
     // A webhook may have settled the session concurrently.
     const { data: current, error: lookupError } = await admin.from('paymongo_payment_sessions').select().eq('id', id).single()
-    if (!lookupError && current?.status === 'succeeded') return current as Session
+    if (!lookupError && ['succeeded','needs_review'].includes(current?.status)) return current as Session
     throw new GatewayError('Could not save the payment status. Please refresh.', 503)
   }
   return data as Session
 }
-export async function synchronizePayment(admin: any, client: PayMongoClient, session: Session) {
+export async function synchronizePayment(admin: any, client: PayMongoClient, session: Session, mayCancelExpired = true): Promise<Session> {
+  if (session.status === 'needs_review') return session
   if (!session.provider_intent_id || session.environment !== client.config.environment) return session
   const payload = await client.retrieve(session.provider_intent_id)
   const a = validateIntent(payload, session)
@@ -27,14 +28,56 @@ export async function synchronizePayment(admin: any, client: PayMongoClient, ses
   }
   if (session.status === 'succeeded') return session
   const patch: Record<string, unknown> = { last_checked_at: new Date().toISOString() }
-  if (a.status === 'cancelled' || a.status === 'canceled') patch.status = 'cancelled'
+  const overdue = !!session.expires_at && Date.parse(session.expires_at) <= Date.now()
+  if (a.status === 'cancelled' || a.status === 'canceled') patch.status = overdue ? 'expired' : 'cancelled'
   else if (a.status === 'awaiting_payment_method' && session.provider_method_id) {
     patch.status = session.expires_at && Date.parse(session.expires_at) <= Date.now() ? 'expired' : 'failed'
   } else if (a.status === 'awaiting_next_action') {
-    Object.assign(patch, qrDetails(payload), { status: 'pending', issue: null })
+    if (overdue) {
+      // Sandbox intents can keep waiting long after the QR deadline. Retire the
+      // provider intent before releasing the bill for another payment request.
+      if (mayCancelExpired) {
+        try {
+          await client.request(`payment_intents/${session.provider_intent_id}/cancel`, 'POST', {}, `${session.id}:expire`)
+        } catch (_) {
+          // Cancellation may race with payment or lose its response. A fresh
+          // provider read, not the clock or cancel response, decides the result.
+        }
+        return await synchronizePayment(admin, client, session, false)
+      }
+      Object.assign(patch, { qr_image: null, test_url: null,
+        issue: 'This QR has expired. Checking the previous payment before a new request can be created.' })
+    } else Object.assign(patch, qrDetails(payload), { status: 'pending', issue: null })
+  } else if (a.status === 'processing') {
+    Object.assign(patch, { qr_image: null, test_url: null,
+      issue: 'Payment is processing. Wait for confirmation before starting another request.' })
+  }
+  if (['expired', 'failed', 'cancelled'].includes(String(patch.status))) {
+    Object.assign(patch, { qr_image: null, test_url: null, issue: null })
   }
   // Do not expire a processing payment by a device/server clock alone.
   return await updateSession(admin, session.id, patch)
+}
+
+// The billing RPC serializes requests on the bill. Run it again only after the
+// provider-confirmed terminal state has released the old request's reservation.
+export async function createOrResumePayment(admin: any, client: PayMongoClient,
+  begin: () => PromiseLike<{ data: any; error: any }>): Promise<Session> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { data, error } = await begin()
+    if (error) throw new GatewayError(error.message, 409)
+    if (!data?.session) throw new GatewayError('Could not prepare payment request', 503)
+    let session: Session = data.session
+    if (data.is_new) return await generatePaymentQr(admin, client, session)
+    if (session.status === 'creating') {
+      const { data: claimed, error: claimError } = await admin.rpc('claim_paymongo_creation', { p_session_id: session.id })
+      if (claimError) throw new GatewayError('Could not resume payment creation. Try again.', 503)
+      if (claimed) session = await generatePaymentQr(admin, client, claimed)
+    } else session = await synchronizePayment(admin, client, session)
+    if (attempt === 0 && ['expired','failed','cancelled'].includes(session.status)) continue
+    return session
+  }
+  throw new GatewayError('Check the previous payment before trying again.', 409)
 }
 export async function generatePaymentQr(admin: any, client: PayMongoClient, original: Session) {
   let session = original
@@ -69,7 +112,8 @@ export async function generatePaymentQr(admin: any, client: PayMongoClient, orig
     if (a.status !== 'awaiting_next_action') return await synchronizePayment(admin, client, session)
     const details = qrDetails(payload)
     return await save({ ...details, status: 'pending', issue: null,
-      expires_at: session.expires_at ?? new Date(Date.now() + 1800_000).toISOString(), last_checked_at: new Date().toISOString() })
+      // QR validity starts on attach, not when the payment method was created.
+      expires_at: new Date(Date.now() + 1800_000).toISOString(), last_checked_at: new Date().toISOString() })
   } catch (error) {
     // Keep the same IDs/idempotency keys for uncertain network outcomes.
     await save({ issue: 'QR generation was interrupted. Refresh to resume the same payment request.' })
