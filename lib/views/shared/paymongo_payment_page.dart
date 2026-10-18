@@ -71,13 +71,27 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
     super.dispose();
   }
 
-  Future<void> _resume() async {
+  Future<void> _resume({bool prepare = true}) async {
     if (_payment == null) return;
     await _run(() async {
-      final latest = _payment!.outstandingAmount <= 0
-          ? await widget.service.confirmed(_payment!.id)
-          : await widget.service.latest(_payment!.id);
-      return latest != null && !latest.canRestart ? latest : null;
+      if (_payment!.outstandingAmount <= 0) {
+        return widget.service.confirmed(_payment!.id);
+      }
+      final existing = await widget.service.latest(_payment!.id);
+      if (!prepare) {
+        return existing == null || existing.canRestart
+            ? null
+            : widget.service.refresh(existing.id);
+      }
+      if (_payment!.isRent &&
+          (existing?.isActive == true || existing?.status == 'needs_review') &&
+          existing!.billBreakdown.isNotEmpty) {
+        return widget.service.createAdvance(
+            existing.billBreakdown.map((item) => item.chargeId).toList());
+      }
+      return _payment!.isRent
+          ? widget.service.createAdvance([_payment!.id])
+          : widget.service.create(_payment!.id);
     });
   }
 
@@ -282,7 +296,7 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
                           _selectedRentIds.clear();
                           if (p?.isRent == true) _selectedRentIds.add(p!.id);
                         });
-                        _resume();
+                        _resume(prepare: false);
                       }),
             const SizedBox(height: 12),
           ],
@@ -358,7 +372,10 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
                       const Divider(),
                     ],
                     Text(statusLabel, key: const Key('gateway-payment-status')),
-                    if (session?.status == 'pending') ...[
+                    if (session?.status == 'pending' &&
+                        session?.issue == null &&
+                        (session?.expiresAt == null ||
+                            session!.expiresAt!.isAfter(DateTime.now()))) ...[
                       const SizedBox(height: 16),
                       if (isTest)
                         Column(children: [
@@ -437,7 +454,9 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
                 icon: const Icon(Icons.qr_code),
                 label: Text(widget.demo
                     ? 'Start demo payment'
-                    : 'Generate payment request')),
+                    : session?.canRestart == true
+                        ? 'Generate new QR'
+                        : 'Generate payment request')),
           if (session != null && !widget.demo && !session.paid)
             OutlinedButton.icon(
                 onPressed: _busy ? null : _refresh,
@@ -446,6 +465,9 @@ class _PaymongoPaymentPageState extends State<PaymongoPaymentPage> {
           if (!widget.demo &&
               session?.isTest == true &&
               session?.testUrl != null &&
+              session?.issue == null &&
+              (session?.expiresAt == null ||
+                  session!.expiresAt!.isAfter(DateTime.now())) &&
               session?.status == 'pending')
             FilledButton(
                 onPressed:

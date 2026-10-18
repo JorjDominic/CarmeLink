@@ -85,7 +85,74 @@ class _AutomaticSettings extends PaymentCollectionSettingsService {
           mode: PaymentCollectionMode.paymongo, paymongoReady: true);
 }
 
+class _PayNowGateway extends PaymongoPaymentService {
+  int creates = 0;
+  @override
+  Future<PaymongoPaymentSession?> latest(String id) async => null;
+  @override
+  Future<PaymongoPaymentSession> create(String id) async {
+    creates++;
+    return PaymongoPaymentSession(
+        id: 'usable-request',
+        status: 'pending',
+        amountCentavos: 10000,
+        environment: 'test',
+        expiresAt: DateTime.now().add(const Duration(minutes: 30)));
+  }
+}
+
 void main() {
+  testWidgets(
+      'expired request exposes one replacement action and preserves its bill selection',
+      (tester) async {
+    final gateway = _AdvanceGateway();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: PaymongoPaymentPage(
+                service: gateway,
+                initialSession: const PaymongoPaymentSession(
+                    id: 'expired',
+                    status: 'expired',
+                    amountCentavos: 650000,
+                    environment: 'test',
+                    billBreakdown: [
+                      PaymongoBillBreakdown(
+                          chargeId: 'nov',
+                          title: 'November Rent',
+                          amountCentavos: 300000),
+                      PaymongoBillBreakdown(
+                          chargeId: 'dec',
+                          title: 'December Rent',
+                          amountCentavos: 350000)
+                    ])))));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('demo-payment-qr')), findsNothing);
+    await tester.ensureVisible(find.text('Generate new QR'));
+    await tester.tap(find.text('Generate new QR'));
+    await tester.pumpAndSettle();
+    expect(gateway.selected, unorderedEquals(['nov', 'dec']));
+    expect(find.text('Awaiting payment (TEST)'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets('Pay Now prepares a usable request without a second generate tap',
+      (tester) async {
+    final gateway = _PayNowGateway();
+    final bill = Payment(
+        id: 'damage',
+        label: 'Damage on paint',
+        amount: 100,
+        dueDate: DateTime(2026, 10, 19),
+        status: 'due',
+        category: 'damage');
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: PaymongoPaymentPage(payment: bill, service: gateway))));
+    await tester.pumpAndSettle();
+    expect(gateway.creates, 1);
+    expect(find.text('Awaiting payment (TEST)'), findsOneWidget);
+    expect(find.text('Generate payment request'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   testWidgets('paid bill reopens the confirmed multi-month receipt',
       (tester) async {
     final gateway = _AdvanceGateway();
@@ -142,10 +209,13 @@ void main() {
     addTearDown(() => TenantController.instance.setPaymentsForTesting([]));
     final gateway = _AdvanceGateway();
     await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-            body: PaymongoPaymentPage(payment: november, service: gateway))));
+        home: Scaffold(body: PaymongoPaymentPage(service: gateway))));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('rent-month-utility')), findsNothing);
+    await tester.tap(find.byType(DropdownButtonFormField<Payment>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('November Rent').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('rent-month-dec')));
     await tester.pumpAndSettle();
     expect(find.text('PHP 6500.00'), findsOneWidget);
@@ -157,7 +227,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(gateway.selected, unorderedEquals(['nov', 'dec']));
     expect(find.byType(CheckboxListTile), findsNothing);
-    expect(find.text('November Rent'), findsOneWidget);
+    expect(find.text('November Rent'), findsNWidgets(2));
     expect(find.text('December Rent'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
