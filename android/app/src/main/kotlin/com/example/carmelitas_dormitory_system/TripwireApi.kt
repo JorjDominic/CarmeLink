@@ -10,6 +10,12 @@ import java.net.URL
 class TripwireApi(context: Context) {
     private val prefs = context.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE)
 
+    /** Call from a worker thread, before requesting a location fix. Fail closed offline. */
+    fun hasCurrentGeofencingAgreement(): Boolean = try {
+        val response = post("/rest/v1/rpc/module_agreement_status", JSONObject().put("p_module", "geofencing"))
+        response.first in 200..299 && JSONObject(response.second).optBoolean("allowed", false)
+    } catch (_: Exception) { false }
+
     fun post(path: String, body: JSONObject): Pair<Int, String> {
         val base = prefs.getString("supabase_url", null) ?: throw IOException("Missing server configuration")
         val key = prefs.getString("publishable_key", null) ?: throw IOException("Missing publishable key")

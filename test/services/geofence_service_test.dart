@@ -6,6 +6,7 @@ import 'package:carmelitas_dormitory_system/core/widgets/common_widgets.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
 import 'package:carmelitas_dormitory_system/services/geofence_service.dart';
 import 'package:carmelitas_dormitory_system/services/guardian_alert_service.dart';
+import '../support/accepted_module_agreements.dart';
 
 void main() {
   tearDown(() {
@@ -454,7 +455,9 @@ void main() {
       );
     });
 
-    test('updates and preserves preferred alert time and inside/outside in service state', () {
+    test(
+        'updates and preserves preferred alert time and inside/outside in service state',
+        () {
       const customTime = TimeOfDay(hour: 20, minute: 30);
       GuardianAlertService.setPreferredAlertTime(customTime);
       expect(GuardianAlertService.preferredAlertTime, customTime);
@@ -480,7 +483,8 @@ void main() {
       GeofenceService.mockLocationServiceEnabled = false;
 
       final controller = TenantController.instance;
-      final result = await controller.performGeofenceCheckIn();
+      final result = await controller.performGeofenceCheckIn(
+          agreementService: const AcceptedModuleAgreements());
 
       expect(result.isUnavailable, isTrue);
       expect(result.direction, isNull);
@@ -509,7 +513,8 @@ void main() {
 
       final controller = TenantController.instance;
       // Even if backend Supabase isn't reachable / initialized, check-in doesn't crash
-      final result = await controller.performGeofenceCheckIn();
+      final result = await controller.performGeofenceCheckIn(
+          agreementService: const AcceptedModuleAgreements());
 
       // On-device evaluation should be intact (inside perimeter -> IN)
       expect(result.direction, 'IN');

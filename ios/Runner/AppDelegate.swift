@@ -100,6 +100,9 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   private var burstTimeout: DispatchWorkItem?
   private var burstActive = false
   private var syncing = false
+  private var agreementVerifiedAt: Date?
+  private var checkingAgreement = false
+  private var agreementTimer: Timer?
   private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
   private var burstBackgroundTask: UIBackgroundTaskIdentifier = .invalid
 
@@ -131,6 +134,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     publishableKey: String
   ) {
     let previousTenant = defaults.string(forKey: "tripwire_tenant_id")
+    agreementVerifiedAt = nil
     if previousTenant != tenantId {
       defaults.removeObject(forKey: queueKey)
       defaults.removeObject(forKey: confirmedDirectionKey)
@@ -168,13 +172,7 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       startMonitoring(latitude: latitude, longitude: longitude, radius: radius)
       // Obtain multiple accurate fixes now. This reconciles stale server state
       // immediately after the user reopens an app that Android/iOS had stopped.
-      startLocationBurst()
     }
-    if status == .authorizedWhenInUse {
-      manager.requestAlwaysAuthorization()
-    }
-    syncPendingEvents()
-    evaluateMonitoringHealth()
   }
 
   func restoreIfNeeded() {
@@ -186,14 +184,57 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       longitude: defaults.double(forKey: "tripwire_longitude"),
       radius: defaults.double(forKey: "tripwire_radius")
     )
-    if status == .authorizedWhenInUse {
-      manager.requestAlwaysAuthorization()
-    }
-    syncPendingEvents()
-    evaluateMonitoringHealth()
   }
 
   private func startMonitoring(latitude: Double, longitude: Double, radius: Double) {
+    verifyAgreement { [weak self] in
+      self?.startAuthorizedMonitoring(latitude: latitude, longitude: longitude, radius: radius)
+    }
+  }
+
+  private func verifyAgreement(force: Bool = false, allowRefresh: Bool = true, then completion: @escaping () -> Void) {
+    guard defaults.bool(forKey: registeredKey) else { return }
+    if !force, let checked = agreementVerifiedAt, Date().timeIntervalSince(checked) < 30 {
+      completion()
+      return
+    }
+    guard !checkingAgreement else { return }
+    checkingAgreement = true
+    let expectedTenant = defaults.string(forKey: "tripwire_tenant_id")
+    post(path: "/rest/v1/rpc/module_agreement_status", body: ["p_module": "geofencing"]) { [weak self] code, data, error in
+      DispatchQueue.main.async {
+        guard let self else { return }
+        self.checkingAgreement = false
+        guard self.defaults.bool(forKey: self.registeredKey),
+              self.defaults.string(forKey: "tripwire_tenant_id") == expectedTenant else { return }
+        if code == 401 && allowRefresh {
+          self.refreshSession { refreshed in
+            DispatchQueue.main.async {
+              guard self.defaults.bool(forKey: self.registeredKey),
+                    self.defaults.string(forKey: "tripwire_tenant_id") == expectedTenant else { return }
+              if refreshed { self.verifyAgreement(force: true, allowRefresh: false, then: completion) }
+              else { self.unregister() }
+            }
+          }
+          return
+        }
+        let result = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        guard error == nil, (200...299).contains(code), result?["allowed"] as? Bool == true else {
+          self.unregister()
+          return
+        }
+        self.agreementVerifiedAt = Date()
+        if self.agreementTimer == nil {
+          self.agreementTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            self?.verifyAgreement(force: true) {}
+          }
+        }
+        completion()
+      }
+    }
+  }
+
+  private func startAuthorizedMonitoring(latitude: Double, longitude: Double, radius: Double) {
     guard CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else { return }
     for region in manager.monitoredRegions where region.identifier == regionIdentifier || region.identifier == gateRegionIdentifier {
       manager.stopMonitoring(for: region)
@@ -229,9 +270,17 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
     if defaults.string(forKey: confirmedDirectionKey) == nil {
       manager.requestState(for: region)
     }
+    if manager.authorizationStatus == .authorizedWhenInUse { manager.requestAlwaysAuthorization() }
+    startLocationBurst()
+    syncPendingEvents()
+    evaluateMonitoringHealth()
   }
 
   func unregister() {
+    finishSync()
+    agreementTimer?.invalidate()
+    agreementTimer = nil
+    agreementVerifiedAt = nil
     defaults.removeObject(forKey: monitoringAvailableKey)
     defaults.removeObject(forKey: monitoringReasonKey)
     defaults.removeObject(forKey: "tripwire_last_location_reminder_at")
@@ -285,6 +334,10 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   }
 
   func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    guard let checked = agreementVerifiedAt, Date().timeIntervalSince(checked) < 30 else {
+      verifyAgreement { [weak self] in self?.startLocationBurst() }
+      return
+    }
     evaluateMonitoringHealth()
     guard
       defaults.bool(forKey: registeredKey),
@@ -335,6 +388,10 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
   // ─── Fine-accuracy location burst ─────────────────────────────────────────
 
   private func startLocationBurst() {
+    verifyAgreement { [weak self] in self?.startAuthorizedLocationBurst() }
+  }
+
+  private func startAuthorizedLocationBurst() {
     guard defaults.bool(forKey: registeredKey) else { return }
     // Always start a fine-accuracy burst whenever the coarse CLCircularRegion
     // fires — we need an accurate fix to confirm direction via polygon
@@ -642,6 +699,10 @@ final class TripwireLocationManager: NSObject, CLLocationManagerDelegate {
       }
       guard error == nil, (200...299).contains(code) else {
         let details = data.flatMap { String(data: $0, encoding: .utf8) } ?? error?.localizedDescription ?? "Unknown error"
+        if details.contains("MODULE_AGREEMENT_REQUIRED") {
+          DispatchQueue.main.async { self.unregister() }
+          return
+        }
         self.failSync("Gate event sync failed (\(code)): \(details.prefix(500))")
         return
       }

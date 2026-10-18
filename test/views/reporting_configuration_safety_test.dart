@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../support/accepted_module_agreements.dart';
 
 import 'package:carmelitas_dormitory_system/controllers/tenant_controller.dart';
 import 'package:carmelitas_dormitory_system/models/models.dart';
@@ -154,7 +155,11 @@ void main() {
       'concern add/rename/archive/restore preserves selected identity and requires reselection',
       (tester) async {
     final choices = Choices();
-    await open(tester, ConfidentialConcernPage(configurationService: choices));
+    await open(
+        tester,
+        ConfidentialConcernPage(
+            configurationService: choices,
+            agreementService: const AcceptedModuleAgreements()));
     expect(field(tester, 'Report type').initialValue, 'noise');
     choices.concerns = [
       option('report_type', 'noise', 'Quiet hours concern'),
@@ -177,7 +182,11 @@ void main() {
   testWidgets('concern latest refresh wins over an older response',
       (tester) async {
     final choices = Choices();
-    await open(tester, ConfidentialConcernPage(configurationService: choices));
+    await open(
+        tester,
+        ConfidentialConcernPage(
+            configurationService: choices,
+            agreementService: const AcceptedModuleAgreements()));
     final stale = Completer<List<DormitoryOption>>();
     choices.next = stale.future;
     final oldRefresh = tester
@@ -206,7 +215,9 @@ void main() {
         await tester.pumpWidget(MaterialApp(
             home: Scaffold(
                 body: concern
-                    ? ConfidentialConcernPage(configurationService: choices)
+                    ? ConfidentialConcernPage(
+                        configurationService: choices,
+                        agreementService: const AcceptedModuleAgreements())
                     : SubmitMaintenancePage(configurationService: choices))));
         await tester.pump();
         expect(find.byType(LinearProgressIndicator), findsOneWidget);

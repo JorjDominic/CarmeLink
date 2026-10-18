@@ -8,6 +8,8 @@ import '../../core/widgets/adaptive_shell.dart';
 import '../../core/widgets/role_guard.dart';
 import '../../models/models.dart';
 import '../../services/app_notification_service.dart';
+import '../../services/confidentiality_agreement_service.dart';
+import '../../views/shared/confidentiality_agreements_page.dart';
 import '../../services/table_refresh_subscription.dart';
 import '../../views/owner/billing_management_page.dart';
 import '../../views/owner/contracts_page.dart';
@@ -232,6 +234,24 @@ abstract final class StaffWebDestinations {
         webGroup: 'Administration',
         webDescription: 'Sensitive-record retention controls',
       ),
+      if (owner) ...[
+        const AppDestination(
+            label: 'Confidentiality agreements',
+            icon: Icons.privacy_tip_outlined,
+            selectedIcon: Icons.privacy_tip,
+            page: ConfidentialityAgreementsPage(),
+            webGroup: 'Administration',
+            webDescription: 'Publish agreements and verify acceptance'),
+        const AppDestination(
+            label: 'Geofencing agreements',
+            icon: Icons.location_on_outlined,
+            selectedIcon: Icons.location_on,
+            page: ConfidentialityAgreementsPage(
+                service: ConfidentialityAgreementService(
+                    module: AgreementModule.geofencing)),
+            webGroup: 'Administration',
+            webDescription: 'Location monitoring agreements and acceptance'),
+      ],
     ];
   }
 }

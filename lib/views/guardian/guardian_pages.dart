@@ -1,4 +1,6 @@
 import '../shared/notification_destination.dart';
+import '../shared/module_agreement_gate.dart';
+import '../../services/confidentiality_agreement_service.dart';
 import '../shared/staff_message_contacts.dart';
 import 'package:flutter/material.dart';
 import '../shared/security_deposit_card.dart';
@@ -573,7 +575,7 @@ class GuardianTenantInfoPage extends StatelessWidget {
   }
 }
 
-class GuardianPresenceMonitoringPage extends StatefulWidget {
+class GuardianPresenceMonitoringPage extends StatelessWidget {
   const GuardianPresenceMonitoringPage({
     super.key,
     this.initialSegment = 0,
@@ -582,12 +584,23 @@ class GuardianPresenceMonitoringPage extends StatefulWidget {
   final int initialSegment;
 
   @override
-  State<GuardianPresenceMonitoringPage> createState() =>
+  Widget build(BuildContext context) => ModuleAgreementGate(
+      service: const ConfidentialityAgreementService(
+          module: AgreementModule.geofencing),
+      builder: (_) => _GuardianPresenceContent(initialSegment: initialSegment));
+}
+
+class _GuardianPresenceContent extends StatefulWidget {
+  const _GuardianPresenceContent({required this.initialSegment});
+  final int initialSegment;
+
+  @override
+  State<_GuardianPresenceContent> createState() =>
       _GuardianPresenceMonitoringPageState();
 }
 
 class _GuardianPresenceMonitoringPageState
-    extends State<GuardianPresenceMonitoringPage> {
+    extends State<_GuardianPresenceContent> {
   late int _selectedSegment;
   String _filter = 'pending'; // 'pending', 'approved', 'rejected', 'all'
   TableRefreshSubscription? _subscription;
@@ -2172,7 +2185,9 @@ class GuardianPaymentStatusPage extends StatelessWidget {
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
-          final payments = List<Payment>.from(controller.payments.where((p) => NotificationTarget.recordIdOf(context, 'payment') == null || p.id == NotificationTarget.recordIdOf(context, 'payment')))
+          final payments = List<Payment>.from(controller.payments.where((p) =>
+              NotificationTarget.recordIdOf(context, 'payment') == null ||
+              p.id == NotificationTarget.recordIdOf(context, 'payment')))
             ..sort((a, b) {
               final aOpen = !a.isVerified && !a.isVoided;
               final bOpen = !b.isVerified && !b.isVoided;
@@ -2451,7 +2466,8 @@ class _GuardianAnnouncementsPageState extends State<GuardianAnnouncementsPage> {
   @override
   Widget build(BuildContext context) {
     final rawList = _announcements ?? [];
-    final targetAnnouncement = NotificationTarget.recordIdOf(context, 'announcement');
+    final targetAnnouncement =
+        NotificationTarget.recordIdOf(context, 'announcement');
     final filtered = rawList.where((item) {
       if (targetAnnouncement != null) return item.id == targetAnnouncement;
       if (_selectedCategory != 'all' &&

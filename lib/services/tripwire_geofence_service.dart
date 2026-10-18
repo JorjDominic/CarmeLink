@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../controllers/tenant_controller.dart';
 import '../core/config/supabase_config.dart';
 import 'gate_service.dart';
+import 'confidentiality_agreement_service.dart';
 import 'geofence_service.dart';
 import 'push_notification_service.dart';
 
@@ -30,14 +31,27 @@ class TripwireGeofenceService {
   final GeofenceLocationService _locationService =
       const GeofenceLocationService();
   bool _syncing = false;
+  int _generation = 0;
 
   Future<void> start(String tenantId) async {
     if (kIsWeb) return;
+    final generation = ++_generation;
     try {
+      final allowed = await const ConfidentialityAgreementService(
+              module: AgreementModule.geofencing)
+          .hasAcceptedCurrent();
+      if (generation != _generation) return;
+      if (SupabaseConfig.clientSafe?.auth.currentUser?.id != tenantId ||
+          !allowed) {
+        await stop();
+        return;
+      }
       if (defaultTargetPlatform == TargetPlatform.android) {
         // Check native settings before any network/GPS work. Android owns the
         // reminder and its recovery/cooldown state, including while backgrounded.
-        await _channel.invokeMethod<void>('checkMonitoringHealth').timeout(_platformTimeout);
+        await _channel
+            .invokeMethod<void>('checkMonitoringHealth')
+            .timeout(_platformTimeout);
       }
       final row = await SupabaseConfig.client
           .from('dorm_boundary_config')
@@ -46,7 +60,7 @@ class TripwireGeofenceService {
           .order('updated_at', ascending: false)
           .limit(1)
           .maybeSingle();
-      if (row == null) return;
+      if (row == null || generation != _generation) return;
 
       GeofenceLocationService.applyBoundaryConfiguration(row);
       final baseline = await _locationService.checkCurrentPresence();
@@ -58,7 +72,9 @@ class TripwireGeofenceService {
       }
       final serverDirection = await _loadServerDirection(tenantId);
       final session = SupabaseConfig.client.auth.currentSession;
-      if (session == null) return;
+      if (session == null ||
+          session.user.id != tenantId ||
+          generation != _generation) return;
       final rawPolygon = row['polygon_points'];
       final polygon = rawPolygon is List
           ? rawPolygon
@@ -158,6 +174,7 @@ class TripwireGeofenceService {
   }
 
   Future<void> stop() async {
+    _generation++;
     if (kIsWeb) return;
     try {
       await _channel.invokeMethod<void>('unregister').timeout(_platformTimeout);

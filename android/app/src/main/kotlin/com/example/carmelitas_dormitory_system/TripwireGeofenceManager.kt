@@ -269,6 +269,18 @@ class TripwireGeofenceManager(private val context: Context) {
 
     fun restore() {
         if (!prefs.getBoolean("registered", false)) return
+        val expectedTenant = prefs.getString("tenant_id", null)
+        Thread {
+            val allowed = TripwireApi(context).hasCurrentGeofencingAgreement()
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                if (expectedTenant != prefs.getString("tenant_id", null) || !prefs.getBoolean("registered", false)) return@post
+                if (allowed) restoreAuthorized() else unregister()
+            }
+        }.start()
+    }
+
+    private fun restoreAuthorized() {
+        if (!prefs.getBoolean("registered", false)) return
         val tenantId = prefs.getString("tenant_id", null) ?: return
         val latitude = Double.fromBits(prefs.getLong("latitude_bits", 0L))
         val longitude = Double.fromBits(prefs.getLong("longitude_bits", 0L))
@@ -296,7 +308,7 @@ class TripwireGeofenceManager(private val context: Context) {
             })
     }
 
-    fun unregister(result: MethodChannel.Result) {
+    fun unregister(result: MethodChannel.Result? = null) {
         prefs.edit().putBoolean("registered", false).apply()
         context.stopService(Intent(context, TripwireLocationBurstService::class.java))
         WorkManager.getInstance(context).cancelUniqueWork("carmelink-geofence-verification")
@@ -305,7 +317,7 @@ class TripwireGeofenceManager(private val context: Context) {
         LocationMonitoringHealth.stop(context)
         client.removeGeofences(pendingIntent).addOnCompleteListener {
             prefs.edit().clear().apply()
-            result.success(true)
+            result?.success(true)
         }
     }
 

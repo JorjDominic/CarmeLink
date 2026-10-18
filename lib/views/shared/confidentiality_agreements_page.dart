@@ -71,13 +71,13 @@ class _ConfidentialityAgreementsPageState
         builder: (context) => StatefulBuilder(
             builder: (context, update) => AlertDialog(
                   scrollable: true,
-                  title:
-                      const Text('Publish approved confidentiality agreement'),
+                  title: Text(
+                      'Publish approved ${widget.service.module.title.toLowerCase()} agreement'),
                   content: SizedBox(
                       width: 700,
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
                         const Text(
-                            'Use wording approved by the Owner or authorized representative. Published versions cannot be edited or deleted. Publication does not block or suspend accounts.'),
+                            'Use wording approved by the Owner or authorized representative. Published versions cannot be edited or deleted. Users must accept the latest version before accessing this module. Publishing a replacement requires acceptance again.'),
                         DropdownButtonFormField<String>(
                             initialValue: audience,
                             decoration: const InputDecoration(
@@ -181,7 +181,7 @@ class _ConfidentialityAgreementsPageState
       if (seen.add(v['audience'] as String)) currentIds.add(v['id'] as String);
     }
     return PageFrame(
-        title: 'Confidentiality agreements',
+        title: '${widget.service.module.title} agreements',
         subtitle: 'Approved versions and recorded acceptance',
         maxWidth: 1000,
         onRefresh: load,
@@ -201,7 +201,7 @@ class _ConfidentialityAgreementsPageState
             if (versions.isEmpty)
               const CarmelitaCard(
                   child: Text(
-                      'No approved confidentiality agreement has been published. Acceptance is not required to continue using your account.')),
+                      'No approved agreement has been published. This module stays locked until an owner publishes an agreement and you accept it. Other modules remain available.')),
             for (final v in versions)
               Padding(
                   padding: const EdgeInsets.only(bottom: 10),
@@ -251,10 +251,14 @@ class AgreementReviewPage extends StatefulWidget {
       required this.version,
       required this.canAccept,
       this.acceptedAt,
+      this.onAccepted,
+      this.onDecline,
       this.service = const ConfidentialityAgreementService()});
   final Map<String, dynamic> version;
   final bool canAccept;
   final String? acceptedAt;
+  final Future<void> Function()? onAccepted;
+  final VoidCallback? onDecline;
   final ConfidentialityAgreementService service;
   @override
   State<AgreementReviewPage> createState() => _AgreementReviewPageState();
@@ -294,6 +298,7 @@ class _AgreementReviewPageState extends State<AgreementReviewPage> {
       await widget.service.accept(widget.version['id'] as String,
           reviewed: reviewed, accepted: checked);
       if (mounted) setState(() => saved = true);
+      if (mounted) await widget.onAccepted?.call();
     } catch (_) {
       if (mounted)
         setState(() => error =
@@ -315,7 +320,7 @@ class _AgreementReviewPageState extends State<AgreementReviewPage> {
                       padding: const EdgeInsets.all(20),
                       children: [
                         Text(
-                            '${widget.version['audience']} confidentiality agreement',
+                            '${widget.version['audience']} ${widget.service.module.title.toLowerCase()} agreement',
                             style: Theme.of(context).textTheme.titleLarge),
                         Text(
                             'Published ${DateTime.parse(widget.version['published_at'] as String).toLocal()}'),
@@ -347,7 +352,13 @@ class _AgreementReviewPageState extends State<AgreementReviewPage> {
                                   : null,
                               child: Text(saving
                                   ? 'Saving acceptance…'
-                                  : 'Accept agreement')),
+                                  : widget.onAccepted != null
+                                      ? 'Accept and continue'
+                                      : 'Accept agreement')),
+                          if (widget.onDecline != null)
+                            TextButton(
+                                onPressed: saving ? null : widget.onDecline,
+                                child: const Text('Decline and go back')),
                         ] else
                           const Text(
                               'Historical agreement. Review the current version to record a new acceptance.'),

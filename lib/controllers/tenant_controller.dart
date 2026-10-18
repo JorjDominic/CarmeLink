@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../services/confidentiality_agreement_service.dart';
 import '../core/utils/financial_snapshot.dart';
 
 import '../core/config/supabase_config.dart';
@@ -706,11 +707,18 @@ class TenantController extends ChangeNotifier {
   /// the resulting status/direction to the secure RPC.
   Future<GeofenceCheckResult> performGeofenceCheckIn({
     String checkpointType = 'on_demand',
+    ConfidentialityAgreementService agreementService =
+        const ConfidentialityAgreementService(
+            module: AgreementModule.geofencing),
   }) async {
     _checkingPresence = true;
     notifyListeners();
 
     try {
+      if (!await agreementService.hasAcceptedCurrent()) {
+        throw StateError(
+            'Review and accept the current geofencing agreement before checking your location.');
+      }
       final previous =
           _currentGateStatus == 'UNAVAILABLE' ? null : _currentGateStatus;
       final result = await _geofenceService.checkCurrentPresence(

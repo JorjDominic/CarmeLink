@@ -1,5 +1,6 @@
 import '../shared/payment_receipt_history.dart';
 import '../shared/confidentiality_agreements_page.dart';
+import '../../services/confidentiality_agreement_service.dart';
 import '../../services/dormitory_configuration_service.dart';
 import '../../core/utils/financial_snapshot.dart';
 import '../../core/widgets/configured_choice_field.dart';
@@ -2202,6 +2203,14 @@ const _operationCategories = [
           'Publish approved versions and verify acceptance',
           Icons.privacy_tip_outlined,
           ConfidentialityAgreementsPage(),
+          ownerOnly: true),
+      _OperationItem(
+          'Geofencing agreements',
+          'Publish location monitoring agreements and verify acceptance',
+          Icons.location_on_outlined,
+          ConfidentialityAgreementsPage(
+              service: ConfidentialityAgreementService(
+                  module: AgreementModule.geofencing)),
           ownerOnly: true),
       _OperationItem('Disciplinary records', 'Manage violations',
           Icons.rule_outlined, DisciplinaryRecordsPage(),

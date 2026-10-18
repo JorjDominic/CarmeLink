@@ -1,4 +1,7 @@
 import '../shared/payment_receipt_history.dart';
+import '../shared/module_agreement_gate.dart';
+import '../../services/confidentiality_agreement_service.dart';
+import '../../services/geofence_scheduler.dart';
 import '../../core/widgets/configured_choice_field.dart';
 import '../../core/config/supabase_config.dart';
 import '../../services/payment_collection_settings_service.dart';
@@ -5437,14 +5440,24 @@ class TenantConversationPage extends StatelessWidget {
   Widget build(BuildContext context) => const TenantMessagesPage();
 }
 
-class TenantPresencePage extends StatefulWidget {
+class TenantPresencePage extends StatelessWidget {
   const TenantPresencePage({super.key});
 
   @override
-  State<TenantPresencePage> createState() => _TenantPresencePageState();
+  Widget build(BuildContext context) => ModuleAgreementGate(
+      service: const ConfidentialityAgreementService(
+          module: AgreementModule.geofencing),
+      builder: (_) => const _TenantPresenceContent());
 }
 
-class _TenantPresencePageState extends State<TenantPresencePage> {
+class _TenantPresenceContent extends StatefulWidget {
+  const _TenantPresenceContent();
+
+  @override
+  State<_TenantPresenceContent> createState() => _TenantPresencePageState();
+}
+
+class _TenantPresencePageState extends State<_TenantPresenceContent> {
   TableRefreshSubscription? _subscription;
   Map<String, dynamic> _monitoringStatus = const {'registered': false};
   bool _monitoringStatusLoading = false;
@@ -5460,6 +5473,8 @@ class _TenantPresencePageState extends State<TenantPresencePage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        final uid = SessionController.instance.currentUser?.id;
+        if (uid != null) GeofenceScheduler.instance.start(uid);
         TenantController.instance.loadCurfewRequests(force: true);
         TenantController.instance.loadGateEvents(force: true);
         _loadMonitoringStatus(sync: true);
@@ -7484,19 +7499,32 @@ class _VisitorRequestPageState extends State<VisitorRequestPage> {
   }
 }
 
-class ConfidentialConcernPage extends StatefulWidget {
+class ConfidentialConcernPage extends StatelessWidget {
   const ConfidentialConcernPage(
       {super.key,
+      this.agreementService = const ConfidentialityAgreementService(),
       this.configurationService = const DormitoryConfigurationService()});
 
   final DormitoryConfigurationService configurationService;
+  final ConfidentialityAgreementService agreementService;
 
   @override
-  State<ConfidentialConcernPage> createState() =>
+  Widget build(BuildContext context) => ModuleAgreementGate(
+      service: agreementService,
+      builder: (_) => _ConfidentialConcernContent(
+          configurationService: configurationService));
+}
+
+class _ConfidentialConcernContent extends StatefulWidget {
+  const _ConfidentialConcernContent({required this.configurationService});
+  final DormitoryConfigurationService configurationService;
+
+  @override
+  State<_ConfidentialConcernContent> createState() =>
       _ConfidentialConcernPageState();
 }
 
-class _ConfidentialConcernPageState extends State<ConfidentialConcernPage> {
+class _ConfidentialConcernPageState extends State<_ConfidentialConcernContent> {
   String category = 'Safety concern';
   List<DormitoryOption> reportTypes = [];
   DormitoryOption? selectedType;

@@ -36,9 +36,15 @@ class TripwireLocationBurstService : Service() {
     private var running = false
     private var continuous = false
     private var precise = true
+    private val agreementHandler = android.os.Handler(Looper.getMainLooper())
+    private var checkingAgreement = false
+    private var agreementAllowed = false
+    private var destroyed = false
+    private val agreementCheck = Runnable { validateAgreementAndStart() }
     private val timeout = Runnable { stopBurst() }
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
+            if (!agreementAllowed) return
             for (location in result.locations) {
                 val direction = TripwireGeofenceManager.verifyAndAppend(this@TripwireLocationBurstService, location)
                 if (direction != null) {
@@ -85,9 +91,32 @@ class TripwireLocationBurstService : Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
-        startBurst()
-        monitoring = continuous && running
+        validateAgreementAndStart()
         return if (continuous) START_STICKY else START_NOT_STICKY
+    }
+
+    private fun validateAgreementAndStart() {
+        if (checkingAgreement || destroyed) return
+        checkingAgreement = true
+        agreementAllowed = false
+        val expectedTenant = getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE).getString("tenant_id", null)
+        Thread {
+            val allowed = TripwireApi(applicationContext).hasCurrentGeofencingAgreement()
+            agreementHandler.post {
+                checkingAgreement = false
+                if (destroyed || expectedTenant != getSharedPreferences(TripwireGeofenceManager.PREFS, MODE_PRIVATE).getString("tenant_id", null)) return@post
+                if (!allowed) {
+                    TripwireGeofenceManager(applicationContext).unregister()
+                    stopBurst()
+                    return@post
+                }
+                agreementAllowed = true
+                if (!running) startBurst()
+                monitoring = continuous && running
+                agreementHandler.removeCallbacks(agreementCheck)
+                agreementHandler.postDelayed(agreementCheck, 30_000L)
+            }
+        }.start()
     }
 
     private fun startBurst() {
@@ -143,6 +172,9 @@ class TripwireLocationBurstService : Service() {
     }
 
     override fun onDestroy() {
+        destroyed = true
+        agreementAllowed = false
+        agreementHandler.removeCallbacksAndMessages(null)
         monitoring = false
         android.os.Handler(Looper.getMainLooper()).removeCallbacks(timeout)
         if (running) locationClient.removeLocationUpdates(callback)

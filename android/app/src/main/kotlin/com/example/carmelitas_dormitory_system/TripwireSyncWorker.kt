@@ -38,6 +38,10 @@ class TripwireSyncWorker(context: Context, params: WorkerParameters) : Worker(co
                 return Result.retry()
             }
             if (response.first !in 200..299) {
+                if (response.second.contains("MODULE_AGREEMENT_REQUIRED")) {
+                    manager.unregister()
+                    return Result.success()
+                }
                 prefs.edit().putString("last_sync_error", "Gate event sync failed (${response.first}): ${response.second.take(500)}").apply()
                 return if (response.first in listOf(401, 408, 429) || response.first >= 500) Result.retry() else Result.failure()
             }

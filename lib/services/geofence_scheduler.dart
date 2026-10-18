@@ -6,6 +6,9 @@ import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../controllers/tenant_controller.dart';
+import '../core/config/supabase_config.dart';
+import 'confidentiality_agreement_service.dart';
+import 'table_refresh_subscription.dart';
 import '../services/gate_service.dart';
 import 'geofence_service.dart';
 import 'push_notification_service.dart';
@@ -36,6 +39,11 @@ class GeofenceScheduler with WidgetsBindingObserver {
 
   String? _tenantId;
   bool _running = false;
+  String? _requestedTenantId;
+  int _generation = 0;
+  TableRefreshSubscription? _agreements;
+  static const _agreement =
+      ConfidentialityAgreementService(module: AgreementModule.geofencing);
 
   // Foreground stream state
   StreamSubscription<Position>? _positionSub;
@@ -44,10 +52,29 @@ class GeofenceScheduler with WidgetsBindingObserver {
 
   bool get isRunning => _running;
 
-  Future<void> start(String tenantId) async {
-    if (_running && _tenantId == tenantId) return;
+  Future<void> start(String tenantId, {bool refreshNative = false}) async {
+    final generation = ++_generation;
+    if (_requestedTenantId == null) WidgetsBinding.instance.addObserver(this);
+    _requestedTenantId = tenantId;
+    _agreements ??= TableRefreshSubscription('geofence-agreement', const [
+      'confidentiality_agreement_versions',
+      'confidentiality_agreement_acceptances'
+    ], () {
+      final requested = _requestedTenantId;
+      if (requested != null) unawaited(start(requested));
+    });
+    final allowed = await _agreement.hasAcceptedCurrent();
+    if (generation != _generation) return;
+    if (!allowed ||
+        SupabaseConfig.clientSafe?.auth.currentUser?.id != tenantId) {
+      _running = false;
+      _tenantId = null;
+      _stopPositionStream();
+      await TripwireGeofenceService.instance.stop();
+      return;
+    }
+    if (_running && _tenantId == tenantId && !refreshNative) return;
     if (_running) {
-      WidgetsBinding.instance.removeObserver(this);
       _running = false;
       _tenantId = null;
       await TripwireGeofenceService.instance.stop();
@@ -55,32 +82,42 @@ class GeofenceScheduler with WidgetsBindingObserver {
     }
     _running = true;
     _tenantId = tenantId;
-    WidgetsBinding.instance.addObserver(this);
     await TripwireGeofenceService.instance.start(tenantId);
+    final stillAllowed = await _agreement.hasAcceptedCurrent();
+    if (generation != _generation || !_running) return;
+    if (!stillAllowed) {
+      _running = false;
+      _tenantId = null;
+      await TripwireGeofenceService.instance.stop();
+      return;
+    }
     _startPositionStream();
   }
 
   void stop() {
+    _generation++;
     unawaited(TripwireGeofenceService.instance.stop());
     _stopPositionStream();
     _tenantId = null;
-    if (_running) WidgetsBinding.instance.removeObserver(this);
+    if (_requestedTenantId != null)
+      WidgetsBinding.instance.removeObserver(this);
+    _requestedTenantId = null;
+    _agreements?.dispose();
+    _agreements = null;
     _running = false;
     _lastKnownDirection = null;
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_running) return;
-    final tenantId = _tenantId;
+    final tenantId = _requestedTenantId;
     if (tenantId == null) return;
 
     if (state == AppLifecycleState.resumed) {
       // Re-register native monitoring and sync any events captured while
       // the app was suspended.
-      unawaited(TripwireGeofenceService.instance.start(tenantId));
-      // Re-attach the foreground stream now that we are back in the foreground.
-      _startPositionStream();
+      _stopPositionStream();
+      unawaited(start(tenantId, refreshNative: true));
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       // Stop the foreground stream — the native tripwire takes over.

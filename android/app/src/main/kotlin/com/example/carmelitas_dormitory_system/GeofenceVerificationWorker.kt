@@ -32,6 +32,10 @@ class GeofenceVerificationWorker(context: Context, params: WorkerParameters) : W
     override fun doWork(): Result {
         val prefs = applicationContext.getSharedPreferences(TripwireGeofenceManager.PREFS, Context.MODE_PRIVATE)
         if (!prefs.getBoolean("registered", false) || inputData.getString("tenant_id") != prefs.getString("tenant_id", null)) return Result.success()
+        if (!TripwireApi(applicationContext).hasCurrentGeofencingAgreement()) {
+            TripwireGeofenceManager(applicationContext).unregister()
+            return Result.success()
+        }
         if (ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.ACCESS_FINE_LOCATION) !=
             PackageManager.PERMISSION_GRANTED || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.ACCESS_BACKGROUND_LOCATION) !=

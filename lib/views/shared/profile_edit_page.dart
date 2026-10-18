@@ -1,4 +1,5 @@
 import 'confidentiality_agreements_page.dart';
+import '../../services/confidentiality_agreement_service.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/session_controller.dart';
@@ -209,6 +210,18 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                         const ConfidentialityAgreementsPage())),
                             icon: const Icon(Icons.privacy_tip_outlined),
                             label: const Text('Confidentiality agreements')),
+                        OutlinedButton.icon(
+                            onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        const ConfidentialityAgreementsPage(
+                                            service:
+                                                ConfidentialityAgreementService(
+                                                    module: AgreementModule
+                                                        .geofencing)))),
+                            icon: const Icon(Icons.location_on_outlined),
+                            label: const Text('Geofencing agreements')),
                         const SizedBox(height: 16),
                       ],
                       const SectionTitle('Editable information'),
